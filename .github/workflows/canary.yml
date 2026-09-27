@@ -40,5 +40,5 @@ jobs:
           git commit --quiet -m "Refresh UKCP's filter options" -m "UKCP's live option lists no longer match shared/options.json; the canary run's log lists what was added and removed." -- shared/options.json
           git push --force origin options-refresh
           if [ "$(gh pr view options-refresh --json state --jq .state 2>/dev/null)" != "OPEN" ]; then
-            gh pr create --head options-refresh --title "Refresh UKCP's filter options" --body "UKCP's live filter options differ from \`shared/options.json\`. The [canary run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) lists what was added and removed. Merge, then deploy with \`npm run deploy\`, to bring the live filter panel and the Worker's validation back in step with UKCP."
+            gh pr create --head options-refresh --title "Refresh UKCP's filter options" --body "UKCP's live filter options differ from \`shared/options.json\`. The [canary run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) lists what was added and removed. Merging deploys them, bringing the live filter panel and the Worker's validation back in step with UKCP."
           fi

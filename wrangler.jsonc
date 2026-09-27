@@ -6,6 +6,6 @@
   "assets": { "not_found_handling": "single-page-application", "run_worker_first": ["/api/*"] },
   "cache": { "enabled": true },
   "ratelimits": [{ "name": "UPSTREAM_LIMIT", "namespace_id": "1001", "simple": { "limit": 20, "period": 60 } }],
-  "vars": { "SITE_URL": "http://localhost:5173" },
+  "vars": { "SITE_URL": "https://therapy-search.therapy-search.workers.dev" },
   "observability": { "enabled": false }
 }
