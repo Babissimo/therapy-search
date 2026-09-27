@@ -1,0 +1,1407 @@
+{
+  "helpWith": [
+    "Abuse",
+    "Addiction",
+    "ADHD",
+    "Adolescent Counsellor",
+    "Adolescent Psychotherapeutic Counsellor",
+    "Adolescent Psychotherapist",
+    "Adoption",
+    "Adult Psychotherapist",
+    "Age-related Issues",
+    "AIDS/HIV",
+    "Analytical Psychologist",
+    "Analytical Psychologist - Jungian Analyst",
+    "Analytical Psychotherapist",
+    "Analytical Psychotherapist (Jungian)",
+    "Anger Management",
+    "Anorexia",
+    "Anxiety",
+    "Attachment-based Psychoanalytic Psychotherapist",
+    "Autism",
+    "Autogenic Psychotherapist",
+    "Bereavement",
+    "Biodynamic Psychotherapist",
+    "Body Psychotherapist",
+    "Bulimia",
+    "Bullying",
+    "Cancer",
+    "Child and Adolescent Psychotherapeutic Counsellor",
+    "Child and Adolescent Psychotherapist",
+    "Child Counsellor",
+    "Child Psychotherapeutic Counsellor",
+    "Child Psychotherapist",
+    "Chronic Illness",
+    "Cognitive Analytic Therapist",
+    "Cognitive and Behavioural Psychotherapist",
+    "Constructivist Psychotherapist",
+    "Contemporary Psychoanalyst",
+    "Contemporary Psychotherapist",
+    "Core Process Psychotherapist",
+    "Couple Issues",
+    "Couples Psychotherapeutic Counsellor",
+    "Cultural Issues",
+    "Dance Movement Psychotherapist",
+    "Depression",
+    "Disability",
+    "Divorce",
+    "Domestic Violence",
+    "Dynamic Interpersonal Psychotherapeutic Counsellor",
+    "Eating Disorders",
+    "Educational Psychotherapist",
+    "EMDR",
+    "Employment Difficulties",
+    "Existential Psychotherapist",
+    "Existential-Analytic Psychotherapeutic Counsellor",
+    "Existential-Analytic Psychotherapist",
+    "Family",
+    "Family and Systemic Psychotherapist",
+    "Family Therapist",
+    "Gender",
+    "Gestalt Group Psychotherapist",
+    "Gestalt Psychotherapeutic Counsellor",
+    "Gestalt Psychotherapist",
+    "Group Analyst",
+    "Group Analytic Psychotherapist",
+    "Health-related Issues",
+    "Humanistic and Integrative Psychotherapist",
+    "Humanistic Psychotherapeutic Counsellor",
+    "Humanistic Psychotherapist",
+    "Hypno -Psychotherapist",
+    "Identity Problems",
+    "Infertility",
+    "Integrative Arts Psychotherapist",
+    "Integrative Child Psychotherapist",
+    "Integrative Psychosynthesis Psychotherapist",
+    "Integrative Psychotherapeutic Counsellor",
+    "Integrative Psychotherapist",
+    "Integrative Transpersonal Psychotherapeutic Counsellor",
+    "Integrative Transpersonal Psychotherapist",
+    "Intercultural Psychoanalytical Psychotherapist",
+    "Intersubjective Psychotherapist",
+    "Jungian Analytical Psychotherapist",
+    "Lacanian Analyst",
+    "Medical Psychotherapist",
+    "Mental Health Issues",
+    "Mindfulness Based Psychotherapist",
+    "Neuro-linguistic Psychotherapist",
+    "Obsessions",
+    "Obsessive Compulsive Disorder",
+    "Online Counselling",
+    "Outcome Oriented Psychotherapist",
+    "Parent Infant Psychoanalytic Psychotherapist",
+    "Parents",
+    "Person Centred Psychotherapist",
+    "Person-Centred Experiential Psychotherapeutic Counsellor",
+    "Personal Construct Psychotherapist",
+    "Phobias",
+    "Physical Abuse",
+    "Post-Traumatic Stress",
+    "Prescribed Drug Dependence",
+    "Private Practice Issues",
+    "Process Oriented Psychotherapist",
+    "Psychoanalyst",
+    "Psychoanalytic Psychotherapist",
+    "Psychodrama Psychotherapist",
+    "Psychodynamic Psychotherapist",
+    "Psychosexual Psychotherapist",
+    "Psychosynthesis Psychotherapeutic Counsellor",
+    "Psychosynthesis Psychotherapist",
+    "Psychotherapeutic Counsellor",
+    "Race Issues",
+    "Relationships",
+    "Separation",
+    "Sex Offenders",
+    "Sex Problems",
+    "Sexual Abuse",
+    "Sexual and Relationship Psychotherapist",
+    "Sexuality",
+    "Spirituality",
+    "Step Families",
+    "Stress",
+    "Suicide",
+    "Supervision",
+    "Systemic Family and Couple Psychotherapist",
+    "Systemic Psychotherapist",
+    "Telephone Counselling",
+    "Terminal Illness",
+    "Those at Risk of Sexual Offending",
+    "Those at Risk of Sexually Offending",
+    "Training",
+    "Transactional Analysis Psychotherapist",
+    "Transgender",
+    "Transpersonal Psychotherapist",
+    "Trauma",
+    "UTC Psychotherapist",
+    "Workplace Counselling"
+  ],
+  "groups": [
+    {
+      "label": "Type of Session",
+      "help": "How would you like to meet your therapist? If you're unsure or can be flexible, leave this section blank.",
+      "fields": [
+        {
+          "name": "TypesOfSession",
+          "value": "Face to Face - Long Term",
+          "label": "Face to Face - Long Term"
+        },
+        {
+          "name": "TypesOfSession",
+          "value": "Face to Face - Short Term",
+          "label": "Face to Face - Short Term"
+        },
+        {
+          "name": "TypesOfSession",
+          "value": "Home Visits",
+          "label": "Home Visits"
+        },
+        {
+          "name": "TypesOfSession",
+          "value": "Online Therapy",
+          "label": "Online Therapy"
+        },
+        {
+          "name": "TypesOfSession",
+          "value": "Telephone Therapy",
+          "label": "Telephone Therapy"
+        }
+      ]
+    },
+    {
+      "label": "I Want Help With",
+      "help": "To help refine your search, you can choose to view therapists who specialise in particular issues. If you're unsure, you can leave this section blank.",
+      "fields": [
+        {
+          "name": "HelpWithAdvanced",
+          "value": "Abuse",
+          "label": "Abuse"
+        },
+        {
+          "name": "HelpWithAdvanced",
+          "value": "Addiction",
+          "label": "Addiction"
+        },
+        {
+          "name": "HelpWithAdvanced",
+          "value": "ADHD",
+          "label": "ADHD"
+        },
+        {
+          "name": "HelpWithAdvanced",
+          "value": "Adoption",
+          "label": "Adoption"
+        },
+        {
+          "name": "HelpWithAdvanced",
+          "value": "Age-related Issues",
+          "label": "Age-related Issues"
+        },
+        {
+          "name": "HelpWithAdvanced",
+          "value": "AIDS/HIV",
+          "label": "AIDS/HIV"
+        },
+        {
+          "name": "HelpWithAdvanced",
+          "value": "Anger Management",
+          "label": "Anger Management"
+        },
+        {
+          "name": "HelpWithAdvanced",
+          "value": "Anorexia",
+          "label": "Anorexia"
+        },
+        {
+          "name": "HelpWithAdvanced",
+          "value": "Anxiety",
+          "label": "Anxiety"
+        },
+        {
+          "name": "HelpWithAdvanced",
+          "value": "Autism",
+          "label": "Autism"
+        },
+        {
+          "name": "HelpWithAdvanced",
+          "value": "Bereavement",
+          "label": "Bereavement"
+        },
+        {
+          "name": "HelpWithAdvanced",
+          "value": "Bulimia",
+          "label": "Bulimia"
+        },
+        {
+          "name": "HelpWithAdvanced",
+          "value": "Bullying",
+          "label": "Bullying"
+        },
+        {
+          "name": "HelpWithAdvanced",
+          "value": "Cancer",
+          "label": "Cancer"
+        },
+        {
+          "name": "HelpWithAdvanced",
+          "value": "Chronic Illness",
+          "label": "Chronic Illness"
+        },
+        {
+          "name": "HelpWithAdvanced",
+          "value": "Couple Issues",
+          "label": "Couple Issues"
+        },
+        {
+          "name": "HelpWithAdvanced",
+          "value": "Cultural Issues",
+          "label": "Cultural Issues"
+        },
+        {
+          "name": "HelpWithAdvanced",
+          "value": "Depression",
+          "label": "Depression"
+        },
+        {
+          "name": "HelpWithAdvanced",
+          "value": "Disability",
+          "label": "Disability"
+        },
+        {
+          "name": "HelpWithAdvanced",
+          "value": "Divorce",
+          "label": "Divorce"
+        },
+        {
+          "name": "HelpWithAdvanced",
+          "value": "Domestic Violence",
+          "label": "Domestic Violence"
+        },
+        {
+          "name": "HelpWithAdvanced",
+          "value": "Eating Disorders",
+          "label": "Eating Disorders"
+        },
+        {
+          "name": "HelpWithAdvanced",
+          "value": "EMDR",
+          "label": "EMDR"
+        },
+        {
+          "name": "HelpWithAdvanced",
+          "value": "Employment Difficulties",
+          "label": "Employment Difficulties"
+        },
+        {
+          "name": "HelpWithAdvanced",
+          "value": "Family",
+          "label": "Family"
+        },
+        {
+          "name": "HelpWithAdvanced",
+          "value": "Gender",
+          "label": "Gender"
+        },
+        {
+          "name": "HelpWithAdvanced",
+          "value": "Health-related Issues",
+          "label": "Health-related Issues"
+        },
+        {
+          "name": "HelpWithAdvanced",
+          "value": "Identity Problems",
+          "label": "Identity Problems"
+        },
+        {
+          "name": "HelpWithAdvanced",
+          "value": "Infertility",
+          "label": "Infertility"
+        },
+        {
+          "name": "HelpWithAdvanced",
+          "value": "Mental Health Issues",
+          "label": "Mental Health Issues"
+        },
+        {
+          "name": "HelpWithAdvanced",
+          "value": "Obsessions",
+          "label": "Obsessions"
+        },
+        {
+          "name": "HelpWithAdvanced",
+          "value": "Obsessive Compulsive Disorder",
+          "label": "Obsessive Compulsive Disorder"
+        },
+        {
+          "name": "HelpWithAdvanced",
+          "value": "Online Counselling",
+          "label": "Online Counselling"
+        },
+        {
+          "name": "HelpWithAdvanced",
+          "value": "Parents",
+          "label": "Parents"
+        },
+        {
+          "name": "HelpWithAdvanced",
+          "value": "Phobias",
+          "label": "Phobias"
+        },
+        {
+          "name": "HelpWithAdvanced",
+          "value": "Physical Abuse",
+          "label": "Physical Abuse"
+        },
+        {
+          "name": "HelpWithAdvanced",
+          "value": "Post-Traumatic Stress",
+          "label": "Post-Traumatic Stress"
+        },
+        {
+          "name": "HelpWithAdvanced",
+          "value": "Prescribed Drug Dependence",
+          "label": "Prescribed Drug Dependence"
+        },
+        {
+          "name": "HelpWithAdvanced",
+          "value": "Private Practice Issues",
+          "label": "Private Practice Issues"
+        },
+        {
+          "name": "HelpWithAdvanced",
+          "value": "Race Issues",
+          "label": "Race Issues"
+        },
+        {
+          "name": "HelpWithAdvanced",
+          "value": "Relationships",
+          "label": "Relationships"
+        },
+        {
+          "name": "HelpWithAdvanced",
+          "value": "Separation",
+          "label": "Separation"
+        },
+        {
+          "name": "HelpWithAdvanced",
+          "value": "Sex Offenders",
+          "label": "Sex Offenders"
+        },
+        {
+          "name": "HelpWithAdvanced",
+          "value": "Sex Problems",
+          "label": "Sex Problems"
+        },
+        {
+          "name": "HelpWithAdvanced",
+          "value": "Sexual Abuse",
+          "label": "Sexual Abuse"
+        },
+        {
+          "name": "HelpWithAdvanced",
+          "value": "Sexuality",
+          "label": "Sexuality"
+        },
+        {
+          "name": "HelpWithAdvanced",
+          "value": "Spirituality",
+          "label": "Spirituality"
+        },
+        {
+          "name": "HelpWithAdvanced",
+          "value": "Step Families",
+          "label": "Step Families"
+        },
+        {
+          "name": "HelpWithAdvanced",
+          "value": "Stress",
+          "label": "Stress"
+        },
+        {
+          "name": "HelpWithAdvanced",
+          "value": "Suicide",
+          "label": "Suicide"
+        },
+        {
+          "name": "HelpWithAdvanced",
+          "value": "Supervision",
+          "label": "Supervision"
+        },
+        {
+          "name": "HelpWithAdvanced",
+          "value": "Telephone Counselling",
+          "label": "Telephone Counselling"
+        },
+        {
+          "name": "HelpWithAdvanced",
+          "value": "Terminal Illness",
+          "label": "Terminal Illness"
+        },
+        {
+          "name": "HelpWithAdvanced",
+          "value": "Those at Risk of Sexual Offending",
+          "label": "Those at Risk of Sexual Offending"
+        },
+        {
+          "name": "HelpWithAdvanced",
+          "value": "Those at Risk of Sexually Offending",
+          "label": "Those at Risk of Sexually Offending"
+        },
+        {
+          "name": "HelpWithAdvanced",
+          "value": "Training",
+          "label": "Training"
+        },
+        {
+          "name": "HelpWithAdvanced",
+          "value": "Transgender",
+          "label": "Transgender"
+        },
+        {
+          "name": "HelpWithAdvanced",
+          "value": "Trauma",
+          "label": "Trauma"
+        },
+        {
+          "name": "HelpWithAdvanced",
+          "value": "Workplace Counselling",
+          "label": "Workplace Counselling"
+        }
+      ]
+    },
+    {
+      "label": "Works With",
+      "help": "If you're looking for a therapist to work with a child or young person, use this filter to show only therapists qualified to work with children. You can also choose to view therapists who can work with you and your partner, with a family, or other group.",
+      "fields": [
+        {
+          "name": "WorksWith",
+          "value": "Children and young people",
+          "label": "Children and young people"
+        },
+        {
+          "name": "WorksWith",
+          "value": "Companies",
+          "label": "Companies"
+        },
+        {
+          "name": "WorksWith",
+          "value": "Couples",
+          "label": "Couples"
+        },
+        {
+          "name": "WorksWith",
+          "value": "Families",
+          "label": "Families"
+        },
+        {
+          "name": "WorksWith",
+          "value": "Groups",
+          "label": "Groups"
+        },
+        {
+          "name": "WorksWith",
+          "value": "Individuals",
+          "label": "Individuals"
+        },
+        {
+          "name": "WorksWith",
+          "value": "Private healthcare referrals",
+          "label": "Private healthcare referrals"
+        }
+      ]
+    },
+    {
+      "label": "Type of Therapy",
+      "help": "All UKCP therapists are well equipped to support you with a wide range of issues, so you don't need to choose a particular type of therapy unless you have something specific in mind.",
+      "fields": [
+        {
+          "name": "TypesOfTherapy",
+          "value": "Adolescent Counsellor",
+          "label": "Adolescent Counsellor"
+        },
+        {
+          "name": "TypesOfTherapy",
+          "value": "Adolescent Psychotherapeutic Counsellor",
+          "label": "Adolescent Psychotherapeutic Counsellor"
+        },
+        {
+          "name": "TypesOfTherapy",
+          "value": "Adolescent Psychotherapist",
+          "label": "Adolescent Psychotherapist"
+        },
+        {
+          "name": "TypesOfTherapy",
+          "value": "Adult Psychotherapist",
+          "label": "Adult Psychotherapist"
+        },
+        {
+          "name": "TypesOfTherapy",
+          "value": "Analytical Psychologist",
+          "label": "Analytical Psychologist"
+        },
+        {
+          "name": "TypesOfTherapy",
+          "value": "Analytical Psychologist - Jungian Analyst",
+          "label": "Analytical Psychologist - Jungian Analyst"
+        },
+        {
+          "name": "TypesOfTherapy",
+          "value": "Analytical Psychotherapist",
+          "label": "Analytical Psychotherapist"
+        },
+        {
+          "name": "TypesOfTherapy",
+          "value": "Analytical Psychotherapist (Jungian)",
+          "label": "Analytical Psychotherapist (Jungian)"
+        },
+        {
+          "name": "TypesOfTherapy",
+          "value": "Attachment-based Psychoanalytic Psychotherapist",
+          "label": "Attachment-based Psychoanalytic Psychotherapist"
+        },
+        {
+          "name": "TypesOfTherapy",
+          "value": "Autogenic Psychotherapist",
+          "label": "Autogenic Psychotherapist"
+        },
+        {
+          "name": "TypesOfTherapy",
+          "value": "Biodynamic Psychotherapist",
+          "label": "Biodynamic Psychotherapist"
+        },
+        {
+          "name": "TypesOfTherapy",
+          "value": "Body Psychotherapist",
+          "label": "Body Psychotherapist"
+        },
+        {
+          "name": "TypesOfTherapy",
+          "value": "Child and Adolescent Psychotherapeutic Counsellor",
+          "label": "Child and Adolescent Psychotherapeutic Counsellor"
+        },
+        {
+          "name": "TypesOfTherapy",
+          "value": "Child and Adolescent Psychotherapist",
+          "label": "Child and Adolescent Psychotherapist"
+        },
+        {
+          "name": "TypesOfTherapy",
+          "value": "Child Counsellor",
+          "label": "Child Counsellor"
+        },
+        {
+          "name": "TypesOfTherapy",
+          "value": "Child Psychotherapeutic Counsellor",
+          "label": "Child Psychotherapeutic Counsellor"
+        },
+        {
+          "name": "TypesOfTherapy",
+          "value": "Child Psychotherapist",
+          "label": "Child Psychotherapist"
+        },
+        {
+          "name": "TypesOfTherapy",
+          "value": "Cognitive Analytic Therapist",
+          "label": "Cognitive Analytic Therapist"
+        },
+        {
+          "name": "TypesOfTherapy",
+          "value": "Cognitive and Behavioural Psychotherapist",
+          "label": "Cognitive and Behavioural Psychotherapist"
+        },
+        {
+          "name": "TypesOfTherapy",
+          "value": "Constructivist Psychotherapist",
+          "label": "Constructivist Psychotherapist"
+        },
+        {
+          "name": "TypesOfTherapy",
+          "value": "Contemporary Psychoanalyst",
+          "label": "Contemporary Psychoanalyst"
+        },
+        {
+          "name": "TypesOfTherapy",
+          "value": "Contemporary Psychotherapist",
+          "label": "Contemporary Psychotherapist"
+        },
+        {
+          "name": "TypesOfTherapy",
+          "value": "Core Process Psychotherapist",
+          "label": "Core Process Psychotherapist"
+        },
+        {
+          "name": "TypesOfTherapy",
+          "value": "Couples Psychotherapeutic Counsellor",
+          "label": "Couples Psychotherapeutic Counsellor"
+        },
+        {
+          "name": "TypesOfTherapy",
+          "value": "Dance Movement Psychotherapist",
+          "label": "Dance Movement Psychotherapist"
+        },
+        {
+          "name": "TypesOfTherapy",
+          "value": "Dynamic Interpersonal Psychotherapeutic Counsellor",
+          "label": "Dynamic Interpersonal Psychotherapeutic Counsellor"
+        },
+        {
+          "name": "TypesOfTherapy",
+          "value": "Educational Psychotherapist",
+          "label": "Educational Psychotherapist"
+        },
+        {
+          "name": "TypesOfTherapy",
+          "value": "Existential Psychotherapist",
+          "label": "Existential Psychotherapist"
+        },
+        {
+          "name": "TypesOfTherapy",
+          "value": "Existential-Analytic Psychotherapeutic Counsellor",
+          "label": "Existential-Analytic Psychotherapeutic Counsellor"
+        },
+        {
+          "name": "TypesOfTherapy",
+          "value": "Existential-Analytic Psychotherapist",
+          "label": "Existential-Analytic Psychotherapist"
+        },
+        {
+          "name": "TypesOfTherapy",
+          "value": "Family and Systemic Psychotherapist",
+          "label": "Family and Systemic Psychotherapist"
+        },
+        {
+          "name": "TypesOfTherapy",
+          "value": "Family Therapist",
+          "label": "Family Therapist"
+        },
+        {
+          "name": "TypesOfTherapy",
+          "value": "Gestalt Group Psychotherapist",
+          "label": "Gestalt Group Psychotherapist"
+        },
+        {
+          "name": "TypesOfTherapy",
+          "value": "Gestalt Psychotherapeutic Counsellor",
+          "label": "Gestalt Psychotherapeutic Counsellor"
+        },
+        {
+          "name": "TypesOfTherapy",
+          "value": "Gestalt Psychotherapist",
+          "label": "Gestalt Psychotherapist"
+        },
+        {
+          "name": "TypesOfTherapy",
+          "value": "Group Analyst",
+          "label": "Group Analyst"
+        },
+        {
+          "name": "TypesOfTherapy",
+          "value": "Group Analytic Psychotherapist",
+          "label": "Group Analytic Psychotherapist"
+        },
+        {
+          "name": "TypesOfTherapy",
+          "value": "Humanistic and Integrative Psychotherapist",
+          "label": "Humanistic and Integrative Psychotherapist"
+        },
+        {
+          "name": "TypesOfTherapy",
+          "value": "Humanistic Psychotherapeutic Counsellor",
+          "label": "Humanistic Psychotherapeutic Counsellor"
+        },
+        {
+          "name": "TypesOfTherapy",
+          "value": "Humanistic Psychotherapist",
+          "label": "Humanistic Psychotherapist"
+        },
+        {
+          "name": "TypesOfTherapy",
+          "value": "Hypno -Psychotherapist",
+          "label": "Hypno -Psychotherapist"
+        },
+        {
+          "name": "TypesOfTherapy",
+          "value": "Integrative Arts Psychotherapist",
+          "label": "Integrative Arts Psychotherapist"
+        },
+        {
+          "name": "TypesOfTherapy",
+          "value": "Integrative Child Psychotherapist",
+          "label": "Integrative Child Psychotherapist"
+        },
+        {
+          "name": "TypesOfTherapy",
+          "value": "Integrative Psychosynthesis Psychotherapist",
+          "label": "Integrative Psychosynthesis Psychotherapist"
+        },
+        {
+          "name": "TypesOfTherapy",
+          "value": "Integrative Psychotherapeutic Counsellor",
+          "label": "Integrative Psychotherapeutic Counsellor"
+        },
+        {
+          "name": "TypesOfTherapy",
+          "value": "Integrative Psychotherapist",
+          "label": "Integrative Psychotherapist"
+        },
+        {
+          "name": "TypesOfTherapy",
+          "value": "Integrative Transpersonal Psychotherapeutic Counsellor",
+          "label": "Integrative Transpersonal Psychotherapeutic Counsellor"
+        },
+        {
+          "name": "TypesOfTherapy",
+          "value": "Integrative Transpersonal Psychotherapist",
+          "label": "Integrative Transpersonal Psychotherapist"
+        },
+        {
+          "name": "TypesOfTherapy",
+          "value": "Intercultural Psychoanalytical Psychotherapist",
+          "label": "Intercultural Psychoanalytical Psychotherapist"
+        },
+        {
+          "name": "TypesOfTherapy",
+          "value": "Intersubjective Psychotherapist",
+          "label": "Intersubjective Psychotherapist"
+        },
+        {
+          "name": "TypesOfTherapy",
+          "value": "Jungian Analytical Psychotherapist",
+          "label": "Jungian Analytical Psychotherapist"
+        },
+        {
+          "name": "TypesOfTherapy",
+          "value": "Lacanian Analyst",
+          "label": "Lacanian Analyst"
+        },
+        {
+          "name": "TypesOfTherapy",
+          "value": "Medical Psychotherapist",
+          "label": "Medical Psychotherapist"
+        },
+        {
+          "name": "TypesOfTherapy",
+          "value": "Mindfulness Based Psychotherapist",
+          "label": "Mindfulness Based Psychotherapist"
+        },
+        {
+          "name": "TypesOfTherapy",
+          "value": "Neuro-linguistic Psychotherapist",
+          "label": "Neuro-linguistic Psychotherapist"
+        },
+        {
+          "name": "TypesOfTherapy",
+          "value": "Outcome Oriented Psychotherapist",
+          "label": "Outcome Oriented Psychotherapist"
+        },
+        {
+          "name": "TypesOfTherapy",
+          "value": "Parent Infant Psychoanalytic Psychotherapist",
+          "label": "Parent Infant Psychoanalytic Psychotherapist"
+        },
+        {
+          "name": "TypesOfTherapy",
+          "value": "Person Centred Psychotherapist",
+          "label": "Person Centred Psychotherapist"
+        },
+        {
+          "name": "TypesOfTherapy",
+          "value": "Personal Construct Psychotherapist",
+          "label": "Personal Construct Psychotherapist"
+        },
+        {
+          "name": "TypesOfTherapy",
+          "value": "Person-Centred Experiential Psychotherapeutic Counsellor",
+          "label": "Person-Centred Experiential Psychotherapeutic Counsellor"
+        },
+        {
+          "name": "TypesOfTherapy",
+          "value": "Process Oriented Psychotherapist",
+          "label": "Process Oriented Psychotherapist"
+        },
+        {
+          "name": "TypesOfTherapy",
+          "value": "Psychoanalyst",
+          "label": "Psychoanalyst"
+        },
+        {
+          "name": "TypesOfTherapy",
+          "value": "Psychoanalytic Psychotherapist",
+          "label": "Psychoanalytic Psychotherapist"
+        },
+        {
+          "name": "TypesOfTherapy",
+          "value": "Psychodrama Psychotherapist",
+          "label": "Psychodrama Psychotherapist"
+        },
+        {
+          "name": "TypesOfTherapy",
+          "value": "Psychodynamic Psychotherapist",
+          "label": "Psychodynamic Psychotherapist"
+        },
+        {
+          "name": "TypesOfTherapy",
+          "value": "Psychosexual Psychotherapist",
+          "label": "Psychosexual Psychotherapist"
+        },
+        {
+          "name": "TypesOfTherapy",
+          "value": "Psychosynthesis Psychotherapeutic Counsellor",
+          "label": "Psychosynthesis Psychotherapeutic Counsellor"
+        },
+        {
+          "name": "TypesOfTherapy",
+          "value": "Psychosynthesis Psychotherapist",
+          "label": "Psychosynthesis Psychotherapist"
+        },
+        {
+          "name": "TypesOfTherapy",
+          "value": "Psychotherapeutic Counsellor",
+          "label": "Psychotherapeutic Counsellor"
+        },
+        {
+          "name": "TypesOfTherapy",
+          "value": "Sexual and Relationship Psychotherapist",
+          "label": "Sexual and Relationship Psychotherapist"
+        },
+        {
+          "name": "TypesOfTherapy",
+          "value": "Systemic Family and Couple Psychotherapist",
+          "label": "Systemic Family and Couple Psychotherapist"
+        },
+        {
+          "name": "TypesOfTherapy",
+          "value": "Systemic Psychotherapist",
+          "label": "Systemic Psychotherapist"
+        },
+        {
+          "name": "TypesOfTherapy",
+          "value": "Transactional Analysis Psychotherapist",
+          "label": "Transactional Analysis Psychotherapist"
+        },
+        {
+          "name": "TypesOfTherapy",
+          "value": "Transpersonal Psychotherapist",
+          "label": "Transpersonal Psychotherapist"
+        },
+        {
+          "name": "TypesOfTherapy",
+          "value": "UTC Psychotherapist",
+          "label": "UTC Psychotherapist"
+        }
+      ]
+    },
+    {
+      "label": "Languages",
+      "help": "If it would be helpful to work with a therapist who speaks a particular language, choose from the list here.",
+      "fields": [
+        {
+          "name": "Languages",
+          "value": "Afrikaans",
+          "label": "Afrikaans"
+        },
+        {
+          "name": "Languages",
+          "value": "Akan",
+          "label": "Akan"
+        },
+        {
+          "name": "Languages",
+          "value": "Albanian",
+          "label": "Albanian"
+        },
+        {
+          "name": "Languages",
+          "value": "Amharic",
+          "label": "Amharic"
+        },
+        {
+          "name": "Languages",
+          "value": "Arabic",
+          "label": "Arabic"
+        },
+        {
+          "name": "Languages",
+          "value": "Aramaic",
+          "label": "Aramaic"
+        },
+        {
+          "name": "Languages",
+          "value": "Armenian",
+          "label": "Armenian"
+        },
+        {
+          "name": "Languages",
+          "value": "Bahasa Indonesia",
+          "label": "Bahasa Indonesia"
+        },
+        {
+          "name": "Languages",
+          "value": "Basque",
+          "label": "Basque"
+        },
+        {
+          "name": "Languages",
+          "value": "Bengali",
+          "label": "Bengali"
+        },
+        {
+          "name": "Languages",
+          "value": "Bosnian",
+          "label": "Bosnian"
+        },
+        {
+          "name": "Languages",
+          "value": "British Sign Language",
+          "label": "British Sign Language"
+        },
+        {
+          "name": "Languages",
+          "value": "Bulgarian",
+          "label": "Bulgarian"
+        },
+        {
+          "name": "Languages",
+          "value": "Burmese",
+          "label": "Burmese"
+        },
+        {
+          "name": "Languages",
+          "value": "Catalan",
+          "label": "Catalan"
+        },
+        {
+          "name": "Languages",
+          "value": "Chinese",
+          "label": "Chinese"
+        },
+        {
+          "name": "Languages",
+          "value": "Creole",
+          "label": "Creole"
+        },
+        {
+          "name": "Languages",
+          "value": "Croatian",
+          "label": "Croatian"
+        },
+        {
+          "name": "Languages",
+          "value": "Czech",
+          "label": "Czech"
+        },
+        {
+          "name": "Languages",
+          "value": "Danish",
+          "label": "Danish"
+        },
+        {
+          "name": "Languages",
+          "value": "Dutch",
+          "label": "Dutch"
+        },
+        {
+          "name": "Languages",
+          "value": "English",
+          "label": "English"
+        },
+        {
+          "name": "Languages",
+          "value": "Estonian",
+          "label": "Estonian"
+        },
+        {
+          "name": "Languages",
+          "value": "Farsi",
+          "label": "Farsi"
+        },
+        {
+          "name": "Languages",
+          "value": "Finnish",
+          "label": "Finnish"
+        },
+        {
+          "name": "Languages",
+          "value": "French",
+          "label": "French"
+        },
+        {
+          "name": "Languages",
+          "value": "Gaelic",
+          "label": "Gaelic"
+        },
+        {
+          "name": "Languages",
+          "value": "Georgian",
+          "label": "Georgian"
+        },
+        {
+          "name": "Languages",
+          "value": "German",
+          "label": "German"
+        },
+        {
+          "name": "Languages",
+          "value": "Ghanaian",
+          "label": "Ghanaian"
+        },
+        {
+          "name": "Languages",
+          "value": "Greek",
+          "label": "Greek"
+        },
+        {
+          "name": "Languages",
+          "value": "Gujarati",
+          "label": "Gujarati"
+        },
+        {
+          "name": "Languages",
+          "value": "Hebrew",
+          "label": "Hebrew"
+        },
+        {
+          "name": "Languages",
+          "value": "Hindi",
+          "label": "Hindi"
+        },
+        {
+          "name": "Languages",
+          "value": "Hindustani",
+          "label": "Hindustani"
+        },
+        {
+          "name": "Languages",
+          "value": "Hungarian",
+          "label": "Hungarian"
+        },
+        {
+          "name": "Languages",
+          "value": "Icelandic",
+          "label": "Icelandic"
+        },
+        {
+          "name": "Languages",
+          "value": "Igbo",
+          "label": "Igbo"
+        },
+        {
+          "name": "Languages",
+          "value": "Irish",
+          "label": "Irish"
+        },
+        {
+          "name": "Languages",
+          "value": "Italian",
+          "label": "Italian"
+        },
+        {
+          "name": "Languages",
+          "value": "Japanese",
+          "label": "Japanese"
+        },
+        {
+          "name": "Languages",
+          "value": "Kannada",
+          "label": "Kannada"
+        },
+        {
+          "name": "Languages",
+          "value": "Kikuyu",
+          "label": "Kikuyu"
+        },
+        {
+          "name": "Languages",
+          "value": "Korean",
+          "label": "Korean"
+        },
+        {
+          "name": "Languages",
+          "value": "Krio",
+          "label": "Krio"
+        },
+        {
+          "name": "Languages",
+          "value": "Latvian",
+          "label": "Latvian"
+        },
+        {
+          "name": "Languages",
+          "value": "Lithuanian",
+          "label": "Lithuanian"
+        },
+        {
+          "name": "Languages",
+          "value": "Macedonian",
+          "label": "Macedonian"
+        },
+        {
+          "name": "Languages",
+          "value": "Makaton",
+          "label": "Makaton"
+        },
+        {
+          "name": "Languages",
+          "value": "Malay",
+          "label": "Malay"
+        },
+        {
+          "name": "Languages",
+          "value": "Malayalam",
+          "label": "Malayalam"
+        },
+        {
+          "name": "Languages",
+          "value": "Maltese",
+          "label": "Maltese"
+        },
+        {
+          "name": "Languages",
+          "value": "Mandarin",
+          "label": "Mandarin"
+        },
+        {
+          "name": "Languages",
+          "value": "Marathi",
+          "label": "Marathi"
+        },
+        {
+          "name": "Languages",
+          "value": "Mongolian",
+          "label": "Mongolian"
+        },
+        {
+          "name": "Languages",
+          "value": "Nepali",
+          "label": "Nepali"
+        },
+        {
+          "name": "Languages",
+          "value": "Norwegian",
+          "label": "Norwegian"
+        },
+        {
+          "name": "Languages",
+          "value": "Polish",
+          "label": "Polish"
+        },
+        {
+          "name": "Languages",
+          "value": "Portuguese",
+          "label": "Portuguese"
+        },
+        {
+          "name": "Languages",
+          "value": "Punjabi",
+          "label": "Punjabi"
+        },
+        {
+          "name": "Languages",
+          "value": "Romanian",
+          "label": "Romanian"
+        },
+        {
+          "name": "Languages",
+          "value": "Russian",
+          "label": "Russian"
+        },
+        {
+          "name": "Languages",
+          "value": "Serbian",
+          "label": "Serbian"
+        },
+        {
+          "name": "Languages",
+          "value": "Serbo-Croatian",
+          "label": "Serbo-Croatian"
+        },
+        {
+          "name": "Languages",
+          "value": "Shona",
+          "label": "Shona"
+        },
+        {
+          "name": "Languages",
+          "value": "Sinhalese",
+          "label": "Sinhalese"
+        },
+        {
+          "name": "Languages",
+          "value": "Slovak",
+          "label": "Slovak"
+        },
+        {
+          "name": "Languages",
+          "value": "Slovenian",
+          "label": "Slovenian"
+        },
+        {
+          "name": "Languages",
+          "value": "Spanish",
+          "label": "Spanish"
+        },
+        {
+          "name": "Languages",
+          "value": "Swahili",
+          "label": "Swahili"
+        },
+        {
+          "name": "Languages",
+          "value": "Swedish",
+          "label": "Swedish"
+        },
+        {
+          "name": "Languages",
+          "value": "Swiss German",
+          "label": "Swiss German"
+        },
+        {
+          "name": "Languages",
+          "value": "Taiwanese",
+          "label": "Taiwanese"
+        },
+        {
+          "name": "Languages",
+          "value": "Tamil",
+          "label": "Tamil"
+        },
+        {
+          "name": "Languages",
+          "value": "Thai",
+          "label": "Thai"
+        },
+        {
+          "name": "Languages",
+          "value": "Tigrinya",
+          "label": "Tigrinya"
+        },
+        {
+          "name": "Languages",
+          "value": "Turkish",
+          "label": "Turkish"
+        },
+        {
+          "name": "Languages",
+          "value": "Ukrainian",
+          "label": "Ukrainian"
+        },
+        {
+          "name": "Languages",
+          "value": "Urdu",
+          "label": "Urdu"
+        },
+        {
+          "name": "Languages",
+          "value": "Vietnamese",
+          "label": "Vietnamese"
+        },
+        {
+          "name": "Languages",
+          "value": "Welsh",
+          "label": "Welsh"
+        },
+        {
+          "name": "Languages",
+          "value": "Xhosa",
+          "label": "Xhosa"
+        },
+        {
+          "name": "Languages",
+          "value": "Yiddish",
+          "label": "Yiddish"
+        },
+        {
+          "name": "Languages",
+          "value": "Yoruba",
+          "label": "Yoruba"
+        },
+        {
+          "name": "Languages",
+          "value": "Yue (Cantonese)",
+          "label": ""
+        },
+        {
+          "name": "Languages",
+          "value": "Zulu",
+          "label": "Zulu"
+        }
+      ]
+    },
+    {
+      "label": "Additional Filters",
+      "help": "Use these filters to narrow down your results to only therapists who have added a picture to their profile, and/or therapists who work from wheelchair-accessible premises.",
+      "fields": [
+        {
+          "name": "OnlyProfilesWithPhotos",
+          "value": "true",
+          "label": "Only show profiles with photos"
+        },
+        {
+          "name": "OnlyWheelchairAccessible",
+          "value": "true",
+          "label": "Only show wheelchair accessible"
+        }
+      ]
+    },
+    {
+      "label": "UKCP Colleges",
+      "help": "All UKCP therapists are members of a College which represents their philosophy of psychotherapy. If you are looking to work with someone who has a specific philosophy, you can filter results by College. You can find out more here:",
+      "fields": [
+        {
+          "name": "Colleges",
+          "value": "College for Child and Adolescent Psychotherapies (CCAP)",
+          "label": "College for Child and Adolescent Psychotherapies (CCAP)"
+        },
+        {
+          "name": "Colleges",
+          "value": "College for Sexual and Relationship Psychotherapy (CSRP)",
+          "label": "College for Sexual and Relationship Psychotherapy (CSRP)"
+        },
+        {
+          "name": "Colleges",
+          "value": "College of Family Couple and Systemic Psychotherapy (CFCSP)",
+          "label": "College of Family Couple and Systemic Psychotherapy (CFCSP)"
+        },
+        {
+          "name": "Colleges",
+          "value": "College of Family, Couple and Systemic Psychotherapy (CFCSP)",
+          "label": "College of Family, Couple and Systemic Psychotherapy (CFCSP)"
+        },
+        {
+          "name": "Colleges",
+          "value": "College of Medical Psychotherapists (CMP)",
+          "label": "College of Medical Psychotherapists (CMP)"
+        },
+        {
+          "name": "Colleges",
+          "value": "College of Outcome Oriented and Hypno-Psychotherapies (COOHP)",
+          "label": "College of Outcome Oriented and Hypno-Psychotherapies (COOHP)"
+        },
+        {
+          "name": "Colleges",
+          "value": "Constructivist and Existential College (CEC)",
+          "label": "Constructivist and Existential College (CEC)"
+        },
+        {
+          "name": "Colleges",
+          "value": "Council for Psychoanalysis and Jungian Analysis College (CPJAC)",
+          "label": "Council for Psychoanalysis and Jungian Analysis College (CPJAC)"
+        },
+        {
+          "name": "Colleges",
+          "value": "Humanistic and Integrative Psychotherapy College (HIPC)",
+          "label": "Humanistic and Integrative Psychotherapy College (HIPC)"
+        },
+        {
+          "name": "Colleges",
+          "value": "Psychotherapeutic Counselling and Intersubjective Psychotherapy College (PCIPC)",
+          "label": "Psychotherapeutic Counselling and Intersubjective Psychotherapy College (PCIPC)"
+        },
+        {
+          "name": "Colleges",
+          "value": "Universities Training College (UTC)",
+          "label": "Universities Training College (UTC)"
+        }
+      ]
+    }
+  ]
+}
