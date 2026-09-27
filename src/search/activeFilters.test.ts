@@ -18,7 +18,7 @@ describe("activeFilters", () => {
     expect(activeFilters(withText(emptyParams(), "Location", "Leeds"), options)).toEqual([]);
   });
 
-  it("lists top-bar terms, ticked boxes and the keyword in that order", () => {
+  it("lists HelpWith terms, ticked boxes and the keyword in that order", () => {
     let params = withField(withField(emptyParams(), photos, true), french, true);
     params = withText(withHelpWithTerms(params, ["Trauma"]), "KeywordFilter", "grief");
     expect(activeFilters(params, options).map((f) => f.label)).toEqual(["Trauma", "French", "Only show profiles with photos", "Keyword: grief"]);
@@ -32,7 +32,7 @@ describe("activeFilters", () => {
     expect(language?.without.text.HelpWith).toBe("Anxiety, Trauma");
   });
 
-  it("shares one chip between a top-bar term and the ticked box of the same name", () => {
+  it("shares one chip between a HelpWith term and the ticked box of the same name", () => {
     const anxiety = { name: "HelpWithAdvanced", value: "Anxiety", label: "Anxiety" };
     const withIssues = { ...options, groups: [...options.groups, { label: "I Want Help With", fields: [anxiety] }] };
     const params = withField(withHelpWithTerms(emptyParams(), ["Anxiety"]), anxiety, true);

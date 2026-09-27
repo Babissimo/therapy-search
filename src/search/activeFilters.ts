@@ -6,11 +6,11 @@ import { helpWithTerms, isChecked, withField, withHelpWithTerms, withText } from
 /** One filter narrowing the search, with the search as it would be without it. */
 export type ActiveFilter = { key: string; label: string; without: SearchParams };
 
-/** The top bar's terms, then the panel's ticked boxes in panel order, then the keyword. Location and distance are left out: they place the search rather than narrow it. */
+/** HelpWith terms, which only a link can carry, then the panel's ticked boxes in panel order, then the keyword. Location and distance are left out: they place the search rather than narrow it. */
 export function activeFilters(params: SearchParams, options: Options = OPTIONS): ActiveFilter[] {
   const terms = helpWithTerms(params);
   const ticked = options.groups.flatMap((g) => g.fields).filter((f) => isChecked(params, f));
-  // A top-bar term and a ticked box of the same name read as one filter, so they share a chip that removes both.
+  // A HelpWith term and a ticked box of the same name read as one filter, so they share a chip that removes both.
   const filters: ActiveFilter[] = terms.map((term) => ({
     key: `HelpWith=${term}`,
     label: term,

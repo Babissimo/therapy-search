@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { SlidersHorizontal } from "lucide-react";
 import { Link } from "react-router";
 import { OPTIONS } from "@shared/options";
@@ -8,7 +9,6 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import { FilterChips } from "./FilterChips";
 import { FilterPanel } from "./FilterPanel";
 import { Results } from "./Results";
-import { SearchBar } from "./SearchBar";
 import { tickedIn } from "./state";
 import { TickedCount } from "./TickedCount";
 import { useSearchState } from "./useSearchState";
@@ -31,21 +31,21 @@ export function SearchPage() {
   return (
     <div className="grid gap-8 md:grid-cols-[minmax(0,1fr)_20rem]">
       <div className="space-y-6">
-        <SearchBar key={`${params.text.HelpWith}|${params.text.Location}`} params={params} onChange={update} />
         <MobileFilters params={params} onChange={update} />
         <FilterChips params={params} onChange={update} />
         <Results params={params} onChange={update} />
       </div>
       <aside className="hidden md:block">
-        <FilterPanel key={panelKey(params)} params={params} onChange={update} />
+        <FilterPanel params={params} onChange={update} />
       </aside>
     </div>
   );
 }
 
 function MobileFilters({ params, onChange }: { params: SearchParams; onChange: (next: SearchParams) => void }) {
+  const [open, setOpen] = useState(false);
   return (
-    <Sheet>
+    <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
         <Button variant="outline" className="md:hidden">
           <SlidersHorizontal aria-hidden />
@@ -58,14 +58,10 @@ function MobileFilters({ params, onChange }: { params: SearchParams; onChange: (
           <SheetTitle>Refine your search</SheetTitle>
         </SheetHeader>
         <div className="px-4 pb-6">
-          <FilterPanel key={panelKey(params)} params={params} onChange={onChange} />
+          {/* Search closes the sheet to show its results; ticks leave it open for more. */}
+          <FilterPanel params={params} onChange={onChange} onSearch={() => setOpen(false)} />
         </div>
       </SheetContent>
     </Sheet>
   );
-}
-
-/** Re-keying on the values the panel drafts locally resets those drafts when the URL changes. */
-function panelKey(params: SearchParams): string {
-  return `${params.text.KeywordFilter}|${params.distance}`;
 }
