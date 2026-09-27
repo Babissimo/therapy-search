@@ -1,5 +1,5 @@
 import { FLAG_PARAMS, MULTI_PARAMS, type FlagParam, type MultiParam, type SearchParams, type TextParam } from "@shared/query";
-import type { FilterField } from "@shared/types";
+import type { FilterField, FilterGroup } from "@shared/types";
 
 // Every change returns to page 1, as UKCP's form does; only paging keeps the page.
 
@@ -35,6 +35,10 @@ export function isChecked(params: SearchParams, field: FilterField): boolean {
   if (isMulti(field.name)) return params.multi[field.name].includes(field.value);
   if (isFlag(field.name)) return params.flags[field.name];
   return false;
+}
+
+export function tickedIn(params: SearchParams, group: FilterGroup): number {
+  return group.fields.filter((field) => isChecked(params, field)).length;
 }
 
 /** HelpWith holds the typeahead's choices comma-separated, as UKCP's own field does. */

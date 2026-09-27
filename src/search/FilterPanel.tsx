@@ -10,7 +10,8 @@ import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { CheckboxGroup } from "./CheckboxGroup";
-import { isChecked, withDistance, withField, withFlag, withText } from "./state";
+import { isChecked, tickedIn, withDistance, withField, withFlag, withText } from "./state";
+import { TickedCount } from "./TickedCount";
 
 /** The long lists that carry an in-list search box on UKCP. */
 const SEARCHABLE = new Set(["TypesOfTherapy", "Languages", "Colleges"]);
@@ -22,7 +23,7 @@ export function FilterPanel({ params, onChange }: Props) {
   const outsideUkId = useId();
   const [keyword, setKeyword] = useState(params.text.KeywordFilter);
   const [distance, setDistance] = useState(params.distance);
-  const openGroups = OPTIONS.groups.filter((g) => g.fields.some((f) => isChecked(params, f))).map((g) => g.label);
+  const openGroups = OPTIONS.groups.filter((g) => tickedIn(params, g) > 0).map((g) => g.label);
 
   return (
     <div className="space-y-6">
@@ -74,7 +75,12 @@ export function FilterPanel({ params, onChange }: Props) {
         {OPTIONS.groups.map((group) => (
           <AccordionItem key={group.label} value={group.label}>
             <div className="flex items-center gap-1">
-              <AccordionTrigger className="flex-1">{group.label}</AccordionTrigger>
+              <AccordionTrigger className="flex-1">
+                <span className="flex items-center gap-2">
+                  {group.label}
+                  <TickedCount count={tickedIn(params, group)} />
+                </span>
+              </AccordionTrigger>
               {group.help && (
                 <Tooltip>
                   <TooltipTrigger asChild>
