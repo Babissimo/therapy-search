@@ -23,6 +23,7 @@ describe("parseOptions", () => {
   it("pairs each checkbox's value with its visible label", () => {
     const session = options.groups.find((g) => g.fields[0]?.name === "TypesOfSession");
     expect(session?.fields).toContainEqual({ name: "TypesOfSession", value: "Online Therapy", label: "Online Therapy" });
+    expect(options.groups.flatMap((g) => g.fields).filter((f) => f.label === "")).toEqual([]);
   });
 
   it("fails loudly on a help-with term with a comma, which HelpWith could not carry", () => {
