@@ -5,9 +5,11 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "fixtures": "tsx scripts/capture-fixtures.ts"
+    "fixtures": "tsx scripts/capture-fixtures.ts",
+    "options": "tsx scripts/extract-options.ts"
   },
   "devDependencies": {
+    "@types/jsdom": "^30.0.0",
     "@types/node": "^26.6.3",
     "jsdom": "^30.1.1",
     "node-html-parser": "^9.0.4",
