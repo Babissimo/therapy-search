@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { Check, ChevronsUpDown, Info } from "lucide-react";
-import { OPTIONS } from "@shared/options";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import { helpWithGroups } from "./helpWithGroups";
+
+const GROUPS = helpWithGroups();
 
 type Props = { id: string; terms: string[]; onChange: (terms: string[]) => void };
 
@@ -37,14 +39,16 @@ export function HelpWithPicker({ id, terms, onChange }: Props) {
           <CommandInput placeholder="Type to search" />
           <CommandList>
             <CommandEmpty>Nothing matches that.</CommandEmpty>
-            <CommandGroup>
-              {OPTIONS.helpWith.map((term) => (
-                <CommandItem key={term} value={term} onSelect={() => toggle(term)}>
-                  <Check className={cn("size-4", terms.includes(term) ? "opacity-100" : "opacity-0")} aria-hidden />
-                  {term}
-                </CommandItem>
-              ))}
-            </CommandGroup>
+            {GROUPS.map((group) => (
+              <CommandGroup key={group.heading} heading={group.heading}>
+                {group.terms.map((term) => (
+                  <CommandItem key={term} value={term} onSelect={() => toggle(term)}>
+                    <Check className={cn("size-4", terms.includes(term) ? "opacity-100" : "opacity-0")} aria-hidden />
+                    {term}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            ))}
           </CommandList>
         </Command>
         {terms.length > 0 && (
