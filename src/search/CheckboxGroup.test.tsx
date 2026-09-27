@@ -31,6 +31,14 @@ describe("CheckboxGroup", () => {
     screen.getByText(hint);
   });
 
+  it("lists boxes ticked when it opens first, and leaves later ticks where they are", () => {
+    const names = () => screen.getAllByRole("checkbox").map((c) => c.parentElement?.textContent);
+    const { rerender } = render(<CheckboxGroup group={group} searchable={false} isChecked={(f) => f.value === "Spanish"} onToggle={() => {}} />);
+    expect(names()).toEqual(["Spanish", "French", "Polish"]);
+    rerender(<CheckboxGroup group={group} searchable={false} isChecked={(f) => f.value !== "French"} onToggle={() => {}} />);
+    expect(names()).toEqual(["Spanish", "French", "Polish"]);
+  });
+
   describe("under headings", () => {
     const types = {
       label: "Type of Therapy",
@@ -49,6 +57,12 @@ describe("CheckboxGroup", () => {
       render(<CheckboxGroup group={types} searchable={false} isChecked={(f) => f.value === "Child Counsellor"} onToggle={() => {}} />);
       expect(screen.getByRole("button", { name: "Children and young people, 1 ticked" }).getAttribute("aria-expanded")).toBe("true");
       screen.getByRole("checkbox", { name: "Child Counsellor" });
+    });
+
+    it("lists ticked boxes first under their heading", () => {
+      render(<CheckboxGroup group={types} searchable={false} isChecked={(f) => f.value === "Person Centred Psychotherapist"} onToggle={() => {}} />);
+      const boxes = screen.getAllByRole("checkbox").map((c) => c.parentElement?.textContent);
+      expect(boxes).toEqual(["Person Centred Psychotherapist", "Gestalt Psychotherapist"]);
     });
 
     it("shows every match under its heading while searching", () => {
