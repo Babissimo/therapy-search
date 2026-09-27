@@ -3,6 +3,7 @@ import { BrowserRouter, Link, Route, Routes } from "react-router";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AboutPage } from "@/layout/AboutPage";
 import { SiteLayout } from "@/layout/SiteLayout";
+import { SearchPage } from "@/search/SearchPage";
 
 // Retrying would repeat requests to UKCP that already failed or were rate-limited.
 const queryClient = new QueryClient({
@@ -16,6 +17,7 @@ export function App() {
         <BrowserRouter>
           <SiteLayout>
             <Routes>
+              <Route path="/" element={<SearchPage />} />
               <Route path="/about" element={<AboutPage />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
