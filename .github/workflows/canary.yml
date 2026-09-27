@@ -1,0 +1,44 @@
+name: UKCP canary
+
+on:
+  schedule:
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+
+concurrency: canary
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  canary:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run canary
+      - name: Propose the refreshed option lists
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if git diff --quiet -- shared/options.json; then exit 0; fi
+          if git fetch --quiet origin options-refresh && git diff --quiet FETCH_HEAD -- shared/options.json; then
+            echo "The refresh branch already holds these lists."
+            exit 0
+          fi
+          # Pull requests opened with the workflow token start no CI, so the checks run here.
+          npm test
+          npm run typecheck
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch --create options-refresh
+          git commit --quiet -m "Refresh UKCP's filter options" -m "UKCP's live option lists no longer match shared/options.json; the canary run's log lists what was added and removed." -- shared/options.json
+          git push --force origin options-refresh
+          if [ "$(gh pr view options-refresh --json state --jq .state 2>/dev/null)" != "OPEN" ]; then
+            gh pr create --head options-refresh --title "Refresh UKCP's filter options" --body "UKCP's live filter options differ from \`shared/options.json\`. The [canary run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) lists what was added and removed. Merge, then deploy with \`npm run deploy\`, to bring the live filter panel and the Worker's validation back in step with UKCP."
+          fi
