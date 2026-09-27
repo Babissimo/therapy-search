@@ -1,8 +1,9 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Link, Route, Routes } from "react-router";
+import { BrowserRouter, Link, Route, Routes, useParams } from "react-router";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AboutPage } from "@/layout/AboutPage";
 import { SiteLayout } from "@/layout/SiteLayout";
+import { ProfilePage } from "@/profile/ProfilePage";
 import { SearchPage } from "@/search/SearchPage";
 
 // Retrying would repeat requests to UKCP that already failed or were rate-limited.
@@ -18,6 +19,7 @@ export function App() {
           <SiteLayout>
             <Routes>
               <Route path="/" element={<SearchPage />} />
+              <Route path="/therapist/:slug" element={<ProfileRoute />} />
               <Route path="/about" element={<AboutPage />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
@@ -26,6 +28,11 @@ export function App() {
       </TooltipProvider>
     </QueryClientProvider>
   );
+}
+
+function ProfileRoute() {
+  const { slug = "" } = useParams();
+  return <ProfilePage key={slug} slug={slug} />;
 }
 
 function NotFound() {
