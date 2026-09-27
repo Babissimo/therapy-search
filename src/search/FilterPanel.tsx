@@ -92,7 +92,8 @@ export function FilterPanel({ params, onChange }: Props) {
                 </Tooltip>
               )}
             </div>
-            <AccordionContent>
+            {/* Headings open and searches narrow inside an open group, so its height follows the content. */}
+            <AccordionContent className="h-auto">
               <CheckboxGroup
                 group={group}
                 searchable={group.fields.some((f) => SEARCHABLE.has(f.name))}
