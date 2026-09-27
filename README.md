@@ -40,6 +40,9 @@ NODE_OPTIONS="--network-family-autoselection-attempt-timeout=5000 --dns-result-o
 The filter panel's options come from `shared/options.json`, taken from UKCP's search form (spec §3.2). A daily workflow checks UKCP's pages
 still parse and, when UKCP's options have changed, opens a pull request with the new list. Merging it deploys the change.
 
+The headings inside "I Want Help With" and "Type of Therapy" are ours, kept in `shared/sections.ts`. An option UKCP adds shows under
+"Other" until it is placed there, and the daily run's log names any such option and any placed one UKCP has withdrawn.
+
 Two scripts talk to UKCP directly:
 
 - `npm run options` refreshes `shared/options.json` (one request).

@@ -31,6 +31,44 @@ describe("CheckboxGroup", () => {
     screen.getByText(hint);
   });
 
+  describe("under headings", () => {
+    const types = {
+      label: "Type of Therapy",
+      fields: ["Child Counsellor", "Gestalt Psychotherapist", "Person Centred Psychotherapist"].map((v) => ({ name: "TypesOfTherapy", value: v, label: v })),
+    };
+
+    it("keeps each heading shut until it is opened", () => {
+      render(<CheckboxGroup group={types} searchable={false} isChecked={() => false} onToggle={() => {}} />);
+      expect(screen.queryAllByRole("checkbox")).toHaveLength(0);
+      fireEvent.click(screen.getByRole("button", { name: "Humanistic and integrative" }));
+      expect(screen.getAllByRole("checkbox")).toHaveLength(2);
+      screen.getByRole("checkbox", { name: "Person Centred Psychotherapist" });
+    });
+
+    it("opens a heading that holds a tick, and counts the ticks", () => {
+      render(<CheckboxGroup group={types} searchable={false} isChecked={(f) => f.value === "Child Counsellor"} onToggle={() => {}} />);
+      expect(screen.getByRole("button", { name: "Children and young people, 1 ticked" }).getAttribute("aria-expanded")).toBe("true");
+      screen.getByRole("checkbox", { name: "Child Counsellor" });
+    });
+
+    it("shows every match under its heading while searching", () => {
+      render(<CheckboxGroup group={types} searchable isChecked={() => false} onToggle={() => {}} />);
+      fireEvent.change(screen.getByRole("searchbox", { name: "Search Type of Therapy" }), { target: { value: "psycho" } });
+      expect(screen.queryAllByRole("button")).toHaveLength(0);
+      screen.getByText("Humanistic and integrative");
+      expect(screen.getAllByRole("checkbox")).toHaveLength(2);
+    });
+
+    it("leaves a box ticked during a search in view once the search is cleared", () => {
+      render(<CheckboxGroup group={types} searchable isChecked={() => false} onToggle={() => {}} />);
+      const search = screen.getByRole("searchbox", { name: "Search Type of Therapy" });
+      fireEvent.change(search, { target: { value: "gestalt" } });
+      fireEvent.click(screen.getByRole("checkbox", { name: "Gestalt Psychotherapist" }));
+      fireEvent.change(search, { target: { value: "" } });
+      expect(screen.getByRole("button", { name: "Humanistic and integrative" }).getAttribute("aria-expanded")).toBe("true");
+    });
+  });
+
   it("leaves the hint off groups of separate yes/no flags", () => {
     const flags = { label: "Additional Filters", fields: [{ name: "OnlyProfilesWithPhotos", value: "true", label: "Only show profiles with photos" }] };
     render(<CheckboxGroup group={flags} searchable={false} isChecked={() => true} onToggle={() => {}} />);

@@ -1,6 +1,7 @@
 import "./dom";
 import { OPTIONS } from "../shared/options";
 import { emptyParams, PAGE_SIZE } from "../shared/query";
+import { sectionDrift } from "../shared/sections";
 import { parseOptions } from "../shared/ukcp/parseOptions";
 import { parseProfile } from "../shared/ukcp/parseProfile";
 import { parseResults } from "../shared/ukcp/parseResults";
@@ -20,6 +21,8 @@ if (drift.length > 0) {
   writeOptions(live);
   console.log(`UKCP's options changed:\n  ${drift.join("\n  ")}`);
 }
+const unsectioned = sectionDrift(live);
+if (unsectioned.length > 0) console.log(`The filter panel's headings in shared/sections.ts need updating:\n  ${unsectioned.join("\n  ")}`);
 await pause();
 
 const params = emptyParams();
