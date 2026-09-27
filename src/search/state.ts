@@ -41,7 +41,7 @@ export function tickedIn(params: SearchParams, group: FilterGroup): number {
   return group.fields.filter((field) => isChecked(params, field)).length;
 }
 
-/** HelpWith holds the typeahead's choices comma-separated, as UKCP's own field does. */
+/** HelpWith holds terms from UKCP's typeahead, comma-separated. */
 export function helpWithTerms(params: SearchParams): string[] {
   return params.text.HelpWith.split(",")
     .map((t) => t.trim())

@@ -16,13 +16,16 @@ import { TickedCount } from "./TickedCount";
 /** The long lists that carry an in-list search box on UKCP. */
 const SEARCHABLE = new Set(["TypesOfTherapy", "Languages", "Colleges"]);
 
-type Props = { params: SearchParams; onChange: (next: SearchParams) => void };
+type Props = { params: SearchParams; onChange: (next: SearchParams) => void; onSearch?: () => void };
 
-/** UKCP's "Refine your search" panel. The parent re-keys it when the URL changes, resetting the local drafts. */
-export function FilterPanel({ params, onChange }: Props) {
+/** Location, keyword and UKCP's "Refine your search" filters. */
+export function FilterPanel({ params, onChange, onSearch }: Props) {
   const outsideUkId = useId();
-  const [keyword, setKeyword] = useState(params.text.KeywordFilter);
-  const [distance, setDistance] = useState(params.distance);
+  const [location, setLocation] = useDraft(params.text.Location);
+  const [keyword, setKeyword] = useDraft(params.text.KeywordFilter);
+  const [distance, setDistance] = useDraft(params.distance);
+  // Every change here takes the typed location and keyword with it, so the results match what the panel shows.
+  const search = (next: SearchParams) => onChange(withText(withText(next, "Location", location), "KeywordFilter", keyword));
   const openGroups = OPTIONS.groups.filter((g) => tickedIn(params, g) > 0).map((g) => g.label);
 
   return (
@@ -35,11 +38,18 @@ export function FilterPanel({ params, onChange }: Props) {
       </div>
 
       <form
+        role="search"
+        className="space-y-3"
         onSubmit={(e) => {
           e.preventDefault();
-          onChange(withText(params, "KeywordFilter", keyword));
+          search(withDistance(params, distance));
+          onSearch?.();
         }}
       >
+        <div className="flex gap-2">
+          <Input aria-label="Location" placeholder="Town or postcode" maxLength={TEXT_MAX_LENGTH} value={location} onChange={(e) => setLocation(e.target.value)} />
+          <Button type="submit">Search</Button>
+        </div>
         <Input type="search" aria-label="Keyword search" placeholder="Keyword search" maxLength={TEXT_MAX_LENGTH} value={keyword} onChange={(e) => setKeyword(e.target.value)} />
       </form>
 
@@ -57,13 +67,13 @@ export function FilterPanel({ params, onChange }: Props) {
           step={1}
           value={[distance]}
           onValueChange={([d]) => d !== undefined && setDistance(d)}
-          onValueCommit={([d]) => d !== undefined && onChange(withDistance(params, d))}
+          onValueCommit={([d]) => d !== undefined && search(withDistance(params, d))}
         />
         <div className="flex items-center gap-2">
           <Checkbox
             id={outsideUkId}
             checked={params.flags.LocationSearchOutsideUK}
-            onCheckedChange={(checked) => onChange(withFlag(params, "LocationSearchOutsideUK", checked === true))}
+            onCheckedChange={(checked) => search(withFlag(params, "LocationSearchOutsideUK", checked === true))}
           />
           <label htmlFor={outsideUkId} className="text-sm">
             Search locations outside the UK
@@ -98,7 +108,7 @@ export function FilterPanel({ params, onChange }: Props) {
                 group={group}
                 searchable={group.fields.some((f) => SEARCHABLE.has(f.name))}
                 isChecked={(field) => isChecked(params, field)}
-                onToggle={(field, on) => onChange(withField(params, field, on))}
+                onToggle={(field, on) => search(withField(params, field, on))}
               />
             </AccordionContent>
           </AccordionItem>
@@ -106,4 +116,15 @@ export function FilterPanel({ params, onChange }: Props) {
       </Accordion>
     </div>
   );
+}
+
+/** A local draft of a value from the URL, reset whenever the URL's value changes. */
+function useDraft<T>(value: T): [T, (draft: T) => void] {
+  const [draft, setDraft] = useState(value);
+  const [seen, setSeen] = useState(value);
+  if (value !== seen) {
+    setSeen(value);
+    setDraft(value);
+  }
+  return [draft, setDraft];
 }
