@@ -21,6 +21,9 @@ Searches in development go to UKCP's live site, so keep them few.
 
 ## Deploying
 
+Each push to `main` deploys once CI passes, using the repository secrets `CLOUDFLARE_API_TOKEN` (made from
+Cloudflare's "Edit Cloudflare Workers" token template) and `CLOUDFLARE_ACCOUNT_ID`. To deploy from your own machine:
+
 ```bash
 npx wrangler login
 npm run deploy
@@ -35,7 +38,7 @@ NODE_OPTIONS="--network-family-autoselection-attempt-timeout=5000 --dns-result-o
 ## Keeping up with UKCP
 
 The filter panel's options come from `shared/options.json`, taken from UKCP's search form (spec §3.2). A daily workflow checks UKCP's pages
-still parse and, when UKCP's options have changed, opens a pull request with the new list. Merge it, then deploy.
+still parse and, when UKCP's options have changed, opens a pull request with the new list. Merging it deploys the change.
 
 Two scripts talk to UKCP directly:
 
