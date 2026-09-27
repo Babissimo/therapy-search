@@ -1,18 +1,26 @@
 import { describe, expect, it, vi } from "vitest";
-import { createApp, rateKey, TOO_MANY, UPSTREAM_DOWN, type Env } from "./app";
+import type { PlaceLookup } from "../shared/location";
+import { createApp, PLACE_DOWN, rateKey, TOO_MANY, UPSTREAM_DOWN, type Env, type PlaceFinder } from "./app";
+import { GeocodeError } from "./places/geocoder";
 import { UpstreamError, type UkcpClient } from "./ukcp/client";
 
 const RESULTS = `<span class="results-no">1-1 of 1 results</span>
 <div class="profile-listing"><a href="therapist/Jo-Bloggs-ABCDEFGH"><h2>Jo Bloggs</h2></a></div>`;
+const FOUND: PlaceLookup = { found: true, kind: "outcode", candidates: [{ lat: 50.835, lng: -0.178 }] };
 
-function setup({ allow = true, client = {} as Partial<UkcpClient> } = {}) {
+function setup({ allow = true, allowPlaces = true, client = {} as Partial<UkcpClient>, places = {} as Partial<PlaceFinder> } = {}) {
   const limit = vi.fn(async () => ({ success: allow }));
-  const env: Env = { UPSTREAM_LIMIT: { limit }, SITE_URL: "https://example.test" };
+  const placeLimit = vi.fn(async () => ({ success: allowPlaces }));
+  const env: Env = { UPSTREAM_LIMIT: { limit }, PLACE_LIMIT: { limit: placeLimit }, SITE_URL: "https://example.test" };
   const stub = { search: vi.fn(async () => RESULTS), profile: vi.fn(), contact: vi.fn(), ...client } as unknown as UkcpClient;
-  const app = createApp(() => stub);
+  const finder: PlaceFinder = { lookup: vi.fn(async () => FOUND), ...places };
+  const app = createApp(
+    () => stub,
+    () => finder,
+  );
   const request = (path: string, init?: RequestInit) =>
     app.request(path, { ...init, headers: { "cf-connecting-ip": "203.0.113.9", ...init?.headers } }, env);
-  return { request, stub, limit };
+  return { request, stub, limit, placeLimit, finder };
 }
 
 describe("GET /api/search", () => {
@@ -123,5 +131,58 @@ describe("rateKey", () => {
     expect(rateKey("2001:DB8:1:0002::9")).toBe("2001:db8:1:2::/64");
     expect(rateKey("2001:db8::1")).toBe("2001:db8:0:0::/64");
     expect(rateKey("203.0.113.9")).toBe("203.0.113.9");
+  });
+});
+
+describe("GET /api/place", () => {
+  it("returns a found place for 30 days, counted against the place limit only", async () => {
+    const { request, finder, placeLimit, limit } = setup();
+    const res = await request("/api/place?q=BRIGHTON+BN3");
+    expect([res.status, res.headers.get("Cache-Control")]).toEqual([200, "public, max-age=2592000"]);
+    expect(await res.json()).toEqual(FOUND);
+    expect(finder.lookup).toHaveBeenCalledWith("BRIGHTON BN3", { centre: false, outsideUK: false });
+    expect(placeLimit).toHaveBeenCalledWith({ key: "203.0.113.9" });
+    expect(limit).not.toHaveBeenCalled();
+  });
+
+  it("keeps a miss for a day", async () => {
+    const { request } = setup({ places: { lookup: vi.fn(async (): Promise<PlaceLookup> => ({ found: false, reason: "not-found" })) } });
+    const res = await request("/api/place?q=NOWHERE");
+    expect([res.status, res.headers.get("Cache-Control")]).toEqual([200, "public, max-age=86400"]);
+  });
+
+  it("passes the centre and outside-UK flags on", async () => {
+    const { request, finder } = setup();
+    expect((await request("/api/place?q=PARIS&centre=true&outsideUK=true")).status).toBe(200);
+    expect(finder.lookup).toHaveBeenCalledWith("PARIS", { centre: true, outsideUK: true });
+  });
+
+  it("redirects other spellings of a lookup to the canonical one without looking it up", async () => {
+    const { request, finder } = setup();
+    const res = await request("/api/place?centre=false&q=brighton%20%20bn3");
+    expect(res.status).toBe(301);
+    expect(res.headers.get("Location")).toBe("/api/place?q=BRIGHTON+BN3");
+    expect(finder.lookup).not.toHaveBeenCalled();
+  });
+
+  it("rejects text that is empty or too long", async () => {
+    const { request } = setup();
+    expect((await request("/api/place?q=%20")).status).toBe(400);
+    expect((await request(`/api/place?q=${"A".repeat(101)}`)).status).toBe(400);
+  });
+
+  it("answers 429 over the place limit without looking anything up", async () => {
+    const { request, finder } = setup({ allowPlaces: false });
+    const res = await request("/api/place?q=BRIGHTON");
+    expect([res.status, (await res.json()).error]).toEqual([429, TOO_MANY]);
+    expect(finder.lookup).not.toHaveBeenCalled();
+  });
+
+  it("answers 502, uncached, when a geocoder fails", async () => {
+    const { request } = setup({ places: { lookup: vi.fn(async () => Promise.reject(new GeocodeError("api.postcodes.io answered 500"))) } });
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    const res = await request("/api/place?q=BN3");
+    expect([res.status, res.headers.get("Cache-Control"), (await res.json()).error]).toEqual([502, "no-store", PLACE_DOWN]);
+    expect(log).toHaveBeenCalledWith("GeocodeError: api.postcodes.io answered 500");
   });
 });
