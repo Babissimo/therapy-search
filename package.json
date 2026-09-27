@@ -6,7 +6,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "fixtures": "tsx scripts/capture-fixtures.ts",
-    "options": "tsx scripts/extract-options.ts"
+    "options": "tsx scripts/extract-options.ts",
+    "canary": "tsx scripts/canary.ts"
   },
   "devDependencies": {
     "@types/jsdom": "^30.0.0",
