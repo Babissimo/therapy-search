@@ -1,12 +1,16 @@
 import { SlidersHorizontal } from "lucide-react";
 import { Link } from "react-router";
+import { OPTIONS } from "@shared/options";
 import type { SearchParams } from "@shared/query";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { FilterChips } from "./FilterChips";
 import { FilterPanel } from "./FilterPanel";
 import { Results } from "./Results";
 import { SearchBar } from "./SearchBar";
+import { tickedIn } from "./state";
+import { TickedCount } from "./TickedCount";
 import { useSearchState } from "./useSearchState";
 
 export function SearchPage() {
@@ -29,6 +33,7 @@ export function SearchPage() {
       <div className="space-y-6">
         <SearchBar key={`${params.text.HelpWith}|${params.text.Location}`} params={params} onChange={update} />
         <MobileFilters params={params} onChange={update} />
+        <FilterChips params={params} onChange={update} />
         <Results params={params} onChange={update} />
       </div>
       <aside className="hidden md:block">
@@ -45,6 +50,7 @@ function MobileFilters({ params, onChange }: { params: SearchParams; onChange: (
         <Button variant="outline" className="md:hidden">
           <SlidersHorizontal aria-hidden />
           Refine your search
+          <TickedCount count={OPTIONS.groups.reduce((sum, group) => sum + tickedIn(params, group), 0)} />
         </Button>
       </SheetTrigger>
       <SheetContent side="left" className="overflow-y-auto">
