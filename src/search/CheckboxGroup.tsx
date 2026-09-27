@@ -22,9 +22,12 @@ export function CheckboxGroup({ group, searchable, isChecked, onToggle }: Props)
   const sections = useMemo(() => sectionsOf(group), [group]);
   // Headings holding a tick start open, as the panel's groups do, and a heading opens when a box under it is ticked.
   const [open, setOpen] = useState(() => new Set(sections?.filter((s) => s.fields.some(isChecked)).map((s) => s.heading)));
+  // Boxes ticked when the list opens go first; later ticks stay put, so a box never moves from under the pointer.
+  const [first] = useState(() => new Set(group.fields.filter(isChecked)));
   const needle = filter.trim().toLowerCase();
   const matches = (f: FilterField) => f.label.toLowerCase().includes(needle);
-  const shown = group.fields.filter(matches);
+  const inView = (fields: FilterField[]) => fields.filter(matches).sort((a, b) => Number(first.has(b)) - Number(first.has(a)));
+  const shown = inView(group.fields);
   // UKCP ANDs a list's values, where a list of boxes reads as "any of these".
   const narrows = group.fields.every((f) => isMulti(f.name)) && group.fields.some(isChecked);
 
@@ -67,7 +70,7 @@ export function CheckboxGroup({ group, searchable, isChecked, onToggle }: Props)
       {sections ? (
         <ul className="space-y-1">
           {sections.map((section, i) => {
-            const fields = section.fields.filter(matches);
+            const fields = inView(section.fields);
             if (fields.length === 0) return null;
             const listId = `${baseId}s${i}`;
             // A search shows every match, so its headings are labels rather than toggles.
