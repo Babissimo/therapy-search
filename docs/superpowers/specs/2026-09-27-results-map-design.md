@@ -1,0 +1,216 @@
+# Therapy search: a map of results
+
+Date: 2026-09-27
+
+## 1. Goal and scope
+
+Make the search page a map with the results beside it, so a visitor can see where therapists are and judge how easy each would be to reach. It builds on the parity front end described in `2026-09-27-ukcp-search-parity-design.md`, cited here as "parity §n".
+
+In scope:
+
+- A map-centred search page: the results in a collapsible panel on wide screens and a bottom sheet on narrow ones, with the search and filters over the map (§4.1–4.5)
+- One list of results that grows with "Load more" and that the map mirrors (§4.4)
+- Therapist pins, clusters, the circle they reach and zoom (§4.6–4.7)
+- A notice when UKCP doesn't recognise the typed location (§4.9)
+- A prompt in place of a search of everyone (§4.10), and profiles in a drawer over the search (§4.11)
+- A place-lookup route on the Worker (§5)
+
+Out of scope:
+
+- Mapping every result at once. The results grow a page at a time (§4.4)
+- Searching the area in view, since UKCP searches from a typed location
+- The visitor's own position (a "locate me" control) and travel times
+- Profile office addresses. The profile keeps its "View map" links
+
+## 2. Constraints
+
+The parity constraints still hold (parity §2). In addition:
+
+- **Pins use only what the result card shows.** UKCP publishes no coordinates. A card has one free-text location, seen live as ` BN31FG`, `BRIGHTON BN3`, `Brighton ` or `Brighton BN`, and profile map links are Google text searches. The map geocodes that text at the precision the therapist gave, full postcodes included.
+- **Respectful of the geocoders.** postcodes.io and Nominatim are free services. Each distinct string is looked up once and cached for every visitor (§5.1), requests carry the Worker's existing `User-Agent`, and uncached lookups are capped per visitor (§5.3). Nominatim's policy (at most one request a second, results cached, data attributed) is met by using it only for search centres and outside-UK searches (§3.3).
+- **Third parties never see search terms.** The browser's only third-party requests are map tiles, which reveal the area in view. The default referrer policy sends the tile server our origin alone, never the page URL with its filters, and must stay that way. Place lookups go through the Worker, so the geocoders never see a visitor's IP.
+- **Free to run.** CARTO's raster tiles need a key, free for non-commercial use up to 5 million tile requests a month. Each page of results adds at most 13 Worker requests (§5.1), well inside the free plan's daily allowance at this site's scale.
+
+## 3. Where a pin comes from
+
+### 3.1 Reading the location text
+
+`shared/location.ts` trims the text, collapses its spaces, upper-cases it and classifies it:
+
+| The text has | Kind | Example |
+|---|---|---|
+| A full UK postcode, space optional | `postcode` | ` BN31FG` → `BN3 1FG` |
+| An outcode as its last word | `outcode` | `BRIGHTON BN3` → `BN3` |
+| Other words, once a trailing one- or two-letter postcode area is dropped | `place` | `Brighton BN` → `BRIGHTON` |
+| Nothing else | too general | ` BN` |
+
+A lookup that finds nothing falls back one row: an unknown postcode (a retired one, say) tries its outcode, and an unknown outcode tries any remaining words as a place.
+
+### 3.2 Choosing among candidates
+
+A postcode or outcode has one answer. A place name can match several places ("Brighton" is also a hamlet in Cornwall), so its lookup returns up to ten candidates and the browser chooses:
+
+- With a search centre, the candidate nearest to it.
+- Without one, the most settled type, in the order city, town, other settlement, suburban area, village, hamlet, then the geocoder's own order.
+
+Choosing in the browser keeps each string's cached answer independent of the search it appeared in.
+
+A place-name pin further from the centre than twice the 30 miles searched (§4.5) plus 5 miles is treated as unplaced (§4.8) rather than shown where the therapist probably isn't. Postcodes and outcodes are unambiguous, so they are shown wherever they fall, outside the circle included.
+
+### 3.3 The search centre
+
+The circle is centred on UKCP's "Location searched" (parity §3.3) rather than the typed text, since that is the point UKCP measured distances from. A place name there goes to Nominatim, whose ranking by prominence puts Brighton the city first; a postcode or outcode goes to postcodes.io as in §3.1. There is no centre when the search has no location or UKCP fell back to "United Kingdom" (§4.9).
+
+For outside-UK searches (`LocationSearchOutsideUK`), which postcodes.io cannot answer, every place name goes to Nominatim without its UK restriction, card locations included.
+
+## 4. Front end
+
+### 4.1 Page layout
+
+- The search page fills the viewport below the site header, with the map filling the space the results leave. On this page `SiteLayout` drops its width cap, padding and footer; the footer's disclaimer closes the results list instead (§4.4). Other pages keep their layout.
+- From the `lg` breakpoint (1024px) the results sit in a panel beside the map (§4.2); below it, in a sheet over the map (§4.3). Both hold the same results component.
+- The map pane loads as its own chunk, so the results render without waiting for Leaflet; until it arrives the pane is a plain muted background.
+- The attribution control carries "© OpenStreetMap contributors © CARTO", as the tile terms require. The about page gains a data-sources line for postcodes.io (Ordnance Survey, Royal Mail and ONS data under the Open Government Licence) and Nominatim (OpenStreetMap).
+
+### 4.2 Results panel (wide screens)
+
+- A 24rem panel down the left, beside the map rather than over it, so no pin hides behind it. It is an ordinary region, not a dialog: the map stays usable and focus is never trapped.
+- Its header gives the count (§4.4) and an icon button, "Hide results", that collapses it to a narrow strip holding a "Show results" icon button, giving the map the full width. Both name themselves in a tooltip and carry `aria-expanded` and `aria-controls`. The panel opens on every visit; its state is not stored. The map is told its size changed (Leaflet's `invalidateSize`) whenever the panel opens or closes.
+- Hovering or focusing a card highlights its pin (§4.6).
+
+### 4.3 Results sheet (narrow screens)
+
+- A sheet over the bottom of the map with three positions: peek (the sheet's header alone: its handle, the count and its button), half, and full (up to just below the search box, leaving a strip of map). It opens at full on a search, so a phone starts on the list, and at half on the prompt (§4.10), so the map shows beside it; it moves between the two as a search replaces the prompt or is cleared.
+- The header's button moves it: "Show map" lowers it to peek, and "Show list" raises it to full. Dragging the header moves it too, settling at the nearest position. Only the header drags; the list inside scrolls normally, so the two gestures never compete.
+- Like the panel, it is an ordinary region, and the map above it stays usable at every position.
+- It is the page's own component rather than shadcn's `Drawer`, whose underlying library, vaul, is no longer maintained.
+
+### 4.4 The results list
+
+- The results are one list, in UKCP's order, that grows a page at a time with "Load more"; the map shows every therapist in it that it can place. The button sits beneath the list, outside its scrolling area, so it stays in view however far the list scrolls. UKCP orders location searches by distance band (parity §3.3), so each page reaches further out.
+- Pages come from `/api/search` with the visitor's `OrderSeed` through TanStack Query's `useInfiniteQuery`, each one upstream request within the parity §4.3 limit. Changing the search starts again from the first page. The page URL never carries `page`; a link that has one opens at the first page.
+- The panel's or sheet's header counts the results: "257 results", or "257 results within your area" when a place was searched. The list opens with a line reading, for a location search, "Nearest 24 of 257, up to 0.6 miles away", using the furthest of UKCP's distances among the loaded cards; any other search reads "24 of 257". When any loaded therapist has no pin it adds "3 not on the map" (§4.8). Beneath sit "Pins show the postcode or area each therapist lists.", then the "Location searched" line or the alert that replaces it (§4.9), and UKCP's notices.
+- "Load more" shows a spinner while a page loads and disappears once every result is loaded; the map then takes in any new pins (§4.7). While the first page loads, the list shows skeleton cards.
+- A profile opened from the search leaves it rendered beneath (§4.11). Coming Back to the search from another page restores the view: search results stay cached for 15 minutes after the page unmounts (a `gcTime` matching the existing `staleTime`), and the list's scroll position and the map's centre and zoom are kept in memory against the history entry, so Back finds them. A fresh visit or a shared link starts at the nearest 12 with the map fitted (§4.7).
+
+### 4.5 Search and filters over the map
+
+- Along the top of the map sit the location box with its Search button and a "Filters" button showing how many filters are ticked (`TickedCount`), with the active-filter chips (`FilterChips`) beneath. On narrow screens the chips form one row that scrolls sideways.
+- On wide screens "Filters" opens the filter panel beneath the search box, floating over the map and scrolling within itself, with its "Refine your search" heading and close button on one line. It is closed on arrival. On narrow screens it opens the existing "Refine your search" sheet.
+- The filter panel keeps everything but the location box: "Clear all filters" (§4.10), keyword, "Search locations outside the UK" and the option groups. The location and keyword share one draft, so any change submits whatever is typed in either, as the filter panel does today.
+- Every location search reaches 30 miles, the furthest UKCP's form offers, and links to UKCP's own page ask for the same. There is no distance setting, and a `Distance` in an old link is ignored: results come nearest first, so the reach only lengthens the list, and the circle shows how far it goes (§4.7).
+
+### 4.6 Pins and clusters
+
+- A pin is the therapist's `Avatar` (photo or initials) in a Leaflet `divIcon`. It is keyboard-focusable with the therapist's name as its title, and hovering shows the name and listed location.
+- A therapist whose session types include Remote but not In-person gets a small lucide `Video` badge on the pin, since their location says nothing about travel.
+- Therapists who share one point form a single stacked pin: up to three avatars and the count.
+- Nearby pins merge into clusters with `leaflet.markercluster`, drawn the same way. Clicking a cluster zooms to its bounds, and clustering stops at zoom 16, so every cluster splits before the map runs out of zoom. Leaflet's spiderfy (fanning the markers out) is off.
+- Activating a single pin on a device that can hover (`(hover: hover)`) opens the therapist's profile (§4.11), since hovering has already shown who it is. Otherwise, and for a stacked pin on any device, it selects: the results show "At this pin", outlined in blue with the number of therapists, their cards and a button to clear it, above the full list. The panel opens if collapsed and scrolls to the top; the sheet rises to half if lower. The selected pin, or the cluster holding it, keeps a blue halo that pulses briefly unless reduced motion is preferred. A new search clears the selection.
+- Hovering or focusing a card raises its pin, enlarges it and rings it in blue, or does the same to the cluster holding it. The rings go on the icon inside the marker, so they scale with it, and are blue because the theme's greys vanish against the tiles.
+- The results list is the complete accessible alternative; the map has the label "Map of results".
+
+### 4.7 Circle, zoom and fit
+
+- The circle is centred on the search centre and reaches the furthest loaded pin, measured over the ground. UKCP's own distances run from the middle of the town a therapist lists, putting a whole town 0 miles away, so the pins say better how far the list reaches. It is drawn once pins are placed, in blue, which shows on light and dark tiles alike.
+- The map frames that circle once a search's first page is placed, or the whole 30 miles searched when no pin could be placed, and frames it again whenever "Load more" places pins beyond those already framed. Without a centre it frames the placed pins. The frame is padded clear of the search box and zooms no closer than level 14. A view restored on Back (§4.4) is kept until pins arrive beyond those it took in.
+- shadcn-map's zoom control sits bottom right on wide screens. Narrow screens rely on pinch zoom, since the sheet covers the bottom of the map.
+
+### 4.8 Unplaced therapists
+
+A therapist with no pin keeps their card in the list, in UKCP's order, with a line giving the reason, and the list's header counts them (§4.4):
+
+| Cause | Reason shown |
+|---|---|
+| No location on the card, or only a postcode area | Location too general to place |
+| No match, or only implausible ones (§3.2) | Location couldn't be matched |
+| The lookup failed or was rate limited | Couldn't look up this location just now |
+
+### 4.9 Unrecognised location
+
+When the visitor typed a location but UKCP searched "United Kingdom" (parity §3.2), the results show an `Alert` in place of the "Location searched" line: `UKCP didn't recognise "Brightn", so these results are from across the UK. Try a town or a postcode.` It is skipped when the typed text itself names the UK ("UK", "United Kingdom"). The map then has no centre (§3.3).
+
+### 4.10 The prompt
+
+- With nothing to search for, UKCP would list every therapist in a random order, which answers no one's question. So such a visit asks UKCP for nothing: the results show a prompt to search a town, city or postcode, and the map shows the UK, as it does again whenever the search is cleared. The "Search locations outside the UK" tick alone is nothing to search for, since it only changes how a location is read.
+- "Clear all filters" searches the typed location alone, keeping the "Search locations outside the UK" tick, since a search with nothing left would land back on the prompt.
+
+### 4.11 Profiles in a drawer
+
+- A profile opened from a card or a pin shows in a drawer from the right, over the search, which stays rendered beneath it. The URL becomes `/therapist/:slug`, carrying the search's location as React Router's background location, so closing the drawer or Back returns to the search exactly as it was, and `SiteLayout` keeps the search's layout beneath.
+- A profile reached any other way, such as a shared link, is a page of its own, as before; a reload keeps whichever it was, since the browser keeps the history entry's state. The profile lays itself out by the width it is given, so it reads the same in the drawer as on a narrow page.
+
+## 5. Worker: place lookup
+
+### 5.1 Route
+
+| Route | Upstream | Cache |
+|---|---|---|
+| `GET /api/place?q=<text>[&centre=true][&outsideUK=true]` | postcodes.io or Nominatim | 30 days when found; 1 day when not found or too general |
+
+- One string per request, so Workers Caching (parity §4.2) keys each string on its own and shares it across visitors, where a batch URL would rarely repeat. A page needs at most 13 lookups (12 cards and the centre), fewer once repeated strings are merged, sent in parallel over one HTTP/2 connection.
+- `q` must be 1–100 characters after trimming. The route canonicalises it with `shared/location.ts` and redirects to the canonical URL when it differs, as `/api/search` does (parity §4.2), so equal strings share one entry. The browser requests the canonical form in the first place.
+- Upstream requests, each with a 5-second timeout:
+
+| Kind | Request |
+|---|---|
+| Postcode | `api.postcodes.io/postcodes/<postcode>` |
+| Outcode | `api.postcodes.io/outcodes/<outcode>` |
+| Place, on a card | `api.postcodes.io/places?q=<name>&limit=10` |
+| Place, as the centre or in an outside-UK search | `nominatim.openstreetmap.org/search?q=<name>&format=jsonv2&countrycodes=gb`, with `limit=1` for a centre and `limit=10` for a card, and no `countrycodes` outside the UK |
+
+### 5.2 Response
+
+```ts
+type PlaceLookup =
+  | { found: true; kind: "postcode" | "outcode" | "place"; candidates: { lat: number; lng: number; type?: string }[] }
+  | { found: false; reason: "too-general" | "not-found" };
+```
+
+`type` is a place candidate's settlement type, mapped from postcodes.io's `local_type` or Nominatim's `addresstype` onto the order in §3.2; types outside it rank last.
+
+### 5.3 Limits and errors
+
+- Uncached lookups count against a new rate-limit binding, `PLACE_LIMIT`, of 60 a minute per IP, keyed as in parity §4.3. It is separate from UKCP's limit, so geocoding never uses up a visitor's searches. Past it, the route returns `429`.
+- An upstream failure or timeout returns `502` and is never cached. The browser shows that therapist as unplaced with the "just now" reason (§4.8) and asks again on the next visit to the search.
+- The route logs only a status, never the text looked up (parity §2).
+
+## 6. Map component
+
+- `src/components/ui/map.tsx` is vendored from shadcn-map (`https://shadcn-map.vercel.app/r/map.json`), keeping only `Map`, `MapTileLayer`, `MapMarker`, `MapTooltip`, `MapMarkerClusterGroup`, `MapCircle` and `MapZoomControl`. Its drawing, fullscreen, layers, search and locate controls go, with the dependencies only they need (`leaflet-draw`, `leaflet.fullscreen`, the place-autocomplete registry item), as does `next-themes`, since the app has its own theme switch, and the lazy-loading wrappers it has for server rendering, since the map pane is already its own chunk (§4.1). Pin and cluster icons are plain DOM elements rather than rendered React, because Leaflet creates and discards them itself as clusters change.
+- Dependencies: `leaflet` 1.9, `react-leaflet` 5 and `leaflet.markercluster` 1.5. For the cluster wrapper we use `react-leaflet-cluster` 4, which is stable on React 19, rather than shadcn-map's `react-leaflet-markercluster`, whose React 19 version is still a release candidate.
+- Tiles are CARTO's `light_all`, or `dark_all` while `<html>` has the theme switch's `dark` class, swapping live when the theme changes. The key is read at build time from `VITE_CARTO_KEY`, which the deploy job sets from a `CARTO_KEY` Actions variable; it ships in the page, so it is a variable rather than a secret. Without a key, as in local development and CI's check job, the map uses OpenStreetMap's standard tiles in both themes.
+
+## 7. Errors
+
+| Condition | UI |
+|---|---|
+| The first page fails | The list's message (parity §6) in the panel or sheet; the map shows neither pins nor circle, since the centre comes from that page |
+| "Load more" fails | The same message above the button beneath the list, which now reads "Try again"; loaded results stay |
+| The centre lookup fails | No circle; the map fits the pins, and place names are chosen as if there were no centre (§3.2) |
+| A pin's lookup fails | Unplaced, with the "just now" reason (§4.8) |
+| Tiles fail to load | Leaflet's blank background; pins and clusters still work |
+
+## 8. Testing
+
+- **Location text:** unit tests of classification and canonicalisation covering every row of §3.1, including the live strings in §2.
+- **Worker route:** Vitest calling the Hono app with a stub `fetch` for postcodes.io and Nominatim and a fake rate limiter. Cases: each kind, the fallback chain, the canonical redirect, `Cache-Control` for found and not found, `502` on upstream failure, `429`, and `countrycodes` dropped outside the UK.
+- **Pin logic:** unit tests of candidate choice with and without a centre, the plausibility cut, grouping pins that share a point, remote-only detection, the reach line and the unplaced reasons.
+- **Components:** the prompt asks UKCP for nothing; "Load more" appends a page, stays outside the scrolling list, and the URL gains no `page`; a new search starts again at the first page; the panel collapses and reopens; the sheet's buttons move it between positions; a stacked pin shows "At this pin", marks the pin, and clearing it restores the list; hovering a card reaches the map as a highlighted pin; the circle reaches the furthest pin and the frame grows with "Load more"; a profile opens in a drawer over the search and closing it returns to the search unchanged; Back restores the list's scroll; the tiles follow the `dark` class; the unrecognised-location alert. Leaflet is mocked under jsdom.
+- **Manual:** a pass in the browser against the dev server for what jsdom can't show: pins, cluster zoom versus selection, the circle and the fit, the refit on "Load more", the pin rings and halo in both themes, the panel resizing the map, the sheet's positions and drag on a narrow viewport, the drawer, and dark tiles.
+
+## 9. Delivery
+
+One pull request, whose commits build it in this order:
+
+1. This spec and the place lookup: `shared/location.ts`, `/api/place`, the `PLACE_LIMIT` binding and the API client method.
+2. The unrecognised-location notice (§4.9).
+3. The results list with "Load more" in place of page numbers (§4.4), before any map.
+4. The map components: the vendored `map.tsx` and its dependencies.
+5. The fixed 30-mile search (§4.5).
+6. The map-centred page: its layout, the results panel and sheet, the search and filters over the map, and the map pane with its circle, fit, themed tiles and attribution.
+7. The pins: pins, stacked pins, clusters, selection, card highlighting, the circle they reach, the unplaced lines and the about page's data sources.
+8. The prompt (§4.10).
+9. The profile drawer (§4.11).
+
+Before it deploys, the repository needs a `CARTO_KEY` Actions variable holding a CARTO basemaps key; until then the live map shows OpenStreetMap tiles.
