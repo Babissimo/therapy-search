@@ -1,20 +1,26 @@
 import { Hono, type Context } from "hono";
+import { LOCATION_MAX_LENGTH, canonicalLocation, placeQuery, type PlaceLookup, type PlaceOptions } from "../shared/location";
 import { ALLOWED } from "../shared/options";
 import { InvalidParam, readParams, toQuery } from "../shared/query";
 import { UpstreamError, type UkcpClient } from "./ukcp/client";
 
 export type RateLimit = { limit(options: { key: string }): Promise<{ success: boolean }> };
-export type Env = { UPSTREAM_LIMIT: RateLimit; SITE_URL: string };
+export type Env = { UPSTREAM_LIMIT: RateLimit; PLACE_LIMIT: RateLimit; SITE_URL: string };
+export type PlaceFinder = { lookup(text: string, options: PlaceOptions): Promise<PlaceLookup> };
 type Ctx = Context<{ Bindings: Env }>;
 
 const SEARCH_MAX_AGE = 15 * 60;
 const PROFILE_MAX_AGE = 60 * 60;
+// Places don't move; a miss is kept shorter in case the geocoders learn it.
+const PLACE_FOUND_MAX_AGE = 30 * 24 * 60 * 60;
+const PLACE_MISSING_MAX_AGE = 24 * 60 * 60;
 export const UPSTREAM_DOWN = "UKCP's search isn't responding. Try again, or search on UKCP directly.";
 export const TOO_MANY = "Too many searches in a short time. Wait a minute and try again.";
+export const PLACE_DOWN = "Couldn't look up that place just now.";
 // UKCP builds slugs from names, so they can carry accents and apostrophes.
 const SLUG = /^[\p{L}\p{N}][\p{L}\p{M}\p{N}'’.-]{2,119}$/u;
 
-export function createApp(clientFor: (env: Env) => UkcpClient) {
+export function createApp(clientFor: (env: Env) => UkcpClient, placesFor: (env: Env) => PlaceFinder) {
   const app = new Hono<{ Bindings: Env }>();
 
   // Anything not explicitly cacheable must never be stored: errors, redirects to bad input, contact details.
@@ -31,7 +37,7 @@ export function createApp(clientFor: (env: Env) => UkcpClient) {
     if (new URLSearchParams(url.search).toString() !== canonical) {
       return c.redirect(`/api/search${canonical ? `?${canonical}` : ""}`, 301);
     }
-    if (!(await allowUpstream(c))) return c.json({ error: TOO_MANY }, 429);
+    if (!(await allow(c, c.env.UPSTREAM_LIMIT))) return c.json({ error: TOO_MANY }, 429);
     const html = expectPage(await clientFor(c.env).search(params), "results-no", "fat-search-alert");
     return upstreamHtml(c, html, `public, max-age=${SEARCH_MAX_AGE}`);
   });
@@ -39,7 +45,7 @@ export function createApp(clientFor: (env: Env) => UkcpClient) {
   app.get("/api/therapist/:slug", async (c) => {
     const slug = c.req.param("slug");
     if (!SLUG.test(slug)) return c.json({ error: "That isn't a UKCP profile address." }, 400);
-    if (!(await allowUpstream(c))) return c.json({ error: TOO_MANY }, 429);
+    if (!(await allow(c, c.env.UPSTREAM_LIMIT))) return c.json({ error: TOO_MANY }, 429);
     const html = await clientFor(c.env).profile(slug);
     if (html === null) return c.json({ error: "This profile isn't on UKCP any more." }, 404);
     return upstreamHtml(c, expectPage(html, "therapist-header"), `public, max-age=${PROFILE_MAX_AGE}`);
@@ -51,8 +57,28 @@ export function createApp(clientFor: (env: Env) => UkcpClient) {
     if (origin && origin !== new URL(c.req.url).origin) return c.json({ error: "Contact details can only be shown on this site." }, 403);
     const id = c.req.param("id");
     if (!/^\d{1,10}$/.test(id)) return c.json({ error: "That isn't a UKCP contact id." }, 400);
-    if (!(await allowUpstream(c))) return c.json({ error: TOO_MANY }, 429);
+    if (!(await allow(c, c.env.UPSTREAM_LIMIT))) return c.json({ error: TOO_MANY }, 429);
     return upstreamHtml(c, await clientFor(c.env).contact(id), "no-store");
+  });
+
+  app.get("/api/place", async (c) => {
+    const url = new URL(c.req.url);
+    const text = canonicalLocation(url.searchParams.get("q") ?? "");
+    if (text.length === 0 || text.length > LOCATION_MAX_LENGTH) throw new InvalidParam("q", `q must be 1 to ${LOCATION_MAX_LENGTH} characters`);
+    const options = { centre: url.searchParams.get("centre") === "true", outsideUK: url.searchParams.get("outsideUK") === "true" };
+    const canonical = placeQuery(text, options);
+    // Compared as parsed parameters, as for searches, so re-encoding can't cause a redirect loop.
+    if (new URLSearchParams(url.search).toString() !== canonical) return c.redirect(`/api/place?${canonical}`, 301);
+    if (!(await allow(c, c.env.PLACE_LIMIT))) return c.json({ error: TOO_MANY }, 429);
+    let lookup: PlaceLookup;
+    try {
+      lookup = await placesFor(c.env).lookup(text, options);
+    } catch (error) {
+      // The message names the service and status, never the text looked up.
+      console.error(error instanceof Error ? `${error.name}: ${error.message}` : "place lookup failed");
+      return c.json({ error: PLACE_DOWN }, 502);
+    }
+    return c.json(lookup, 200, { "Cache-Control": `public, max-age=${lookup.found ? PLACE_FOUND_MAX_AGE : PLACE_MISSING_MAX_AGE}` });
   });
 
   app.notFound((c) => c.json({ error: "Not found" }, 404));
@@ -82,9 +108,9 @@ function upstreamHtml(c: Ctx, html: string, cacheControl: string): Response {
   return c.body(html, 200, { "Content-Type": "text/plain; charset=utf-8", "X-Content-Type-Options": "nosniff", "Cache-Control": cacheControl });
 }
 
-/** Counts a request that will reach UKCP against the visitor's per-minute allowance. */
-async function allowUpstream(c: Ctx): Promise<boolean> {
-  const { success } = await c.env.UPSTREAM_LIMIT.limit({ key: rateKey(c.req.header("cf-connecting-ip") ?? "unknown") });
+/** Counts a request that will reach an upstream service against the visitor's per-minute allowance for it. */
+async function allow(c: Ctx, limiter: RateLimit): Promise<boolean> {
+  const { success } = await limiter.limit({ key: rateKey(c.req.header("cf-connecting-ip") ?? "unknown") });
   return success;
 }
 
