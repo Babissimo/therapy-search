@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Check, ChevronsUpDown } from "lucide-react";
+import { Check, ChevronsUpDown, Info } from "lucide-react";
 import { OPTIONS } from "@shared/options";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -47,6 +47,12 @@ export function HelpWithPicker({ id, terms, onChange }: Props) {
             </CommandGroup>
           </CommandList>
         </Command>
+        {terms.length > 0 && (
+          <p className="flex gap-1.5 border-t p-2 text-xs text-muted-foreground">
+            <Info className="mt-px size-3.5 shrink-0" aria-hidden />
+            Therapists must match every term chosen, so each extra one narrows the results.
+          </p>
+        )}
       </PopoverContent>
     </Popover>
   );

@@ -52,7 +52,7 @@ export function withHelpWithTerms(params: SearchParams, terms: string[]): Search
   return withText(params, "HelpWith", terms.join(", "));
 }
 
-function isMulti(name: string): name is MultiParam {
+export function isMulti(name: string): name is MultiParam {
   return (MULTI_PARAMS as readonly string[]).includes(name);
 }
 

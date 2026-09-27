@@ -22,4 +22,18 @@ describe("CheckboxGroup", () => {
     fireEvent.click(screen.getByRole("checkbox", { name: "Spanish" }));
     expect(onToggle).toHaveBeenCalledWith(group.fields[2], true);
   });
+
+  it("warns that ticks narrow once one is ticked, for lists whose values UKCP combines", () => {
+    const hint = /each extra tick narrows/;
+    const { rerender } = render(<CheckboxGroup group={group} searchable={false} isChecked={() => false} onToggle={() => {}} />);
+    expect(screen.queryByText(hint)).toBeNull();
+    rerender(<CheckboxGroup group={group} searchable={false} isChecked={(f) => f.value === "French"} onToggle={() => {}} />);
+    screen.getByText(hint);
+  });
+
+  it("leaves the hint off groups of separate yes/no flags", () => {
+    const flags = { label: "Additional Filters", fields: [{ name: "OnlyProfilesWithPhotos", value: "true", label: "Only show profiles with photos" }] };
+    render(<CheckboxGroup group={flags} searchable={false} isChecked={() => true} onToggle={() => {}} />);
+    expect(screen.queryByText(/each extra tick narrows/)).toBeNull();
+  });
 });
