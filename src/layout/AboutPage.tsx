@@ -21,6 +21,15 @@ export function AboutPage() {
         and your choice of light or dark theme if you pick one.
       </p>
       <p>
+        The map's tiles come from CARTO, with map data from OpenStreetMap contributors. Your browser fetches them directly, so CARTO sees the
+        area you're looking at, but not your search. Therapists' locations are placed using{" "}
+        <a className="underline" href="https://postcodes.io">
+          postcodes.io
+        </a>{" "}
+        (which contains Ordnance Survey, Royal Mail and ONS data under the Open Government Licence) and OpenStreetMap's Nominatim. This site
+        asks them on your behalf, so they never see your IP address, and each answer is reused for every visitor.
+      </p>
+      <p>
         If you're from UKCP, or have any concern about this site,{" "}
         <a className="underline" href={CONTACT_URL}>
           get in touch
