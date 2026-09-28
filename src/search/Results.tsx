@@ -1,28 +1,33 @@
-import { useState } from "react";
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { PAGE_SIZE, toQuery, ukcpSearchUrl, type SearchParams } from "@shared/query";
+import { Loader2 } from "lucide-react";
+import { useEffect, useRef } from "react";
+import type { SearchParams } from "@shared/query";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { LocationNotice } from "./LocationNotice";
-import { orderSeed } from "./orderSeed";
-import { ResultsPagination } from "./ResultsPagination";
-import { withPage } from "./state";
+import { reachLine } from "./reach";
+import { ResultsError } from "./ResultsError";
 import { TherapistCard } from "./TherapistCard";
+import type { SearchResults } from "./useResults";
 
-type Props = { params: SearchParams; onChange: (next: SearchParams) => void };
+type Props = { params: SearchParams; results: SearchResults };
 
-export function Results({ params, onChange }: Props) {
-  const [seed] = useState(() => orderSeed());
-  const query = toQuery({ ...params, orderSeed: seed }, { withSeed: true });
-  const { data, error, isPending, isPlaceholderData } = useQuery({
-    queryKey: ["search", query],
-    queryFn: () => api.search(query),
-    placeholderData: keepPreviousData,
-  });
-
-  if (isPending) {
+export function Results({ params, results }: Props) {
+  const { query, first, therapists, searchedPlace } = results;
+  const list = useRef<HTMLUListElement>(null);
+  // How many cards were listed when the next-page button was pressed while focused, until that fetch settles.
+  const focusFrom = useRef<number | null>(null);
+  const pages = query.data?.pages.length;
+  useEffect(() => {
+    const from = focusFrom.current;
+    if (from === null || query.isFetchingNextPage) return;
+    focusFrom.current = null;
+    // The last page takes the button away, dropping focus to the page; the keyboard carries on from the first new card.
+    const dropped = document.activeElement === null || document.activeElement === document.body;
+    if (!query.hasNextPage && dropped) list.current?.children[from]?.querySelector("a")?.focus();
+  }, [pages, query.isFetchingNextPage, query.hasNextPage]);
+  if (query.isPending) {
     return (
       <div className="space-y-4" aria-busy>
         {Array.from({ length: 4 }, (_, i) => (
@@ -31,43 +36,52 @@ export function Results({ params, onChange }: Props) {
       </div>
     );
   }
-  if (error) {
-    return (
-      <Alert variant="destructive">
-        <AlertDescription>
-          {error.message}{" "}
-          <a className="underline" href={ukcpSearchUrl(params)}>
-            Search on UKCP
-          </a>
-        </AlertDescription>
-      </Alert>
-    );
-  }
+  if (query.isLoadingError) return <ResultsError error={query.error} params={params} />;
 
-  const totalPages = Math.ceil(data.total / PAGE_SIZE);
   return (
-    <section aria-busy={isPlaceholderData} className={cn("space-y-4", isPlaceholderData && "opacity-60")}>
-      <p className="text-sm text-muted-foreground">{data.total > 0 ? `${data.from}-${data.to} of ${data.total} results` : "No results"}</p>
-      <LocationNotice typed={params.text.Location} searched={data.locationSearched} />
-      {data.notices.map((notice) => (
+    <section aria-busy={query.isPlaceholderData} className={cn("space-y-4", query.isPlaceholderData && "opacity-60")}>
+      <p className="text-sm text-muted-foreground">{reachLine(therapists, first?.total ?? 0, searchedPlace !== undefined)}</p>
+      <LocationNotice typed={params.text.Location} searched={first?.locationSearched} />
+      {first?.notices.map((notice) => (
         <Alert key={notice}>
           <AlertDescription>{notice}</AlertDescription>
         </Alert>
       ))}
-      <ul className="space-y-4">
-        {data.therapists.map((t) => (
+      <ul ref={list} className="space-y-4">
+        {therapists.map((t) => (
           <li key={t.slug}>
             <TherapistCard therapist={t} />
           </li>
         ))}
       </ul>
-      {totalPages > 1 && (
-        <ResultsPagination
-          page={params.page}
-          totalPages={totalPages}
-          hrefFor={(page) => `/?${toQuery(withPage(params, page))}`}
-          onPage={(page) => onChange(withPage(params, page))}
-        />
+      {/* A next page that failed is still to come, so this stays for its retry. */}
+      {query.hasNextPage && !query.isPlaceholderData && (
+        <div>
+          {query.isFetchNextPageError && (
+            <Alert variant="destructive" className="mb-4">
+              <AlertDescription>{query.error?.message}</AlertDescription>
+            </Alert>
+          )}
+          {/* One button loads and retries, so keyboard focus stays on it through a failure. */}
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full aria-disabled:opacity-50"
+            // Not disabled while loading, which would drop focus; a second press is ignored, as it would restart the fetch.
+            aria-disabled={query.isFetchingNextPage}
+            onClick={(event) => {
+              if (query.isFetchingNextPage) return;
+              focusFrom.current = document.activeElement === event.currentTarget ? therapists.length : null;
+              query.fetchNextPage();
+            }}
+          >
+            {query.isFetchingNextPage && <Loader2 className="animate-spin" aria-hidden />}
+            {query.isFetchNextPageError ? "Try again" : "Load more"}
+          </Button>
+          <p aria-live="polite" className="sr-only">
+            {query.isFetchingNextPage ? "Loading more results" : ""}
+          </p>
+        </div>
       )}
     </section>
   );

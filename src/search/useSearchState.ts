@@ -9,7 +9,8 @@ export function useSearchState() {
   const key = query.toString();
   const { params, error } = useMemo(() => {
     try {
-      return { params: readParams(new URLSearchParams(key), ALLOWED), error: null };
+      // Results grow with "Load more" rather than by page, so a page named in a link is ignored.
+      return { params: { ...readParams(new URLSearchParams(key), ALLOWED), page: 1 }, error: null };
     } catch (e) {
       if (e instanceof InvalidParam) return { params: null, error: e };
       throw e;

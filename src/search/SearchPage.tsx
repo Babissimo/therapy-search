@@ -11,6 +11,7 @@ import { FilterPanel } from "./FilterPanel";
 import { Results } from "./Results";
 import { tickedIn } from "./state";
 import { TickedCount } from "./TickedCount";
+import { useResults } from "./useResults";
 import { useSearchState } from "./useSearchState";
 
 export function SearchPage() {
@@ -27,22 +28,28 @@ export function SearchPage() {
       </Alert>
     );
   }
+  return <SearchView params={params} onChange={update} />;
+}
 
+type ViewProps = { params: SearchParams; onChange: (next: SearchParams) => void };
+
+function SearchView({ params, onChange }: ViewProps) {
+  const results = useResults(params);
   return (
     <div className="grid gap-8 md:grid-cols-[minmax(0,1fr)_20rem]">
       <div className="space-y-6">
-        <MobileFilters params={params} onChange={update} />
-        <FilterChips params={params} onChange={update} />
-        <Results params={params} onChange={update} />
+        <MobileFilters params={params} onChange={onChange} />
+        <FilterChips params={params} onChange={onChange} />
+        <Results params={params} results={results} />
       </div>
       <aside className="hidden md:block">
-        <FilterPanel params={params} onChange={update} />
+        <FilterPanel params={params} onChange={onChange} />
       </aside>
     </div>
   );
 }
 
-function MobileFilters({ params, onChange }: { params: SearchParams; onChange: (next: SearchParams) => void }) {
+function MobileFilters({ params, onChange }: ViewProps) {
   const [open, setOpen] = useState(false);
   return (
     <Sheet open={open} onOpenChange={setOpen}>
