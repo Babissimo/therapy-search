@@ -1,5 +1,5 @@
 import { SlidersHorizontal, X } from "lucide-react";
-import { lazy, Suspense, useId, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useId, useRef, useState } from "react";
 import { Link, useLocation } from "react-router";
 import { OPTIONS } from "@shared/options";
 import { SEARCH_MILES, toQuery, type SearchParams } from "@shared/query";
@@ -11,7 +11,8 @@ import { useMediaQuery } from "@/lib/useMediaQuery";
 import { cn } from "@/lib/utils";
 import { FilterChips } from "./FilterChips";
 import { FilterPanel } from "./FilterPanel";
-import { layoutPins } from "./map/pins";
+import { createHighlight } from "./map/highlight";
+import { layoutPins, type Pin } from "./map/pins";
 import { useCardLookups, useCentre } from "./map/usePlaces";
 import { LoadMore } from "./LoadMore";
 import { resultCount } from "./reach";
@@ -69,17 +70,46 @@ function SearchView({ params, onChange }: ViewProps) {
     results.therapists.map((t) => t.location),
     params.flags.LocationSearchOutsideUK,
   );
-  const { unplaced } = centre.settled ? layoutPins(results.therapists, (t) => lookupFor(t.location), centre.point, SEARCH_MILES) : NOT_LAID_OUT;
+  const { pins, unplaced } = centre.settled
+    ? layoutPins(results.therapists, (t) => lookupFor(t.location), centre.point, SEARCH_MILES)
+    : NOT_LAID_OUT;
+  const placing = results.therapists.some((t) => lookupFor(t.location) === undefined);
+  const fitKey = toQuery(params);
+  // Kept by key, so the selection follows its pin as Load more adds to it; a new search clears it.
+  const [selection, setSelection] = useState<{ fitKey: string; pinKey: string }>();
+  const selected = selection?.fitKey === fitKey ? pins.find((pin) => pin.key === selection.pinKey) : undefined;
+  const [highlight] = useState(createHighlight);
+  // A new search's list can replace a hovered card without a pointerleave or blur, so the highlight ends with the search.
+  useEffect(() => {
+    highlight.set(undefined);
+  }, [highlight, fitKey]);
   const [panelOpen, setPanelOpen] = useState(true);
   const [sheet, setSheet] = useState<SheetPosition>("full");
   const scroll = useRememberedScroll(entry, !results.query.isPending);
   const listRef = useRef<HTMLUListElement>(null);
+
+  function select(pin: Pin) {
+    setSelection({ fitKey, pinKey: pin.key });
+    if (wide) setPanelOpen(true);
+    else if (sheet === "peek") setSheet("half");
+    // The selection heads the list.
+    if (scroll.ref.current) scroll.ref.current.scrollTop = 0;
+  }
+
   const count = results.first?.total;
   const title = results.searchedPlace === undefined || count === undefined ? resultCount(count) : `${resultCount(count)} within your area`;
 
   const list = (
     <>
-      <Results params={params} results={results} listRef={listRef} unplaced={unplaced} />
+      <Results
+        params={params}
+        results={results}
+        listRef={listRef}
+        unplaced={unplaced}
+        selection={selected}
+        onClearSelection={() => setSelection(undefined)}
+        onHighlight={highlight.set}
+      />
       <Disclaimer className="mt-8 text-xs" />
     </>
   );
@@ -94,7 +124,17 @@ function SearchView({ params, onChange }: ViewProps) {
       )}
       <div className="relative min-w-0 flex-1">
         <Suspense fallback={<div className="size-full bg-muted" />}>
-          <MapPane fitKey={toQuery(params)} entry={entry} centre={centre.point} centreSettled={centreSettled} />
+          <MapPane
+            fitKey={fitKey}
+            entry={entry}
+            centre={centre.point}
+            centreSettled={centreSettled}
+            pins={pins}
+            placing={placing}
+            highlight={highlight}
+            selected={selected}
+            onSelect={select}
+          />
         </Suspense>
         <MapToolbar params={params} onChange={onChange} drafts={drafts} wide={wide} />
         {!wide && (
