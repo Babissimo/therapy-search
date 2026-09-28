@@ -22,4 +22,15 @@ describe("api", () => {
     answer("<p>A redesigned page</p>");
     await expect(api.search("")).rejects.toMatchObject({ status: 502, message: UNREADABLE });
   });
+
+  it("looks a place up by its canonical query", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ found: false, reason: "not-found" })));
+    await expect(api.place(" Brighton bn3", { centre: true })).resolves.toEqual({ found: false, reason: "not-found" });
+    expect(fetch).toHaveBeenCalledWith("/api/place?q=BRIGHTON+BN3&centre=true");
+  });
+
+  it("passes on the Worker's error for a place lookup", async () => {
+    answer(JSON.stringify({ error: "Couldn't look up that place just now." }), 502);
+    await expect(api.place("BN3")).rejects.toMatchObject({ status: 502, message: "Couldn't look up that place just now." });
+  });
 });
