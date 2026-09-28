@@ -5,6 +5,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { LocationNotice } from "./LocationNotice";
 import { orderSeed } from "./orderSeed";
 import { ResultsPagination } from "./ResultsPagination";
 import { withPage } from "./state";
@@ -47,11 +48,7 @@ export function Results({ params, onChange }: Props) {
   return (
     <section aria-busy={isPlaceholderData} className={cn("space-y-4", isPlaceholderData && "opacity-60")}>
       <p className="text-sm text-muted-foreground">{data.total > 0 ? `${data.from}-${data.to} of ${data.total} results` : "No results"}</p>
-      {data.locationSearched && (
-        <p className="text-sm">
-          Location searched: <strong>{data.locationSearched}</strong>
-        </p>
-      )}
+      <LocationNotice typed={params.text.Location} searched={data.locationSearched} />
       {data.notices.map((notice) => (
         <Alert key={notice}>
           <AlertDescription>{notice}</AlertDescription>
