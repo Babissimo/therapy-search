@@ -1,10 +1,11 @@
+import { MapPinOff } from "lucide-react";
 import { Link } from "react-router";
 import type { TherapistCard as Therapist } from "@shared/types";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 
-export function TherapistCard({ therapist: t }: { therapist: Therapist }) {
+export function TherapistCard({ therapist: t, note }: { therapist: Therapist; note?: string }) {
   const place = [t.location, t.distance && `(${t.distance})`].filter(Boolean).join(" ");
   const contact = [t.phone, t.sessionTypes].filter(Boolean).join(" | ");
 
@@ -23,6 +24,13 @@ export function TherapistCard({ therapist: t }: { therapist: Therapist }) {
             </Link>
           </h2>
           {place && <p className="text-sm">{place}</p>}
+          {note && (
+            <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <MapPinOff aria-hidden className="size-3.5 shrink-0" />
+              <span className="sr-only">Not on the map: </span>
+              {note}
+            </p>
+          )}
           {contact && <p className="text-sm text-muted-foreground">{contact}</p>}
           {t.summary && <p className="text-sm">{t.summary}</p>}
           {t.tags.length > 0 && (
