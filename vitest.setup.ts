@@ -9,3 +9,17 @@ globalThis.ResizeObserver ??= class {
 };
 
 afterEach(() => cleanup());
+
+// jsdom has no matchMedia: pages see a narrow screen without hover unless a test stubs its own.
+if (typeof window !== "undefined") {
+  window.matchMedia ??= (query) => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addListener() {},
+    removeListener() {},
+    addEventListener() {},
+    removeEventListener() {},
+    dispatchEvent: () => false,
+  });
+}
