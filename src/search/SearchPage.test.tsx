@@ -1,19 +1,34 @@
 // @vitest-environment jsdom
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation, useNavigate } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { SearchResult, TherapistCard } from "@shared/types";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { api } from "@/lib/api";
+import type { Highlight } from "./map/highlight";
+import { layoutPins, type Pin } from "./map/pins";
 import { SearchPage } from "./SearchPage";
 
-// The map pane is tested on its own; here it shows what the page passed it.
+// Counted, to see whether a hover makes the page lay its pins out again.
+vi.mock("./map/pins", async (importOriginal) => {
+  const pins = await importOriginal<typeof import("./map/pins")>();
+  return { ...pins, layoutPins: vi.fn(pins.layoutPins) };
+});
+
+// The map pane is tested on its own; here it shows what the page passed it, with a button for each pin.
 vi.mock("./map/MapPane", async () => {
-  const { createElement } = await import("react");
+  const { createElement, useSyncExternalStore } = await import("react");
+  type Props = { centreSettled: boolean; radiusMiles: number; pins: Pin[]; highlight: Highlight; onSelect: (pin: Pin) => void };
   return {
-    default: ({ centreSettled, radiusMiles }: { centreSettled: boolean; radiusMiles: number }) =>
-      createElement("div", { "data-testid": "map", "data-settled": String(centreSettled), "data-radius": radiusMiles }),
+    default: ({ centreSettled, radiusMiles, pins, highlight, onSelect }: Props) => {
+      const slug = useSyncExternalStore(highlight.subscribe, highlight.get);
+      return createElement(
+        "div",
+        { "data-testid": "map", "data-settled": String(centreSettled), "data-radius": radiusMiles, "data-highlighted": slug ?? "" },
+        pins.map((pin) => createElement("button", { key: pin.key, type: "button", onClick: () => onSelect(pin) }, `Pin ${pin.key}`)),
+      );
+    },
   };
 });
 
@@ -34,11 +49,15 @@ function screenIs(wide: boolean) {
 
 const therapist = (slug: string, location?: string): TherapistCard => ({ slug, name: `Therapist ${slug}`, initials: "T", tags: [], location });
 
-/** The given cards as one page, or else thirty results twelve a page; no place is searched, so no centre is looked up. */
-function answer(cards?: TherapistCard[]) {
+/** The given pages of cards, or else thirty results twelve a page; no place is searched, so no centre is looked up. */
+function answer(pages: TherapistCard[][]) {
   vi.spyOn(api, "search").mockImplementation(async (query): Promise<SearchResult> => {
-    if (cards) return { total: cards.length, from: 1, to: cards.length, notices: [], therapists: cards };
     const page = Number(new URLSearchParams(query).get("page") ?? 1);
+    if (pages.length > 0) {
+      const before = pages.slice(0, page - 1).flat().length;
+      const therapists = pages[page - 1] ?? [];
+      return { total: pages.flat().length, from: before + 1, to: before + therapists.length, notices: [], therapists };
+    }
     const therapists = Array.from({ length: 12 }, (_, i) => therapist(`p${page}-${i}`));
     return { total: 30, from: (page - 1) * 12 + 1, to: page * 12, notices: [], therapists };
   });
@@ -57,8 +76,8 @@ function Url() {
   return <output data-testid="url">{useLocation().search}</output>;
 }
 
-function renderAt(url: string, cards?: TherapistCard[]) {
-  answer(cards);
+function renderAt(url: string, ...pages: TherapistCard[][]) {
+  answer(pages);
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
       <TooltipProvider>
@@ -207,5 +226,64 @@ describe("SearchPage", () => {
     expect(await within(results()).findByText("2 of 2 · 1 not on the map")).toBeTruthy();
     expect(within(results()).getByText("Location too general to place")).toBeTruthy();
     expect(within(results()).getByText("Pins show the postcode or area each therapist lists.")).toBeTruthy();
+  });
+
+  it("shows who is at a pin above the results until cleared, raising the sheet halfway", async () => {
+    screenIs(false);
+    vi.spyOn(api, "place").mockResolvedValue({ found: true, kind: "outcode", candidates: [{ lat: 50.83, lng: -0.15 }] });
+    renderAt("/", [therapist("a", "BRIGHTON BN3"), therapist("b", "Hove BN3")]);
+    fireEvent.click(screen.getByRole("button", { name: "Show map" }));
+    fireEvent.click(await screen.findByRole("button", { name: /^Pin / }));
+    const here = screen.getByRole("region", { name: "At this pin" });
+    expect(within(here).getAllByRole("link").map((link) => link.textContent)).toEqual(["Therapist a", "Therapist b"]);
+    expect(results().dataset.position).toBe("half");
+    fireEvent.click(screen.getByRole("button", { name: "Clear selection" }));
+    expect(screen.queryByRole("region", { name: "At this pin" })).toBeNull();
+  });
+
+  it("adds whoever joins the selected pin as more results load", async () => {
+    screenIs(true);
+    vi.spyOn(api, "place").mockResolvedValue({ found: true, kind: "outcode", candidates: [{ lat: 50.83, lng: -0.15 }] });
+    renderAt("/", [therapist("a", "BRIGHTON BN3"), therapist("b", "Hove BN3")], [therapist("c", "Brighton BN3")]);
+    fireEvent.click(await screen.findByRole("button", { name: /^Pin / }));
+    const here = () => within(screen.getByRole("region", { name: "At this pin" })).getAllByRole("link").map((link) => link.textContent);
+    expect(here()).toEqual(["Therapist a", "Therapist b"]);
+    fireEvent.click(screen.getByRole("button", { name: "Load more" }));
+    await waitFor(() => expect(here()).toEqual(["Therapist a", "Therapist b", "Therapist c"]));
+  });
+
+  it("rings the pin of the card in focus", async () => {
+    screenIs(true);
+    renderAt("/");
+    const card = await screen.findByRole("link", { name: "Therapist p1-2" });
+    act(() => card.focus());
+    expect((await screen.findByTestId("map")).dataset.highlighted).toBe("p1-2");
+  });
+
+  it("rings a hovered card's pin without laying the pins out again", async () => {
+    screenIs(true);
+    renderAt("/");
+    const card = await screen.findByRole("link", { name: "Therapist p1-2" });
+    await screen.findByTestId("map");
+    const laidOut = vi.mocked(layoutPins).mock.calls.length;
+    fireEvent.pointerEnter(card.closest("[data-slot=card]") as HTMLElement);
+    expect(screen.getByTestId("map").dataset.highlighted).toBe("p1-2");
+    expect(vi.mocked(layoutPins).mock.calls.length).toBe(laidOut);
+  });
+
+  it("forgets a hovered card when a new search replaces the list, even one listing the same therapist", async () => {
+    screenIs(true);
+    renderAt("/");
+    const card = await screen.findByRole("link", { name: "Therapist p1-2" });
+    await screen.findByTestId("map");
+    fireEvent.pointerEnter(card.closest("[data-slot=card]") as HTMLElement);
+    expect(screen.getByTestId("map").dataset.highlighted).toBe("p1-2");
+    let arrive: (result: SearchResult) => void = () => {};
+    vi.mocked(api.search).mockImplementationOnce(() => new Promise((resolve) => (arrive = resolve)));
+    fireEvent.change(screen.getByRole("textbox", { name: "Location" }), { target: { value: "York" } });
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+    await act(async () => arrive({ total: 1, from: 1, to: 1, notices: [], therapists: [therapist("p1-2")] }));
+    await within(results()).findByText(/^1 of 1/);
+    expect(screen.getByTestId("map").dataset.highlighted).toBe("");
   });
 });

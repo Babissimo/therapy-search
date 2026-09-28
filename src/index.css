@@ -148,4 +148,8 @@
   .leaflet-control-attribution {
     @apply rounded-md bg-muted! px-1! py-0.5! text-[10px] leading-none! text-muted-foreground!;
   }
+  /* A pin or cluster whose therapist's card is hovered or focused. */
+  .pin-highlight {
+    @apply rounded-full outline-3 outline-offset-2 outline-primary;
+  }
 }

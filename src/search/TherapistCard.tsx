@@ -5,12 +5,18 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 
-export function TherapistCard({ therapist: t, note }: { therapist: Therapist; note?: string }) {
+export function TherapistCard({ therapist: t, note, onHighlight }: { therapist: Therapist; note?: string; onHighlight?: (on: boolean) => void }) {
   const place = [t.location, t.distance && `(${t.distance})`].filter(Boolean).join(" ");
   const contact = [t.phone, t.sessionTypes].filter(Boolean).join(" | ");
 
   return (
-    <Card className="relative transition-colors hover:bg-muted/40">
+    <Card
+      className="relative transition-colors hover:bg-muted/40"
+      onPointerEnter={() => onHighlight?.(true)}
+      onPointerLeave={() => onHighlight?.(false)}
+      onFocus={() => onHighlight?.(true)}
+      onBlur={() => onHighlight?.(false)}
+    >
       <CardContent className="flex gap-4">
         <Avatar className="size-16 shrink-0">
           <AvatarImage src={t.photoUrl} alt="" />
