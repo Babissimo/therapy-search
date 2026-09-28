@@ -34,9 +34,10 @@ function screenIs(wide: boolean) {
 
 const therapist = (slug: string, location?: string): TherapistCard => ({ slug, name: `Therapist ${slug}`, initials: "T", tags: [], location });
 
-/** Thirty results, twelve a page; no place is searched, so no centre is looked up. */
-function answer() {
+/** The given cards as one page, or else thirty results twelve a page; no place is searched, so no centre is looked up. */
+function answer(cards?: TherapistCard[]) {
   vi.spyOn(api, "search").mockImplementation(async (query): Promise<SearchResult> => {
+    if (cards) return { total: cards.length, from: 1, to: cards.length, notices: [], therapists: cards };
     const page = Number(new URLSearchParams(query).get("page") ?? 1);
     const therapists = Array.from({ length: 12 }, (_, i) => therapist(`p${page}-${i}`));
     return { total: 30, from: (page - 1) * 12 + 1, to: page * 12, notices: [], therapists };
@@ -56,8 +57,8 @@ function Url() {
   return <output data-testid="url">{useLocation().search}</output>;
 }
 
-function renderAt(url: string) {
-  answer();
+function renderAt(url: string, cards?: TherapistCard[]) {
+  answer(cards);
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
       <TooltipProvider>
@@ -197,5 +198,14 @@ describe("SearchPage", () => {
     renderAt("/");
     await loaded();
     expect(within(results()).getByText(/Not affiliated with or endorsed by UKCP/)).toBeTruthy();
+  });
+
+  it("says which therapists the map can't place, and why", async () => {
+    screenIs(true);
+    vi.spyOn(api, "place").mockResolvedValue({ found: true, kind: "outcode", candidates: [{ lat: 50.83, lng: -0.15 }] });
+    renderAt("/", [therapist("a", "BRIGHTON BN3"), therapist("b", " BN")]);
+    expect(await within(results()).findByText("2 of 2 · 1 not on the map")).toBeTruthy();
+    expect(within(results()).getByText("Location too general to place")).toBeTruthy();
+    expect(within(results()).getByText("Pins show the postcode or area each therapist lists.")).toBeTruthy();
   });
 });

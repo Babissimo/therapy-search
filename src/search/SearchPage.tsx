@@ -11,7 +11,8 @@ import { useMediaQuery } from "@/lib/useMediaQuery";
 import { cn } from "@/lib/utils";
 import { FilterChips } from "./FilterChips";
 import { FilterPanel } from "./FilterPanel";
-import { useCentre } from "./map/usePlaces";
+import { layoutPins } from "./map/pins";
+import { useCardLookups, useCentre } from "./map/usePlaces";
 import { Results } from "./Results";
 import { ResultsPanel } from "./ResultsPanel";
 import { ResultsSheet, type SheetPosition } from "./ResultsSheet";
@@ -28,6 +29,9 @@ const MapPane = lazy(() => import("./map/MapPane"));
 
 /** Wide enough for the results to sit beside the map rather than over it. */
 const WIDE = "(min-width: 64rem)";
+
+/** Before the centre is known, when place names can't yet be judged by their distance from it. */
+const NOT_LAID_OUT: ReturnType<typeof layoutPins> = { pins: [], unplaced: [] };
 
 export function SearchPage() {
   const { params, error, update } = useSearchState();
@@ -59,6 +63,11 @@ function SearchView({ params, onChange }: ViewProps) {
   const centre = useCentre(results.searchedPlace, params.flags.LocationSearchOutsideUK);
   // While the next search loads, the results, and so the place searched, are still the last search's.
   const centreSettled = centre.settled && !results.query.isPlaceholderData;
+  const lookupFor = useCardLookups(
+    results.therapists.map((t) => t.location),
+    params.flags.LocationSearchOutsideUK,
+  );
+  const { unplaced } = centre.settled ? layoutPins(results.therapists, (t) => lookupFor(t.location), centre.point, params.distance) : NOT_LAID_OUT;
   const [panelOpen, setPanelOpen] = useState(true);
   const [sheet, setSheet] = useState<SheetPosition>("full");
   const scroll = useRememberedScroll(entry, !results.query.isPending);
@@ -66,7 +75,7 @@ function SearchView({ params, onChange }: ViewProps) {
 
   const list = (
     <>
-      <Results params={params} results={results} />
+      <Results params={params} results={results} unplaced={unplaced} />
       <Disclaimer className="mt-8 text-xs" />
     </>
   );
