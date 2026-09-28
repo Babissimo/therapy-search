@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { useId } from "react";
 import { CircleHelp } from "lucide-react";
 import { Link } from "react-router";
 import { OPTIONS } from "@shared/options";
@@ -10,22 +10,19 @@ import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { CheckboxGroup } from "./CheckboxGroup";
-import { isChecked, tickedIn, withDistance, withField, withFlag, withText } from "./state";
+import { isChecked, tickedIn, withDistance, withField, withFlag } from "./state";
 import { TickedCount } from "./TickedCount";
+import type { SearchDrafts } from "./useSearchDrafts";
 
 /** The long lists that carry an in-list search box on UKCP. */
 const SEARCHABLE = new Set(["TypesOfTherapy", "Languages", "Colleges"]);
 
-type Props = { params: SearchParams; onChange: (next: SearchParams) => void; onSearch?: () => void };
+type Props = { params: SearchParams; drafts: SearchDrafts; onSearch?: () => void };
 
-/** Location, keyword and UKCP's "Refine your search" filters. */
-export function FilterPanel({ params, onChange, onSearch }: Props) {
+/** Keyword, distance and UKCP's "Refine your search" filters. Every change takes the typed location and keyword with it. */
+export function FilterPanel({ params, drafts, onSearch }: Props) {
   const outsideUkId = useId();
-  const [location, setLocation] = useDraft(params.text.Location);
-  const [keyword, setKeyword] = useDraft(params.text.KeywordFilter);
-  const [distance, setDistance] = useDraft(params.distance);
-  // Every change here takes the typed location and keyword with it, so the results match what the panel shows.
-  const search = (next: SearchParams) => onChange(withText(withText(next, "Location", location), "KeywordFilter", keyword));
+  const { distance } = drafts;
   const openGroups = OPTIONS.groups.filter((g) => tickedIn(params, g) > 0).map((g) => g.label);
 
   return (
@@ -38,19 +35,20 @@ export function FilterPanel({ params, onChange, onSearch }: Props) {
       </div>
 
       <form
-        role="search"
-        className="space-y-3"
         onSubmit={(e) => {
           e.preventDefault();
-          search(withDistance(params, distance));
+          drafts.submit(withDistance(params, distance));
           onSearch?.();
         }}
       >
-        <div className="flex gap-2">
-          <Input aria-label="Location" placeholder="Town or postcode" maxLength={TEXT_MAX_LENGTH} value={location} onChange={(e) => setLocation(e.target.value)} />
-          <Button type="submit">Search</Button>
-        </div>
-        <Input type="search" aria-label="Keyword search" placeholder="Keyword search" maxLength={TEXT_MAX_LENGTH} value={keyword} onChange={(e) => setKeyword(e.target.value)} />
+        <Input
+          type="search"
+          aria-label="Keyword search"
+          placeholder="Keyword search"
+          maxLength={TEXT_MAX_LENGTH}
+          value={drafts.keyword}
+          onChange={(e) => drafts.setKeyword(e.target.value)}
+        />
       </form>
 
       <div className="space-y-4 rounded-lg bg-muted p-4">
@@ -66,14 +64,14 @@ export function FilterPanel({ params, onChange, onSearch }: Props) {
           max={DISTANCE.max}
           step={1}
           value={[distance]}
-          onValueChange={([d]) => d !== undefined && setDistance(d)}
-          onValueCommit={([d]) => d !== undefined && search(withDistance(params, d))}
+          onValueChange={([d]) => d !== undefined && drafts.setDistance(d)}
+          onValueCommit={([d]) => d !== undefined && drafts.submit(withDistance(params, d))}
         />
         <div className="flex items-center gap-2">
           <Checkbox
             id={outsideUkId}
             checked={params.flags.LocationSearchOutsideUK}
-            onCheckedChange={(checked) => search(withFlag(params, "LocationSearchOutsideUK", checked === true))}
+            onCheckedChange={(checked) => drafts.submit(withFlag(params, "LocationSearchOutsideUK", checked === true))}
           />
           <label htmlFor={outsideUkId} className="text-sm">
             Search locations outside the UK
@@ -108,7 +106,7 @@ export function FilterPanel({ params, onChange, onSearch }: Props) {
                 group={group}
                 searchable={group.fields.some((f) => SEARCHABLE.has(f.name))}
                 isChecked={(field) => isChecked(params, field)}
-                onToggle={(field, on) => search(withField(params, field, on))}
+                onToggle={(field, on) => drafts.submit(withField(params, field, on))}
               />
             </AccordionContent>
           </AccordionItem>
@@ -116,15 +114,4 @@ export function FilterPanel({ params, onChange, onSearch }: Props) {
       </Accordion>
     </div>
   );
-}
-
-/** A local draft of a value from the URL, reset whenever the URL's value changes. */
-function useDraft<T>(value: T): [T, (draft: T) => void] {
-  const [draft, setDraft] = useState(value);
-  const [seen, setSeen] = useState(value);
-  if (value !== seen) {
-    setSeen(value);
-    setDraft(value);
-  }
-  return [draft, setDraft];
 }
