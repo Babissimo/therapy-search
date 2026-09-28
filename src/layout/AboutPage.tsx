@@ -17,7 +17,8 @@ export function AboutPage() {
         servers, and each visitor's requests are rate-limited.
       </p>
       <p>
-        No searches are logged. Your browser keeps one random number so that results stay in the same order while you page through them.
+        No searches are logged. Your browser keeps one random number so that results stay in the same order while you page through them,
+        and your choice of light or dark theme if you pick one.
       </p>
       <p>
         If you're from UKCP, or have any concern about this site,{" "}
