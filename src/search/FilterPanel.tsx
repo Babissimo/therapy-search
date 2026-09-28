@@ -18,36 +18,34 @@ const SEARCHABLE = new Set(["TypesOfTherapy", "Languages", "Colleges"]);
 
 type Props = { params: SearchParams; drafts: SearchDrafts; onSearch?: () => void };
 
-/** Keyword and UKCP's "Refine your search" filters. Every change takes the typed location and keyword with it. */
+/** Keyword and UKCP's "Refine your search" filters, under a heading its container gives. Every change takes the typed location and keyword with it. */
 export function FilterPanel({ params, drafts, onSearch }: Props) {
   const outsideUkId = useId();
   const openGroups = OPTIONS.groups.filter((g) => tickedIn(params, g) > 0).map((g) => g.label);
 
   return (
     <div className="space-y-6">
-      <div className="flex items-baseline justify-between">
-        <h2 className="font-semibold">Refine your search</h2>
-        <Button variant="link" size="sm" className="px-0" asChild>
+      <div className="space-y-2">
+        <Button variant="link" size="sm" className="h-auto px-0" asChild>
           <Link to="/">Clear all filters</Link>
         </Button>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            drafts.submit(params);
+            onSearch?.();
+          }}
+        >
+          <Input
+            type="search"
+            aria-label="Keyword search"
+            placeholder="Keyword search"
+            maxLength={TEXT_MAX_LENGTH}
+            value={drafts.keyword}
+            onChange={(e) => drafts.setKeyword(e.target.value)}
+          />
+        </form>
       </div>
-
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          drafts.submit(params);
-          onSearch?.();
-        }}
-      >
-        <Input
-          type="search"
-          aria-label="Keyword search"
-          placeholder="Keyword search"
-          maxLength={TEXT_MAX_LENGTH}
-          value={drafts.keyword}
-          onChange={(e) => drafts.setKeyword(e.target.value)}
-        />
-      </form>
 
       <div className="flex items-center gap-2">
         <Checkbox

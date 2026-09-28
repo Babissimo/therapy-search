@@ -1,11 +1,13 @@
 // @vitest-environment jsdom
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { useRef } from "react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { emptyParams, type SearchParams } from "@shared/query";
 import type { SearchResult } from "@shared/types";
 import { api, ApiError } from "@/lib/api";
+import { LoadMore } from "./LoadMore";
 import { Results } from "./Results";
 import { withText } from "./state";
 import { useResults } from "./useResults";
@@ -32,7 +34,14 @@ function answerPages({ total = 30, fail }: { total?: number; fail?: number } = {
 }
 
 function Harness({ params }: { params: SearchParams }) {
-  return <Results params={params} results={useResults(params)} />;
+  const results = useResults(params);
+  const listRef = useRef<HTMLUListElement>(null);
+  return (
+    <>
+      <Results params={params} results={results} listRef={listRef} />
+      <LoadMore results={results} listRef={listRef} />
+    </>
+  );
 }
 
 function renderResults(params: SearchParams) {

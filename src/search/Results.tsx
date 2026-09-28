@@ -1,8 +1,6 @@
-import { Loader2 } from "lucide-react";
-import { useEffect, useRef } from "react";
+import type { Ref } from "react";
 import type { SearchParams } from "@shared/query";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { LocationNotice } from "./LocationNotice";
@@ -11,22 +9,15 @@ import { ResultsError } from "./ResultsError";
 import { TherapistCard } from "./TherapistCard";
 import type { SearchResults } from "./useResults";
 
-type Props = { params: SearchParams; results: SearchResults };
+type Props = {
+  params: SearchParams;
+  results: SearchResults;
+  /** The list of cards, for "Load more" to hand the keyboard on to. */
+  listRef?: Ref<HTMLUListElement>;
+};
 
-export function Results({ params, results }: Props) {
+export function Results({ params, results, listRef }: Props) {
   const { query, first, therapists, searchedPlace } = results;
-  const list = useRef<HTMLUListElement>(null);
-  // How many cards were listed when the next-page button was pressed while focused, until that fetch settles.
-  const focusFrom = useRef<number | null>(null);
-  const pages = query.data?.pages.length;
-  useEffect(() => {
-    const from = focusFrom.current;
-    if (from === null || query.isFetchingNextPage) return;
-    focusFrom.current = null;
-    // The last page takes the button away, dropping focus to the page; the keyboard carries on from the first new card.
-    const dropped = document.activeElement === null || document.activeElement === document.body;
-    if (!query.hasNextPage && dropped) list.current?.children[from]?.querySelector("a")?.focus();
-  }, [pages, query.isFetchingNextPage, query.hasNextPage]);
   if (query.isPending) {
     return (
       <div className="space-y-4" aria-busy>
@@ -47,42 +38,13 @@ export function Results({ params, results }: Props) {
           <AlertDescription>{notice}</AlertDescription>
         </Alert>
       ))}
-      <ul ref={list} className="space-y-4">
+      <ul ref={listRef} className="space-y-4">
         {therapists.map((t) => (
           <li key={t.slug}>
             <TherapistCard therapist={t} />
           </li>
         ))}
       </ul>
-      {/* A next page that failed is still to come, so this stays for its retry. */}
-      {query.hasNextPage && !query.isPlaceholderData && (
-        <div>
-          {query.isFetchNextPageError && (
-            <Alert variant="destructive" className="mb-4">
-              <AlertDescription>{query.error?.message}</AlertDescription>
-            </Alert>
-          )}
-          {/* One button loads and retries, so keyboard focus stays on it through a failure. */}
-          <Button
-            type="button"
-            variant="outline"
-            className="w-full aria-disabled:opacity-50"
-            // Not disabled while loading, which would drop focus; a second press is ignored, as it would restart the fetch.
-            aria-disabled={query.isFetchingNextPage}
-            onClick={(event) => {
-              if (query.isFetchingNextPage) return;
-              focusFrom.current = document.activeElement === event.currentTarget ? therapists.length : null;
-              query.fetchNextPage();
-            }}
-          >
-            {query.isFetchingNextPage && <Loader2 className="animate-spin" aria-hidden />}
-            {query.isFetchNextPageError ? "Try again" : "Load more"}
-          </Button>
-          <p aria-live="polite" className="sr-only">
-            {query.isFetchingNextPage ? "Loading more results" : ""}
-          </p>
-        </div>
-      )}
     </section>
   );
 }
