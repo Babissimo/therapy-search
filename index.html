@@ -3,6 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Third parties, such as the map's tile server, get our origin alone, never a page URL with its search. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
     <title>Find a UKCP therapist (unofficial)</title>
     <script>
       // Applies the theme before first paint, so a dark page never flashes white. Mirrors src/layout/theme.ts.
