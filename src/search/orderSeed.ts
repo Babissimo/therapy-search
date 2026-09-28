@@ -1,4 +1,5 @@
 import { ORDER_SEED_POOL } from "@shared/query";
+import { browserStorage } from "@/lib/storage";
 
 const KEY = "ukcp-order-seed";
 
@@ -18,12 +19,4 @@ export function orderSeed(storage: SeedStorage | null = browserStorage(), random
     // Private browsing can refuse writes; the seed then lasts for this page load only.
   }
   return seed;
-}
-
-function browserStorage(): Storage | null {
-  try {
-    return window.localStorage;
-  } catch {
-    return null;
-  }
 }

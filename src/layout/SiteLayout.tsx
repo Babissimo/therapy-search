@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router";
+import { ThemeSwitch } from "./ThemeSwitch";
 
 export function SiteLayout({ children }: { children: ReactNode }) {
   return (
@@ -9,9 +10,12 @@ export function SiteLayout({ children }: { children: ReactNode }) {
           <Link to="/" className="font-semibold">
             Find a UKCP therapist
           </Link>
-          <Link to="/about" className="text-sm text-muted-foreground hover:underline">
-            About this site
-          </Link>
+          <div className="flex items-center gap-4">
+            <Link to="/about" className="text-sm text-muted-foreground hover:underline">
+              About<span className="max-sm:hidden"> this site</span>
+            </Link>
+            <ThemeSwitch />
+          </div>
         </div>
       </header>
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">{children}</main>

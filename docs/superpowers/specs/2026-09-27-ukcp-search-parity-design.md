@@ -120,6 +120,8 @@ Vite, React, Tailwind and shadcn/ui (Radix primitives), with React Router (v8, d
 
 The search state lives in the page URL using UKCP's own parameter names (§3.2), with `page` for the page number, as UKCP does, so a search can be bookmarked or shared and maps one-to-one onto a UKCP URL. As on UKCP, checkboxes and the distance slider apply as soon as they change, text fields apply on Enter or the Search button, and any change returns to page 1. The visitor's `OrderSeed` is drawn once from a pool of 64 values and kept in `localStorage`, so the order stays stable while paging and shuffled searches still share cache entries. It is sent only when there is no location, since location searches are ordered by distance band.
 
+A switch in the header picks a light, dark or system theme, the last following `prefers-color-scheme`. A light or dark choice is kept in `localStorage`, and an inline script in `index.html` applies it before first paint so a dark page never flashes white.
+
 | UKCP element | shadcn/ui |
 |---|---|
 | "I want help with" typeahead, multiple terms | `Popover` + `Command` combobox, choices shown as `Badge`s |
