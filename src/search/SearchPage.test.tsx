@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation, useNavigate } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { SearchResult, TherapistCard } from "@shared/types";
@@ -114,6 +114,8 @@ const loaded = () => within(results()).findByText(/^\d+ of 30/);
 /** The results' scrolling list, which holds everything but their header and footer. */
 const list = () => results().querySelector<HTMLElement>(".overflow-y-auto")!;
 const names = () => within(results()).getAllByRole("link", { name: /^Therapist/ }).map((link) => link.textContent);
+/** Gives the lazily loaded map time to arrive, were the page to ask for it. */
+const mapLoads = () => act(async () => void (await import("./map/MapPane")));
 
 const BRIGHTON = { lat: 50.8225, lng: -0.1372 };
 const HOVE = { lat: 50.835, lng: -0.178 };
@@ -141,41 +143,46 @@ describe("SearchPage", () => {
     expect(results()).toBeTruthy();
   });
 
-  it("asks for a search rather than listing everyone when there is nothing to search for", async () => {
+  it("asks for a search in place of the map and results when there is nothing to search for", async () => {
     screenIs(true);
     renderAt("/");
-    expect(within(results()).getByText(/^Search a town, city or postcode/)).toBeTruthy();
-    expect(await screen.findByTestId("map")).toBeTruthy();
+    await mapLoads();
+    expect(screen.getByText(/^Search a town, city or postcode/)).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 1, name: "Find a UKCP therapist" })).toBeTruthy();
+    expect(screen.queryByRole("region", { name: "Results" })).toBeNull();
+    expect(screen.queryByTestId("map")).toBeNull();
     expect(api.search).not.toHaveBeenCalled();
     fireEvent.change(screen.getByRole("textbox", { name: "Location" }), { target: { value: "York" } });
     fireEvent.click(screen.getByRole("button", { name: "Search" }));
     await loaded();
+    expect(await screen.findByTestId("map")).toBeTruthy();
+    expect(screen.queryByText(/^Search a town, city or postcode/)).toBeNull();
   });
 
   it("takes the outside-UK tick alone as nothing to search for", async () => {
     screenIs(true);
     renderAt("/?LocationSearchOutsideUK=true");
-    expect(within(results()).getByText(/^Search a town, city or postcode/)).toBeTruthy();
-    expect((await screen.findByTestId("map")).dataset.fitKey).toBe("");
+    await mapLoads();
+    expect(screen.getByText(/^Search a town, city or postcode/)).toBeTruthy();
+    expect(screen.queryByTestId("map")).toBeNull();
     expect(api.search).not.toHaveBeenCalled();
   });
 
-  it("goes back to the prompt, the UK and a half-raised sheet when the location is cleared", async () => {
+  it("goes back to the prompt in place of the map and results when the location is cleared, and opens the next search on its list", async () => {
     screenIs(false);
     renderAt(SEARCH);
     await loaded();
-    expect(results().dataset.position).toBe("full");
+    expect(await screen.findByTestId("map")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Show map" }));
     fireEvent.change(screen.getByRole("textbox", { name: "Location" }), { target: { value: "" } });
     fireEvent.click(screen.getByRole("button", { name: "Search" }));
-    expect(within(results()).getByText(/^Search a town, city or postcode/)).toBeTruthy();
-    expect(results().dataset.position).toBe("half");
-    expect(screen.getByTestId("map").dataset.fitKey).toBe("");
-  });
-
-  it("opens a phone with the map in view beside the prompt", () => {
-    screenIs(false);
-    renderAt("/");
-    expect(results().dataset.position).toBe("half");
+    expect(screen.getByText(/^Search a town, city or postcode/)).toBeTruthy();
+    expect(screen.queryByRole("region", { name: "Results" })).toBeNull();
+    expect(screen.queryByTestId("map")).toBeNull();
+    fireEvent.change(screen.getByRole("textbox", { name: "Location" }), { target: { value: "York" } });
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+    expect(results().dataset.position).toBe("full");
+    await loaded();
   });
 
   it("keeps Load more beneath the list rather than at its end", async () => {
@@ -222,6 +229,31 @@ describe("SearchPage", () => {
     expect(screen.queryByRole("region", { name: "Refine your search" })).toBeNull();
   });
 
+  it("opens the filters beside the prompt on wide screens, open as they search until a search for a place puts them away", async () => {
+    screenIs(true);
+    renderAt("/");
+    const filters = () => screen.queryByRole("region", { name: "Refine your search" });
+    expect(filters()).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+    expect(filters()).toBeTruthy();
+    const keyword = screen.getByRole("searchbox", { name: "Keyword search" });
+    fireEvent.change(keyword, { target: { value: "grief" } });
+    fireEvent.submit(keyword.closest("form")!);
+    await loaded();
+    expect(filters()).toBeTruthy();
+    fireEvent.change(screen.getByRole("textbox", { name: "Location" }), { target: { value: "York" } });
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+    expect(filters()).toBeNull();
+    await loaded();
+  });
+
+  it("keeps the filters shut on a phone's prompt that widens, as they open only on arriving wide", () => {
+    const resize = screenIs(false);
+    renderAt("/");
+    resize(true);
+    expect(screen.queryByRole("region", { name: "Refine your search" })).toBeNull();
+  });
+
   it("leaves the outside-UK tick out of the Filters count, as Clear all keeps it", async () => {
     screenIs(true);
     renderAt("/?LocationSearchOutsideUK=true&Languages=French");
@@ -249,7 +281,7 @@ describe("SearchPage", () => {
     await loaded();
   });
 
-  it("holds the map's framing until a first search arrives, and not without one", async () => {
+  it("holds the map's framing until a first search arrives", async () => {
     screenIs(true);
     let arrive: (result: SearchResult) => void = () => {};
     answer([]);
@@ -259,9 +291,6 @@ describe("SearchPage", () => {
     await act(async () => arrive({ total: 1, from: 1, to: 1, notices: [], therapists: [therapist("york")] }));
     await within(results()).findByText(/^1 of 1/);
     expect(screen.getByTestId("map").dataset.settled).toBe("true");
-    cleanup();
-    renderAt("/");
-    expect((await screen.findByTestId("map")).dataset.settled).toBe("true");
   });
 
   it("settles the map's framing when a first search fails, so the map is not left waiting", async () => {

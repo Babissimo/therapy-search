@@ -7,11 +7,20 @@ import { cn } from "@/lib/utils";
 import { useLocate } from "./useLocate";
 import type { SearchDrafts } from "./useSearchDrafts";
 
-type Props = { params: SearchParams; drafts: SearchDrafts; className?: string };
+type Props = {
+  params: SearchParams;
+  drafts: SearchDrafts;
+  /** Hears a search for a place, typed or located, rather than one with the box left empty. */
+  onPlaceSearch?: () => void;
+  className?: string;
+};
 
 /** The location search, which can search the visitor's nearest postcode; either way it takes the typed keyword with it. */
-export function SearchBox({ params, drafts, className }: Props) {
-  const here = useLocate((postcode) => drafts.submitAt(params, postcode));
+export function SearchBox({ params, drafts, onPlaceSearch, className }: Props) {
+  const here = useLocate((postcode) => {
+    drafts.submitAt(params, postcode);
+    onPlaceSearch?.();
+  });
   const problemId = useId();
   return (
     <div className={cn("min-w-0", className)}>
@@ -21,6 +30,7 @@ export function SearchBox({ params, drafts, className }: Props) {
         onSubmit={(e) => {
           e.preventDefault();
           drafts.submit(params);
+          if (drafts.location.trim() !== "") onPlaceSearch?.();
         }}
       >
         <div className="relative min-w-0 flex-1">

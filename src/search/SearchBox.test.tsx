@@ -8,20 +8,20 @@ import { SearchBox } from "./SearchBox";
 import { NO_POSTCODE, REFUSED } from "./useLocate";
 import { useSearchDrafts } from "./useSearchDrafts";
 
-function Harness({ params, onChange }: { params: SearchParams; onChange: (next: SearchParams) => void }) {
+function Harness({ params, onChange, onPlaceSearch }: { params: SearchParams; onChange: (next: SearchParams) => void; onPlaceSearch?: () => void }) {
   const drafts = useSearchDrafts(params, onChange);
   return (
     <>
-      <SearchBox params={params} drafts={drafts} />
+      <SearchBox params={params} drafts={drafts} onPlaceSearch={onPlaceSearch} />
       <input aria-label="Keyword" value={drafts.keyword} onChange={(e) => drafts.setKeyword(e.target.value)} />
     </>
   );
 }
 
-const renderBox = (onChange = vi.fn()) =>
+const renderBox = (onChange = vi.fn(), onPlaceSearch?: () => void) =>
   render(
     <TooltipProvider>
-      <Harness params={emptyParams()} onChange={onChange} />
+      <Harness params={emptyParams()} onChange={onChange} onPlaceSearch={onPlaceSearch} />
     </TooltipProvider>,
   );
 
@@ -55,6 +55,26 @@ describe("SearchBox", () => {
     expect(nearest).toHaveBeenCalledWith(50.82614, -0.15987);
     expect(onChange.mock.calls[0]?.[0].text).toMatchObject({ Location: "BN3 1FG", KeywordFilter: "grief" });
     expect(location().value).toBe("BN3 1FG");
+  });
+
+  it("tells its owner when it searches a place, typed or located, but not with the box blank or no postcode found", async () => {
+    geolocation(at(48.85, 2.35));
+    const nearest = vi.spyOn(api, "nearest").mockResolvedValue({ found: false });
+    const onPlaceSearch = vi.fn();
+    const onChange = vi.fn();
+    renderBox(onChange, onPlaceSearch);
+    fireEvent.change(location(), { target: { value: "  " } });
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+    expect(onChange).toHaveBeenCalledOnce();
+    locate();
+    await screen.findByRole("alert");
+    expect(onPlaceSearch).not.toHaveBeenCalled();
+    nearest.mockResolvedValue({ found: true, postcode: "BN3 1FG" });
+    locate();
+    await waitFor(() => expect(onPlaceSearch).toHaveBeenCalledOnce());
+    fireEvent.change(location(), { target: { value: "York" } });
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+    expect(onPlaceSearch).toHaveBeenCalledTimes(2);
   });
 
   it("says so when the browser won't share the position, until the box is typed in", async () => {

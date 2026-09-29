@@ -1,4 +1,4 @@
-import { MapPin, SlidersHorizontal, X } from "lucide-react";
+import { SlidersHorizontal, X } from "lucide-react";
 import { lazy, Suspense, useEffect, useId, useRef, useState, type ComponentProps } from "react";
 import { Link, useLocation } from "react-router";
 import { OPTIONS } from "@shared/options";
@@ -28,7 +28,7 @@ import { useSearchDrafts, type SearchDrafts } from "./useSearchDrafts";
 import { useSearchState } from "./useSearchState";
 import { useRememberedScroll } from "./viewMemory";
 
-// Leaflet comes in its own chunk, so the results never wait for it.
+// Leaflet comes in its own chunk, so the results never wait for it and a visit that searches nothing never loads it.
 const MapPane = lazy(() => import("./map/MapPane"));
 
 /** Wide enough for the results to sit beside the map rather than over it. */
@@ -69,13 +69,13 @@ function SearchView({ params, onChange }: ViewProps) {
   // With nothing to search for, UKCP would list everyone in a random order, which answers no one's question. The
   // outside-UK tick alone is nothing to search for: it only changes how a location is read.
   const searching = toQuery(withFlag(params, "LocationSearchOutsideUK", false)) !== "";
-  // What the map frames: nothing, and so the UK, until there is a search.
+  // What the map frames, and what a selection belongs to.
   const fitKey = searching ? toQuery(params) : "";
   const results = useResults(params, searching);
   const centre = useCentre(results.searchedPlace, params.flags.LocationSearchOutsideUK);
   // The place searched comes with the results, so there is none until a first search's results arrive; while the next
   // search loads, the results, and so the place, are still the last search's.
-  const centreSettled = centre.settled && !(searching && results.query.isPending) && !results.query.isPlaceholderData;
+  const centreSettled = centre.settled && !results.query.isPending && !results.query.isPlaceholderData;
   const lookupFor = useCardLookups(
     results.therapists.map((t) => t.location),
     params.flags.LocationSearchOutsideUK,
@@ -93,13 +93,11 @@ function SearchView({ params, onChange }: ViewProps) {
     highlight.set(undefined);
   }, [highlight, fitKey]);
   const [panelOpen, setPanelOpen] = useState(true);
-  // The sheet opens on a search's list, or halfway beside the prompt, and follows as one gives way to the other.
-  const [sheet, setSheet] = useState<SheetPosition>(searching ? "full" : "half");
-  const [sheetFor, setSheetFor] = useState(searching);
-  if (sheetFor !== searching) {
-    setSheetFor(searching);
-    setSheet(searching ? "full" : "half");
-  }
+  // Open on arriving at the prompt on a wide screen, where there is no map for them to cover.
+  const [filtersOpen, setFiltersOpen] = useState(!searching && wide);
+  // The sheet opens on the list, and does again after the prompt, which has none.
+  const [sheet, setSheet] = useState<SheetPosition>("full");
+  if (!searching && sheet !== "full") setSheet("full");
   const scroll = useRememberedScroll(entry, !results.query.isPending);
   const listRef = useRef<HTMLUListElement>(null);
   // Whether the list was showing when a pin was selected, so it can glide to the pin's entry rather than jump.
@@ -127,7 +125,7 @@ function SearchView({ params, onChange }: ViewProps) {
   const count = results.first?.total;
   const title = results.searchedPlace === undefined || count === undefined ? resultCount(count) : `${resultCount(count)} within your area`;
 
-  const list = searching ? (
+  const list = (
     <Results
       params={params}
       results={results}
@@ -137,50 +135,57 @@ function SearchView({ params, onChange }: ViewProps) {
       selected={selected}
       onHighlight={highlight.set}
     />
-  ) : (
-    <SearchPrompt />
   );
   const footer = <LoadMore results={results} listRef={listRef} placing={placing} />;
 
+  // The toolbar keeps its place in the tree as the prompt gives way to a search, so what is typed or open in it stays.
   return (
-    <div className="flex min-h-0 flex-1">
-      {wide && (
-        <ResultsPanel
-          open={panelOpen}
-          onOpenChange={setPanelOpen}
-          title={title}
-          masthead={<Masthead className="border-b px-4 py-3" />}
-          scrollRef={scroll.ref}
-          onScroll={scroll.save}
-          footer={footer}
-        >
-          {list}
-        </ResultsPanel>
-      )}
-      <div className="relative min-w-0 flex-1">
-        <Suspense fallback={<div className="size-full bg-muted" />}>
-          <MapPane
-            fitKey={fitKey}
-            entry={entry}
-            centre={centre.point}
-            reachMiles={reachMiles(results.therapists)}
-            centreSettled={centreSettled}
-            pins={pins}
-            placing={placing}
-            highlight={highlight}
-            selected={selected}
-            onSelect={select}
-          />
-        </Suspense>
-        <MapToolbar params={params} onChange={onChange} drafts={drafts} wide={wide} />
-        {!wide && (
-          <ResultsSheet position={sheet} onPositionChange={setSheet} title={title} scrollRef={scroll.ref} onScroll={scroll.save} footer={footer}>
-            <Masthead className="pb-3" />
+    <>
+      {/* With no results to head, the site's name heads the page. */}
+      {!searching && <Masthead className="border-b px-4 py-3" />}
+      <div className="flex min-h-0 flex-1">
+        {wide && searching && (
+          <ResultsPanel
+            open={panelOpen}
+            onOpenChange={setPanelOpen}
+            title={title}
+            masthead={<Masthead className="border-b px-4 py-3" />}
+            scrollRef={scroll.ref}
+            onScroll={scroll.save}
+            footer={footer}
+          >
             {list}
-          </ResultsSheet>
+          </ResultsPanel>
         )}
+        <div className="relative min-w-0 flex-1">
+          {searching ? (
+            <Suspense fallback={<div className="size-full bg-muted" />}>
+              <MapPane
+                fitKey={fitKey}
+                entry={entry}
+                centre={centre.point}
+                reachMiles={reachMiles(results.therapists)}
+                centreSettled={centreSettled}
+                pins={pins}
+                placing={placing}
+                highlight={highlight}
+                selected={selected}
+                onSelect={select}
+              />
+            </Suspense>
+          ) : (
+            <SearchPrompt besideFilters={wide && filtersOpen} />
+          )}
+          <MapToolbar params={params} onChange={onChange} drafts={drafts} wide={wide} filtersOpen={filtersOpen} onFiltersOpenChange={setFiltersOpen} />
+          {!wide && searching && (
+            <ResultsSheet position={sheet} onPositionChange={setSheet} title={title} scrollRef={scroll.ref} onScroll={scroll.save} footer={footer}>
+              <Masthead className="pb-3" />
+              {list}
+            </ResultsSheet>
+          )}
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 
@@ -193,9 +198,15 @@ function reveal(list: HTMLElement, entry: HTMLElement, glide: boolean) {
   list.scrollTo({ top: list.scrollTop + top - view.top - REVEAL_GAP_PX, behavior: smooth ? "smooth" : "auto" });
 }
 
-/** The search box, filters and active-filter chips, floating over the top of the map. */
-function MapToolbar({ params, onChange, drafts, wide }: ViewProps & { drafts: SearchDrafts; wide: boolean }) {
-  const [filtersOpen, setFiltersOpen] = useState(false);
+/** The search box, filters and active-filter chips, floating over the top of the map or the prompt. */
+function MapToolbar({
+  params,
+  onChange,
+  drafts,
+  wide,
+  filtersOpen,
+  onFiltersOpenChange,
+}: ViewProps & { drafts: SearchDrafts; wide: boolean; filtersOpen: boolean; onFiltersOpenChange: (open: boolean) => void }) {
   const filtersId = useId();
   // UKCP's groups rather than the panel's, so the outside-UK tick, which makes no chip and survives Clear all, goes uncounted.
   const ticked = OPTIONS.groups.reduce((sum, group) => sum + tickedIn(params, group), 0);
@@ -203,13 +214,14 @@ function MapToolbar({ params, onChange, drafts, wide }: ViewProps & { drafts: Se
     // Only the toolbar's own controls take the pointer; the map shows through the rest of it.
     <div className="pointer-events-none absolute inset-3 z-10 flex flex-col items-start gap-2 lg:right-auto lg:w-96">
       <div className="pointer-events-auto flex w-full items-start gap-2 rounded-xl border bg-background p-2 shadow-md">
-        <SearchBox params={params} drafts={drafts} className="min-w-0 flex-1" />
+        {/* A search for a place puts the filters away to show where it is; ticks and the keyword leave them open for more. */}
+        <SearchBox params={params} drafts={drafts} onPlaceSearch={() => onFiltersOpenChange(false)} className="min-w-0 flex-1" />
         {wide ? (
           <FiltersButton
             ticked={ticked}
             aria-expanded={filtersOpen}
             aria-controls={filtersOpen ? filtersId : undefined}
-            onClick={() => setFiltersOpen((open) => !open)}
+            onClick={() => onFiltersOpenChange(!filtersOpen)}
           />
         ) : (
           <MobileFilters params={params} drafts={drafts} ticked={ticked} />
@@ -231,7 +243,7 @@ function MapToolbar({ params, onChange, drafts, wide }: ViewProps & { drafts: Se
             <h2 id={`${filtersId}-heading`} className="font-semibold">
               Refine your search
             </h2>
-            <Button type="button" variant="ghost" size="icon-sm" aria-label="Close filters" onClick={() => setFiltersOpen(false)}>
+            <Button type="button" variant="ghost" size="icon-sm" aria-label="Close filters" onClick={() => onFiltersOpenChange(false)}>
               <X aria-hidden />
             </Button>
           </div>
@@ -242,15 +254,18 @@ function MapToolbar({ params, onChange, drafts, wide }: ViewProps & { drafts: Se
   );
 }
 
-/** In place of results until there is something to search for. */
-function SearchPrompt() {
+/** In place of the map and results until there is something to search for, so no map tiles are fetched for nothing. */
+function SearchPrompt({ besideFilters }: { besideFilters: boolean }) {
   return (
-    <div className="flex gap-3 py-2">
-      <MapPin aria-hidden className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
-      <div className="space-y-2 text-sm">
-        <p className="font-medium">Search a town, city or postcode to see the UKCP therapists within your area, nearest first.</p>
-        <p className="text-muted-foreground">
-          Filters <SlidersHorizontal aria-hidden className="inline size-3.5 align-[-0.125em]" /> narrow the search by what therapists help with, how
+    // Clear of the toolbar over its top, or beside the filters open beneath it.
+    <div className={cn("flex size-full overflow-y-auto", besideFilters ? "py-6 pr-6 pl-105" : "px-6 py-24")}>
+      {/* Centred by its margins, so text taller than the space scrolls from its top rather than being cut off there. */}
+      <div className="m-auto max-w-2xl space-y-4 text-center text-balance sm:space-y-6">
+        <p className="text-2xl font-semibold tracking-tight sm:text-4xl">
+          Search a town, city or postcode to see the UKCP therapists within your area, nearest first.
+        </p>
+        <p className="text-lg text-muted-foreground sm:text-xl">
+          Filters <SlidersHorizontal aria-hidden className="inline size-[0.9em] align-[-0.1em]" /> narrow the search by what therapists help with, how
           they work, the languages they speak and more.
         </p>
       </div>
