@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, useSyncExternalStore, type RefObject } fro
 import { useMap } from "react-leaflet";
 import { useNavigate } from "react-router";
 import { MapMarker, MapMarkerClusterGroup, MapTooltip, markerData } from "@/components/ui/map";
+import { useProfileLink } from "@/profile/profileLink";
 import type { Highlight } from "./highlight";
 import { pinIcon } from "./pinIcon";
 import type { Pin } from "./pins";
@@ -88,6 +89,7 @@ function useMarkedPin(
 
 function TherapistPin({ pin, markers, onSelect }: { pin: Pin; markers: Map<string, L.Marker>; onSelect: (pin: Pin) => void }) {
   const navigate = useNavigate();
+  const profile = useProfileLink();
   // Fresh only for the life of this marker (the key above remounts it for any change of place or membership), so
   // re-renders, such as another card being hovered, keep Leaflet's marker, icon and position rather than re-clustering it.
   const [position] = useState<[number, number]>(() => [pin.point.lat, pin.point.lng]);
@@ -102,8 +104,10 @@ function TherapistPin({ pin, markers, onSelect }: { pin: Pin; markers: Map<strin
   };
   const activate = () => {
     // Where the pointer can hover, the tooltip has already said who this is.
-    if (only && window.matchMedia("(hover: hover)").matches) navigate(`/therapist/${only.slug}`);
-    else onSelect(pin);
+    if (only && window.matchMedia("(hover: hover)").matches) {
+      const { to, state } = profile(only.slug);
+      navigate(to, { state });
+    } else onSelect(pin);
   };
   return (
     // No title: the icon names the marker, and a title would add the browser's own tooltip to this one.

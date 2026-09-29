@@ -1,13 +1,15 @@
 import type { ReactNode } from "react";
-import { Link, useMatch } from "react-router";
+import { Link, matchPath, useLocation } from "react-router";
 import { cn } from "@/lib/utils";
+import { backgroundOf } from "@/profile/profileLink";
 import { Disclaimer } from "./Disclaimer";
 import { ThemeSwitch } from "./ThemeSwitch";
 
 export function SiteLayout({ children }: { children: ReactNode }) {
   // The search page is a map filling the window below the header, its results ending with the disclaimer;
-  // other pages read as documents with a footer.
-  const fill = useMatch("/") !== null;
+  // other pages read as documents with a footer. A profile's drawer leaves the page beneath it as it was.
+  const location = useLocation();
+  const fill = matchPath("/", (backgroundOf(location) ?? location).pathname) !== null;
   return (
     <div className={cn("flex flex-col", fill ? "h-svh" : "min-h-svh")}>
       <header className="border-b">
