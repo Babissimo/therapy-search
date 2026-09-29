@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router";
+import { MemoryRouter, Route, Routes, type Location } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Profile } from "@shared/types";
 import { api, ApiError } from "@/lib/api";
@@ -9,7 +9,7 @@ import { ProfilePage } from "./ProfilePage";
 
 const PROFILE: Profile = { slug: "Test-ABCDEFGH", name: "Test Therapist", initials: "TT", languages: [], emailInContact: false, social: [], about: [], practical: [], offices: [] };
 
-function renderAt(entries: string[], result: Profile | ApiError = PROFILE) {
+function renderAt(entries: (string | Partial<Location>)[], result: Profile | ApiError = PROFILE) {
   const profile = vi.spyOn(api, "profile");
   if (result instanceof ApiError) profile.mockRejectedValue(result);
   else profile.mockResolvedValue(result);
@@ -61,5 +61,41 @@ describe("ProfilePage's header", () => {
     renderAt(["/therapist/Test-ABCDEFGH"], { ...PROFILE, email: "test@example.com" });
     const email = await screen.findByRole("link", { name: "Email: test@example.com" });
     expect(email.closest("header")).not.toBeNull();
+  });
+});
+
+describe("ProfilePage's content", () => {
+  const section = (heading: string, items: string[]) => ({ heading, paragraphs: [], items, details: [] });
+  const office = (name: string, cost: string) => ({ name, isMain: false, address: [], cost });
+  const RICH: Profile = {
+    ...PROFILE,
+    about: [section("What I can help with", ["Anxiety", "Depression"])],
+    practical: [section("Types of sessions", ["Online Therapy"])],
+    offices: [office("Brighton Office", "£70 per session"), office("London Office", "£90 per session")],
+  };
+  // A profile opened over a search carries that search's location.
+  const overSearch = (search: string) => ({ pathname: "/therapist/Test-ABCDEFGH", state: { background: { pathname: "/", search } } });
+
+  it("marks the tags the visitor searched for, and gathers them at the top", async () => {
+    renderAt(["/", overSearch("?HelpWith=Anxiety&TypesOfSession=Online+Therapy")], RICH);
+    const matches = (await screen.findByRole("heading", { name: "Matches your search" })).parentElement;
+    expect([...(matches?.querySelectorAll("li") ?? [])].map((li) => li.textContent)).toEqual(["Anxiety", "Online Therapy"]);
+    // Each is also marked where the profile lists it, where no heading says it matches.
+    expect(screen.getAllByText(", in your search")).toHaveLength(2);
+    expect(screen.getByText("Depression").textContent).toBe("Depression");
+  });
+
+  it("marks nothing on a profile opened directly", async () => {
+    renderAt(["/therapist/Test-ABCDEFGH"], RICH);
+    await screen.findByRole("heading", { name: "Test Therapist" });
+    expect(screen.queryByRole("heading", { name: "Matches your search" })).toBeNull();
+    expect(screen.queryByText(", in your search")).toBeNull();
+  });
+
+  it("puts each office's fees above the profile's text", async () => {
+    renderAt(["/therapist/Test-ABCDEFGH"], RICH);
+    const fees = await screen.findByRole("heading", { name: "Fees" });
+    expect(fees.compareDocumentPosition(screen.getByRole("heading", { name: "What I can help with" })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    screen.getByText("£90 per session");
   });
 });

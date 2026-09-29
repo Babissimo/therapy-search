@@ -1,6 +1,6 @@
 import { useEffect, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ChevronLeft } from "lucide-react";
+import { Check, ChevronLeft } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router";
 import type { Office, ProfileSection } from "@shared/types";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api";
 import { ContactList } from "./ContactList";
+import { matchingTags, useSearchMatch } from "./searchedTerms";
 
 /** A profile as a page of its own, for a visitor who followed a link to it. */
 export function ProfilePage({ slug }: { slug: string }) {
@@ -52,6 +53,7 @@ type Exits = { back?: ReactNode; close?: ReactNode };
 /** A therapist's profile, laid out by the width it is given, whether a page's or a drawer's. */
 export function ProfileBody({ slug, back, close }: { slug: string } & Exits) {
   const { data: profile, error, isPending } = useQuery({ queryKey: ["profile", slug], queryFn: () => api.profile(slug) });
+  const isMatch = useSearchMatch();
 
   if (isPending) {
     return (
@@ -72,6 +74,9 @@ export function ProfileBody({ slug, back, close }: { slug: string } & Exits) {
     );
   }
 
+  const matches = matchingTags(profile, isMatch);
+  const priced = profile.offices.filter((office) => office.cost);
+  const languages: ProfileSection = { heading: "Languages", paragraphs: [], items: profile.languages, details: [] };
   return (
     <article className="@container space-y-8">
       <StickyHeader back={back} close={close}>
@@ -90,15 +95,25 @@ export function ProfileBody({ slug, back, close }: { slug: string } & Exits) {
         </div>
       </StickyHeader>
 
+      {(matches.length > 0 || priced.length > 0) && (
+        <div className="grid gap-4 @2xl:grid-cols-2">
+          {matches.length > 0 && (
+            <SectionView section={{ heading: "Matches your search", paragraphs: [], items: matches, details: [] }} isMatch={isMatch} announce={false} />
+          )}
+          {priced.length > 0 && <Fees offices={priced} />}
+        </div>
+      )}
+
       <div className="grid gap-8 @4xl:grid-cols-[minmax(0,1fr)_20rem]">
         <div className="space-y-8">
           {profile.about.map((section, i) => (
-            <SectionView key={i} section={section} />
+            <SectionView key={i} section={section} isMatch={isMatch} />
           ))}
         </div>
         <aside className="space-y-6">
+          {profile.languages.length > 0 && <SectionView section={languages} isMatch={isMatch} />}
           {profile.practical.map((section, i) => (
-            <SectionView key={i} section={section} />
+            <SectionView key={i} section={section} isMatch={isMatch} />
           ))}
           {profile.offices.map((office, i) => (
             <OfficeCard key={i} office={office} />
@@ -123,7 +138,14 @@ function StickyHeader({ back, close, children }: Exits & { children?: ReactNode 
   );
 }
 
-function SectionView({ section }: { section: ProfileSection }) {
+type SectionProps = {
+  section: ProfileSection;
+  isMatch: (tag: string) => boolean;
+  /** Tells screen readers which tags match, where the heading doesn't already say so. */
+  announce?: boolean;
+};
+
+function SectionView({ section, isMatch, announce = true }: SectionProps) {
   return (
     <section className="space-y-3">
       <h2 className="text-lg font-semibold">{section.heading}</h2>
@@ -136,7 +158,15 @@ function SectionView({ section }: { section: ProfileSection }) {
         <ul className="flex flex-wrap gap-1.5">
           {section.items.map((item, i) => (
             <li key={i}>
-              <Badge variant="secondary">{item}</Badge>
+              {isMatch(item) ? (
+                <Badge>
+                  <Check data-icon="inline-start" aria-hidden />
+                  {item}
+                  {announce && <span className="sr-only">, in your search</span>}
+                </Badge>
+              ) : (
+                <Badge variant="secondary">{item}</Badge>
+              )}
             </li>
           ))}
         </ul>
@@ -145,11 +175,39 @@ function SectionView({ section }: { section: ProfileSection }) {
         <Accordion type="multiple">
           {section.details.map((detail, i) => (
             <AccordionItem key={i} value={String(i)}>
-              <AccordionTrigger>{detail.title}</AccordionTrigger>
+              <AccordionTrigger>
+                <span className="flex items-center gap-2">
+                  {isMatch(detail.title) && <Check aria-hidden className="size-4 shrink-0" />}
+                  {detail.title}
+                  {announce && isMatch(detail.title) && <span className="sr-only">, in your search</span>}
+                </span>
+              </AccordionTrigger>
               <AccordionContent className="whitespace-pre-line">{detail.text}</AccordionContent>
             </AccordionItem>
           ))}
         </Accordion>
+      )}
+    </section>
+  );
+}
+
+/** The fees of the offices that give them, named by office only where they differ. */
+function Fees({ offices }: { offices: Office[] }) {
+  const alike = new Set(offices.map((office) => office.cost)).size === 1;
+  return (
+    <section className="space-y-3">
+      <h2 className="text-lg font-semibold">Fees</h2>
+      {alike ? (
+        <p className="whitespace-pre-line">{offices[0]?.cost}</p>
+      ) : (
+        <dl className="space-y-3">
+          {offices.map((office, i) => (
+            <div key={i}>
+              <dt className="font-medium">{office.name}</dt>
+              <dd className="whitespace-pre-line">{office.cost}</dd>
+            </div>
+          ))}
+        </dl>
       )}
     </section>
   );
@@ -176,12 +234,6 @@ function OfficeCard({ office }: { office: Office }) {
           <a className="underline" href={office.mapUrl} target="_blank" rel="noreferrer">
             View map
           </a>
-        )}
-        {office.cost && (
-          <div>
-            <h3 className="font-medium">Cost</h3>
-            <p className="whitespace-pre-line">{office.cost}</p>
-          </div>
         )}
       </CardContent>
     </Card>
