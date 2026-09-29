@@ -1,6 +1,6 @@
 import { parseContact } from "@shared/ukcp/parseContact";
 import { parseProfile } from "@shared/ukcp/parseProfile";
-import { parseResults } from "@shared/ukcp/parseResults";
+import { parseListings, type Listings } from "@shared/ukcp/parseResults";
 import { ParseError } from "@shared/ukcp/text";
 import { nearestQuery, placeQuery, type NearestLookup, type PlaceLookup, type PlaceOptions } from "@shared/location";
 
@@ -26,12 +26,23 @@ async function request<T>(url: string, read: (html: string) => T, init?: Request
   const res = await fetch(url, init);
   if (!res.ok) throw await failure(res);
   const html = await res.text();
+  return readable(() => read(html));
+}
+
+/** Reads UKCP's HTML, reporting markup it can't read as UKCP having changed. */
+function readable<T>(read: () => T): T {
   try {
-    return read(html);
+    return read();
   } catch (error) {
     if (error instanceof ParseError) throw new ApiError(502, UNREADABLE);
     throw error;
   }
+}
+
+/** A results page whose cards, read later as they are shown, report unreadable markup as the page itself does. */
+function listingsOf(html: string): Listings {
+  const found = parseListings(html);
+  return { ...found, listings: found.listings.map((listing) => ({ ...listing, read: () => readable(listing.read) })) };
 }
 
 async function json<T>(url: string): Promise<T> {
@@ -41,7 +52,7 @@ async function json<T>(url: string): Promise<T> {
 }
 
 export const api = {
-  search: (query: string) => request(`/api/search${query ? `?${query}` : ""}`, parseResults),
+  search: (query: string) => request(`/api/search${query ? `?${query}` : ""}`, listingsOf),
   profile: (slug: string) => request(`/api/therapist/${encodeURIComponent(slug)}`, (html) => parseProfile(html, slug)),
   contact: (id: string) => request(`/api/contact/${encodeURIComponent(id)}`, parseContact, { method: "POST" }),
   place: (text: string, options: PlaceOptions = {}) => json<PlaceLookup>(`/api/place?${placeQuery(text, options)}`),

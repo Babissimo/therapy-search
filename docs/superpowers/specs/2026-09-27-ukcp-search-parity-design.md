@@ -202,6 +202,8 @@ type Options = {
 };
 ```
 
+A results page is first read as listings: the `SearchResult` above with each card as `{ slug, distance?, read }`, whose `read()` gives the `TherapistCard`. A card's other details, which cost the most to read, are read only when it is shown.
+
 Profile sections stay generic because their set varies between profiles; only offices get dedicated fields, since the UI treats them specially. Parsers keep a photo, map or website link only when it is `http(s)`, so markup from upstream can never put a script URL into our page. `Options.groups` mirrors UKCP's filter panel, including the photo and wheelchair flags, so the UI renders what UKCP offers and the Worker validates against the same lists (§3.2).
 
 ## 6. Errors

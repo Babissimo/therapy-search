@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Profile } from "@shared/types";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { api } from "@/lib/api";
+import { listed } from "@/lib/listed.testing";
 import { AppRoutes } from "./App";
 
 // Leaflet draws nothing under jsdom; the map is tested on its own.
@@ -33,7 +34,7 @@ function renderAt(url: string) {
 
 beforeEach(() => {
   vi.stubGlobal("matchMedia", (query: string) => ({ matches: query === "(min-width: 64rem)", media: query, addEventListener() {}, removeEventListener() {} }));
-  vi.spyOn(api, "search").mockResolvedValue({ total: 1, from: 1, to: 1, notices: [], therapists: [{ slug: PROFILE.slug, name: PROFILE.name, initials: "JB", tags: [] }] });
+  vi.spyOn(api, "search").mockResolvedValue(listed({ total: 1, from: 1, to: 1, notices: [], therapists: [{ slug: PROFILE.slug, name: PROFILE.name, initials: "JB", tags: [] }] }));
   vi.spyOn(api, "profile").mockResolvedValue(PROFILE);
   vi.spyOn(window, "scrollTo").mockImplementation(() => {});
 });

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
 import { fixture } from "./__fixtures__";
-import { parseResults } from "./parseResults";
+import { parseListings, parseResults } from "./parseResults";
 import { ParseError } from "./text";
 
 const SLUG = /^Test-Therapist-\d+-TESTID\d+$/;
@@ -69,5 +69,21 @@ describe("parseResults card details", () => {
   it("fails loudly when the markup is not what it expects", () => {
     expect(() => parseResults("<p>A redesigned page</p>")).toThrow(ParseError);
     expect(() => parseResults(`<span class="results-no">1-1 of 1 results</span><div class="profile-listing"><a href="/elsewhere"><h2>X</h2></a></div>`)).toThrow(ParseError);
+  });
+});
+
+describe("parseListings", () => {
+  it("finds each card's slug and distance, reading the rest only when asked", () => {
+    const { listings, ...found } = parseListings(fixture("results-location.html"));
+    const { therapists, ...read } = parseResults(fixture("results-location.html"));
+    expect(found).toEqual(read);
+    expect(listings.map((l) => [l.slug, l.distance])).toEqual(therapists.map((t) => [t.slug, t.distance]));
+    expect(listings.map((l) => l.read())).toEqual(therapists);
+  });
+
+  it("leaves a card it can't read to fail when it is read", () => {
+    const [listing] = parseListings(`<span class="results-no">1-1 of 1 results</span><div class="profile-listing"><a href="therapist/Jo-Bloggs-ABCDEFGH"></a></div>`).listings;
+    expect(listing?.slug).toBe("Jo-Bloggs-ABCDEFGH");
+    expect(() => listing?.read()).toThrow(ParseError);
   });
 });

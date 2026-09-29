@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { SearchResult, TherapistCard } from "@shared/types";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { api } from "@/lib/api";
+import { listed } from "@/lib/listed.testing";
 import type { Highlight } from "./map/highlight";
 import { layoutPins, type Pin } from "./map/pins";
 import { SearchPage } from "./SearchPage";
@@ -57,15 +58,15 @@ const therapist = (slug: string, location?: string): TherapistCard => ({ slug, n
 
 /** The given pages of cards, or else thirty results twelve a page; no place is searched, so no centre is looked up. */
 function answer(pages: TherapistCard[][]) {
-  vi.spyOn(api, "search").mockImplementation(async (query): Promise<SearchResult> => {
+  vi.spyOn(api, "search").mockImplementation(async (query) => {
     const page = Number(new URLSearchParams(query).get("page") ?? 1);
     if (pages.length > 0) {
       const before = pages.slice(0, page - 1).flat().length;
       const therapists = pages[page - 1] ?? [];
-      return { total: pages.flat().length, from: before + 1, to: before + therapists.length, notices: [], therapists };
+      return listed({ total: pages.flat().length, from: before + 1, to: before + therapists.length, notices: [], therapists });
     }
     const therapists = Array.from({ length: 12 }, (_, i) => therapist(`p${page}-${i}`));
-    return { total: 30, from: (page - 1) * 12 + 1, to: page * 12, notices: [], therapists };
+    return listed({ total: 30, from: (page - 1) * 12 + 1, to: page * 12, notices: [], therapists });
   });
 }
 
@@ -197,7 +198,7 @@ describe("SearchPage", () => {
   it("says a searched place's results are within its area", async () => {
     screenIs(true);
     vi.spyOn(api, "place").mockResolvedValue({ found: true, kind: "place", candidates: [{ lat: 53.8, lng: -1.55 }] });
-    vi.spyOn(api, "search").mockResolvedValue({ total: 1, from: 1, to: 1, notices: [], therapists: [therapist("a")], locationSearched: "Leeds, UK" });
+    vi.spyOn(api, "search").mockResolvedValue(listed({ total: 1, from: 1, to: 1, notices: [], therapists: [therapist("a")], locationSearched: "Leeds, UK" }));
     render(
       <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
         <TooltipProvider>
@@ -285,7 +286,7 @@ describe("SearchPage", () => {
     screenIs(true);
     let arrive: (result: SearchResult) => void = () => {};
     answer([]);
-    vi.mocked(api.search).mockImplementationOnce(() => new Promise((resolve) => (arrive = resolve)));
+    vi.mocked(api.search).mockImplementationOnce(() => new Promise((resolve) => (arrive = (result) => resolve(listed(result)))));
     renderAt(SEARCH);
     expect((await screen.findByTestId("map")).dataset.settled).toBe("false");
     await act(async () => arrive({ total: 1, from: 1, to: 1, notices: [], therapists: [therapist("york")] }));
@@ -307,7 +308,7 @@ describe("SearchPage", () => {
     await loaded();
     expect((await screen.findByTestId("map")).dataset.settled).toBe("true");
     let arrive: (result: SearchResult) => void = () => {};
-    vi.mocked(api.search).mockImplementationOnce(() => new Promise((resolve) => (arrive = resolve)));
+    vi.mocked(api.search).mockImplementationOnce(() => new Promise((resolve) => (arrive = (result) => resolve(listed(result)))));
     fireEvent.change(screen.getByRole("textbox", { name: "Location" }), { target: { value: "York" } });
     fireEvent.click(screen.getByRole("button", { name: "Search" }));
     expect(screen.getByTestId("map").dataset.settled).toBe("false");
@@ -478,7 +479,7 @@ describe("SearchPage", () => {
     fireEvent.pointerEnter(card.closest("[data-slot=card]") as HTMLElement);
     expect(screen.getByTestId("map").dataset.highlighted).toBe("p1-2");
     let arrive: (result: SearchResult) => void = () => {};
-    vi.mocked(api.search).mockImplementationOnce(() => new Promise((resolve) => (arrive = resolve)));
+    vi.mocked(api.search).mockImplementationOnce(() => new Promise((resolve) => (arrive = (result) => resolve(listed(result)))));
     fireEvent.change(screen.getByRole("textbox", { name: "Location" }), { target: { value: "York" } });
     fireEvent.click(screen.getByRole("button", { name: "Search" }));
     await act(async () => arrive({ total: 1, from: 1, to: 1, notices: [], therapists: [therapist("p1-2")] }));
