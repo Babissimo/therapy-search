@@ -149,9 +149,11 @@ When the visitor typed a location but UKCP searched "United Kingdom" (parity §3
 | Route | Upstream | Cache |
 |---|---|---|
 | `GET /api/place?q=<text>[&centre=true][&outsideUK=true]` | postcodes.io or Nominatim | 30 days when found; 1 day when not found or too general |
+| `GET /api/nearest?lat=<degrees>&lng=<degrees>` | postcodes.io | 30 days when found; 1 day when not found |
 
 - One string per request, so Workers Caching (parity §4.2) keys each string on its own and shares it across visitors, where a batch URL would rarely repeat. A page needs at most 13 lookups (12 cards and the centre), fewer once repeated strings are merged, sent in parallel over one HTTP/2 connection.
 - `q` must be 1–100 characters after trimming. The route canonicalises it with `shared/location.ts` and redirects to the canonical URL when it differs, as `/api/search` does (parity §4.2), so equal strings share one entry. The browser requests the canonical form in the first place.
+- `/api/nearest` answers the postcode nearest the visitor, for a search from where they are. Its canonical form rounds the point to three decimal places, about 100 metres, so neither the Worker nor any cache sees a finer position; a finer one is redirected before any lookup.
 - Upstream requests, each with a 5-second timeout:
 
 | Kind | Request |
@@ -160,6 +162,7 @@ When the visitor typed a location but UKCP searched "United Kingdom" (parity §3
 | Outcode | `api.postcodes.io/outcodes/<outcode>` |
 | Place, on a card | `api.postcodes.io/places?q=<name>&limit=10` |
 | Place, as the centre or in an outside-UK search | `nominatim.openstreetmap.org/search?q=<name>&format=jsonv2&countrycodes=gb`, with `limit=1` for a centre and `limit=10` for a card, and no `countrycodes` outside the UK |
+| Nearest postcode | `api.postcodes.io/postcodes?lon=<lng>&lat=<lat>&radius=2000&limit=1`, 2 km being as far as postcodes.io looks |
 
 ### 5.2 Response
 
@@ -167,6 +170,8 @@ When the visitor typed a location but UKCP searched "United Kingdom" (parity §3
 type PlaceLookup =
   | { found: true; kind: "postcode" | "outcode" | "place"; candidates: { lat: number; lng: number; type?: string }[] }
   | { found: false; reason: "too-general" | "not-found" };
+
+type NearestLookup = { found: true; postcode: string } | { found: false };
 ```
 
 `type` is a place candidate's settlement type, mapped from postcodes.io's `local_type` or Nominatim's `addresstype` onto the order in §3.2; types outside it rank last.
@@ -175,7 +180,8 @@ type PlaceLookup =
 
 - Uncached lookups count against a new rate-limit binding, `PLACE_LIMIT`, of 60 a minute per IP, keyed as in parity §4.3. It is separate from UKCP's limit, so geocoding never uses up a visitor's searches. Past it, the route returns `429`.
 - An upstream failure or timeout returns `502` and is never cached. The browser shows that therapist as unplaced with the "just now" reason (§4.8) and asks again on the next visit to the search.
-- The route logs only a status, never the text looked up (parity §2).
+- Nearest-postcode lookups share `PLACE_LIMIT`, and fail the same way.
+- The routes log only a status, never the text or point looked up (parity §2).
 
 ## 6. Map component
 

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { PlaceLookup } from "../shared/location";
-import { createApp, PLACE_DOWN, rateKey, TOO_MANY, UPSTREAM_DOWN, type Env, type PlaceFinder } from "./app";
+import { createApp, NEAREST_DOWN, PLACE_DOWN, rateKey, TOO_MANY, UPSTREAM_DOWN, type Env, type PlaceFinder } from "./app";
 import { GeocodeError } from "./places/geocoder";
 import { UpstreamError, type UkcpClient } from "./ukcp/client";
 
@@ -13,7 +13,7 @@ function setup({ allow = true, allowPlaces = true, client = {} as Partial<UkcpCl
   const placeLimit = vi.fn(async () => ({ success: allowPlaces }));
   const env: Env = { UPSTREAM_LIMIT: { limit }, PLACE_LIMIT: { limit: placeLimit }, SITE_URL: "https://example.test" };
   const stub = { search: vi.fn(async () => RESULTS), profile: vi.fn(), contact: vi.fn(), ...client } as unknown as UkcpClient;
-  const finder: PlaceFinder = { lookup: vi.fn(async () => FOUND), ...places };
+  const finder: PlaceFinder = { lookup: vi.fn(async () => FOUND), nearest: vi.fn(async () => ({ found: true, postcode: "BN3 1FG" }) as const), ...places };
   const app = createApp(
     () => stub,
     () => finder,
@@ -183,6 +183,54 @@ describe("GET /api/place", () => {
     const log = vi.spyOn(console, "error").mockImplementation(() => {});
     const res = await request("/api/place?q=BN3");
     expect([res.status, res.headers.get("Cache-Control"), (await res.json()).error]).toEqual([502, "no-store", PLACE_DOWN]);
+    expect(log).toHaveBeenCalledWith("GeocodeError: api.postcodes.io answered 500");
+  });
+});
+
+describe("GET /api/nearest", () => {
+  it("answers the postcode nearest a rounded point, which the edge may cache for 30 days", async () => {
+    const { request, finder, placeLimit } = setup();
+    const res = await request("/api/nearest?lat=50.826&lng=-0.160");
+    expect([res.status, res.headers.get("Cache-Control")]).toEqual([200, "public, max-age=2592000"]);
+    expect(await res.json()).toEqual({ found: true, postcode: "BN3 1FG" });
+    expect(finder.nearest).toHaveBeenCalledWith(50.826, -0.16);
+    expect(placeLimit).toHaveBeenCalledOnce();
+  });
+
+  it("keeps a point with no postcode near it for a day", async () => {
+    const { request } = setup({ places: { nearest: vi.fn(async () => ({ found: false }) as const) } });
+    const res = await request("/api/nearest?lat=59.000&lng=-3.000");
+    expect([res.status, res.headers.get("Cache-Control")]).toEqual([200, "public, max-age=86400"]);
+  });
+
+  it("redirects a finer point to its rounded one without looking it up", async () => {
+    const { request, finder } = setup();
+    const res = await request("/api/nearest?lat=50.82614&lng=-0.15987");
+    expect(res.status).toBe(301);
+    expect(res.headers.get("Location")).toBe("/api/nearest?lat=50.826&lng=-0.160");
+    expect(finder.nearest).not.toHaveBeenCalled();
+  });
+
+  it("rejects a point that isn't one", async () => {
+    const { request, finder } = setup();
+    for (const query of ["lat=abc&lng=0", "lat=91&lng=0", "lat=0&lng=-181", "lat=51.5", "lat=&lng=0"]) {
+      expect((await request(`/api/nearest?${query}`)).status).toBe(400);
+    }
+    expect(finder.nearest).not.toHaveBeenCalled();
+  });
+
+  it("answers 429 over the place limit without looking anything up", async () => {
+    const { request, finder } = setup({ allowPlaces: false });
+    const res = await request("/api/nearest?lat=50.826&lng=-0.160");
+    expect([res.status, (await res.json()).error]).toEqual([429, TOO_MANY]);
+    expect(finder.nearest).not.toHaveBeenCalled();
+  });
+
+  it("answers 502, uncached, when postcodes.io fails, logging no position", async () => {
+    const { request } = setup({ places: { nearest: vi.fn(async () => Promise.reject(new GeocodeError("api.postcodes.io answered 500"))) } });
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    const res = await request("/api/nearest?lat=50.826&lng=-0.160");
+    expect([res.status, res.headers.get("Cache-Control"), (await res.json()).error]).toEqual([502, "no-store", NEAREST_DOWN]);
     expect(log).toHaveBeenCalledWith("GeocodeError: api.postcodes.io answered 500");
   });
 });

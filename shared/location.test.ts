@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canonicalLocation, classifyLocation, placeQuery, settlementRank } from "./location";
+import { canonicalLocation, classifyLocation, nearestQuery, placeQuery, settlementRank } from "./location";
 
 describe("canonicalLocation", () => {
   it("trims, collapses spaces and upper-cases", () => {
@@ -47,5 +47,12 @@ describe("settlementRank", () => {
     expect(new Set(ranks).size).toBe(ranks.length);
     expect(settlementRank("suburb")).toBe(settlementRank("suburban area"));
     expect(settlementRank("peak")).toBe(settlementRank(undefined));
+  });
+});
+
+describe("nearestQuery", () => {
+  it("rounds a point to three places, spelling each rounded point one way", () => {
+    expect(nearestQuery(50.82614, -0.15987)).toBe("lat=50.826&lng=-0.160");
+    expect(nearestQuery(-0.0004, 0)).toBe("lat=0.000&lng=0.000");
   });
 });
