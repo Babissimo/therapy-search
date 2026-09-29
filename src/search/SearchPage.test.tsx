@@ -229,6 +229,31 @@ describe("SearchPage", () => {
     expect(screen.queryByRole("region", { name: "Refine your search" })).toBeNull();
   });
 
+  it("opens the filters beside the prompt on wide screens, open as they search until a search for a place puts them away", async () => {
+    screenIs(true);
+    renderAt("/");
+    const filters = () => screen.queryByRole("region", { name: "Refine your search" });
+    expect(filters()).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+    expect(filters()).toBeTruthy();
+    const keyword = screen.getByRole("searchbox", { name: "Keyword search" });
+    fireEvent.change(keyword, { target: { value: "grief" } });
+    fireEvent.submit(keyword.closest("form")!);
+    await loaded();
+    expect(filters()).toBeTruthy();
+    fireEvent.change(screen.getByRole("textbox", { name: "Location" }), { target: { value: "York" } });
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+    expect(filters()).toBeNull();
+    await loaded();
+  });
+
+  it("keeps the filters shut on a phone's prompt that widens, as they open only on arriving wide", () => {
+    const resize = screenIs(false);
+    renderAt("/");
+    resize(true);
+    expect(screen.queryByRole("region", { name: "Refine your search" })).toBeNull();
+  });
+
   it("leaves the outside-UK tick out of the Filters count, as Clear all keeps it", async () => {
     screenIs(true);
     renderAt("/?LocationSearchOutsideUK=true&Languages=French");

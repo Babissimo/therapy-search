@@ -93,6 +93,8 @@ function SearchView({ params, onChange }: ViewProps) {
     highlight.set(undefined);
   }, [highlight, fitKey]);
   const [panelOpen, setPanelOpen] = useState(true);
+  // Open on arriving at the prompt on a wide screen, where there is no map for them to cover.
+  const [filtersOpen, setFiltersOpen] = useState(!searching && wide);
   // The sheet opens on the list, and does again after the prompt, which has none.
   const [sheet, setSheet] = useState<SheetPosition>("full");
   if (!searching && sheet !== "full") setSheet("full");
@@ -172,9 +174,9 @@ function SearchView({ params, onChange }: ViewProps) {
               />
             </Suspense>
           ) : (
-            <SearchPrompt />
+            <SearchPrompt besideFilters={wide && filtersOpen} />
           )}
-          <MapToolbar params={params} onChange={onChange} drafts={drafts} wide={wide} />
+          <MapToolbar params={params} onChange={onChange} drafts={drafts} wide={wide} filtersOpen={filtersOpen} onFiltersOpenChange={setFiltersOpen} />
           {!wide && searching && (
             <ResultsSheet position={sheet} onPositionChange={setSheet} title={title} scrollRef={scroll.ref} onScroll={scroll.save} footer={footer}>
               <Masthead className="pb-3" />
@@ -197,8 +199,14 @@ function reveal(list: HTMLElement, entry: HTMLElement, glide: boolean) {
 }
 
 /** The search box, filters and active-filter chips, floating over the top of the map or the prompt. */
-function MapToolbar({ params, onChange, drafts, wide }: ViewProps & { drafts: SearchDrafts; wide: boolean }) {
-  const [filtersOpen, setFiltersOpen] = useState(false);
+function MapToolbar({
+  params,
+  onChange,
+  drafts,
+  wide,
+  filtersOpen,
+  onFiltersOpenChange,
+}: ViewProps & { drafts: SearchDrafts; wide: boolean; filtersOpen: boolean; onFiltersOpenChange: (open: boolean) => void }) {
   const filtersId = useId();
   // UKCP's groups rather than the panel's, so the outside-UK tick, which makes no chip and survives Clear all, goes uncounted.
   const ticked = OPTIONS.groups.reduce((sum, group) => sum + tickedIn(params, group), 0);
@@ -206,13 +214,14 @@ function MapToolbar({ params, onChange, drafts, wide }: ViewProps & { drafts: Se
     // Only the toolbar's own controls take the pointer; the map shows through the rest of it.
     <div className="pointer-events-none absolute inset-3 z-10 flex flex-col items-start gap-2 lg:right-auto lg:w-96">
       <div className="pointer-events-auto flex w-full items-start gap-2 rounded-xl border bg-background p-2 shadow-md">
-        <SearchBox params={params} drafts={drafts} className="min-w-0 flex-1" />
+        {/* A search for a place puts the filters away to show where it is; ticks and the keyword leave them open for more. */}
+        <SearchBox params={params} drafts={drafts} onPlaceSearch={() => onFiltersOpenChange(false)} className="min-w-0 flex-1" />
         {wide ? (
           <FiltersButton
             ticked={ticked}
             aria-expanded={filtersOpen}
             aria-controls={filtersOpen ? filtersId : undefined}
-            onClick={() => setFiltersOpen((open) => !open)}
+            onClick={() => onFiltersOpenChange(!filtersOpen)}
           />
         ) : (
           <MobileFilters params={params} drafts={drafts} ticked={ticked} />
@@ -234,7 +243,7 @@ function MapToolbar({ params, onChange, drafts, wide }: ViewProps & { drafts: Se
             <h2 id={`${filtersId}-heading`} className="font-semibold">
               Refine your search
             </h2>
-            <Button type="button" variant="ghost" size="icon-sm" aria-label="Close filters" onClick={() => setFiltersOpen(false)}>
+            <Button type="button" variant="ghost" size="icon-sm" aria-label="Close filters" onClick={() => onFiltersOpenChange(false)}>
               <X aria-hidden />
             </Button>
           </div>
@@ -246,10 +255,10 @@ function MapToolbar({ params, onChange, drafts, wide }: ViewProps & { drafts: Se
 }
 
 /** In place of the map and results until there is something to search for, so no map tiles are fetched for nothing. */
-function SearchPrompt() {
+function SearchPrompt({ besideFilters }: { besideFilters: boolean }) {
   return (
-    // Clear of the toolbar over its top.
-    <div className="flex size-full overflow-y-auto px-6 py-24">
+    // Clear of the toolbar over its top, or beside the filters open beneath it.
+    <div className={cn("flex size-full overflow-y-auto", besideFilters ? "py-6 pr-6 pl-105" : "px-6 py-24")}>
       {/* Centred by its margins, so text taller than the space scrolls from its top rather than being cut off there. */}
       <div className="m-auto max-w-2xl space-y-4 text-center text-balance sm:space-y-6">
         <p className="text-2xl font-semibold tracking-tight sm:text-4xl">
