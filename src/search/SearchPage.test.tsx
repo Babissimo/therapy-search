@@ -312,6 +312,20 @@ describe("SearchPage", () => {
     expect(screen.getByTestId("map").dataset.selected).toBe("");
   });
 
+  it("clears the selection when its pin is activated again", async () => {
+    screenIs(true);
+    vi.spyOn(api, "place").mockResolvedValue({ found: true, kind: "outcode", candidates: [{ lat: 50.83, lng: -0.15 }] });
+    renderAt(SEARCH, [therapist("a", "BRIGHTON BN3"), therapist("b", "Hove BN3")]);
+    const pin = await screen.findByRole("button", { name: /^Pin / });
+    fireEvent.click(pin);
+    expect(screen.getByRole("region", { name: "At this pin" })).toBeTruthy();
+    fireEvent.click(pin);
+    expect(screen.queryByRole("region", { name: "At this pin" })).toBeNull();
+    expect(screen.getByTestId("map").dataset.selected).toBe("");
+    fireEvent.click(pin);
+    expect(screen.getByRole("region", { name: "At this pin" })).toBeTruthy();
+  });
+
   it("adds whoever joins the selected pin as more results load", async () => {
     screenIs(true);
     vi.spyOn(api, "place").mockResolvedValue({ found: true, kind: "outcode", candidates: [{ lat: 50.83, lng: -0.15 }] });

@@ -99,6 +99,10 @@ function SearchView({ params, onChange }: ViewProps) {
   const listRef = useRef<HTMLUListElement>(null);
 
   function select(pin: Pin) {
+    if (pin.key === selected?.key) {
+      setSelection(undefined);
+      return;
+    }
     setSelection({ fitKey, pinKey: pin.key });
     if (wide) setPanelOpen(true);
     else if (sheet === "peek") setSheet("half");
