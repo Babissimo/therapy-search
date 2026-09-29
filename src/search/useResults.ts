@@ -4,6 +4,7 @@ import type { SearchResult, TherapistCard } from "@shared/types";
 import type { Listings } from "@shared/ukcp/parseResults";
 import { api } from "@/lib/api";
 import { locationFellBack } from "./LocationNotice";
+import { inOrder, orderSeed } from "./order";
 import { withPage } from "./state";
 
 // As long as results stay fresh, so Back from a profile finds every page still loaded.
@@ -23,15 +24,15 @@ export type SearchResults = {
 };
 
 /**
- * A search's results in UKCP's order, a page at a time for "Load more", cut from batches that are each asked of UKCP
- * once. Nothing is asked for, or shown, until `enabled`.
+ * A search's results in this browser's order, a page at a time for "Load more", cut from batches that are each asked
+ * of UKCP once. Nothing is asked for, or shown, until `enabled`.
  */
 export function useResults(params: SearchParams, enabled = true): SearchResults {
   const batchQuery = (n: number) => toQuery(withPage(params, n));
   // Spelt out because TypeScript otherwise fills in the page data's type before inferring the page parameter's.
   const query = useInfiniteQuery<Page, Error, InfiniteData<Page, After>, readonly unknown[], After>({
     queryKey: ["results", batchQuery(1)],
-    queryFn: ({ pageParam }) => pageAfter(pageParam, (n) => api.search(batchQuery(n))),
+    queryFn: ({ pageParam }) => pageAfter(pageParam, (n) => batchInOrder(batchQuery(n))),
     initialPageParam: { shown: 0 },
     getNextPageParam: (last) => (last.therapists.length > 0 && last.to < last.total ? { shown: last.to, batch: last.batch, stride: last.stride } : undefined),
     enabled,
@@ -64,6 +65,12 @@ async function pageAfter({ shown, batch, stride }: After, fetchBatch: (n: number
   const offset = shown - (batch.from - 1);
   const therapists = offset < 0 ? [] : batch.listings.slice(offset, offset + PAGE_SIZE).map((listing) => listing.read());
   return { ...aboutBatch(batch), from: shown + 1, to: shown + therapists.length, therapists, batch, stride };
+}
+
+/** A batch in this browser's order, in place of the shuffle UKCP gave it. */
+async function batchInOrder(query: string): Promise<Listings> {
+  const batch = await api.search(query);
+  return { ...batch, listings: inOrder(batch.listings, orderSeed()) };
 }
 
 /** A batch's count, place and notices, without its cards. */

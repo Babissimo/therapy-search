@@ -13,6 +13,9 @@ import { Results } from "./Results";
 import { withHelpWithTerms, withText } from "./state";
 import { useResults } from "./useResults";
 
+// Results keep the order they are answered in here; order.test.ts and useResults.test.tsx cover the order itself.
+vi.mock("./order", () => ({ orderSeed: () => 0, inOrder: <T,>(listings: T[]) => listings }));
+
 const TOO_MANY = "Too many searches in a short time. Wait a minute and try again.";
 
 /**

@@ -11,6 +11,9 @@ import type { Highlight } from "./map/highlight";
 import { layoutPins, type Pin } from "./map/pins";
 import { SearchPage } from "./SearchPage";
 
+// Results keep the order they are answered in here; order.test.ts and useResults.test.tsx cover the order itself.
+vi.mock("./order", () => ({ orderSeed: () => 0, inOrder: <T,>(listings: T[]) => listings }));
+
 // Counted, to see whether a hover makes the page lay its pins out again.
 vi.mock("./map/pins", async (importOriginal) => {
   const pins = await importOriginal<typeof import("./map/pins")>();
