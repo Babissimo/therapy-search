@@ -4,6 +4,8 @@ on:
   pull_request:
   push:
     branches: [main]
+  # For when GitHub starts no run for a push to main.
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -22,7 +24,8 @@ jobs:
       - run: npm run build
 
   deploy:
-    if: github.event_name == 'push'
+    # Main deploys, whether pushed or run by hand; pull requests and other branches are only checked.
+    if: github.ref == 'refs/heads/main'
     needs: check
     runs-on: ubuntu-latest
     concurrency: deploy
