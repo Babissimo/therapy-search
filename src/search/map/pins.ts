@@ -10,8 +10,9 @@ export type Unplaced = { therapist: TherapistCard; reason: UnplacedReason };
 /** A settled lookup of a card's location; `ok: false` when the lookup itself failed. */
 export type LookupResult = { ok: true; lookup: PlaceLookup } | { ok: false };
 
-export const UNPLACED_REASONS: Record<UnplacedReason, string> = {
-  "too-general": "Location too general to place",
+export const UNPLACED_REASONS: Record<UnplacedReason, string | undefined> = {
+  // A location too vague to place needs no explaining; the list's header still counts it.
+  "too-general": undefined,
   "not-matched": "Location couldn't be matched",
   failed: "Couldn't look up this location just now",
 };

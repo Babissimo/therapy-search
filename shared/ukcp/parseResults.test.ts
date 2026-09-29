@@ -44,12 +44,13 @@ describe("parseResults card details", () => {
   const card = (inner: string) =>
     `<span class="results-no">1-1 of 1 results</span><div class="profile-listing"><a href="therapist/Jo-Bloggs-ABCDEFGH" class="light-anchor">${inner}</a></div>`;
 
-  it("separates the phone from the session type and tidies non-breaking spaces", () => {
+  it("leaves the phone out of the session type and tidies non-breaking spaces", () => {
     const [t] = parseResults(
       card(`<h2>Jo Bloggs</h2><span class="profile-listing-contact-session-type"><strong>0121 504 3691</strong>
 |&nbsp;In-person&nbsp;&amp;&nbsp;Remote </span>`),
     ).therapists;
-    expect([t?.phone, t?.sessionTypes]).toEqual(["0121 504 3691", "In-person & Remote"]);
+    expect(t?.sessionTypes).toBe("In-person & Remote");
+    expect(JSON.stringify(t)).not.toContain("0121");
   });
 
   it("uses UKCP's initials when there is no photo, and leaves blanks undefined", () => {

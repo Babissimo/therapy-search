@@ -90,6 +90,7 @@ For outside-UK searches (`LocationSearchOutsideUK`), which postcodes.io cannot a
 ### 4.4 The results list
 
 - The results are one list, in UKCP's order, that grows a page at a time with "Load more"; the map shows every therapist in it that it can place. The button sits beneath the list, outside its scrolling area, so it stays in view however far the list scrolls. UKCP orders location searches by distance band (parity §3.3), so each page reaches further out.
+- A card shows the photo, 96 pixels across, beside the name, place and session types, with the summary and tags beneath at the card's full width. The place is the postcode or district alone followed by the distance, as in "E8 (0.2 miles away)": the town mostly repeats the searched place. A card with no distance, as in a search with no place, or with no postcode in its location keeps the location whole, since there it is all that says where someone is. A card in a pin's box (below) leaves the place to the box's heading and gives only the distance, as in "0.2 miles away". Tags are shown only when the search asks for them by name, as a help-with term, a ticked box or the keyword. Phone numbers are left to the profile's contact button (parity §3.4).
 - Therapists who share a stacked pin (§4.6) are listed together where the first of them comes, in a box headed by the location they all list with their number, or by the postcodes, districts or places that placed them when they write it differently. Their names sit beneath that heading as `h3`s. Cards join the box as their locations are placed and as "Load more" brings others to the pin; a keyboard handed on from "Load more" waits for the new cards to be placed, since joining a box redraws a card.
 - Results come from `/api/search` in batches of 480, each one upstream request within the parity §4.3 limit, and "Load more" shows them twelve at a time, asking for the next batch only once the last is used up. UKCP reshuffles equally distant results about once a minute (parity §3.2), so pages asked for one at a time would repeat some therapists and skip others; within a batch the order holds, and a therapist repeated where two batches meet is shown once. UKCP takes any page size: 480 answers most towns in one request (Leeds has 231 results) in about a second and about 65 KB compressed, where a whole city (London has 3,579) would outrun the Worker's 10-second upstream timeout. Should UKCP answer fewer than asked, the first batch's length sets the step. Changing the search starts again from the first page. The page URL never carries `page`; a link that has one opens at the first page.
 - The panel's or sheet's header counts the results: "257 results", or "257 results within your area" when a place was searched. The list opens with a line reading, for a location search, "Nearest 24 of 257, up to 0.6 miles away", using the furthest of UKCP's distances among the loaded cards; any other search reads "24 of 257". When any loaded therapist has no pin it adds "3 not on the map" (§4.8). Beneath sit "Pins show the postcode or area each therapist lists.", then the "Location searched" line or the alert that replaces it (§4.9), and UKCP's notices.
@@ -122,11 +123,11 @@ For outside-UK searches (`LocationSearchOutsideUK`), which postcodes.io cannot a
 
 ### 4.8 Unplaced therapists
 
-A therapist with no pin keeps their card in the list, in UKCP's order, with a line giving the reason, and the list's header counts them (§4.4):
+A therapist with no pin keeps their card in the list, in UKCP's order, and the list's header counts them (§4.4). The card gives the reason on a line of its own, unless the location is too vague to place, which needs no explaining:
 
 | Cause | Reason shown |
 |---|---|
-| No location on the card, or only a postcode area | Location too general to place |
+| No location on the card, or only a postcode area | None |
 | No match, or only implausible ones (§3.2) | Location couldn't be matched |
 | The lookup failed or was rate limited | Couldn't look up this location just now |
 

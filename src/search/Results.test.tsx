@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { useRef } from "react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -10,7 +10,7 @@ import { api, ApiError } from "@/lib/api";
 import { LoadMore } from "./LoadMore";
 import type { Pin } from "./map/pins";
 import { Results } from "./Results";
-import { withText } from "./state";
+import { withHelpWithTerms, withText } from "./state";
 import { useResults } from "./useResults";
 
 const TOO_MANY = "Too many searches in a short time. Wait a minute and try again.";
@@ -205,6 +205,19 @@ describe("Results", () => {
     await act(async () => release());
     await screen.findByText(/^Nearest 24 of 24/);
     expect(document.activeElement).toBe(elsewhere);
+  });
+
+  it("shows each card only the tags the search asked for, in a pin's box too", async () => {
+    const tagged = (slug: string) => ({ slug, name: `Therapist ${slug}`, initials: "T", tags: ["Anxiety", "Trauma"] });
+    const therapists = ["a", "b", "c"].map(tagged);
+    vi.spyOn(api, "search").mockResolvedValue({ total: 3, from: 1, to: 3, notices: [], therapists });
+    const params = withHelpWithTerms(leeds, ["Anxiety"]);
+    const view = renderResults(params);
+    await screen.findByRole("link", { name: "Therapist a" });
+    view.rerender(params, { pins: [{ key: "LS1", point: { lat: 53.8, lng: -1.55 }, therapists: therapists.slice(1), kind: "outcode" }] });
+    expect(screen.getAllByText("Anxiety")).toHaveLength(3);
+    expect(within(screen.getByRole("group")).getAllByText("Anxiety")).toHaveLength(2);
+    expect(screen.queryByText("Trauma")).toBeNull();
   });
 
   it("counts plainly when the search has no location", async () => {

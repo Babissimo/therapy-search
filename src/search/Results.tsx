@@ -4,6 +4,7 @@ import type { SearchParams } from "@shared/query";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { soughtTerms } from "./activeFilters";
 import { LocationNotice } from "./LocationNotice";
 import { listEntries, pinLabel, UNPLACED_REASONS, type Pin, type Unplaced } from "./map/pins";
 import { reachLine } from "./reach";
@@ -40,6 +41,7 @@ export function Results({ params, results, listRef, pins = [], unplaced = [], se
   const reasons = new Map(unplaced.map(({ therapist, reason }) => [therapist.slug, UNPLACED_REASONS[reason]] as const));
   const reach = reachLine(therapists, first?.total ?? 0, searchedPlace !== undefined);
   const highlight = (slug: string) => (on: boolean) => onHighlight?.(on ? slug : undefined);
+  const sought = soughtTerms(params);
 
   return (
     <section aria-busy={query.isPlaceholderData} className={cn("space-y-4", query.isPlaceholderData && "opacity-60")}>
@@ -66,9 +68,9 @@ export function Results({ params, results, listRef, pins = [], unplaced = [], se
               className={cn("rounded-xl", marked && t && "ring-2 ring-sky-500")}
             >
               {t ? (
-                <TherapistCard therapist={t} note={reasons.get(t.slug)} onHighlight={highlight(t.slug)} />
+                <TherapistCard therapist={t} sought={sought} note={reasons.get(t.slug)} onHighlight={highlight(t.slug)} />
               ) : (
-                <PinGroup pin={entry.pin} marked={marked} highlight={highlight} />
+                <PinGroup pin={entry.pin} marked={marked} sought={sought} highlight={highlight} />
               )}
             </li>
           );
@@ -78,8 +80,10 @@ export function Results({ params, results, listRef, pins = [], unplaced = [], se
   );
 }
 
+type PinGroupProps = { pin: Pin; marked: boolean; sought: ReadonlySet<string>; highlight: (slug: string) => (on: boolean) => void };
+
 /** Everyone at a stacked pin, under the place they list. */
-function PinGroup({ pin, marked, highlight }: { pin: Pin; marked: boolean; highlight: (slug: string) => (on: boolean) => void }) {
+function PinGroup({ pin, marked, sought, highlight }: PinGroupProps) {
   const headingId = useId();
   return (
     // A group rather than a section, which would make every place a landmark.
@@ -96,7 +100,7 @@ function PinGroup({ pin, marked, highlight }: { pin: Pin; marked: boolean; highl
       <ul className="space-y-3">
         {pin.therapists.map((t) => (
           <li key={t.slug}>
-            <TherapistCard therapist={t} heading="h3" onHighlight={highlight(t.slug)} />
+            <TherapistCard therapist={t} sought={sought} grouped onHighlight={highlight(t.slug)} />
           </li>
         ))}
       </ul>
