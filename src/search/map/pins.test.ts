@@ -32,23 +32,19 @@ describe("layoutPins", () => {
     expect(layout([card("a")], { a: undefined })).toEqual({ pins: [], unplaced: [] });
   });
 
-  it("gives each unplaced therapist a reason", () => {
+  it("leaves unplaced those whose lookup failed, was too general or found nothing", () => {
     const { unplaced } = layout([card("a"), card("b"), card("c")], {
       a: { ok: false },
       b: { ok: true, lookup: { found: false, reason: "too-general" } },
       c: { ok: true, lookup: { found: false, reason: "not-found" } },
     });
-    expect(unplaced.map((u) => [u.therapist.slug, u.reason])).toEqual([
-      ["a", "failed"],
-      ["b", "too-general"],
-      ["c", "not-matched"],
-    ]);
+    expect(unplaced.map((t) => t.slug)).toEqual(["a", "b", "c"]);
   });
 
   it("unplaces a place-name match implausibly far from the search, but not a postcode", () => {
     const leeds = { lat: 53.8, lng: -1.55 };
     const { pins, unplaced } = layout([card("a"), card("b")], { a: found("place", leeds), b: found("outcode", leeds) });
-    expect(unplaced.map((u) => [u.therapist.slug, u.reason])).toEqual([["a", "not-matched"]]);
+    expect(unplaced.map((t) => t.slug)).toEqual(["a"]);
     expect(pins.map((p) => p.therapists[0]?.slug)).toEqual(["b"]);
   });
 });

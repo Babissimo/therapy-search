@@ -17,10 +17,10 @@ const therapist = (extra: Partial<Therapist> = {}): Therapist => ({
   ...extra,
 });
 
-function renderCard(t: Therapist, sought: string[] = [], { note, grouped }: { note?: string; grouped?: boolean } = {}) {
+function renderCard(t: Therapist, sought: string[] = [], { grouped }: { grouped?: boolean } = {}) {
   render(
     <MemoryRouter>
-      <TherapistCard therapist={t} sought={new Set(sought)} note={note} grouped={grouped} />
+      <TherapistCard therapist={t} sought={new Set(sought)} grouped={grouped} />
     </MemoryRouter>,
   );
 }
@@ -69,10 +69,5 @@ describe("TherapistCard", () => {
   it("shows no tags for a search that asks for none", () => {
     renderCard(therapist());
     expect(screen.queryByRole("list")).toBeNull();
-  });
-
-  it("says why the map can't place a therapist", () => {
-    renderCard({ slug: "jo", name: "Jo", initials: "J", tags: [] }, [], { note: "Location couldn't be matched" });
-    expect(screen.getByText("Location couldn't be matched").textContent).toBe("Not on the map: Location couldn't be matched");
   });
 });
