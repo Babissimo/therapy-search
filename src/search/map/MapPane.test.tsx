@@ -65,7 +65,7 @@ function renderPane(props: Partial<MapPaneProps> = {}) {
   return render(
     <MemoryRouter>
       <MapPane
-        fitKey=""
+        fitKey="Location=Leeds"
         entry={`entry-${++entries}`}
         centreSettled
         pins={[]}
@@ -135,10 +135,7 @@ describe("MapPane", () => {
     expect(screen.getByTestId("fit").dataset.instant).toBe("false");
   });
 
-  it("shows tiles at once with nothing searched, or a view restored", () => {
-    renderPane();
-    expect(screen.getByTestId("tiles")).toBeTruthy();
-    cleanup();
+  it("shows a view restored at once, with its tiles", () => {
     saveView("restored", { map: { fitKey: "Location=Leeds", pins: 2, centre: [53.8, -1.55], zoom: 12 } });
     renderPane({ fitKey: "Location=Leeds", entry: "restored" });
     expect(screen.getByTestId("tiles")).toBeTruthy();

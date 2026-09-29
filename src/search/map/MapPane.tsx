@@ -9,7 +9,7 @@ import type { Pin } from "./pins";
 import { PinsLayer } from "./PinsLayer";
 
 export type MapPaneProps = {
-  /** The search as a query string: a new one frames the map afresh. Empty when nothing is searched. */
+  /** The search as a query string: a new one frames the map afresh. */
   fitKey: string;
   /** The history entry the view is remembered against. */
   entry: string;
@@ -31,9 +31,9 @@ export type MapPaneProps = {
 export default function MapPane({ fitKey, entry, centre, reachMiles, centreSettled, pins, placing, highlight, selected, onSelect }: MapPaneProps) {
   const saved = savedView(entry).map;
   const restored = saved?.fitKey === fitKey ? saved : undefined;
-  // A search opened from a link keeps its tiles back until it is framed, so the whole UK's aren't fetched on the way.
-  // Nothing searched, or a view restored on Back, is already where it will stay.
-  const [tiles, showTiles] = useState(fitKey === "" || restored !== undefined);
+  // A search keeps its tiles back until it is framed, so the whole UK's aren't fetched on the way. A view restored on
+  // Back is already where it will stay.
+  const [tiles, showTiles] = useState(restored !== undefined);
   const points = pins.map((p) => p.point);
   return (
     <div role="region" aria-label="Map of results" className="isolate size-full">

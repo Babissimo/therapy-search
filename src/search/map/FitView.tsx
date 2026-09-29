@@ -2,7 +2,7 @@ import L from "leaflet";
 import { useEffect, useRef } from "react";
 import { useMap } from "react-leaflet";
 import { SEARCH_MILES } from "@shared/query";
-import { METRES_PER_MILE, UK_VIEW, type Point } from "./geo";
+import { METRES_PER_MILE, type Point } from "./geo";
 
 /** A search's view, with how many pins and how far a circle it took in. */
 export type Framed = { fitKey: string; pins: number; reach?: number };
@@ -27,7 +27,7 @@ const MAX_ZOOM = 14;
  * Frames each search as its first page is placed, and again whenever Load more places further pins or the circle
  * reaches further: around the circle and every pin, or the whole area searched when nothing lies beyond the centre.
  * With no centre it frames the pins alone. A view restored on Back is left as it was until pins or a circle arrive
- * beyond those it had. With nothing searched it shows the UK.
+ * beyond those it had.
  * `onFramed` hears when the view is where the search puts it, or that there is nothing to frame.
  */
 export function FitView({ fitKey, centre, reachMiles, points, waiting, restored, instant, onFramed }: Props) {
@@ -43,12 +43,11 @@ export function FitView({ fitKey, centre, reachMiles, points, waiting, restored,
     const options: L.FitBoundsOptions = { ...PADDING, maxZoom: MAX_ZOOM };
     // Only ever false: an explicit true would animate even a pan across the country.
     if (instant) options.animate = false;
-    if (fitKey === "") map.setView(UK_VIEW.centre, UK_VIEW.zoom);
-    else if (bounds.isValid()) map.fitBounds(bounds, options);
-    else {
+    if (!bounds.isValid()) {
       onFramed?.();
       return;
     }
+    map.fitBounds(bounds, options);
     framed.current = { fitKey, pins: points.length, reach: reachMiles };
     onFramed?.();
   }, [map, fitKey, centre, reachMiles, points, waiting, instant, onFramed]);

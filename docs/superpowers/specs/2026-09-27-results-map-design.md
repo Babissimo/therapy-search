@@ -67,10 +67,10 @@ For outside-UK searches (`LocationSearchOutsideUK`), which postcodes.io cannot a
 
 ### 4.1 Page layout
 
-- The search page fills the viewport, with the map filling the space the results leave. There is no site header. On this page `SiteLayout` drops its width cap, padding and footer, and the site's name and the theme switch head the results instead (§4.2, §4.3). Other pages keep their layout, with those two in the footer.
+- The search page fills the viewport, with the map filling the space the results leave. There is no site header once there is a search. On this page `SiteLayout` drops its width cap, padding and footer, and the site's name and the theme switch head the results instead (§4.2, §4.3), or the page while it shows the prompt (§4.10). Other pages keep their layout, with those two in the footer.
 - The site's name is not a link. Resting the mouse on it shows the about text in a card; a click, tap or Enter pins the card open and moves focus into it, so touch and the keyboard reach its links.
 - From the `lg` breakpoint (1024px) the results sit in a panel beside the map (§4.2); below it, in a sheet over the map (§4.3). Both hold the same results component.
-- The map pane loads as its own chunk, so the results render without waiting for Leaflet; until it arrives the pane is a plain muted background.
+- The map pane loads as its own chunk, so the results render without waiting for Leaflet, and only once there is a search (§4.10); until it arrives the pane is a plain muted background.
 - The attribution control carries "© OpenStreetMap contributors © CARTO", as the tile terms require. The about text gains a data-sources line for postcodes.io (Ordnance Survey, Royal Mail and ONS data under the Open Government Licence) and Nominatim (OpenStreetMap).
 
 ### 4.2 Results panel (wide screens)
@@ -81,7 +81,7 @@ For outside-UK searches (`LocationSearchOutsideUK`), which postcodes.io cannot a
 
 ### 4.3 Results sheet (narrow screens)
 
-- A sheet over the bottom of the map with three positions: peek (the sheet's header alone: its handle, the count and its button), half, and full (up to just below the search box, leaving a strip of map). It opens at full on a search, so a phone starts on the list, and at half on the prompt (§4.10), so the map shows beside it; it moves between the two as a search replaces the prompt or is cleared.
+- A sheet over the bottom of the map with three positions: peek (the sheet's header alone: its handle, the count and its button), half, and full (up to just below the search box, leaving a strip of map). It opens at full, so a phone starts on the list, and does again when a search follows the prompt (§4.10).
 - The header's button moves it: "Show map" lowers it to peek, and "Show list" raises it to full. Dragging the header moves it too, settling at the nearest position. Only the header drags; the list inside scrolls normally, so the two gestures never compete.
 - The site's name and the theme switch open its list (§4.1), and scroll away with it.
 - Like the panel, it is an ordinary region, and the map above it stays usable at every position.
@@ -119,7 +119,7 @@ For outside-UK searches (`LocationSearchOutsideUK`), which postcodes.io cannot a
 
 - The circle is centred on the search centre and reaches the furthest of UKCP's distances among the loaded cards, the figure the list's opening line gives (§4.4). UKCP measures to each therapist's address and lists them nearest first, so the circle grows with every "Load more" that reaches further. A pin marks only the district or town a card lists, so it can sit a mile or two either side of the edge. A card showing an office other than the one UKCP measured to carries no distance, and its pin can fall well outside. The circle is drawn once a loaded card is further than 0 miles, in blue, which shows on light and dark tiles alike.
 - The map frames that circle and every placed pin once a search's first page is placed, or the whole 30 miles searched when nothing lies beyond the centre (no card has a distance, or every card is 0 miles away and none is placed), and frames them again whenever "Load more" places pins beyond those already framed or the circle reaches further. Without a centre it frames the placed pins. The frame is padded clear of the search box and zooms no closer than level 14. A view restored on Back (§4.4) is kept until pins or a circle arrive beyond those it took in.
-- A search opened from a link or a reload draws no tiles until its first frame, or until it turns out to have nothing to frame, and jumps to that frame rather than animating, so a search that frames its results never fetches the UK overview's tiles first (§6). With nothing searched, or a view restored on Back, tiles load at once.
+- A search opened from a link or a reload draws no tiles until its first frame, or until it turns out to have nothing to frame, and jumps to that frame rather than animating, so a search that frames its results never fetches the UK overview's tiles first (§6). A view restored on Back loads its tiles at once.
 - shadcn-map's zoom control sits bottom right on wide screens. Narrow screens rely on pinch zoom, since the sheet covers the bottom of the map.
 
 ### 4.8 Unplaced therapists
@@ -132,7 +132,7 @@ When the visitor typed a location but UKCP searched "United Kingdom" (parity §3
 
 ### 4.10 The prompt
 
-- With nothing to search for, UKCP would list every therapist in a random order, which answers no one's question. So such a visit asks UKCP for nothing: the results show a prompt to search a town, city or postcode, and the map shows the UK, as it does again whenever the search is cleared. The "Search locations outside the UK" tick alone is nothing to search for, since it only changes how a location is read.
+- With nothing to search for, UKCP would list every therapist in a random order, which answers no one's question. So such a visit asks UKCP for nothing, and loads no map, whose tiles of the UK would count against CARTO's allowance (§2) for nothing. In the map's place, in large type, a prompt asks for a town, city or postcode and says what the filters narrow the search by. There is no results panel or sheet, so the site's name and the theme switch head the page (§4.1). The page returns to the prompt whenever the search is cleared. The "Search locations outside the UK" tick alone is nothing to search for, since it only changes how a location is read.
 - "Clear all filters" searches the typed location alone, keeping the "Search locations outside the UK" tick, since a search with nothing left would land back on the prompt.
 
 ### 4.11 Profiles in a drawer
@@ -203,7 +203,7 @@ type NearestLookup = { found: true; postcode: string } | { found: false };
 - **Location text:** unit tests of classification and canonicalisation covering every row of §3.1, including the live strings in §2.
 - **Worker route:** Vitest calling the Hono app with a stub `fetch` for postcodes.io and Nominatim and a fake rate limiter. Cases: each kind, the fallback chain, the canonical redirect, `Cache-Control` for found and not found, `502` on upstream failure, `429`, and `countrycodes` dropped outside the UK.
 - **Pin logic:** unit tests of candidate choice with and without a centre, the plausibility cut, grouping pins that share a point, remote-only detection, the reach line and the unplaced reasons.
-- **Components:** the prompt asks UKCP for nothing; "Load more" appends a page, stays outside the scrolling list, and the URL gains no `page`; a new search starts again at the first page; the panel collapses and reopens; the sheet's buttons move it between positions; therapists sharing a pin are listed together under their place, which the pin's selection marks and scrolls into view; hovering a card reaches the map as a highlighted pin; the circle reaches the furthest of UKCP's distances and the frame grows with "Load more" to take in pins beyond it; a profile opens in a drawer over the search and closing it returns to the search unchanged; Back restores the list's scroll; the tiles follow the `dark` class; the unrecognised-location alert. Leaflet is mocked under jsdom.
+- **Components:** the prompt asks UKCP for nothing and shows no map; "Load more" appends a page, stays outside the scrolling list, and the URL gains no `page`; a new search starts again at the first page; the panel collapses and reopens; the sheet's buttons move it between positions; therapists sharing a pin are listed together under their place, which the pin's selection marks and scrolls into view; hovering a card reaches the map as a highlighted pin; the circle reaches the furthest of UKCP's distances and the frame grows with "Load more" to take in pins beyond it; a profile opens in a drawer over the search and closing it returns to the search unchanged; Back restores the list's scroll; the tiles follow the `dark` class; the unrecognised-location alert. Leaflet is mocked under jsdom.
 - **Manual:** a pass in the browser against the dev server for what jsdom can't show: pins, cluster zoom versus selection, the circle and the fit, the refit on "Load more", the pin rings and halo in both themes, the panel resizing the map, the sheet's positions and drag on a narrow viewport, the drawer, and dark tiles.
 
 ## 9. Delivery
