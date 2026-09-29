@@ -5,7 +5,8 @@ import { InvalidParam, readParams, toQuery } from "../shared/query";
 import { UpstreamError, type SessionStore, type UkcpClient } from "./ukcp/client";
 
 export type RateLimit = { limit(options: { key: string }): Promise<{ success: boolean }> };
-export type Env = { UPSTREAM_LIMIT: RateLimit; PLACE_LIMIT: RateLimit; UKCP_SESSION: SessionStore; SITE_URL: string };
+export type Assets = { fetch(url: string): Promise<Response> };
+export type Env = { ASSETS: Assets; UPSTREAM_LIMIT: RateLimit; PLACE_LIMIT: RateLimit; UKCP_SESSION: SessionStore; SITE_URL: string };
 export type PlaceFinder = {
   lookup(text: string, options: PlaceOptions): Promise<PlaceLookup>;
   nearest(lat: number, lng: number): Promise<NearestLookup>;
@@ -17,6 +18,8 @@ const PROFILE_MAX_AGE = 60 * 60;
 // Places don't move; a miss is kept shorter in case the geocoders learn it.
 const PLACE_FOUND_MAX_AGE = 30 * 24 * 60 * 60;
 const PLACE_MISSING_MAX_AGE = 24 * 60 * 60;
+// Vite names each built file by a hash of its content, so a browser can keep one for good.
+const ASSET_CACHE_CONTROL = "public, max-age=31536000, immutable";
 export const UPSTREAM_DOWN = "UKCP's search isn't responding. Try again, or search on UKCP directly.";
 export const TOO_MANY = "Too many searches in a short time. Wait a minute and try again.";
 export const PLACE_DOWN = "Couldn't look up that place just now.";
@@ -102,6 +105,17 @@ export function createApp(clientFor: (env: Env) => UkcpClient, placesFor: (env: 
       return c.json({ error: NEAREST_DOWN }, 502);
     }
     return c.json(nearest, 200, { "Cache-Control": `public, max-age=${nearest.found ? PLACE_FOUND_MAX_AGE : PLACE_MISSING_MAX_AGE}` });
+  });
+
+  // Built files are marked here rather than by a _headers rule, which would also mark the app's page that assets answer
+  // for a name the running deploy lacks, such as a chunk a tab from an older deploy asks for.
+  app.get("/assets/*", async (c) => {
+    // Fetched without the visitor's conditional headers, since a 304 would fail the check below.
+    const res = await c.env.ASSETS.fetch(c.req.url);
+    if (!res.ok || res.headers.get("Content-Type")?.startsWith("text/html")) return c.json({ error: "Not found" }, 404, { "Cache-Control": "no-store" });
+    const file = new Response(res.body, res);
+    file.headers.set("Cache-Control", ASSET_CACHE_CONTROL);
+    return file;
   });
 
   app.notFound((c) => c.json({ error: "Not found" }, 404));

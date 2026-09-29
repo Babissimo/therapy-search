@@ -19,7 +19,7 @@ Out of scope for v1:
 
 ## 2. Constraints
 
-- **Free to run.** Cloudflare Workers free plan: 100,000 Worker requests a day and 10 ms of CPU per request, and static assets are free and unlimited.
+- **Free to run.** Cloudflare Workers free plan: 100,000 Worker requests a day and 10 ms of CPU per request. With Workers Caching on (§4.2), cached answers and static files count as requests too.
 - **Respectful of UKCP.**
   - Cache identical searches (15 minutes) and profiles (1 hour), and collapse concurrent identical requests, so repeated traffic never reaches UKCP.
   - Send upstream only what a visitor's action on UKCP would send, except that a search asks for 480 results at once where UKCP's page asks for 12 (map spec §4.4): one search POST per uncached batch of results, one profile GET per opened profile, one contact POST per click. Never prefetch or crawl.
@@ -152,6 +152,8 @@ Search is a GET on our side so the response can be cached by URL. The Worker **v
 The contact route answers only requests from the site's own pages (a matching `Origin`), so other sites cannot make their visitors' browsers request contact details from UKCP.
 
 Caching uses Workers Caching (`cache.enabled` in the Wrangler config, `Cache-Control: public, max-age=…` on responses). It keys by path and query and collapses concurrent misses, and it works on `workers.dev`. Entries outlive a deploy (`cache.cross_version_cache`), since the Worker's answers rarely change between deploys: a change that alters them reaches a cached URL only as its entry expires, within an hour for searches and profiles. A route whose answers are kept longer carries a version in its query instead, raised when they change.
+
+Built files under `/assets` are named by a hash of their content, so the Worker serves them marked `immutable` for a year and a returning browser asks for none of them. A name the running deploy lacks, such as a chunk requested by a tab from an older deploy, gets an uncached `404` once the edge no longer holds it, rather than the app's page, which the assets would otherwise send and a `_headers` rule would mark immutable.
 
 ### 4.3 Rate limit
 
