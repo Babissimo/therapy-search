@@ -54,7 +54,7 @@ async function json<T>(url: string): Promise<T> {
 export const api = {
   search: (query: string) => request(`/api/search${query ? `?${query}` : ""}`, listingsOf),
   profile: (slug: string) => request(`/api/therapist/${encodeURIComponent(slug)}`, (html) => parseProfile(html, slug)),
-  contact: (id: string) => request(`/api/contact/${encodeURIComponent(id)}`, parseContact, { method: "POST" }),
+  contact: (id: string) => request(`/api/contact/${encodeURIComponent(id)}`, parseContact),
   place: (text: string, options: PlaceOptions = {}) => json<PlaceLookup>(`/api/place?${placeQuery(text, options)}`),
   nearest: (lat: number, lng: number) => json<NearestLookup>(`/api/nearest?${nearestQuery(lat, lng)}`),
 };

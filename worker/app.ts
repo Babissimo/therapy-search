@@ -19,6 +19,7 @@ const SEARCH_MAX_AGE = 15 * 60;
 const WHOLE_SEARCH_MAX_AGE = 6 * 60 * 60;
 // UKCP opens a results page with its count or a notice; the rest can run to megabytes.
 const OPENING_BYTES = 8 * 1024;
+// Contact details are kept as long as the profile they belong to.
 const PROFILE_MAX_AGE = 60 * 60;
 // Places don't move; a miss is kept shorter in case the geocoders learn it.
 const PLACE_FOUND_MAX_AGE = 30 * 24 * 60 * 60;
@@ -35,7 +36,7 @@ const SLUG = /^[\p{L}\p{N}][\p{L}\p{M}\p{N}'’.-]{2,119}$/u;
 export function createApp(clientFor: (env: Env) => UkcpClient, placesFor: (env: Env) => PlaceFinder) {
   const app = new Hono<{ Bindings: Env }>();
 
-  // Anything not explicitly cacheable must never be stored: errors, redirects to bad input, contact details.
+  // Anything not explicitly cacheable must never be stored: errors and redirects to bad input.
   app.use("/api/*", async (c, next) => {
     await next();
     if (!c.res.headers.has("Cache-Control")) c.res.headers.set("Cache-Control", "no-store");
@@ -63,14 +64,16 @@ export function createApp(clientFor: (env: Env) => UkcpClient, placesFor: (env: 
     return upstreamHtml(c, expectPage(html, "therapist-header"), `public, max-age=${PROFILE_MAX_AGE}`);
   });
 
-  app.post("/api/contact/:id", async (c) => {
+  app.get("/api/contact/:id", async (c) => {
     // Only our own pages may ask, so other sites can't make their visitors' browsers request contact details from UKCP.
-    const origin = c.req.header("origin");
-    if (origin && origin !== new URL(c.req.url).origin) return c.json({ error: "Contact details can only be shown on this site." }, 403);
+    const site = c.req.header("sec-fetch-site");
+    if (site === "cross-site" || site === "same-site") return c.json({ error: "Contact details can only be shown on this site." }, 403);
     const id = c.req.param("id");
     if (!/^\d{1,10}$/.test(id)) return c.json({ error: "That isn't a UKCP contact id." }, 400);
     if (!(await allow(c, c.env.UPSTREAM_LIMIT))) return c.json({ error: TOO_MANY }, 429);
-    return upstreamHtml(c, await clientFor(c.env).contact(id), "no-store");
+    const html = await clientFor(c.env).contact(id);
+    // UKCP answers an unknown id with an empty page, which is passed on but not kept, as is any page without details.
+    return upstreamHtml(c, html, html.includes("therapist-contacts-details-") ? `public, max-age=${PROFILE_MAX_AGE}` : "no-store");
   });
 
   app.get("/api/place", async (c) => {

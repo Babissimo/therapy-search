@@ -141,19 +141,30 @@ describe("GET /api/therapist/:slug", () => {
   });
 });
 
-describe("POST /api/contact/:id", () => {
-  it("returns the details and is never cached", async () => {
-    const html = `<div class="therapist-contacts-details-tel"><a href="tel:01234567890">01234 567890</a></div>`;
-    const { request } = setup({ client: { contact: vi.fn(async () => html) } });
-    const res = await request("/api/contact/9239", { method: "POST" });
+describe("GET /api/contact/:id", () => {
+  const CONTACT = `<div class="therapist-contacts-details-tel"><a href="tel:01234567890">01234 567890</a></div>`;
+
+  it("returns the details as plain text that the edge may cache for an hour", async () => {
+    const { request, stub } = setup({ client: { contact: vi.fn(async () => CONTACT) } });
+    const res = await request("/api/contact/9239");
+    expect([res.status, res.headers.get("Cache-Control"), res.headers.get("Content-Type")]).toEqual([200, "public, max-age=3600", "text/plain; charset=utf-8"]);
+    expect(await res.text()).toBe(CONTACT);
+    expect(stub.contact).toHaveBeenCalledWith("9239");
+  });
+
+  it("passes on an answer without details but never caches it", async () => {
+    const { request } = setup({ client: { contact: vi.fn(async () => "\r\n") } });
+    const res = await request("/api/contact/999999999");
     expect([res.status, res.headers.get("Cache-Control")]).toEqual([200, "no-store"]);
-    expect(await res.text()).toBe(html);
   });
 
   it("answers requests from this site's pages and refuses other sites'", async () => {
-    const { request, stub } = setup({ client: { contact: vi.fn(async () => "") } });
-    expect((await request("/api/contact/9239", { method: "POST", headers: { origin: "http://localhost" } })).status).toBe(200);
-    expect((await request("/api/contact/9239", { method: "POST", headers: { origin: "https://elsewhere.example" } })).status).toBe(403);
+    const { request, stub } = setup({ client: { contact: vi.fn(async () => CONTACT) } });
+    const from = (site: string) => request("/api/contact/9239", { headers: { "sec-fetch-site": site } });
+    expect((await from("same-origin")).status).toBe(200);
+    const refused = await from("cross-site");
+    expect([refused.status, refused.headers.get("Cache-Control")]).toEqual([403, "no-store"]);
+    expect((await from("same-site")).status).toBe(403);
     expect(stub.contact).toHaveBeenCalledOnce();
   });
 });
