@@ -18,7 +18,7 @@ async function save(name: string, html: string) {
 function search(change: (p: SearchParams) => void = () => {}): Promise<string> {
   const params = emptyParams();
   change(params);
-  return client.search(params, PAGE_SIZE);
+  return client.search(params, PAGE_SIZE).then((body) => new TextDecoder().decode(body));
 }
 
 const form = parse(await client.searchPage()).querySelector("form#FindATherapistSearch");
