@@ -9,12 +9,21 @@ const RESULTS = `<span class="results-no">1-1 of 1 results</span>
 const v = `v=${LOOKUP_VERSION}`;
 const FOUND: PlaceLookup = { found: true, kind: "outcode", candidates: [{ lat: 50.835, lng: -0.178 }] };
 
-function setup({ allow = true, allowPlaces = true, client = {} as Partial<UkcpClient>, places = {} as Partial<PlaceFinder> } = {}) {
+const SCRIPT = () => new Response("export {};", { headers: { "Content-Type": "text/javascript", "Cache-Control": "public, max-age=0, must-revalidate", ETag: '"abc"' } });
+
+function setup({
+  allow = true,
+  allowPlaces = true,
+  client = {} as Partial<UkcpClient>,
+  places = {} as Partial<PlaceFinder>,
+  asset = SCRIPT as () => Response,
+} = {}) {
   const limit = vi.fn(async () => ({ success: allow }));
   const placeLimit = vi.fn(async () => ({ success: allowPlaces }));
   // The routes are given a client, so the session store is never reached.
   const store = { get: async () => null, put: async () => {} };
-  const env: Env = { UPSTREAM_LIMIT: { limit }, PLACE_LIMIT: { limit: placeLimit }, UKCP_SESSION: store, SITE_URL: "https://example.test" };
+  const assets = { fetch: vi.fn(async (_url: string) => asset()) };
+  const env: Env = { ASSETS: assets, UPSTREAM_LIMIT: { limit }, PLACE_LIMIT: { limit: placeLimit }, UKCP_SESSION: store, SITE_URL: "https://example.test" };
   const stub = { search: vi.fn(async () => RESULTS), profile: vi.fn(), contact: vi.fn(), ...client } as unknown as UkcpClient;
   const finder: PlaceFinder = { lookup: vi.fn(async () => FOUND), nearest: vi.fn(async () => ({ found: true, postcode: "BN3 1FG" }) as const), ...places };
   const app = createApp(
@@ -23,7 +32,7 @@ function setup({ allow = true, allowPlaces = true, client = {} as Partial<UkcpCl
   );
   const request = (path: string, init?: RequestInit) =>
     app.request(path, { ...init, headers: { "cf-connecting-ip": "203.0.113.9", ...init?.headers } }, env);
-  return { request, stub, limit, placeLimit, finder };
+  return { request, stub, limit, placeLimit, finder, assets };
 }
 
 describe("GET /api/search", () => {
@@ -243,5 +252,32 @@ describe("GET /api/nearest", () => {
     const res = await request(`/api/nearest?lat=50.826&lng=-0.160&${v}`);
     expect([res.status, res.headers.get("Cache-Control"), (await res.json()).error]).toEqual([502, "no-store", NEAREST_DOWN]);
     expect(log).toHaveBeenCalledWith("GeocodeError: api.postcodes.io answered 500");
+  });
+});
+
+describe("GET /assets/*", () => {
+  it("marks a built file immutable for a year", async () => {
+    const { request } = setup();
+    const res = await request("/assets/index-CaFBIOBx.js");
+    expect([res.status, res.headers.get("Cache-Control"), res.headers.get("ETag")]).toEqual([200, "public, max-age=31536000, immutable", '"abc"']);
+    expect(await res.text()).toBe("export {};");
+  });
+
+  it("asks assets for the whole file, whatever the browser sent", async () => {
+    const { request, assets } = setup();
+    await request("/assets/index-CaFBIOBx.js", { headers: { "If-None-Match": '"abc"', Range: "bytes=0-1" } });
+    expect(assets.fetch).toHaveBeenCalledWith("http://localhost/assets/index-CaFBIOBx.js");
+  });
+
+  it("answers 404, uncached, where assets would send the app's page for a name no deploy has", async () => {
+    const { request } = setup({ asset: () => new Response("<!doctype html>", { headers: { "Content-Type": "text/html; charset=utf-8" } }) });
+    const res = await request("/assets/MapPane-OldHash.js");
+    expect([res.status, res.headers.get("Cache-Control")]).toEqual([404, "no-store"]);
+  });
+
+  it("keeps nothing assets could not serve", async () => {
+    const { request } = setup({ asset: () => new Response(null, { status: 404 }) });
+    const res = await request("/assets/missing.css");
+    expect([res.status, res.headers.get("Cache-Control")]).toEqual([404, "no-store"]);
   });
 });
