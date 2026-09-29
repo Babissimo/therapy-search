@@ -48,11 +48,18 @@ function placeName(text: string): string {
   return /[A-Z]/.test(name) ? name : "";
 }
 
+/**
+ * The date of the last change to what a place or nearest-postcode lookup answers. Cached answers outlive a deploy, so
+ * only a new value reaches past them; a date is never reused, as its entries may still hold another build's answers.
+ */
+export const LOOKUP_VERSION = "2026-09-29";
+
 /** The one query string for a lookup: fixed key order, flags only when set. */
 export function placeQuery(text: string, { centre = false, outsideUK = false }: PlaceOptions = {}): string {
   const query = new URLSearchParams({ q: canonicalLocation(text) });
   if (centre) query.set("centre", "true");
   if (outsideUK) query.set("outsideUK", "true");
+  query.set("v", LOOKUP_VERSION);
   return query.toString();
 }
 
@@ -73,5 +80,5 @@ export type NearestLookup = { found: true; postcode: string } | { found: false }
 export function nearestQuery(lat: number, lng: number): string {
   // Math.round turns a small negative into -0, which prints without its sign, so each point has one spelling.
   const rounded = (degrees: number) => (Math.round(degrees * 1000) / 1000).toFixed(3);
-  return new URLSearchParams({ lat: rounded(lat), lng: rounded(lng) }).toString();
+  return new URLSearchParams({ lat: rounded(lat), lng: rounded(lng), v: LOOKUP_VERSION }).toString();
 }

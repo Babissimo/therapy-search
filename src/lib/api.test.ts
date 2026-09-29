@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { LOOKUP_VERSION } from "@shared/location";
 import { api, UNREADABLE } from "./api";
 
 const answer = (body: string, status = 200) => vi.stubGlobal("fetch", vi.fn(async () => new Response(body, { status })));
@@ -26,13 +27,13 @@ describe("api", () => {
   it("looks a place up by its canonical query", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => Response.json({ found: false, reason: "not-found" })));
     await expect(api.place(" Brighton bn3", { centre: true })).resolves.toEqual({ found: false, reason: "not-found" });
-    expect(fetch).toHaveBeenCalledWith("/api/place?q=BRIGHTON+BN3&centre=true");
+    expect(fetch).toHaveBeenCalledWith(`/api/place?q=BRIGHTON+BN3&centre=true&v=${LOOKUP_VERSION}`);
   });
 
   it("asks for the postcode nearest a point rounded to about 100 metres", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => Response.json({ found: true, postcode: "BN3 1FG" })));
     await expect(api.nearest(50.82614, -0.15987)).resolves.toEqual({ found: true, postcode: "BN3 1FG" });
-    expect(fetch).toHaveBeenCalledWith("/api/nearest?lat=50.826&lng=-0.160");
+    expect(fetch).toHaveBeenCalledWith(`/api/nearest?lat=50.826&lng=-0.160&v=${LOOKUP_VERSION}`);
   });
 
   it("passes on the Worker's error for a place lookup", async () => {
