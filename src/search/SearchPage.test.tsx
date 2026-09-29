@@ -212,6 +212,13 @@ describe("SearchPage", () => {
     expect(screen.queryByRole("region", { name: "Refine your search" })).toBeNull();
   });
 
+  it("leaves the outside-UK tick out of the Filters count, as Clear all keeps it", async () => {
+    screenIs(true);
+    renderAt("/?LocationSearchOutsideUK=true&Languages=French");
+    await loaded();
+    expect(screen.getByRole("button", { name: "Filters, 1 ticked" })).toBeTruthy();
+  });
+
   it("opens the filters in a sheet on narrow screens", async () => {
     screenIs(false);
     renderAt(SEARCH);

@@ -170,6 +170,7 @@ function SearchView({ params, onChange }: ViewProps) {
 function MapToolbar({ params, onChange, drafts, wide }: ViewProps & { drafts: SearchDrafts; wide: boolean }) {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const filtersId = useId();
+  // UKCP's groups rather than the panel's, so the outside-UK tick, which makes no chip and survives Clear all, goes uncounted.
   const ticked = OPTIONS.groups.reduce((sum, group) => sum + tickedIn(params, group), 0);
   return (
     // Only the toolbar's own controls take the pointer; the map shows through the rest of it.

@@ -53,11 +53,18 @@ describe("SearchBox and FilterPanel", () => {
     const onChange = vi.fn();
     render(panel(emptyParams(), onChange));
     fireEvent.change(location(), { target: { value: "Paris" } });
+    fireEvent.click(screen.getByRole("button", { name: "Additional Filters" }));
     fireEvent.click(screen.getByRole("checkbox", { name: "Search locations outside the UK" }));
     expect(onChange.mock.calls[0]?.[0]).toMatchObject({ flags: { LocationSearchOutsideUK: true }, text: { Location: "Paris" } });
     fireEvent.click(screen.getByRole("button", { name: "Languages" }));
     fireEvent.click(screen.getByRole("checkbox", { name: "French" }));
     expect(onChange.mock.calls[1]?.[0]).toMatchObject({ multi: { Languages: ["French"] }, text: { Location: "Paris" } });
+  });
+
+  it("list the outside-UK tick among the additional filters, which start open when it is ticked", () => {
+    render(panel(withFlag(emptyParams(), "LocationSearchOutsideUK", true)));
+    expect(screen.getByRole("button", { name: "Additional Filters, 1 ticked" }).getAttribute("aria-expanded")).toBe("true");
+    expect(screen.getByRole("checkbox", { name: "Search locations outside the UK" }).getAttribute("aria-checked")).toBe("true");
   });
 
   it("clear every filter but keep the typed location and whether it is outside the UK", () => {

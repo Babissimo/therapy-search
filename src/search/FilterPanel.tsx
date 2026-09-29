@@ -1,14 +1,12 @@
-import { useId } from "react";
 import { CircleHelp } from "lucide-react";
-import { OPTIONS } from "@shared/options";
 import { TEXT_MAX_LENGTH, type SearchParams } from "@shared/query";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { CheckboxGroup } from "./CheckboxGroup";
-import { isChecked, tickedIn, withField, withFlag } from "./state";
+import { FILTER_GROUPS } from "./filterGroups";
+import { isChecked, tickedIn, withField } from "./state";
 import { TickedCount } from "./TickedCount";
 import type { SearchDrafts } from "./useSearchDrafts";
 
@@ -19,8 +17,7 @@ type Props = { params: SearchParams; drafts: SearchDrafts; onSearch?: () => void
 
 /** Keyword and UKCP's "Refine your search" filters, under a heading its container gives. Every change takes the typed location and keyword with it. */
 export function FilterPanel({ params, drafts, onSearch }: Props) {
-  const outsideUkId = useId();
-  const openGroups = OPTIONS.groups.filter((g) => tickedIn(params, g) > 0).map((g) => g.label);
+  const openGroups = FILTER_GROUPS.filter((g) => tickedIn(params, g) > 0).map((g) => g.label);
 
   return (
     <div className="space-y-6">
@@ -46,19 +43,8 @@ export function FilterPanel({ params, drafts, onSearch }: Props) {
         </form>
       </div>
 
-      <div className="flex items-center gap-2">
-        <Checkbox
-          id={outsideUkId}
-          checked={params.flags.LocationSearchOutsideUK}
-          onCheckedChange={(checked) => drafts.submit(withFlag(params, "LocationSearchOutsideUK", checked === true))}
-        />
-        <label htmlFor={outsideUkId} className="text-sm">
-          Search locations outside the UK
-        </label>
-      </div>
-
       <Accordion type="multiple" defaultValue={openGroups}>
-        {OPTIONS.groups.map((group) => (
+        {FILTER_GROUPS.map((group) => (
           <AccordionItem key={group.label} value={group.label}>
             <div className="flex items-center gap-1">
               <AccordionTrigger className="flex-1">
