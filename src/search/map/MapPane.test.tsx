@@ -14,7 +14,7 @@ vi.mock("@/components/ui/map", async () => {
   return {
     Map: ({ center, zoom, children }: { center: [number, number]; zoom: number; children?: unknown }) =>
       createElement("div", { "data-testid": "map", "data-view": `${center.join(",")}@${zoom}` }, children as never),
-    MapTileLayer: () => null,
+    MapTileLayer: () => createElement("div", { "data-testid": "tiles" }),
     MapZoomControl: () => null,
     MapCircle: ({ radius }: { radius: number }) => createElement("div", { "data-testid": "circle", "data-radius": radius }),
     MapMarkerClusterGroup: ({ children }: { children?: unknown }) => createElement(Fragment, null, children as never),
@@ -32,10 +32,14 @@ vi.mock("@/components/ui/map", async () => {
 vi.mock("./FitView", async () => {
   const { createElement } = await import("react");
   return {
-    FitView: ({ restored }: { restored?: { fitKey: string; pins: number; reach?: number } }) =>
-      createElement("div", {
+    // Clicked to stand for the view being framed.
+    FitView: ({ restored, instant, onFramed }: { restored?: { fitKey: string; pins: number; reach?: number }; instant?: boolean; onFramed?: () => void }) =>
+      createElement("button", {
+        type: "button",
         "data-testid": "fit",
+        "data-instant": String(Boolean(instant)),
         "data-restored": restored ? `${restored.fitKey} with ${restored.pins} pins${restored.reach === undefined ? "" : ` to ${restored.reach} miles`}` : "",
+        onClick: onFramed,
       }),
   };
 });
@@ -120,6 +124,24 @@ describe("MapPane", () => {
     renderPane({ fitKey: "Location=York", entry: "afresh" });
     expect(screen.getByTestId("map").dataset.view).toBe("54.5,-3@5");
     expect(screen.getByTestId("fit").dataset.restored).toBe("");
+  });
+
+  it("holds a search's tiles back until it is framed, framing it without animation", () => {
+    renderPane({ fitKey: "Location=York" });
+    expect(screen.queryByTestId("tiles")).toBeNull();
+    expect(screen.getByTestId("fit").dataset.instant).toBe("true");
+    fireEvent.click(screen.getByTestId("fit"));
+    expect(screen.getByTestId("tiles")).toBeTruthy();
+    expect(screen.getByTestId("fit").dataset.instant).toBe("false");
+  });
+
+  it("shows tiles at once with nothing searched, or a view restored", () => {
+    renderPane();
+    expect(screen.getByTestId("tiles")).toBeTruthy();
+    cleanup();
+    saveView("restored", { map: { fitKey: "Location=Leeds", pins: 2, centre: [53.8, -1.55], zoom: 12 } });
+    renderPane({ fitKey: "Location=Leeds", entry: "restored" });
+    expect(screen.getByTestId("tiles")).toBeTruthy();
   });
 
   it("pins therapists, stacking those who share a point", () => {

@@ -36,6 +36,7 @@ function Map({
   return (
     <MapContainer zoom={zoom} maxZoom={maxZoom} zoomControl={false} className={cn("size-full", className)} {...props}>
       <FollowSize />
+      <DataCreditsOnly />
       {children}
     </MapContainer>
   );
@@ -52,6 +53,15 @@ function FollowSize() {
   return null;
 }
 
+/** The credits name the map's data alone, and do so before any tiles are drawn. */
+function DataCreditsOnly() {
+  const map = useMap();
+  useEffect(() => {
+    map.attributionControl?.setPrefix(false);
+  }, [map]);
+  return null;
+}
+
 export type TileSource = { url: string; attribution: string };
 
 const OSM_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
@@ -60,18 +70,15 @@ const OSM_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright
 function tileSource(cartoKey: string | undefined, dark = false): TileSource {
   if (!cartoKey) return { url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png", attribution: OSM_ATTRIBUTION };
   return {
-    url: `https://{s}.basemaps.cartocdn.com/${dark ? "dark_all" : "light_all"}/{z}/{x}/{y}{r}.png?key=${encodeURIComponent(cartoKey)}`,
+    // CARTO's documented form: one host, which HTTP/2 serves over a single connection.
+    url: `https://basemaps.cartocdn.com/rastertiles/${dark ? "dark_all" : "light_all"}/{z}/{x}/{y}{r}.png?key=${encodeURIComponent(cartoKey)}`,
     attribution: `${OSM_ATTRIBUTION}, &copy; <a href="https://carto.com/attributions">CARTO</a>`,
   };
 }
 
 function MapTileLayer(props: Omit<TileLayerProps, "url" | "attribution">) {
-  const map = useMap();
   const dark = useDarkTheme();
   const { url, attribution } = tileSource(import.meta.env.VITE_CARTO_KEY, dark);
-  useEffect(() => {
-    map.attributionControl?.setPrefix(false);
-  }, [map]);
   // Keyed by URL, so a theme change swaps the layer rather than relying on Leaflet to redraw it in place.
   return <TileLayer key={url} url={url} attribution={attribution} {...props} />;
 }

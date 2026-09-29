@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useMapEvents } from "react-leaflet";
 import { Map, MapCircle, MapTileLayer, MapZoomControl } from "@/components/ui/map";
 import { savedView, saveView } from "../viewMemory";
@@ -30,11 +31,14 @@ export type MapPaneProps = {
 export default function MapPane({ fitKey, entry, centre, reachMiles, centreSettled, pins, placing, highlight, selected, onSelect }: MapPaneProps) {
   const saved = savedView(entry).map;
   const restored = saved?.fitKey === fitKey ? saved : undefined;
+  // A search opened from a link keeps its tiles back until it is framed, so the whole UK's aren't fetched on the way.
+  // Nothing searched, or a view restored on Back, is already where it will stay.
+  const [tiles, showTiles] = useState(fitKey === "" || restored !== undefined);
   const points = pins.map((p) => p.point);
   return (
     <div role="region" aria-label="Map of results" className="isolate size-full">
       <Map center={restored?.centre ?? UK_VIEW.centre} zoom={restored?.zoom ?? UK_VIEW.zoom}>
-        <MapTileLayer />
+        {tiles && <MapTileLayer />}
         <MapZoomControl className="top-auto right-2 bottom-8 left-auto max-lg:hidden" />
         {/* Pins mark only the district or town a card lists, so one can sit a little either side of the edge. */}
         {centre && reachMiles !== undefined && reachMiles > 0 && (
@@ -48,7 +52,17 @@ export default function MapPane({ fitKey, entry, centre, reachMiles, centreSettl
         )}
         <PinsLayer pins={pins} highlight={highlight} selected={selected} onSelect={onSelect} />
         {/* The frame takes in every loaded pin, so it waits until they are placed. */}
-        <FitView fitKey={fitKey} centre={centre} reachMiles={reachMiles} points={points} waiting={!centreSettled || placing} restored={restored} />
+        <FitView
+          fitKey={fitKey}
+          centre={centre}
+          reachMiles={reachMiles}
+          points={points}
+          waiting={!centreSettled || placing}
+          restored={restored}
+          // With no tiles drawn there is nothing to animate across, and they should load where the frame lands.
+          instant={!tiles}
+          onFramed={() => showTiles(true)}
+        />
         <RememberView entry={entry} fitKey={fitKey} pins={pins.length} reach={reachMiles} />
       </Map>
     </div>
