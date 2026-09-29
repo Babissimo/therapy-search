@@ -69,8 +69,18 @@ describe("FitView", () => {
 
   it("does nothing with neither a centre nor pins", () => {
     const fit = spyFit();
-    render(onMap(<FitView fitKey="" points={[]} waiting={false} />));
+    render(onMap(<FitView fitKey="a" points={[]} waiting={false} />));
     expect(fit).not.toHaveBeenCalled();
+  });
+
+  it("goes back to the whole UK when nothing is searched", () => {
+    spyFit();
+    const view = vi.spyOn(L.Map.prototype, "setView");
+    const { rerender } = render(onMap(<FitView fitKey="a" centre={BRIGHTON} reachMiles={1} points={[HOVE]} waiting={false} />));
+    // The map set its own first view as it mounted.
+    view.mockClear();
+    rerender(onMap(<FitView fitKey="" points={[]} waiting={false} />));
+    expect(view).toHaveBeenCalledWith([54.5, -3], 5);
   });
 
   it("leaves a view restored for this search alone until pins arrive beyond those it had", () => {

@@ -6,7 +6,7 @@ import { emptyParams, type SearchParams } from "@shared/query";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { FilterPanel } from "./FilterPanel";
 import { SearchBox } from "./SearchBox";
-import { withText } from "./state";
+import { withFlag, withMulti, withText } from "./state";
 import { useSearchDrafts } from "./useSearchDrafts";
 
 function Harness({ params, onChange }: { params: SearchParams; onChange: (next: SearchParams) => void }) {
@@ -58,6 +58,17 @@ describe("SearchBox and FilterPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: "Languages" }));
     fireEvent.click(screen.getByRole("checkbox", { name: "French" }));
     expect(onChange.mock.calls[1]?.[0]).toMatchObject({ multi: { Languages: ["French"] }, text: { Location: "Paris" } });
+  });
+
+  it("clear every filter but keep the typed location and whether it is outside the UK", () => {
+    const onChange = vi.fn();
+    const params = withFlag(withMulti(withText(emptyParams(), "KeywordFilter", "grief"), "Languages", "French", true), "LocationSearchOutsideUK", true);
+    render(panel(params, onChange));
+    fireEvent.change(location(), { target: { value: "Paris" } });
+    fireEvent.click(screen.getByRole("button", { name: "Clear all filters" }));
+    const outsideParis = withFlag(withText(emptyParams(), "Location", "Paris"), "LocationSearchOutsideUK", true);
+    expect(onChange).toHaveBeenCalledWith(outsideParis);
+    expect(keyword().value).toBe("");
   });
 
   it("keep a typed location until the search's own location changes", () => {

@@ -18,8 +18,8 @@ export type SearchResults = {
   searchedPlace?: string;
 };
 
-/** A search's results, a page at a time in UKCP's order, for "Load more". */
-export function useResults(params: SearchParams): SearchResults {
+/** A search's results, a page at a time in UKCP's order, for "Load more". Nothing is asked for, or shown, until `enabled`. */
+export function useResults(params: SearchParams, enabled = true): SearchResults {
   const [seed] = useState(() => orderSeed());
   const pageQuery = (page: number) => toQuery({ ...withPage(params, page), orderSeed: seed }, { withSeed: true });
   // Spelt out because TypeScript otherwise fills in the page data's type before inferring the page number's.
@@ -28,7 +28,9 @@ export function useResults(params: SearchParams): SearchResults {
     queryFn: ({ pageParam }) => api.search(pageQuery(pageParam)),
     initialPageParam: 1,
     getNextPageParam: (last: SearchResult, pages: SearchResult[]) => (last.to < last.total ? pages.length + 1 : undefined),
-    placeholderData: keepPreviousData,
+    enabled,
+    // Without a search, the last one's results would linger in its place.
+    placeholderData: enabled ? keepPreviousData : undefined,
     gcTime: KEEP_FOR,
   });
   const pages = query.data?.pages ?? [];

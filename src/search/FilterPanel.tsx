@@ -1,6 +1,5 @@
 import { useId } from "react";
 import { CircleHelp } from "lucide-react";
-import { Link } from "react-router";
 import { OPTIONS } from "@shared/options";
 import { TEXT_MAX_LENGTH, type SearchParams } from "@shared/query";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -26,8 +25,8 @@ export function FilterPanel({ params, drafts, onSearch }: Props) {
   return (
     <div className="space-y-6">
       <div className="space-y-2">
-        <Button variant="link" size="sm" className="h-auto px-0" asChild>
-          <Link to="/">Clear all filters</Link>
+        <Button type="button" variant="link" size="sm" className="h-auto px-0" onClick={drafts.clear}>
+          Clear all filters
         </Button>
         <form
           onSubmit={(e) => {

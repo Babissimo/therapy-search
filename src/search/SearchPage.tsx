@@ -1,4 +1,4 @@
-import { SlidersHorizontal, X } from "lucide-react";
+import { MapPin, SlidersHorizontal, X } from "lucide-react";
 import { lazy, Suspense, useEffect, useId, useRef, useState } from "react";
 import { Link, useLocation } from "react-router";
 import { OPTIONS } from "@shared/options";
@@ -20,7 +20,7 @@ import { Results } from "./Results";
 import { ResultsPanel } from "./ResultsPanel";
 import { ResultsSheet, type SheetPosition } from "./ResultsSheet";
 import { SearchBox } from "./SearchBox";
-import { tickedIn } from "./state";
+import { tickedIn, withFlag } from "./state";
 import { TickedCount } from "./TickedCount";
 import { useResults } from "./useResults";
 import { useSearchDrafts, type SearchDrafts } from "./useSearchDrafts";
@@ -62,7 +62,12 @@ function SearchView({ params, onChange }: ViewProps) {
   const wide = useMediaQuery(WIDE);
   const { key: entry } = useLocation();
   const drafts = useSearchDrafts(params, onChange);
-  const results = useResults(params);
+  // With nothing to search for, UKCP would list everyone in a random order, which answers no one's question. The
+  // outside-UK tick alone is nothing to search for: it only changes how a location is read.
+  const searching = toQuery(withFlag(params, "LocationSearchOutsideUK", false)) !== "";
+  // What the map frames: nothing, and so the UK, until there is a search.
+  const fitKey = searching ? toQuery(params) : "";
+  const results = useResults(params, searching);
   const centre = useCentre(results.searchedPlace, params.flags.LocationSearchOutsideUK);
   // While the next search loads, the results, and so the place searched, are still the last search's.
   const centreSettled = centre.settled && !results.query.isPlaceholderData;
@@ -74,7 +79,6 @@ function SearchView({ params, onChange }: ViewProps) {
     ? layoutPins(results.therapists, (t) => lookupFor(t.location), centre.point, SEARCH_MILES)
     : NOT_LAID_OUT;
   const placing = results.therapists.some((t) => lookupFor(t.location) === undefined);
-  const fitKey = toQuery(params);
   // Kept by key, so the selection follows its pin as Load more adds to it; a new search clears it.
   const [selection, setSelection] = useState<{ fitKey: string; pinKey: string }>();
   const selected = selection?.fitKey === fitKey ? pins.find((pin) => pin.key === selection.pinKey) : undefined;
@@ -84,7 +88,13 @@ function SearchView({ params, onChange }: ViewProps) {
     highlight.set(undefined);
   }, [highlight, fitKey]);
   const [panelOpen, setPanelOpen] = useState(true);
-  const [sheet, setSheet] = useState<SheetPosition>("full");
+  // The sheet opens on a search's list, or halfway beside the prompt, and follows as one gives way to the other.
+  const [sheet, setSheet] = useState<SheetPosition>(searching ? "full" : "half");
+  const [sheetFor, setSheetFor] = useState(searching);
+  if (sheetFor !== searching) {
+    setSheetFor(searching);
+    setSheet(searching ? "full" : "half");
+  }
   const scroll = useRememberedScroll(entry, !results.query.isPending);
   const listRef = useRef<HTMLUListElement>(null);
 
@@ -101,15 +111,19 @@ function SearchView({ params, onChange }: ViewProps) {
 
   const list = (
     <>
-      <Results
-        params={params}
-        results={results}
-        listRef={listRef}
-        unplaced={unplaced}
-        selection={selected}
-        onClearSelection={() => setSelection(undefined)}
-        onHighlight={highlight.set}
-      />
+      {searching ? (
+        <Results
+          params={params}
+          results={results}
+          listRef={listRef}
+          unplaced={unplaced}
+          selection={selected}
+          onClearSelection={() => setSelection(undefined)}
+          onHighlight={highlight.set}
+        />
+      ) : (
+        <SearchPrompt />
+      )}
       <Disclaimer className="mt-8 text-xs" />
     </>
   );
@@ -196,6 +210,19 @@ function MapToolbar({ params, onChange, drafts, wide }: ViewProps & { drafts: Se
           <FilterPanel params={params} drafts={drafts} />
         </section>
       )}
+    </div>
+  );
+}
+
+/** In place of results until there is something to search for. */
+function SearchPrompt() {
+  return (
+    <div className="flex gap-3 py-2">
+      <MapPin aria-hidden className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
+      <div className="space-y-2 text-sm">
+        <p className="font-medium">Search a town, city or postcode to see the UKCP therapists within your area, nearest first.</p>
+        <p className="text-muted-foreground">Filters narrow the search by what therapists help with, how they work, the languages they speak and more.</p>
+      </div>
     </div>
   );
 }

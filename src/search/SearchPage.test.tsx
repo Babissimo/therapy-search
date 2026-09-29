@@ -19,14 +19,15 @@ vi.mock("./map/pins", async (importOriginal) => {
 // The map pane is tested on its own; here it shows what the page passed it, with a button for each pin.
 vi.mock("./map/MapPane", async () => {
   const { createElement, useSyncExternalStore } = await import("react");
-  type Props = { centreSettled: boolean; pins: Pin[]; highlight: Highlight; selected?: Pin; onSelect: (pin: Pin) => void };
+  type Props = { fitKey: string; centreSettled: boolean; pins: Pin[]; highlight: Highlight; selected?: Pin; onSelect: (pin: Pin) => void };
   return {
-    default: ({ centreSettled, pins, highlight, selected, onSelect }: Props) => {
+    default: ({ fitKey, centreSettled, pins, highlight, selected, onSelect }: Props) => {
       const slug = useSyncExternalStore(highlight.subscribe, highlight.get);
       return createElement(
         "div",
         {
           "data-testid": "map",
+          "data-fit-key": fitKey,
           "data-settled": String(centreSettled),
           "data-highlighted": slug ?? "",
           "data-selected": selected?.key ?? "",
@@ -105,6 +106,8 @@ function renderAt(url: string, ...pages: TherapistCard[][]) {
   );
 }
 
+/** A search whose answer, with no "Location searched", has no centre to look up. */
+const SEARCH = "/?Location=Leeds";
 const url = () => new URLSearchParams(screen.getByTestId("url").textContent ?? "");
 const results = () => screen.getByRole("region", { name: "Results" });
 const loaded = () => within(results()).findByText(/^\d+ of 30/);
@@ -119,7 +122,7 @@ afterEach(() => {
 describe("SearchPage", () => {
   it("sets the results beside the map on wide screens, and can put them away", async () => {
     screenIs(true);
-    renderAt("/?Location=Leeds");
+    renderAt(SEARCH);
     await loaded();
     expect(await screen.findByTestId("map")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Hide results" }));
@@ -128,9 +131,46 @@ describe("SearchPage", () => {
     expect(results()).toBeTruthy();
   });
 
+  it("asks for a search rather than listing everyone when there is nothing to search for", async () => {
+    screenIs(true);
+    renderAt("/");
+    expect(within(results()).getByText(/^Search a town, city or postcode/)).toBeTruthy();
+    expect(await screen.findByTestId("map")).toBeTruthy();
+    expect(api.search).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByRole("textbox", { name: "Location" }), { target: { value: "York" } });
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+    await loaded();
+  });
+
+  it("takes the outside-UK tick alone as nothing to search for", async () => {
+    screenIs(true);
+    renderAt("/?LocationSearchOutsideUK=true");
+    expect(within(results()).getByText(/^Search a town, city or postcode/)).toBeTruthy();
+    expect((await screen.findByTestId("map")).dataset.fitKey).toBe("");
+    expect(api.search).not.toHaveBeenCalled();
+  });
+
+  it("goes back to the prompt, the UK and a half-raised sheet when the location is cleared", async () => {
+    screenIs(false);
+    renderAt(SEARCH);
+    await loaded();
+    expect(results().dataset.position).toBe("full");
+    fireEvent.change(screen.getByRole("textbox", { name: "Location" }), { target: { value: "" } });
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+    expect(within(results()).getByText(/^Search a town, city or postcode/)).toBeTruthy();
+    expect(results().dataset.position).toBe("half");
+    expect(screen.getByTestId("map").dataset.fitKey).toBe("");
+  });
+
+  it("opens a phone with the map in view beside the prompt", () => {
+    screenIs(false);
+    renderAt("/");
+    expect(results().dataset.position).toBe("half");
+  });
+
   it("keeps Load more beneath the list rather than at its end", async () => {
     screenIs(true);
-    renderAt("/?Location=Leeds");
+    renderAt(SEARCH);
     await loaded();
     const more = screen.getByRole("button", { name: "Load more" });
     expect(results().contains(more)).toBe(true);
@@ -144,7 +184,7 @@ describe("SearchPage", () => {
     render(
       <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
         <TooltipProvider>
-          <MemoryRouter initialEntries={["/?Location=Leeds"]}>
+          <MemoryRouter initialEntries={[SEARCH]}>
             <SearchPage />
           </MemoryRouter>
         </TooltipProvider>
@@ -155,7 +195,7 @@ describe("SearchPage", () => {
 
   it("lays the results over the map on narrow screens, starting on the list", async () => {
     screenIs(false);
-    renderAt("/?Location=Leeds");
+    renderAt(SEARCH);
     await loaded();
     expect(results().dataset.position).toBe("full");
     fireEvent.click(screen.getByRole("button", { name: "Show map" }));
@@ -164,7 +204,7 @@ describe("SearchPage", () => {
 
   it("opens the filters beneath the search box on wide screens", async () => {
     screenIs(true);
-    renderAt("/");
+    renderAt(SEARCH);
     await loaded();
     fireEvent.click(screen.getByRole("button", { name: "Filters" }));
     expect(screen.getByRole("region", { name: "Refine your search" })).toBeTruthy();
@@ -174,7 +214,7 @@ describe("SearchPage", () => {
 
   it("opens the filters in a sheet on narrow screens", async () => {
     screenIs(false);
-    renderAt("/");
+    renderAt(SEARCH);
     await loaded();
     fireEvent.click(screen.getByRole("button", { name: "Filters" }));
     expect(await screen.findByRole("dialog", { name: "Refine your search" })).toBeTruthy();
@@ -182,7 +222,7 @@ describe("SearchPage", () => {
 
   it("searches from the box with the typed keyword", async () => {
     screenIs(true);
-    renderAt("/");
+    renderAt(SEARCH);
     await loaded();
     fireEvent.click(screen.getByRole("button", { name: "Filters" }));
     fireEvent.change(screen.getByRole("searchbox", { name: "Keyword search" }), { target: { value: "grief" } });
@@ -194,7 +234,7 @@ describe("SearchPage", () => {
 
   it("holds the map's framing while a new search loads, as what it shows is still the last search's", async () => {
     screenIs(true);
-    renderAt("/");
+    renderAt(SEARCH);
     await loaded();
     expect((await screen.findByTestId("map")).dataset.settled).toBe("true");
     let arrive: (result: SearchResult) => void = () => {};
@@ -209,7 +249,7 @@ describe("SearchPage", () => {
 
   it("returns to the same place in the list after Back from a profile", async () => {
     screenIs(true);
-    renderAt("/?Location=Leeds");
+    renderAt(SEARCH);
     await loaded();
     list().scrollTop = 400;
     fireEvent.scroll(list());
@@ -222,7 +262,7 @@ describe("SearchPage", () => {
 
   it("keeps the same place in the list as the window crosses between wide and narrow", async () => {
     const resize = screenIs(true);
-    renderAt("/?Location=Leeds");
+    renderAt(SEARCH);
     await loaded();
     list().scrollTop = 400;
     fireEvent.scroll(list());
@@ -242,7 +282,7 @@ describe("SearchPage", () => {
 
   it("closes the results with the disclaimer", async () => {
     screenIs(true);
-    renderAt("/");
+    renderAt(SEARCH);
     await loaded();
     expect(within(results()).getByText(/Not affiliated with or endorsed by UKCP/)).toBeTruthy();
   });
@@ -250,7 +290,7 @@ describe("SearchPage", () => {
   it("says which therapists the map can't place, and why", async () => {
     screenIs(true);
     vi.spyOn(api, "place").mockResolvedValue({ found: true, kind: "outcode", candidates: [{ lat: 50.83, lng: -0.15 }] });
-    renderAt("/", [therapist("a", "BRIGHTON BN3"), therapist("b", " BN")]);
+    renderAt(SEARCH, [therapist("a", "BRIGHTON BN3"), therapist("b", " BN")]);
     expect(await within(results()).findByText("2 of 2 · 1 not on the map")).toBeTruthy();
     expect(within(results()).getByText("Location too general to place")).toBeTruthy();
     expect(within(results()).getByText("Pins show the postcode or area each therapist lists.")).toBeTruthy();
@@ -259,7 +299,7 @@ describe("SearchPage", () => {
   it("shows who is at a pin above the results until cleared, raising the sheet halfway and marking the pin", async () => {
     screenIs(false);
     vi.spyOn(api, "place").mockResolvedValue({ found: true, kind: "outcode", candidates: [{ lat: 50.83, lng: -0.15 }] });
-    renderAt("/", [therapist("a", "BRIGHTON BN3"), therapist("b", "Hove BN3")]);
+    renderAt(SEARCH, [therapist("a", "BRIGHTON BN3"), therapist("b", "Hove BN3")]);
     fireEvent.click(screen.getByRole("button", { name: "Show map" }));
     const pin = await screen.findByRole("button", { name: /^Pin / });
     fireEvent.click(pin);
@@ -275,7 +315,7 @@ describe("SearchPage", () => {
   it("adds whoever joins the selected pin as more results load", async () => {
     screenIs(true);
     vi.spyOn(api, "place").mockResolvedValue({ found: true, kind: "outcode", candidates: [{ lat: 50.83, lng: -0.15 }] });
-    renderAt("/", [therapist("a", "BRIGHTON BN3"), therapist("b", "Hove BN3")], [therapist("c", "Brighton BN3")]);
+    renderAt(SEARCH, [therapist("a", "BRIGHTON BN3"), therapist("b", "Hove BN3")], [therapist("c", "Brighton BN3")]);
     fireEvent.click(await screen.findByRole("button", { name: /^Pin / }));
     const here = () => within(screen.getByRole("region", { name: "At this pin" })).getAllByRole("link").map((link) => link.textContent);
     expect(here()).toEqual(["Therapist a", "Therapist b"]);
@@ -285,7 +325,7 @@ describe("SearchPage", () => {
 
   it("rings the pin of the card in focus", async () => {
     screenIs(true);
-    renderAt("/");
+    renderAt(SEARCH);
     const card = await screen.findByRole("link", { name: "Therapist p1-2" });
     act(() => card.focus());
     expect((await screen.findByTestId("map")).dataset.highlighted).toBe("p1-2");
@@ -293,7 +333,7 @@ describe("SearchPage", () => {
 
   it("rings a hovered card's pin without laying the pins out again", async () => {
     screenIs(true);
-    renderAt("/");
+    renderAt(SEARCH);
     const card = await screen.findByRole("link", { name: "Therapist p1-2" });
     await screen.findByTestId("map");
     const laidOut = vi.mocked(layoutPins).mock.calls.length;
@@ -304,7 +344,7 @@ describe("SearchPage", () => {
 
   it("forgets a hovered card when a new search replaces the list, even one listing the same therapist", async () => {
     screenIs(true);
-    renderAt("/");
+    renderAt(SEARCH);
     const card = await screen.findByRole("link", { name: "Therapist p1-2" });
     await screen.findByTestId("map");
     fireEvent.pointerEnter(card.closest("[data-slot=card]") as HTMLElement);

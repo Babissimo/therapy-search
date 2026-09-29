@@ -2,15 +2,13 @@ import { useMapEvents } from "react-leaflet";
 import { Map, MapCircle, MapTileLayer, MapZoomControl } from "@/components/ui/map";
 import { savedView, saveView } from "../viewMemory";
 import { FitView } from "./FitView";
-import { furthestMiles, METRES_PER_MILE, type Point } from "./geo";
+import { furthestMiles, METRES_PER_MILE, UK_VIEW, type Point } from "./geo";
 import type { Highlight } from "./highlight";
 import type { Pin } from "./pins";
 import { PinsLayer } from "./PinsLayer";
 
-const UK: [number, number] = [54.5, -3];
-
 export type MapPaneProps = {
-  /** The search as a query string: a new one frames the map afresh. */
+  /** The search as a query string: a new one frames the map afresh. Empty when nothing is searched. */
   fitKey: string;
   /** The history entry the view is remembered against. */
   entry: string;
@@ -35,7 +33,7 @@ export default function MapPane({ fitKey, entry, centre, centreSettled, pins, pl
   const reachMiles = centre && furthestMiles(centre, points);
   return (
     <div role="region" aria-label="Map of results" className="isolate size-full">
-      <Map center={restored?.centre ?? UK} zoom={restored?.zoom ?? 5}>
+      <Map center={restored?.centre ?? UK_VIEW.centre} zoom={restored?.zoom ?? UK_VIEW.zoom}>
         <MapTileLayer />
         <MapZoomControl className="top-auto right-2 bottom-8 left-auto max-lg:hidden" />
         {centre && reachMiles !== undefined && (

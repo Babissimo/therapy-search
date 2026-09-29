@@ -4,6 +4,8 @@ export type Point = { lat: number; lng: number };
 type Found = Extract<PlaceLookup, { found: true }>;
 
 export const METRES_PER_MILE = 1609.344;
+/** The whole UK, shown until there is a search. */
+export const UK_VIEW = { centre: [54.5, -3] as [number, number], zoom: 5 };
 const EARTH_RADIUS_MILES = 3958.8;
 
 export function milesBetween(a: Point, b: Point): number {
