@@ -18,8 +18,13 @@ export function parseProfile(html: string, slug: string): Profile {
     initials: initialsOf(name),
     photoUrl: safeUrl(doc.querySelector("img.therapist-photo")?.getAttribute("src")),
     location: optional(oneLine(doc.querySelector(".profile-intro-locations")?.textContent)),
+    languages: oneLine(doc.querySelector(".profile-intro-languages")?.textContent)
+      .split(",")
+      .map((language) => language.trim())
+      .filter(Boolean),
     email: mailto ? mailtoAddress(mailto) : undefined,
     contactId: details && details.getAttribute("data-nodata") !== "true" ? (details.getAttribute("data-id") ?? undefined) : undefined,
+    social: socialLinks(doc),
     about: sectionsIn(doc.querySelector(".profile-bio")),
     practical: sectionsIn(doc.querySelector(".profile-practical-information")),
     offices: [...doc.querySelectorAll(".profile-locations > section")].map(parseOffice),
@@ -34,6 +39,12 @@ function mailtoAddress(href: string): string | undefined {
   } catch {
     return optional(address.trim());
   }
+}
+
+/** The page repeats the social media icons for each layout it offers, so each link is kept once. */
+function socialLinks(doc: Document): string[] {
+  const hrefs = [...doc.querySelectorAll(".profile-intro-social-media a")].map((a) => safeUrl(a.getAttribute("href")));
+  return [...new Set(hrefs.filter((url): url is string => url !== undefined))];
 }
 
 /** The sections with something under their heading; a heading alone tells the visitor nothing. */

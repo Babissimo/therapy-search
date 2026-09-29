@@ -40,8 +40,11 @@ export type Profile = {
   initials: string;
   photoUrl?: string;
   location?: string;
+  languages: string[];
   email?: string;
   contactId?: string;
+  /** Links from the header's social media icons. */
+  social: string[];
   about: ProfileSection[];
   practical: ProfileSection[];
   offices: Office[];

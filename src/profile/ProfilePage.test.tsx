@@ -7,7 +7,7 @@ import type { Profile } from "@shared/types";
 import { api, ApiError } from "@/lib/api";
 import { ProfilePage } from "./ProfilePage";
 
-const PROFILE: Profile = { slug: "Test-ABCDEFGH", name: "Test Therapist", initials: "TT", about: [], practical: [], offices: [] };
+const PROFILE: Profile = { slug: "Test-ABCDEFGH", name: "Test Therapist", initials: "TT", languages: [], social: [], about: [], practical: [], offices: [] };
 
 function renderAt(entries: string[], result: Profile | ApiError = PROFILE) {
   const profile = vi.spyOn(api, "profile");

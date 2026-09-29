@@ -97,6 +97,8 @@ A zero-result response has no `.results-no` and a "No therapists can be found" n
 | Element | Meaning |
 |---|---|
 | `.therapist-header h1`, `img.therapist-photo`, `.profile-intro-locations` | Name (its presence marks a profile page), photo, location |
+| `.profile-intro-languages` | The languages they work in, comma-separated, on some profiles |
+| `.profile-intro-social-media a` | Social media links, repeated for each of the page's layouts. Each `aria-label` names the form field the link was entered in, which need not match the site (a Threads link sits under "Twitter"), so the page names a link by its address |
 | `.profile-bio > section` | "About" sections, of which there may be none: `h2` heading, then `p` text (with `<br>` breaks), a `ul` list, or `.accordion-item`s (Special Interests: title plus long text) |
 | `.profile-practical-information > section` | Side sections such as Types of sessions and UKCP College: `h3`/`h2` heading and a `ul` |
 | `.profile-locations > section` | One office each: `h3` name (a `.fa-star` marks the main address), `address` lines, `a.mini-cta` map link, and the element after the "Cost:" `h4`, which is free text |
@@ -191,8 +193,10 @@ type ProfileSection = {
 
 type Profile = {
   slug: string; name: string; initials: string; photoUrl?: string; location?: string;
+  languages: string[];
   email?: string;      // inline "Email Therapist" address
   contactId?: string;  // present when contact details can be revealed
+  social: string[];    // social media links
   about: ProfileSection[];
   practical: ProfileSection[];
   offices: { name: string; isMain: boolean; address: string[]; mapUrl?: string; cost?: string }[];

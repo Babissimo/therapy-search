@@ -10,6 +10,7 @@ describe("parseProfile on a captured page", () => {
   it("reads the header", () => {
     expect(p).toMatchObject({ slug: "Test-Therapist-1-TESTID01", name: "Test Therapist 1", location: "Testtown", email: "therapist@example.com" });
     expect(p.contactId).toMatch(/^\d+$/);
+    expect([p.languages, p.social]).toEqual([[], []]);
   });
 
   it("reads each about section's heading with its text, list or expandable details", () => {
@@ -55,6 +56,19 @@ describe("parseProfile details", () => {
     const email = (href: string) => parseProfile(page(`<a href="${href}">Email</a>`), "Jo-Bloggs-ABCDEFGH").email;
     expect(email("mailto:jo%40example.com?subject=Enquiry")).toBe("jo@example.com");
     expect(email("mailto:jo%zz@example.com")).toBe("jo%zz@example.com");
+  });
+
+  it("reads each social media link once, though the page repeats them, and only web links", () => {
+    const icons = `<div class="profile-intro-social-media"><a href="https://linkedin.com/in/jo" aria-label="LinkedIn"><img src="/assets/img/icon-social-linkedin.svg"></a>
+<a href="https://threads.net/@jo" aria-label="Twitter"><img></a><a href="javascript:alert(1)" aria-label="Facebook"><img></a></div>`;
+    const p = parseProfile(page(icons + icons), "Jo-Bloggs-ABCDEFGH");
+    expect(p.social).toEqual(["https://linkedin.com/in/jo", "https://threads.net/@jo"]);
+  });
+
+  it("reads the languages from the header, of which there may be none", () => {
+    const languages = (html: string) => parseProfile(header + html, "Jo-Bloggs-ABCDEFGH").languages;
+    expect(languages(`<span class="profile-intro profile-intro-languages">English, French </span>`)).toEqual(["English", "French"]);
+    expect(languages("")).toEqual([]);
   });
 
   it("ignores the share link's empty mailto", () => {

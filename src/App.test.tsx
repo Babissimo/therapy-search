@@ -12,7 +12,7 @@ import { AppRoutes } from "./App";
 // Leaflet draws nothing under jsdom; the map is tested on its own.
 vi.mock("@/search/map/MapPane", () => ({ default: () => null }));
 
-const PROFILE: Profile = { slug: "Jo-ABCDEFGH", name: "Jo Bloggs", initials: "JB", about: [], practical: [], offices: [] };
+const PROFILE: Profile = { slug: "Jo-ABCDEFGH", name: "Jo Bloggs", initials: "JB", languages: [], social: [], about: [], practical: [], offices: [] };
 
 function Url() {
   const { pathname, search } = useLocation();
