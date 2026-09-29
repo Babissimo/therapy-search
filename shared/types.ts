@@ -5,7 +5,6 @@ export type TherapistCard = {
   photoUrl?: string;
   location?: string;
   distance?: string;
-  phone?: string;
   sessionTypes?: string;
   summary?: string;
   tags: string[];

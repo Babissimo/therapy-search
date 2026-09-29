@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { emptyParams } from "@shared/query";
-import { activeFilters } from "./activeFilters";
+import { activeFilters, soughtTerms } from "./activeFilters";
 import { withField, withHelpWithTerms, withText } from "./state";
 
 const french = { name: "Languages", value: "French", label: "French" };
@@ -40,5 +40,17 @@ describe("activeFilters", () => {
     expect(filters.map((f) => f.label)).toEqual(["Anxiety"]);
     expect(filters[0]?.without.text.HelpWith).toBe("");
     expect(filters[0]?.without.multi.HelpWithAdvanced).toEqual([]);
+  });
+});
+
+describe("soughtTerms", () => {
+  it("gathers HelpWith terms, ticked boxes and the keyword, lower-cased", () => {
+    let params = withField(withHelpWithTerms(withText(emptyParams(), "Location", "Leeds"), ["Trauma"]), french, true);
+    params = withText(params, "KeywordFilter", "EMDR");
+    expect([...soughtTerms(params, options)]).toEqual(["trauma", "french", "emdr"]);
+  });
+
+  it("is empty for a bare search", () => {
+    expect(soughtTerms(withText(emptyParams(), "Location", "Leeds"), options).size).toBe(0);
   });
 });

@@ -85,7 +85,7 @@ An HTML fragment that UKCP injects into `#therapist-results-target`. Parse targe
 | `.profile-listing-locations strong` + trailing text | Town and postcode, and "(0 miles from Brighton)" when searching by location |
 | `.profile-listing-contact-session-type` | Phone in `strong`, then session-type text ("In-person & Remote") |
 | `p` | Summary, already truncated by UKCP |
-| `.tag-list li span` | Up to about 5 issue tags |
+| `.tag-list li span` | Up to about 5 issue tags; `li.relevant` marks those a help-with term or ticked box matched, never the keyword |
 | `.pagination [data-target-page]` | Page links; we derive paging from total and page size instead |
 
 A zero-result response has no `.results-no` and a "No therapists can be found" notice.
@@ -172,7 +172,7 @@ type SearchResult = {
 type TherapistCard = {
   slug: string; name: string; initials: string; photoUrl?: string;
   location?: string; distance?: string;
-  phone?: string; sessionTypes?: string;
+  sessionTypes?: string;
   summary?: string; tags: string[];
 };
 

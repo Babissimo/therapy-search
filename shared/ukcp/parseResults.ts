@@ -30,7 +30,7 @@ function parseCard(a: Element): TherapistCard {
 
   const locations = a.querySelector(".profile-listing-locations");
   const contact = a.querySelector(".profile-listing-contact-session-type");
-  const phone = optional(oneLine(contact?.querySelector("strong")?.textContent));
+  // The strong holds the phone, which the list leaves to the profile's contact reveal.
   const sessionText = [...(contact?.childNodes ?? [])]
     .filter((n) => n.nodeName !== "STRONG")
     .map((n) => n.textContent ?? "")
@@ -43,7 +43,6 @@ function parseCard(a: Element): TherapistCard {
     photoUrl: safeUrl(a.querySelector("img.profile-photo")?.getAttribute("src")),
     location: optional(oneLine(locations?.querySelector("strong")?.textContent)),
     distance: /\(([^)]*\bfrom\b[^)]*)\)/.exec(oneLine(locations?.textContent))?.[1],
-    phone,
     sessionTypes: optional(oneLine(sessionText).replace(/^\|\s*/, "")),
     summary: optional(oneLine(a.querySelector("p")?.textContent)),
     tags: [...a.querySelectorAll(".tag-list li")].map((li) => oneLine(li.textContent)).filter(Boolean),
