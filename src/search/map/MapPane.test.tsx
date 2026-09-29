@@ -19,8 +19,12 @@ vi.mock("@/components/ui/map", async () => {
     MapZoomControl: () => null,
     MapCircle: ({ radius }: { radius: number }) => createElement("div", { "data-testid": "circle", "data-radius": radius }),
     MapMarkerClusterGroup: ({ children }: { children?: unknown }) => createElement(Fragment, null, children as never),
-    MapMarker: ({ eventHandlers, children }: { eventHandlers?: { click?: () => void }; children?: unknown }) =>
-      createElement("button", { type: "button", onClick: () => eventHandlers?.click?.() }, children as never),
+    MapMarker: ({ eventHandlers, children }: { eventHandlers?: { click?: (event: { originalEvent: MouseEvent }) => void }; children?: unknown }) =>
+      createElement(
+        "button",
+        { type: "button", onClick: (event: { nativeEvent: MouseEvent }) => eventHandlers?.click?.({ originalEvent: event.nativeEvent }) },
+        children as never,
+      ),
     MapTooltip: ({ children }: { children?: unknown }) => createElement(Fragment, null, children as never),
     markerData: () => undefined,
     elementIcon: () => ({}),
@@ -135,5 +139,14 @@ describe("MapPane", () => {
     fireEvent.click(screen.getByRole("button", { name: "2 therapists here" }));
     expect(onSelect.mock.calls.map(([selected]) => selected.key)).toEqual(["a", "b c"]);
     expect(screen.getByTestId("path").textContent).toBe("/");
+  });
+
+  it("activates a pin once for a double-click", () => {
+    const onSelect = vi.fn();
+    renderPane({ pins: [pin("b", "c")], onSelect });
+    const stack = screen.getByRole("button", { name: "2 therapists here" });
+    fireEvent.click(stack, { detail: 1 });
+    fireEvent.click(stack, { detail: 2 });
+    expect(onSelect).toHaveBeenCalledTimes(1);
   });
 });

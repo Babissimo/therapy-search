@@ -102,7 +102,9 @@ function TherapistPin({ pin, markers, onSelect }: { pin: Pin; markers: Map<strin
       for (const t of pin.therapists) if (markers.get(t.slug) === marker) markers.delete(t.slug);
     };
   };
-  const activate = () => {
+  const activate = (event: L.LeafletMouseEvent) => {
+    // The second click of a double-click, which would clear the selection its first click made.
+    if (event.originalEvent.detail > 1) return;
     // Where the pointer can hover, the tooltip has already said who this is.
     if (only && window.matchMedia("(hover: hover)").matches) {
       const { to, state } = profile(only.slug);
