@@ -36,6 +36,7 @@ function Map({
   return (
     <MapContainer zoom={zoom} maxZoom={maxZoom} zoomControl={false} className={cn("size-full", className)} {...props}>
       <FollowSize />
+      <DataCreditsOnly />
       {children}
     </MapContainer>
   );
@@ -48,6 +49,15 @@ function FollowSize() {
     const observer = new ResizeObserver(() => map.invalidateSize());
     observer.observe(map.getContainer());
     return () => observer.disconnect();
+  }, [map]);
+  return null;
+}
+
+/** The credits name the map's data alone, and do so before any tiles are drawn. */
+function DataCreditsOnly() {
+  const map = useMap();
+  useEffect(() => {
+    map.attributionControl?.setPrefix(false);
   }, [map]);
   return null;
 }
@@ -66,12 +76,8 @@ function tileSource(cartoKey: string | undefined, dark = false): TileSource {
 }
 
 function MapTileLayer(props: Omit<TileLayerProps, "url" | "attribution">) {
-  const map = useMap();
   const dark = useDarkTheme();
   const { url, attribution } = tileSource(import.meta.env.VITE_CARTO_KEY, dark);
-  useEffect(() => {
-    map.attributionControl?.setPrefix(false);
-  }, [map]);
   // Keyed by URL, so a theme change swaps the layer rather than relying on Leaflet to redraw it in place.
   return <TileLayer key={url} url={url} attribution={attribution} {...props} />;
 }

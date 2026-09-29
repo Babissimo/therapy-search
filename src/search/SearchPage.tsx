@@ -73,8 +73,9 @@ function SearchView({ params, onChange }: ViewProps) {
   const fitKey = searching ? toQuery(params) : "";
   const results = useResults(params, searching);
   const centre = useCentre(results.searchedPlace, params.flags.LocationSearchOutsideUK);
-  // While the next search loads, the results, and so the place searched, are still the last search's.
-  const centreSettled = centre.settled && !results.query.isPlaceholderData;
+  // The place searched comes with the results, so there is none until a first search's results arrive; while the next
+  // search loads, the results, and so the place, are still the last search's.
+  const centreSettled = centre.settled && !(searching && results.query.isPending) && !results.query.isPlaceholderData;
   const lookupFor = useCardLookups(
     results.therapists.map((t) => t.location),
     params.flags.LocationSearchOutsideUK,

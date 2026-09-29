@@ -114,4 +114,23 @@ describe("FitView", () => {
     rerender(onMap(<FitView fitKey="a" centre={BRIGHTON} reachMiles={12} points={[HOVE, { lat: 51, lng: -0.14 }]} waiting={false} restored={restored} />));
     expect(fit).toHaveBeenCalledOnce();
   });
+
+  it("tells the pane once it has framed, jumping there when asked to", () => {
+    const fit = spyFit();
+    const onFramed = vi.fn();
+    const { rerender } = render(onMap(<FitView fitKey="a" points={[BRIGHTON]} waiting instant onFramed={onFramed} />));
+    expect(onFramed).not.toHaveBeenCalled();
+    rerender(onMap(<FitView fitKey="a" centre={BRIGHTON} reachMiles={1} points={[HOVE]} waiting={false} instant onFramed={onFramed} />));
+    expect(fit.mock.calls[0]?.[1]).toMatchObject({ animate: false });
+    expect(onFramed).toHaveBeenCalledOnce();
+    // Load more placed a pin further out, with the tiles drawn by now: Leaflet decides whether to animate.
+    rerender(onMap(<FitView fitKey="a" centre={BRIGHTON} reachMiles={12} points={[HOVE, { lat: 51, lng: -0.14 }]} waiting={false} onFramed={onFramed} />));
+    expect(fit.mock.calls[1]?.[1]).not.toHaveProperty("animate");
+  });
+
+  it("tells the pane when there is nothing to frame", () => {
+    const onFramed = vi.fn();
+    render(onMap(<FitView fitKey="a" points={[]} waiting={false} onFramed={onFramed} />));
+    expect(onFramed).toHaveBeenCalled();
+  });
 });

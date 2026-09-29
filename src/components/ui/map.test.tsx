@@ -42,6 +42,11 @@ describe("Map", () => {
     expect(map.current?.getZoom()).toBe(11);
   });
 
+  it("credits the map's data alone, with no tiles drawn yet", () => {
+    const { container } = render(<Map center={[51.5, -0.1]} zoom={10} style={{ height: 400, width: 400 }} />);
+    expect(container.querySelector(".leaflet-control-attribution")?.textContent).not.toContain("Leaflet");
+  });
+
   it("lets a cluster read the data its markers carry", async () => {
     const cluster = createRef<L.MarkerClusterGroup>();
     render(

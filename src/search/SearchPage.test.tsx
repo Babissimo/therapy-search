@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation, useNavigate } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { SearchResult, TherapistCard } from "@shared/types";
@@ -247,6 +247,29 @@ describe("SearchPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "Search" }));
     expect([url().get("Location"), url().get("KeywordFilter")]).toEqual(["York", "grief"]);
     await loaded();
+  });
+
+  it("holds the map's framing until a first search arrives, and not without one", async () => {
+    screenIs(true);
+    let arrive: (result: SearchResult) => void = () => {};
+    answer([]);
+    vi.mocked(api.search).mockImplementationOnce(() => new Promise((resolve) => (arrive = resolve)));
+    renderAt(SEARCH);
+    expect((await screen.findByTestId("map")).dataset.settled).toBe("false");
+    await act(async () => arrive({ total: 1, from: 1, to: 1, notices: [], therapists: [therapist("york")] }));
+    await within(results()).findByText(/^1 of 1/);
+    expect(screen.getByTestId("map").dataset.settled).toBe("true");
+    cleanup();
+    renderAt("/");
+    expect((await screen.findByTestId("map")).dataset.settled).toBe("true");
+  });
+
+  it("settles the map's framing when a first search fails, so the map is not left waiting", async () => {
+    screenIs(true);
+    answer([]);
+    vi.mocked(api.search).mockRejectedValueOnce(new Error("UKCP answered 503"));
+    renderAt(SEARCH);
+    await waitFor(() => expect(screen.getByTestId("map").dataset.settled).toBe("true"));
   });
 
   it("holds the map's framing while a new search loads, as what it shows is still the last search's", async () => {
