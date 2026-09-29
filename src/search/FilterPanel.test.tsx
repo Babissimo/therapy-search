@@ -27,17 +27,15 @@ describe("FilterPanel", () => {
     expect(onChange.mock.calls[0]?.[0].text).toMatchObject({ Location: "Leeds", KeywordFilter: "grief" });
   });
 
-  it("takes the typed location with a new distance, the outside-UK tick or any other tick", () => {
+  it("takes the typed location with the outside-UK tick or any other tick", () => {
     const onChange = vi.fn();
     render(panel(emptyParams(), onChange));
     fireEvent.change(location(), { target: { value: "Paris" } });
-    fireEvent.keyDown(screen.getByRole("slider"), { key: "ArrowRight" });
-    expect(onChange.mock.calls[0]?.[0]).toMatchObject({ distance: emptyParams().distance + 1, text: { Location: "Paris" } });
     fireEvent.click(screen.getByRole("checkbox", { name: "Search locations outside the UK" }));
-    expect(onChange.mock.calls[1]?.[0]).toMatchObject({ flags: { LocationSearchOutsideUK: true }, text: { Location: "Paris" } });
+    expect(onChange.mock.calls[0]?.[0]).toMatchObject({ flags: { LocationSearchOutsideUK: true }, text: { Location: "Paris" } });
     fireEvent.click(screen.getByRole("button", { name: "Languages" }));
     fireEvent.click(screen.getByRole("checkbox", { name: "French" }));
-    expect(onChange.mock.calls[2]?.[0]).toMatchObject({ multi: { Languages: ["French"] }, text: { Location: "Paris" } });
+    expect(onChange.mock.calls[1]?.[0]).toMatchObject({ multi: { Languages: ["French"] }, text: { Location: "Paris" } });
   });
 
   it("keeps a typed location until the search's own location changes", () => {

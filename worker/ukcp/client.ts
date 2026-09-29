@@ -1,4 +1,4 @@
-import { FLAG_PARAMS, MULTI_PARAMS, PAGE_SIZE, UKCP_ORIGIN, type SearchParams } from "../../shared/query";
+import { FLAG_PARAMS, MULTI_PARAMS, PAGE_SIZE, SEARCH_MILES, UKCP_ORIGIN, type SearchParams } from "../../shared/query";
 const SESSION_TTL_MS = 20 * 60 * 1000;
 const TIMEOUT_MS = 10_000;
 const TOKEN = /<input[^>]*name="__RequestVerificationToken"[^>]*value="([^"]+)"/;
@@ -106,7 +106,7 @@ export function searchForm(params: SearchParams): URLSearchParams {
     HelpWith: params.text.HelpWith,
     Location: params.text.Location,
     KeywordFilter: params.text.KeywordFilter,
-    Distance: String(params.distance),
+    Distance: String(SEARCH_MILES),
   });
   for (const name of MULTI_PARAMS) for (const value of params.multi[name]) form.append(name, value);
   for (const name of FLAG_PARAMS) form.set(name, String(params.flags[name]));

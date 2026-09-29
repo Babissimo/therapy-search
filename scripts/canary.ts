@@ -27,7 +27,6 @@ await pause();
 
 const params = emptyParams();
 params.text.Location = "London";
-params.distance = 5;
 const results = parseResults(await client.search(params));
 expect(results.total > PAGE_SIZE && results.therapists.length === PAGE_SIZE, `expected a full page of London results, got ${results.therapists.length} of ${results.total}`);
 expect(results.locationSearched !== undefined, "the London search reported no resolved location");

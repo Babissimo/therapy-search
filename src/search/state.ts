@@ -7,10 +7,6 @@ export function withText(params: SearchParams, name: TextParam, value: string): 
   return { ...params, page: 1, text: { ...params.text, [name]: value.trim() } };
 }
 
-export function withDistance(params: SearchParams, distance: number): SearchParams {
-  return { ...params, page: 1, distance };
-}
-
 export function withFlag(params: SearchParams, name: FlagParam, on: boolean): SearchParams {
   return { ...params, page: 1, flags: { ...params.flags, [name]: on } };
 }

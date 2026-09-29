@@ -118,7 +118,7 @@ describe("searchForm", () => {
     expect(form.getAll("Languages")).toEqual(["French", "Spanish"]);
     expect(form.get("OnlyWheelchairAccessible")).toBe("true");
     expect(form.get("OnlyProfilesWithPhotos")).toBe("false");
-    expect(form.get("Distance")).toBe("10");
+    expect(form.get("Distance")).toBe("30");
     expect(form.get("Pager.CurrentPage")).toBe("3");
     expect(form.get("Pager.PageSize")).toBe("12");
     expect(form.get("OrderSeed")).toBe("7");
