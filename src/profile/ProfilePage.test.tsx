@@ -99,6 +99,18 @@ describe("ProfilePage's content", () => {
     screen.getByText("£90 per session");
   });
 
+  it("puts the long sections first and the short ones beside or after them", async () => {
+    const prose = (heading: string) => ({ heading, paragraphs: ["Text"], items: [], details: [] });
+    renderAt(["/therapist/Test-ABCDEFGH"], { ...PROFILE, about: [prose("My Approach"), section("I work with", ["Adults"])], practical: [section("UKCP College", ["Test College"])] });
+    const approach = await screen.findByRole("heading", { name: "My Approach" });
+    expect(approach.closest("aside")).toBeNull();
+    for (const name of ["I work with", "UKCP College"]) {
+      const heading = screen.getByRole("heading", { name });
+      expect(heading.closest("aside")).not.toBeNull();
+      expect(approach.compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    }
+  });
+
   it("links each office's name to its map", async () => {
     const mapped = { ...office("Brighton Office", "£70"), mapUrl: "https://maps.example/?q=Brighton" };
     renderAt(["/therapist/Test-ABCDEFGH"], { ...PROFILE, offices: [mapped, office("London Office", "£70")] });
