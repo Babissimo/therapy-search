@@ -101,3 +101,15 @@ describe("Geocoder.lookup", () => {
     await expect(failure).rejects.toThrow("api.postcodes.io answered 500");
   });
 });
+
+describe("Geocoder.nearest", () => {
+  it("finds the postcode nearest a point, as far out as postcodes.io looks", async () => {
+    const { geocoder } = upstream({ [`${P}/postcodes?lon=-0.16&lat=50.826&radius=2000&limit=1`]: json({ result: [{ postcode: "BN3 1FG" }] }) });
+    await expect(geocoder.nearest(50.826, -0.16)).resolves.toEqual({ found: true, postcode: "BN3 1FG" });
+  });
+
+  it("reports a point with no postcode within reach as not found", async () => {
+    const { geocoder } = upstream({ [`${P}/postcodes?lon=-3&lat=59&radius=2000&limit=1`]: json({ result: null }) });
+    await expect(geocoder.nearest(59, -3)).resolves.toEqual({ found: false });
+  });
+});
