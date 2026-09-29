@@ -46,7 +46,8 @@ function avatar(therapist: TherapistCard, size: string): HTMLElement {
   );
   circle.textContent = therapist.initials;
   if (therapist.photoUrl) {
-    const img = element("img", "absolute inset-0 size-full rounded-full object-cover");
+    // Important, because Leaflet's own stylesheet sets `width: auto` on marker images and outranks any utility.
+    const img = element("img", "absolute inset-0 size-full! rounded-full object-cover");
     img.src = therapist.photoUrl;
     img.alt = "";
     // A photo that fails to load leaves the initials showing.
