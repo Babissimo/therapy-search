@@ -322,15 +322,13 @@ describe("SearchPage", () => {
     expect(await screen.findByRole("button", { name: "Filters, 1 ticked" })).toBeTruthy();
   });
 
-  it("counts the therapists the map can't place, saying why unless the location is too vague to place", async () => {
+  it("counts the therapists the map can't place, whether their location is too vague or matches nothing", async () => {
     screenIs(true);
     vi.spyOn(api, "place").mockImplementation(async (text) =>
       text.includes("NOWHERE") ? { found: false, reason: "not-found" } : { found: true, kind: "outcode", candidates: [{ lat: 50.83, lng: -0.15 }] },
     );
     renderAt(SEARCH, [therapist("a", "BRIGHTON BN3"), therapist("b", " BN"), therapist("c", "NOWHERE")]);
     expect(await within(results()).findByText("3 of 3 · 2 not on the map")).toBeTruthy();
-    expect(within(results()).getByText("Location couldn't be matched")).toBeTruthy();
-    expect(within(results()).queryByText("Location too general to place")).toBeNull();
     expect(within(results()).getByText("Pins show the postcode or area each therapist lists.")).toBeTruthy();
   });
 

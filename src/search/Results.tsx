@@ -1,12 +1,13 @@
 import { MapPin } from "lucide-react";
 import { useId, type Ref } from "react";
 import type { SearchParams } from "@shared/query";
+import type { TherapistCard as Therapist } from "@shared/types";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { soughtTerms } from "./activeFilters";
 import { LocationNotice } from "./LocationNotice";
-import { listEntries, pinLabel, UNPLACED_REASONS, type Pin, type Unplaced } from "./map/pins";
+import { listEntries, pinLabel, type Pin } from "./map/pins";
 import { reachLine } from "./reach";
 import { ResultsError } from "./ResultsError";
 import { TherapistCard } from "./TherapistCard";
@@ -18,7 +19,7 @@ type Props = {
   /** The list of cards, for "Load more" to hand the keyboard on to. */
   listRef?: Ref<HTMLUListElement>;
   pins?: Pin[];
-  unplaced?: Unplaced[];
+  unplaced?: Therapist[];
   /** The pin last activated on the map, whose place in the list is marked. */
   selected?: Pin;
   /** The therapist whose card the pointer or focus is on, for the map to ring their pin. */
@@ -38,7 +39,6 @@ export function Results({ params, results, listRef, pins = [], unplaced = [], se
   }
   if (query.isLoadingError) return <ResultsError error={query.error} params={params} />;
 
-  const reasons = new Map(unplaced.map(({ therapist, reason }) => [therapist.slug, UNPLACED_REASONS[reason]] as const));
   const reach = reachLine(therapists, first?.total ?? 0, searchedPlace !== undefined);
   const highlight = (slug: string) => (on: boolean) => onHighlight?.(on ? slug : undefined);
   const sought = soughtTerms(params);
@@ -46,7 +46,7 @@ export function Results({ params, results, listRef, pins = [], unplaced = [], se
   return (
     <section aria-busy={query.isPlaceholderData} className={cn("space-y-4", query.isPlaceholderData && "opacity-60")}>
       <div className="space-y-1">
-        <p className="text-sm text-muted-foreground">{reasons.size > 0 ? `${reach} · ${reasons.size} not on the map` : reach}</p>
+        <p className="text-sm text-muted-foreground">{unplaced.length > 0 ? `${reach} · ${unplaced.length} not on the map` : reach}</p>
         <p className="text-xs text-muted-foreground">Pins show the postcode or area each therapist lists.</p>
       </div>
       <LocationNotice typed={params.text.Location} searched={first?.locationSearched} />
@@ -68,7 +68,7 @@ export function Results({ params, results, listRef, pins = [], unplaced = [], se
               className={cn("rounded-xl", marked && t && "ring-2 ring-sky-500")}
             >
               {t ? (
-                <TherapistCard therapist={t} sought={sought} note={reasons.get(t.slug)} onHighlight={highlight(t.slug)} />
+                <TherapistCard therapist={t} sought={sought} onHighlight={highlight(t.slug)} />
               ) : (
                 <PinGroup pin={entry.pin} marked={marked} sought={sought} highlight={highlight} />
               )}

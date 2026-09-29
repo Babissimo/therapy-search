@@ -123,13 +123,7 @@ For outside-UK searches (`LocationSearchOutsideUK`), which postcodes.io cannot a
 
 ### 4.8 Unplaced therapists
 
-A therapist with no pin keeps their card in the list, in UKCP's order, and the list's header counts them (§4.4). The card gives the reason on a line of its own, unless the location is too vague to place, which needs no explaining:
-
-| Cause | Reason shown |
-|---|---|
-| No location on the card, or only a postcode area | None |
-| No match, or only implausible ones (§3.2) | Location couldn't be matched |
-| The lookup failed or was rate limited | Couldn't look up this location just now |
+A therapist has no pin when their card gives no location or only a postcode area, when the location matches nothing or only implausibly far away (§3.2), or when the lookup fails or is rate limited. Their card stays in the list, in UKCP's order, with no word on why, and the list's header counts them (§4.4).
 
 ### 4.9 Unrecognised location
 

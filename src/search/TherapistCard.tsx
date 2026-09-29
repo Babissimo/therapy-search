@@ -1,4 +1,3 @@
-import { MapPinOff } from "lucide-react";
 import { Link } from "react-router";
 import { classifyLocation } from "@shared/location";
 import type { TherapistCard as Therapist } from "@shared/types";
@@ -11,13 +10,12 @@ type Props = {
   therapist: Therapist;
   /** The search's terms, lower-cased; only tags among them are shown. */
   sought: ReadonlySet<string>;
-  note?: string;
   /** In a pin's box, whose heading names the place: the name drops to an h3 and the card gives only the distance. */
   grouped?: boolean;
   onHighlight?: (on: boolean) => void;
 };
 
-export function TherapistCard({ therapist: t, sought, note, grouped = false, onHighlight }: Props) {
+export function TherapistCard({ therapist: t, sought, grouped = false, onHighlight }: Props) {
   const profile = useProfileLink();
   const Heading = grouped ? "h3" : "h2";
   const where = grouped ? undefined : placeOf(t);
@@ -48,13 +46,6 @@ export function TherapistCard({ therapist: t, sought, note, grouped = false, onH
               </Link>
             </Heading>
             {place && <p className="text-sm">{place}</p>}
-            {note && (
-              <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <MapPinOff aria-hidden className="size-3.5 shrink-0" />
-                <span className="sr-only">Not on the map: </span>
-                {note}
-              </p>
-            )}
             {t.sessionTypes && <p className="text-sm text-muted-foreground">{t.sessionTypes}</p>}
           </div>
         </div>

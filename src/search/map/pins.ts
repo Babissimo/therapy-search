@@ -5,17 +5,8 @@ import { choosePoint, milesBetween, type Point } from "./geo";
 /** `kind` is what placed the pin, which can be less than a card gives when a postcode or district is unknown. */
 export type Pin = { key: string; point: Point; therapists: TherapistCard[]; kind: PlacedKind };
 type PlacedKind = Extract<PlaceLookup, { found: true }>["kind"];
-export type UnplacedReason = "too-general" | "not-matched" | "failed";
-export type Unplaced = { therapist: TherapistCard; reason: UnplacedReason };
 /** A settled lookup of a card's location; `ok: false` when the lookup itself failed. */
 export type LookupResult = { ok: true; lookup: PlaceLookup } | { ok: false };
-
-export const UNPLACED_REASONS: Record<UnplacedReason, string | undefined> = {
-  // A location too vague to place needs no explaining; the list's header still counts it.
-  "too-general": undefined,
-  "not-matched": "Location couldn't be matched",
-  failed: "Couldn't look up this location just now",
-};
 
 /** The text to look up for a card, or null when there is nothing a geocoder could place. */
 export function lookupText(location: string | undefined): string | null {
@@ -32,24 +23,20 @@ export function layoutPins(
   lookupFor: (therapist: TherapistCard) => LookupResult | undefined,
   centre: Point | undefined,
   distanceMiles: number,
-): { pins: Pin[]; unplaced: Unplaced[] } {
+): { pins: Pin[]; unplaced: TherapistCard[] } {
   const pins = new Map<string, Pin>();
-  const unplaced: Unplaced[] = [];
+  const unplaced: TherapistCard[] = [];
   for (const therapist of therapists) {
     const result = lookupFor(therapist);
     if (!result) continue;
-    if (!result.ok) {
-      unplaced.push({ therapist, reason: "failed" });
+    if (!result.ok || !result.lookup.found) {
+      unplaced.push(therapist);
       continue;
     }
     const { lookup } = result;
-    if (!lookup.found) {
-      unplaced.push({ therapist, reason: lookup.reason === "too-general" ? "too-general" : "not-matched" });
-      continue;
-    }
     const point = choosePoint(lookup, centre);
     if (!point || (lookup.kind === "place" && centre && milesBetween(point, centre) > 2 * distanceMiles + 5)) {
-      unplaced.push({ therapist, reason: "not-matched" });
+      unplaced.push(therapist);
       continue;
     }
     const key = `${point.lat.toFixed(5)},${point.lng.toFixed(5)}`;
