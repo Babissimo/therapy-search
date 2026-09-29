@@ -37,6 +37,9 @@ const WIDE = "(min-width: 64rem)";
 /** Before the centre is known, when place names can't yet be judged by their distance from it. */
 const NOT_LAID_OUT: ReturnType<typeof layoutPins> = { pins: [], unplaced: [] };
 
+/** Space left above a selected pin's entry as it scrolls into view. */
+const REVEAL_GAP_PX = 8;
+
 export function SearchPage() {
   const { params, error, update } = useSearchState();
   if (!params) {
@@ -98,6 +101,8 @@ function SearchView({ params, onChange }: ViewProps) {
   }
   const scroll = useRememberedScroll(entry, !results.query.isPending);
   const listRef = useRef<HTMLUListElement>(null);
+  // Whether the list was showing when a pin was selected, so it can glide to the pin's entry rather than jump.
+  const listShowing = useRef(false);
 
   function select(pin: Pin) {
     if (pin.key === selected?.key) {
@@ -105,11 +110,18 @@ function SearchView({ params, onChange }: ViewProps) {
       return;
     }
     setSelection({ fitKey, pinKey: pin.key });
+    listShowing.current = wide ? panelOpen : sheet !== "peek";
     if (wide) setPanelOpen(true);
     else if (sheet === "peek") setSheet("half");
-    // The selection heads the list.
-    if (scroll.ref.current) scroll.ref.current.scrollTop = 0;
   }
+
+  const selectedKey = selected?.key;
+  // After the render that opens the panel or raises the sheet, so the list is there to scroll.
+  useEffect(() => {
+    const list = scroll.ref.current;
+    const entry = selectedKey === undefined ? null : list?.querySelector<HTMLElement>(`[data-pin="${selectedKey}"]`);
+    if (list && entry) reveal(list, entry, listShowing.current);
+  }, [scroll.ref, selectedKey]);
 
   const count = results.first?.total;
   const title = results.searchedPlace === undefined || count === undefined ? resultCount(count) : `${resultCount(count)} within your area`;
@@ -119,15 +131,15 @@ function SearchView({ params, onChange }: ViewProps) {
       params={params}
       results={results}
       listRef={listRef}
+      pins={pins}
       unplaced={unplaced}
-      selection={selected}
-      onClearSelection={() => setSelection(undefined)}
+      selected={selected}
       onHighlight={highlight.set}
     />
   ) : (
     <SearchPrompt />
   );
-  const footer = <LoadMore results={results} listRef={listRef} />;
+  const footer = <LoadMore results={results} listRef={listRef} placing={placing} />;
 
   return (
     <div className="flex min-h-0 flex-1">
@@ -168,6 +180,15 @@ function SearchView({ params, onChange }: ViewProps) {
       </div>
     </div>
   );
+}
+
+/** Scrolls the list to put `entry` just below its top, unless it is already wholly in view. */
+function reveal(list: HTMLElement, entry: HTMLElement, glide: boolean) {
+  const view = list.getBoundingClientRect();
+  const { top, bottom } = entry.getBoundingClientRect();
+  if (top >= view.top && bottom <= view.bottom) return;
+  const smooth = glide && !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  list.scrollTo({ top: list.scrollTop + top - view.top - REVEAL_GAP_PX, behavior: smooth ? "smooth" : "auto" });
 }
 
 /** The search box, filters and active-filter chips, floating over the top of the map. */

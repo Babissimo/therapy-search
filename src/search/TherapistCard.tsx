@@ -6,7 +6,15 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { useProfileLink } from "@/profile/profileLink";
 
-export function TherapistCard({ therapist: t, note, onHighlight }: { therapist: Therapist; note?: string; onHighlight?: (on: boolean) => void }) {
+type Props = {
+  therapist: Therapist;
+  note?: string;
+  /** h3 beneath the heading of a place in the list. */
+  heading?: "h2" | "h3";
+  onHighlight?: (on: boolean) => void;
+};
+
+export function TherapistCard({ therapist: t, note, heading: Heading = "h2", onHighlight }: Props) {
   const profile = useProfileLink();
   const place = [t.location, t.distance && `(${t.distance})`].filter(Boolean).join(" ");
   const contact = [t.phone, t.sessionTypes].filter(Boolean).join(" | ");
@@ -25,12 +33,12 @@ export function TherapistCard({ therapist: t, note, onHighlight }: { therapist: 
           <AvatarFallback>{t.initials}</AvatarFallback>
         </Avatar>
         <div className="min-w-0 space-y-1.5">
-          <h2 className="font-semibold">
+          <Heading className="font-semibold">
             {/* The stretched link makes the whole card clickable, as UKCP's is. */}
             <Link {...profile(t.slug)} className="after:absolute after:inset-0">
               {t.name}
             </Link>
-          </h2>
+          </Heading>
           {place && <p className="text-sm">{place}</p>}
           {note && (
             <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
