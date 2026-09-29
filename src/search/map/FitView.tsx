@@ -4,8 +4,8 @@ import { useMap } from "react-leaflet";
 import { SEARCH_MILES } from "@shared/query";
 import { METRES_PER_MILE, UK_VIEW, type Point } from "./geo";
 
-/** A search's view and how many pins it took in. */
-export type Framed = { fitKey: string; pins: number };
+/** A search's view, with how many pins and how far a circle it took in. */
+export type Framed = { fitKey: string; pins: number; reach?: number };
 type Props = { fitKey: string; centre?: Point; reachMiles?: number; points: Point[]; waiting: boolean; restored?: Framed };
 
 // Clear of the search box and filters over the top left of the map.
@@ -14,23 +14,25 @@ const PADDING = { paddingTopLeft: [48, 96], paddingBottomRight: [48, 48] } satis
 const MAX_ZOOM = 14;
 
 /**
- * Frames each search as its first page is placed, and again whenever Load more places further pins: around the circle
- * the pins reach, or the whole area searched when there are none. With no centre it frames the pins alone. A view
- * restored on Back is left as it was until pins arrive beyond those it had. With nothing searched it shows the UK.
+ * Frames each search as its first page is placed, and again whenever Load more places further pins or the circle
+ * reaches further: around the circle and every pin, or the whole area searched when nothing lies beyond the centre.
+ * With no centre it frames the pins alone. A view restored on Back is left as it was until pins or a circle arrive
+ * beyond those it had. With nothing searched it shows the UK.
  */
 export function FitView({ fitKey, centre, reachMiles, points, waiting, restored }: Props) {
   const map = useMap();
   const framed = useRef(restored);
   useEffect(() => {
     const last = framed.current;
-    if (waiting || (last?.fitKey === fitKey && points.length <= last.pins)) return;
-    const bounds = centre
-      ? L.latLng(centre).toBounds(2 * (reachMiles ?? SEARCH_MILES) * METRES_PER_MILE)
-      : L.latLngBounds(points.map((p) => [p.lat, p.lng]));
+    const taken = last?.fitKey === fitKey && points.length <= last.pins && (reachMiles ?? 0) <= (last.reach ?? 0);
+    if (waiting || taken) return;
+    const bounds = L.latLngBounds(points.map((p) => [p.lat, p.lng]));
+    const miles = reachMiles !== undefined && (reachMiles > 0 || points.length > 0) ? reachMiles : SEARCH_MILES;
+    if (centre) bounds.extend(L.latLng(centre).toBounds(2 * miles * METRES_PER_MILE));
     if (fitKey === "") map.setView(UK_VIEW.centre, UK_VIEW.zoom);
     else if (bounds.isValid()) map.fitBounds(bounds, { ...PADDING, maxZoom: MAX_ZOOM });
     else return;
-    framed.current = { fitKey, pins: points.length };
+    framed.current = { fitKey, pins: points.length, reach: reachMiles };
   }, [map, fitKey, centre, reachMiles, points, waiting]);
   return null;
 }
