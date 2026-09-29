@@ -15,15 +15,12 @@ export const PAGE_SIZE = 12;
 /** Results asked of UKCP at once, since pages asked for a minute apart come from different shuffles. */
 export const BATCH_SIZE = 40 * PAGE_SIZE;
 export const TEXT_MAX_LENGTH = 200;
-/** Our pages draw shuffle seeds from this many values, so shuffled searches share cache entries. */
-export const ORDER_SEED_POOL = 64;
 
 export type SearchParams = {
   text: Record<TextParam, string>;
   multi: Record<MultiParam, string[]>;
   flags: Record<FlagParam, boolean>;
   page: number;
-  orderSeed?: number;
 };
 
 /** Allowed values for each multi-value parameter and the help-with terms, as offered by UKCP's form. */
@@ -67,7 +64,6 @@ export function readParams(query: URLSearchParams, allowed?: AllowedValues): Sea
     params.flags[name] = value === "true";
   }
   params.page = readInt(query, "page", 1, 1, 100_000);
-  if (query.has("OrderSeed")) params.orderSeed = readInt(query, "OrderSeed", 1, 1, ORDER_SEED_POOL);
   return params;
 }
 
@@ -87,11 +83,8 @@ function readInt(query: URLSearchParams, name: string, fallback: number, min: nu
   return value;
 }
 
-/**
- * The one query string for a search: fixed key order, sorted values, defaults left out.
- * The seed is only included when asked for and when there is no location, since location searches are ordered by distance.
- */
-export function toQuery(params: SearchParams, { withSeed = false } = {}): string {
+/** The one query string for a search: fixed key order, sorted values, defaults left out. */
+export function toQuery(params: SearchParams): string {
   const q = new URLSearchParams();
   if (params.text.HelpWith) q.append("HelpWith", params.text.HelpWith);
   if (params.text.Location) q.append("Location", params.text.Location);
@@ -99,7 +92,6 @@ export function toQuery(params: SearchParams, { withSeed = false } = {}): string
   for (const name of MULTI_PARAMS) for (const value of [...params.multi[name]].sort()) q.append(name, value);
   for (const name of FLAG_PARAMS) if (params.flags[name]) q.append(name, "true");
   if (params.page > 1) q.append("page", String(params.page));
-  if (withSeed && !params.text.Location && params.orderSeed !== undefined) q.append("OrderSeed", String(params.orderSeed));
   return q.toString();
 }
 

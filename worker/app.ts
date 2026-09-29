@@ -36,7 +36,7 @@ export function createApp(clientFor: (env: Env) => UkcpClient, placesFor: (env: 
   app.get("/api/search", async (c) => {
     const url = new URL(c.req.url);
     const params = readParams(url.searchParams, ALLOWED);
-    const canonical = toQuery(params, { withSeed: true });
+    const canonical = toQuery(params);
     // Compared as parsed parameters, so a proxy re-encoding the query can't cause a redirect loop.
     if (new URLSearchParams(url.search).toString() !== canonical) {
       return c.redirect(`/api/search${canonical ? `?${canonical}` : ""}`, 301);

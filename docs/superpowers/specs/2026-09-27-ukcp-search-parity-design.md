@@ -61,7 +61,7 @@ Search and contact requests need an ASP.NET anti-forgery pair:
 | `OnlyProfilesWithPhotos`, `OnlyWheelchairAccessible` | `true` / `false` | |
 | `Pager.CurrentPage` | 1-based | |
 | `Pager.PageSize` | UKCP's UI sends none, for a default of 12 | The server accepts any size, a whole London search of 3,579 included, and falls back to 12 below 1. We send 480 (map spec §4.4). |
-| `OrderSeed` | Signed 32-bit integer | UKCP's UI sends a per-visitor seed kept in the `TOrderSeed` cookie. It doesn't hold the order steady (see Ordering). |
+| `OrderSeed` | Signed 32-bit integer | UKCP's UI sends a per-visitor seed kept in the `TOrderSeed` cookie. It doesn't hold the order steady (see Ordering), so we don't send it. |
 | `InPerson`, `Remote` | `true` / `false` | Client-side only: they adjust the location box. The server ignores them. |
 
 Multiple values **AND together**, within a group as well as across groups: `Languages=French&Languages=Spanish` returns only people listed with both. We keep this behaviour for parity.
@@ -118,7 +118,7 @@ Browser (React + shadcn/ui)  ──/api──▶  Worker (Hono)  ──▶  www.
 
 Vite, React, Tailwind and shadcn/ui (Radix primitives), with React Router (v8, declarative mode) for the two routes (`/` search, `/therapist/:slug` profile) and TanStack Query for fetching and loading states, with retries off so a failure never repeats a request to UKCP.
 
-The search state lives in the page URL using UKCP's own parameter names (§3.2), with `page` for the page number, as UKCP does, so a search can be bookmarked or shared and maps one-to-one onto a UKCP URL. As on UKCP, checkboxes and the distance slider apply as soon as they change, text fields apply on Enter or the Search button, and any change returns to page 1. The visitor's `OrderSeed` is drawn once from a pool of 64 values and kept in `localStorage`, so shuffled searches share cache entries. It is sent only when there is no location, since location searches are ordered by distance band.
+The search state lives in the page URL using UKCP's own parameter names (§3.2), with `page` for the page number, as UKCP does, so a search can be bookmarked or shared and maps one-to-one onto a UKCP URL. As on UKCP, checkboxes and the distance slider apply as soon as they change, text fields apply on Enter or the Search button, and any change returns to page 1.
 
 A switch beside the site's name picks a light, dark or system theme, the last following `prefers-color-scheme`. A light or dark choice is kept in `localStorage`, and an inline script in `index.html` applies it before first paint so a dark page never flashes white.
 
@@ -147,7 +147,7 @@ A switch beside the site's name picks a light, dark or system theme, the last fo
 | `GET /api/therapist/:slug` | Profile GET (§3.4) | 1 hour |
 | `POST /api/contact/:id` | ContactDetails POST | None |
 
-Search is a GET on our side so the response can be cached by URL. The Worker **validates** every parameter against the option lists (including each `HelpWith` term) and the numeric ranges in §3.2, with `OrderSeed` limited to the pool of 64 (§4.1), rejecting anything else with `400`, so nothing arbitrary is forwarded. It then **canonicalises** the query (fixed key order, sorted values and `HelpWith` terms, defaults and redundant `OrderSeed` dropped) and redirects to the canonical URL when it differs, so equivalent searches share one cache entry. It **forwards** the query as a form POST for a batch of 480 results, with `page` counting batches (map spec §4.4), and returns UKCP's HTML unchanged, as `text/plain` with `X-Content-Type-Options: nosniff` so it can never render as a page on our origin. The front end parses it (§5).
+Search is a GET on our side so the response can be cached by URL. The Worker **validates** every parameter against the option lists (including each `HelpWith` term) and the numeric ranges in §3.2, rejecting anything else with `400`, so nothing arbitrary is forwarded. It then **canonicalises** the query (fixed key order, sorted values and `HelpWith` terms, defaults and keys it doesn't forward dropped) and redirects to the canonical URL when it differs, so equivalent searches share one cache entry. It **forwards** the query as a form POST for a batch of 480 results, with `page` counting batches (map spec §4.4), and returns UKCP's HTML unchanged, as `text/plain` with `X-Content-Type-Options: nosniff` so it can never render as a page on our origin. The front end parses it (§5).
 
 The contact route answers only requests from the site's own pages (a matching `Origin`), so other sites cannot make their visitors' browsers request contact details from UKCP.
 

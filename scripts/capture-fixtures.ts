@@ -15,7 +15,7 @@ async function save(name: string, html: string) {
 }
 
 /** A page of UKCP's default size, since the parsers read a card the same way in a batch of any size. */
-function search(change: (p: SearchParams) => void): Promise<string> {
+function search(change: (p: SearchParams) => void = () => {}): Promise<string> {
   const params = emptyParams();
   change(params);
   return client.search(params, PAGE_SIZE);
@@ -27,7 +27,7 @@ await save("search-form.html", form.outerHTML);
 
 const brighton = await search((p) => (p.text.Location = "Brighton"));
 await save("results-location.html", brighton);
-await save("results-no-location.html", await search((p) => (p.orderSeed = 42)));
+await save("results-no-location.html", await search());
 await save("results-unknown-location.html", await search((p) => (p.text.Location = "Nowhereville Zzz")));
 await save("results-empty.html", await search((p) => (p.text.KeywordFilter = "zzqqxx-no-such-word")));
 

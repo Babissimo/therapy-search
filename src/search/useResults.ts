@@ -1,10 +1,8 @@
 import { keepPreviousData, useInfiniteQuery, type InfiniteData, type UseInfiniteQueryResult } from "@tanstack/react-query";
-import { useState } from "react";
 import { PAGE_SIZE, toQuery, type SearchParams } from "@shared/query";
 import type { SearchResult, TherapistCard } from "@shared/types";
 import { api } from "@/lib/api";
 import { locationFellBack } from "./LocationNotice";
-import { orderSeed } from "./orderSeed";
 import { withPage } from "./state";
 
 // As long as results stay fresh, so Back from a profile finds every page still loaded.
@@ -28,8 +26,7 @@ export type SearchResults = {
  * once. Nothing is asked for, or shown, until `enabled`.
  */
 export function useResults(params: SearchParams, enabled = true): SearchResults {
-  const [seed] = useState(() => orderSeed());
-  const batchQuery = (n: number) => toQuery({ ...withPage(params, n), orderSeed: seed }, { withSeed: true });
+  const batchQuery = (n: number) => toQuery(withPage(params, n));
   // Spelt out because TypeScript otherwise fills in the page data's type before inferring the page parameter's.
   const query = useInfiniteQuery<Page, Error, InfiniteData<Page, After>, readonly unknown[], After>({
     queryKey: ["results", batchQuery(1)],
