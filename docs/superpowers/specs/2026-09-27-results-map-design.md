@@ -20,7 +20,7 @@ Out of scope:
 - Mapping every result at once. The results grow a page at a time (§4.4)
 - Searching the area in view, since UKCP searches from a typed location
 - The visitor's own position (a "locate me" control) and travel times
-- Profile office addresses. The profile keeps its "View map" links
+- Profile office addresses on the results map. Each office on a profile has its own small map (parity §4.1)
 
 ## 2. Constraints
 

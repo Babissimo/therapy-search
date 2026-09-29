@@ -130,6 +130,8 @@ A profile's header stays at the top of the page or drawer as the visitor reads, 
 
 Beneath the header come the fees, named by office only where offices charge differently, and, for a profile opened from a search, the tags that search asked for, judged as the result cards judge them (map spec §4.4). Those tags are also marked with a tick wherever the profile lists them, languages included.
 
+Each office card holds a still map centred on that office, the therapist's photo pinned as on the results map. It centres on the office's postcode; failing that, for the main office, on the place UKCP lists the therapist under, as the results map does; otherwise on the last line of its address, usually the town. An office that can't be placed has no map. It is looked up through the place route (map spec §5) under the results map's own cache key, and Leaflet loads only once there is somewhere to show.
+
 | UKCP element | shadcn/ui |
 |---|---|
 | "I want help with" typeahead, multiple terms | `Popover` + `Command` combobox, choices shown as `Badge`s |

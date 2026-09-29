@@ -1,8 +1,8 @@
-import { useEffect, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Check, ChevronLeft } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router";
-import type { Office, ProfileSection } from "@shared/types";
+import type { Office, Profile, ProfileSection } from "@shared/types";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -12,7 +12,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api";
 import { ContactList } from "./ContactList";
+import { useOfficePlace } from "./place";
 import { matchingTags, useSearchMatch } from "./searchedTerms";
+
+const ProfileMap = lazy(() => import("./ProfileMap"));
 
 /** A profile as a page of its own, for a visitor who followed a link to it. */
 export function ProfilePage({ slug }: { slug: string }) {
@@ -116,7 +119,7 @@ export function ProfileBody({ slug, back, close }: { slug: string } & Exits) {
             <SectionView key={i} section={section} isMatch={isMatch} />
           ))}
           {profile.offices.map((office, i) => (
-            <OfficeCard key={i} office={office} />
+            <OfficeCard key={i} office={office} profile={profile} />
           ))}
         </aside>
       </div>
@@ -213,7 +216,7 @@ function Fees({ offices }: { offices: Office[] }) {
   );
 }
 
-function OfficeCard({ office }: { office: Office }) {
+function OfficeCard({ office, profile }: { office: Office; profile: Profile }) {
   return (
     <Card>
       <CardHeader>
@@ -230,6 +233,7 @@ function OfficeCard({ office }: { office: Office }) {
             ))}
           </address>
         )}
+        <OfficeMap office={office} profile={profile} />
         {office.mapUrl && (
           <a className="underline" href={office.mapUrl} target="_blank" rel="noreferrer">
             View map
@@ -237,5 +241,20 @@ function OfficeCard({ office }: { office: Office }) {
         )}
       </CardContent>
     </Card>
+  );
+}
+
+/** A small map around the office, once it is placed; Leaflet loads only then. */
+function OfficeMap({ office, profile }: { office: Office; profile: Profile }) {
+  const place = useOfficePlace(office, profile.location);
+  if (!place) return null;
+  const fallback = <div className="size-full bg-muted" />;
+  return (
+    <div role="region" aria-label={`Map of ${office.name || "the office"}`} className="isolate h-40 overflow-hidden rounded-lg border">
+      <Suspense fallback={fallback}>
+        {/* Leaflet takes its centre only once, so a new place makes a new map. */}
+        <ProfileMap key={`${place.point.lat},${place.point.lng}`} profile={profile} point={place.point} zoom={place.zoom} />
+      </Suspense>
+    </div>
   );
 }
