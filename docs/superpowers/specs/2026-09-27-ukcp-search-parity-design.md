@@ -39,7 +39,7 @@ Search and contact requests need an ASP.NET anti-forgery pair:
 1. `GET https://www.psychotherapy.org.uk/find-a-therapist/` sets the cookies `.AspNetCore.Antiforgery.*`, `ARRAffinity` and `ARRAffinitySameSite`, and embeds `<input name="__RequestVerificationToken" value="…">` in `form#FindATherapistSearch`.
 2. Later POSTs send those cookies and the token as a form field. Without them the server returns `400` with an empty body.
 
-`ARRAffinity` pins the session to one backend instance, so all three cookies travel together. The Worker keeps one session per isolate, refreshes it after 20 minutes, and on a `400` refreshes and retries once.
+`ARRAffinity` pins the session to one backend instance, so all three cookies travel together. The search page is about 245 KB, so the Worker fetches it as seldom as it can: every isolate shares one session through a KV key, reading the key only when it has no session of its own under 20 minutes old. A session is refreshed after 20 minutes, and on a `400` it is refreshed and the request retried once. A `5xx` or a timeout on a session more than a minute old leaves the isolate to fetch a new session for its next request, since the session's server may be the one failing; sooner than that, the request is the likelier fault. The key holds only the cookies and token, never anything a visitor sent (§2). It is written once per session fetched, a few times an hour in normal running, far inside KV's free 1,000 writes a day; should writes run out, isolates keep sessions of their own until the quota resets.
 
 ### 3.2 Search request
 
