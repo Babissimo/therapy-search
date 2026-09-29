@@ -22,7 +22,9 @@ Searches in development go to UKCP's live site, so keep them few.
 ## Deploying
 
 Each push to `main` deploys once CI passes, using the repository secrets `CLOUDFLARE_API_TOKEN` (made from
-Cloudflare's "Edit Cloudflare Workers" token template) and `CLOUDFLARE_ACCOUNT_ID`. To deploy from your own machine:
+Cloudflare's "Edit Cloudflare Workers" token template) and `CLOUDFLARE_ACCOUNT_ID`. GitHub occasionally starts no run
+for a push; `gh workflow run CI --ref main` (or Run workflow on the Actions tab) checks and deploys `main` instead. To
+deploy from your own machine:
 
 ```bash
 npx wrangler login
