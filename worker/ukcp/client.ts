@@ -1,4 +1,4 @@
-import { FLAG_PARAMS, MULTI_PARAMS, PAGE_SIZE, SEARCH_MILES, UKCP_ORIGIN, type SearchParams } from "../../shared/query";
+import { BATCH_SIZE, FLAG_PARAMS, MULTI_PARAMS, SEARCH_MILES, UKCP_ORIGIN, type SearchParams } from "../../shared/query";
 const SESSION_TTL_MS = 20 * 60 * 1000;
 const TIMEOUT_MS = 10_000;
 const TOKEN = /<input[^>]*name="__RequestVerificationToken"[^>]*value="([^"]+)"/;
@@ -35,8 +35,9 @@ export class UkcpClient {
     return bodyOf(await this.#fetch("/find-a-therapist/"));
   }
 
-  search(params: SearchParams): Promise<string> {
-    return this.#postWithSession("/umbraco/surface/searchsurface/Search", searchForm(params));
+  /** A batch of results; `params.page` counts batches of `pageSize`. */
+  search(params: SearchParams, pageSize = BATCH_SIZE): Promise<string> {
+    return this.#postWithSession("/umbraco/surface/searchsurface/Search", searchForm(params, pageSize));
   }
 
   contact(id: string): Promise<string> {
@@ -100,8 +101,8 @@ async function bodyOf(res: Response): Promise<string> {
   return res.text();
 }
 
-/** UKCP's own form fields for a search, as its page would post them. */
-export function searchForm(params: SearchParams): URLSearchParams {
+/** UKCP's own form fields for a search, as its page would post them, with a page size its page leaves to the default of 12. */
+export function searchForm(params: SearchParams, pageSize = BATCH_SIZE): URLSearchParams {
   const form = new URLSearchParams({
     HelpWith: params.text.HelpWith,
     Location: params.text.Location,
@@ -111,7 +112,7 @@ export function searchForm(params: SearchParams): URLSearchParams {
   for (const name of MULTI_PARAMS) for (const value of params.multi[name]) form.append(name, value);
   for (const name of FLAG_PARAMS) form.set(name, String(params.flags[name]));
   form.set("Pager.CurrentPage", String(params.page));
-  form.set("Pager.PageSize", String(PAGE_SIZE));
+  form.set("Pager.PageSize", String(pageSize));
   if (params.orderSeed !== undefined) form.set("OrderSeed", String(params.orderSeed));
   return form;
 }

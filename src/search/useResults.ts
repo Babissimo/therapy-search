@@ -1,6 +1,6 @@
 import { keepPreviousData, useInfiniteQuery, type InfiniteData, type UseInfiniteQueryResult } from "@tanstack/react-query";
 import { useState } from "react";
-import { toQuery, type SearchParams } from "@shared/query";
+import { PAGE_SIZE, toQuery, type SearchParams } from "@shared/query";
 import type { SearchResult, TherapistCard } from "@shared/types";
 import { api } from "@/lib/api";
 import { locationFellBack } from "./LocationNotice";
@@ -10,24 +10,32 @@ import { withPage } from "./state";
 // As long as results stay fresh, so Back from a profile finds every page still loaded.
 const KEEP_FOR = 15 * 60 * 1000;
 
+/** A page of results with the batch it was cut from, which the next page is cut from too while it lasts. */
+type Page = SearchResult & { batch: SearchResult; stride: number };
+/** How many results the pages so far hold, and the batch they came from. */
+type After = { shown: number; batch?: SearchResult; stride?: number };
+
 export type SearchResults = {
-  query: UseInfiniteQueryResult<InfiniteData<SearchResult, number>>;
+  query: UseInfiniteQueryResult<InfiniteData<Page, After>>;
   first?: SearchResult;
   therapists: TherapistCard[];
   /** The place UKCP measured distances from, unless it fell back to searching the whole UK. */
   searchedPlace?: string;
 };
 
-/** A search's results, a page at a time in UKCP's order, for "Load more". Nothing is asked for, or shown, until `enabled`. */
+/**
+ * A search's results in UKCP's order, a page at a time for "Load more", cut from batches that are each asked of UKCP
+ * once. Nothing is asked for, or shown, until `enabled`.
+ */
 export function useResults(params: SearchParams, enabled = true): SearchResults {
   const [seed] = useState(() => orderSeed());
-  const pageQuery = (page: number) => toQuery({ ...withPage(params, page), orderSeed: seed }, { withSeed: true });
-  // Spelt out because TypeScript otherwise fills in the page data's type before inferring the page number's.
-  const query = useInfiniteQuery<SearchResult, Error, InfiniteData<SearchResult, number>, readonly unknown[], number>({
-    queryKey: ["results", pageQuery(1)],
-    queryFn: ({ pageParam }) => api.search(pageQuery(pageParam)),
-    initialPageParam: 1,
-    getNextPageParam: (last: SearchResult, pages: SearchResult[]) => (last.to < last.total ? pages.length + 1 : undefined),
+  const batchQuery = (n: number) => toQuery({ ...withPage(params, n), orderSeed: seed }, { withSeed: true });
+  // Spelt out because TypeScript otherwise fills in the page data's type before inferring the page parameter's.
+  const query = useInfiniteQuery<Page, Error, InfiniteData<Page, After>, readonly unknown[], After>({
+    queryKey: ["results", batchQuery(1)],
+    queryFn: ({ pageParam }) => pageAfter(pageParam, (n) => api.search(batchQuery(n))),
+    initialPageParam: { shown: 0 },
+    getNextPageParam: (last) => (last.therapists.length > 0 && last.to < last.total ? { shown: last.to, batch: last.batch, stride: last.stride } : undefined),
     enabled,
     // Without a search, the last one's results would linger in its place.
     placeholderData: enabled ? keepPreviousData : undefined,
@@ -44,7 +52,23 @@ export function useResults(params: SearchParams, enabled = true): SearchResults 
   };
 }
 
-/** Location searches carry no order seed, so UKCP may list someone on two pages; each is shown once. */
+/**
+ * The page after the first `shown` results, stopping short at its batch's end. UKCP may answer fewer than asked for,
+ * so the first batch's length sets the stride between batches.
+ */
+async function pageAfter({ shown, batch, stride }: After, fetchBatch: (n: number) => Promise<SearchResult>): Promise<Page> {
+  if (batch === undefined || stride === undefined) {
+    batch = await fetchBatch(1);
+    stride = batch.total === 0 ? 0 : batch.to - batch.from + 1;
+  }
+  if (stride <= 0) return { ...batch, batch, stride };
+  if (shown >= batch.to) batch = await fetchBatch(Math.floor(shown / stride) + 1);
+  const offset = shown - (batch.from - 1);
+  const therapists = offset < 0 ? [] : batch.therapists.slice(offset, offset + PAGE_SIZE);
+  return { ...batch, from: shown + 1, to: shown + therapists.length, therapists, batch, stride };
+}
+
+/** UKCP reshuffles equally distant results about once a minute, so a later batch can repeat someone; each is shown once. */
 function distinct(pages: SearchResult[]): TherapistCard[] {
   const seen = new Set<string>();
   const therapists: TherapistCard[] = [];
