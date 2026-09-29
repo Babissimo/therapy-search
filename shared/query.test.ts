@@ -11,9 +11,9 @@ describe("canonical query", () => {
     );
   });
 
-  it("keeps non-default distance, page and true flags", () => {
+  it("keeps page and true flags, and drops a distance, which is fixed", () => {
     expect(canonical("page=3&OnlyWheelchairAccessible=true&OnlyProfilesWithPhotos=false&Distance=5&Location=Leeds")).toBe(
-      "Location=Leeds&Distance=5&OnlyWheelchairAccessible=true&page=3",
+      "Location=Leeds&OnlyWheelchairAccessible=true&page=3",
     );
   });
 
@@ -38,8 +38,6 @@ describe("canonical query", () => {
 
 describe("readParams rejects what UKCP's form could not send", () => {
   it.each([
-    ["Distance=31", "Distance"],
-    ["Distance=2.5", "Distance"],
     ["page=0", "page"],
     ["OnlyProfilesWithPhotos=yes", "OnlyProfilesWithPhotos"],
     [`Location=${"x".repeat(201)}`, "Location"],
@@ -65,9 +63,10 @@ describe("readParams rejects what UKCP's form could not send", () => {
 });
 
 describe("ukcpSearchUrl", () => {
-  it("builds the same search on UKCP's site", () => {
+  it("builds the same search on UKCP's site, reaching as far as ours", () => {
     expect(ukcpSearchUrl(read("Location=Leeds&Languages=Welsh"))).toBe(
-      "https://www.psychotherapy.org.uk/find-a-therapist/?Location=Leeds&Languages=Welsh",
+      "https://www.psychotherapy.org.uk/find-a-therapist/?Location=Leeds&Languages=Welsh&Distance=30",
     );
+    expect(ukcpSearchUrl(read("Languages=Welsh"))).toBe("https://www.psychotherapy.org.uk/find-a-therapist/?Languages=Welsh");
   });
 });

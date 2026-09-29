@@ -24,7 +24,7 @@ const form = parse(await client.searchPage()).querySelector("form#FindATherapist
 if (!form) throw new Error("the search page has no form#FindATherapistSearch");
 await save("search-form.html", form.outerHTML);
 
-const brighton = await client.search(search((p) => ((p.text.Location = "Brighton"), (p.distance = 5))));
+const brighton = await client.search(search((p) => (p.text.Location = "Brighton")));
 await save("results-location.html", brighton);
 await save("results-no-location.html", await client.search(search((p) => (p.orderSeed = 42))));
 await save("results-unknown-location.html", await client.search(search((p) => (p.text.Location = "Nowhereville Zzz"))));

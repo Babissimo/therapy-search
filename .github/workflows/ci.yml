@@ -34,6 +34,9 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+        env:
+          # The tile key ships in the page, so it is a variable rather than a secret.
+          VITE_CARTO_KEY: ${{ vars.CARTO_KEY }}
       # Only Wrangler sees the token, not the build's dependencies.
       - run: npx wrangler deploy
         env:

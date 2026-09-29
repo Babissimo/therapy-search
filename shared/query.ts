@@ -8,7 +8,8 @@ export type TextParam = (typeof TEXT_PARAMS)[number];
 export type MultiParam = (typeof MULTI_PARAMS)[number];
 export type FlagParam = (typeof FLAG_PARAMS)[number];
 
-export const DISTANCE = { min: 1, max: 30, default: 10 } as const;
+/** How far every location search reaches, in miles: the furthest UKCP's form offers. Results come nearest first, so the extra reach only lengthens the list. */
+export const SEARCH_MILES = 30;
 export const PAGE_SIZE = 12;
 export const TEXT_MAX_LENGTH = 200;
 /** Our pages draw shuffle seeds from this many values, so shuffled searches share cache entries. */
@@ -18,7 +19,6 @@ export type SearchParams = {
   text: Record<TextParam, string>;
   multi: Record<MultiParam, string[]>;
   flags: Record<FlagParam, boolean>;
-  distance: number;
   page: number;
   orderSeed?: number;
 };
@@ -38,7 +38,6 @@ export function emptyParams(): SearchParams {
     text: { HelpWith: "", Location: "", KeywordFilter: "" },
     multi: { TypesOfSession: [], HelpWithAdvanced: [], WorksWith: [], TypesOfTherapy: [], Languages: [], Colleges: [] },
     flags: { LocationSearchOutsideUK: false, OnlyProfilesWithPhotos: false, OnlyWheelchairAccessible: false },
-    distance: DISTANCE.default,
     page: 1,
   };
 }
@@ -64,7 +63,6 @@ export function readParams(query: URLSearchParams, allowed?: AllowedValues): Sea
     if (value !== null && value !== "true" && value !== "false") throw new InvalidParam(name, `${name} must be true or false`);
     params.flags[name] = value === "true";
   }
-  params.distance = readInt(query, "Distance", DISTANCE.default, DISTANCE.min, DISTANCE.max);
   params.page = readInt(query, "page", 1, 1, 100_000);
   if (query.has("OrderSeed")) params.orderSeed = readInt(query, "OrderSeed", 1, 1, ORDER_SEED_POOL);
   return params;
@@ -94,7 +92,6 @@ export function toQuery(params: SearchParams, { withSeed = false } = {}): string
   const q = new URLSearchParams();
   if (params.text.HelpWith) q.append("HelpWith", params.text.HelpWith);
   if (params.text.Location) q.append("Location", params.text.Location);
-  if (params.distance !== DISTANCE.default) q.append("Distance", String(params.distance));
   if (params.text.KeywordFilter) q.append("KeywordFilter", params.text.KeywordFilter);
   for (const name of MULTI_PARAMS) for (const value of [...params.multi[name]].sort()) q.append(name, value);
   for (const name of FLAG_PARAMS) if (params.flags[name]) q.append(name, "true");
@@ -105,7 +102,10 @@ export function toQuery(params: SearchParams, { withSeed = false } = {}): string
 
 /** The same search on UKCP's own site, which reads these parameters from its query string. */
 export function ukcpSearchUrl(params: SearchParams): string {
-  const query = toQuery(params);
+  const q = new URLSearchParams(toQuery(params));
+  // UKCP's own page reaches 10 miles unless told otherwise.
+  if (params.text.Location) q.set("Distance", String(SEARCH_MILES));
+  const query = q.toString();
   return `${UKCP_ORIGIN}/find-a-therapist/${query ? `?${query}` : ""}`;
 }
 

@@ -14,7 +14,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api";
 import { ContactReveal } from "./ContactReveal";
 
+/** A profile as a page of its own, for a visitor who followed a link to it. */
 export function ProfilePage({ slug }: { slug: string }) {
+  useEffect(() => {
+    window.scrollTo({ top: 0 });
+  }, [slug]);
   return (
     <div className="space-y-4">
       <BackButton />
@@ -48,11 +52,9 @@ function BackButton() {
   );
 }
 
-function ProfileBody({ slug }: { slug: string }) {
+/** A therapist's profile, laid out by the width it is given, whether a page's or a drawer's. */
+export function ProfileBody({ slug }: { slug: string }) {
   const { data: profile, error, isPending } = useQuery({ queryKey: ["profile", slug], queryFn: () => api.profile(slug) });
-  useEffect(() => {
-    window.scrollTo({ top: 0 });
-  }, [slug]);
 
   if (isPending) return <Skeleton className="h-64 w-full rounded-xl" aria-busy />;
   if (error) {
@@ -64,8 +66,8 @@ function ProfileBody({ slug }: { slug: string }) {
   }
 
   return (
-    <article className="space-y-8">
-      <header className="flex flex-col gap-6 sm:flex-row sm:items-start">
+    <article className="@container space-y-8">
+      <header className="flex flex-col gap-6 @lg:flex-row @lg:items-start">
         <Avatar className="size-28 shrink-0">
           <AvatarImage src={profile.photoUrl} alt="" />
           <AvatarFallback className="text-2xl">{profile.initials}</AvatarFallback>
@@ -89,7 +91,7 @@ function ProfileBody({ slug }: { slug: string }) {
         </div>
       </header>
 
-      <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_20rem]">
+      <div className="grid gap-8 @4xl:grid-cols-[minmax(0,1fr)_20rem]">
         <div className="space-y-8">
           {profile.about.map((section, i) => (
             <SectionView key={i} section={section} />

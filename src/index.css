@@ -130,3 +130,45 @@
     @apply font-sans;
     }
 }
+
+/* Leaflet's own elements, brought in line with the theme. */
+@layer base {
+  .leaflet-container {
+    @apply bg-muted! font-[inherit]!;
+  }
+  .leaflet-tooltip {
+    @apply rounded-md! border-none! bg-foreground! px-3! py-1.5! text-background! shadow-none!;
+  }
+  .leaflet-tooltip-top:before,
+  .leaflet-tooltip-bottom:before,
+  .leaflet-tooltip-left:before,
+  .leaflet-tooltip-right:before {
+    @apply hidden;
+  }
+  .leaflet-control-attribution {
+    @apply rounded-md bg-muted! px-1! py-0.5! text-[10px] leading-none! text-muted-foreground!;
+  }
+  /* Rings go on the icon inside the marker, so they scale with it rather than being covered by it. Blue stands out
+     against both the light and dark tiles, where the theme's greys don't. */
+  .pin-highlight > *,
+  .pin-selected > * {
+    @apply rounded-full outline-3 outline-offset-2 outline-sky-500;
+  }
+  /* A pin or cluster whose therapist's card is hovered or focused. */
+  .pin-highlight > * {
+    @apply scale-125 transition-[scale];
+  }
+  /* The pin or cluster holding the therapists shown "At this pin". */
+  .pin-selected > * {
+    @apply ring-6 ring-sky-500/40 motion-safe:animate-[pin-pulse_1.2s_ease-out_3];
+  }
+}
+
+@keyframes pin-pulse {
+  from {
+    box-shadow: 0 0 0 0 var(--color-sky-500);
+  }
+  to {
+    box-shadow: 0 0 0 16px transparent;
+  }
+}

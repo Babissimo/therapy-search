@@ -28,4 +28,13 @@ describe("TherapistCard", () => {
     screen.getByText("01234 567890 | In-person & Remote");
     expect(screen.getAllByRole("listitem").map((li) => li.textContent)).toEqual(["Anxiety", "Trauma"]);
   });
+
+  it("says why the map can't place a therapist", () => {
+    render(
+      <MemoryRouter>
+        <TherapistCard therapist={{ slug: "jo", name: "Jo", initials: "J", tags: [] }} note="Location too general to place" />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText("Location too general to place").textContent).toBe("Not on the map: Location too general to place");
+  });
 });
