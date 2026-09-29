@@ -70,9 +70,32 @@ function renderResults(params: SearchParams) {
 const leeds = withText(emptyParams(), "Location", "Leeds");
 const cards = () => screen.queryAllByRole("link", { name: /^Therapist/ });
 
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  vi.useRealTimers();
+  vi.restoreAllMocks();
+});
 
 describe("Results", () => {
+  const SLOW = /^Getting every result/;
+
+  it("says why a search without a location is taking a while, once it has", () => {
+    vi.useFakeTimers();
+    vi.spyOn(api, "search").mockImplementation(() => new Promise(() => {}));
+    renderResults(emptyParams());
+    act(() => vi.advanceTimersByTime(1900));
+    expect(screen.queryByText(SLOW)).toBeNull();
+    act(() => vi.advanceTimersByTime(100));
+    expect(screen.getByText(SLOW).textContent).toBe("Getting every result. The first time can take a few seconds.");
+  });
+
+  it("says nothing of the kind while a location search loads", () => {
+    vi.useFakeTimers();
+    vi.spyOn(api, "search").mockImplementation(() => new Promise(() => {}));
+    renderResults(leeds);
+    act(() => vi.advanceTimersByTime(5000));
+    expect(screen.queryByText(SLOW)).toBeNull();
+  });
+
   it("shows the nearest page, and adds the next with Load more", async () => {
     answerBatches();
     renderResults(leeds);
