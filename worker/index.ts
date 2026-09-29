@@ -6,7 +6,7 @@ let client: UkcpClient | undefined;
 let geocoder: Geocoder | undefined;
 
 const upstream: Fetch = (url, init) => fetch(url, init);
-const userAgent = (env: Env) => `therapy-search/1.0 (unofficial UKCP front end; +${env.SITE_URL}/about)`;
+const userAgent = (env: Env) => `therapy-search/1.0 (unofficial UKCP front end; +${env.SITE_URL})`;
 
 export default createApp(
   (env) => (client ??= new UkcpClient(upstream, userAgent(env))),

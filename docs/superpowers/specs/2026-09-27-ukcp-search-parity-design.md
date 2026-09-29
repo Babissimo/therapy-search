@@ -23,7 +23,7 @@ Out of scope for v1:
 - **Respectful of UKCP.**
   - Cache identical searches (15 minutes) and profiles (1 hour), and collapse concurrent identical requests, so repeated traffic never reaches UKCP.
   - Send upstream only what a visitor's action on UKCP would send: one search POST per uncached search, one profile GET per opened profile, one contact POST per click. Never prefetch or crawl.
-  - Identify ourselves in the `User-Agent` with a link to the site's about page, so UKCP can see and contact us.
+  - Identify ourselves in the `User-Agent` with a link to the site, so UKCP can see and contact us.
   - Cap uncached upstream requests per visitor IP (§4.3).
 - **Clearly unofficial.** A persistent notice that the site is not affiliated with UKCP, and a "View on UKCP" link on every profile.
 - **No health data at rest.** Search terms such as "Trauma" are special-category data under UK GDPR. The Worker logs no query strings or bodies, and cache keys never include the visitor's IP.
