@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Check, ChevronLeft } from "lucide-react";
+import { Check, ChevronLeft, ExternalLink } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router";
 import type { Office, Profile, ProfileSection } from "@shared/types";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -221,7 +221,15 @@ function OfficeCard({ office, profile }: { office: Office; profile: Profile }) {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          {office.name}
+          {office.mapUrl ? (
+            <a className="inline-flex items-center gap-1.5 underline-offset-4 hover:underline" href={office.mapUrl} target="_blank" rel="noreferrer">
+              {office.name}
+              <ExternalLink aria-hidden className="size-4 text-muted-foreground" />
+              <span className="sr-only">, map</span>
+            </a>
+          ) : (
+            office.name
+          )}
           {office.isMain && <Badge variant="outline">Main address</Badge>}
         </CardTitle>
       </CardHeader>
@@ -234,11 +242,6 @@ function OfficeCard({ office, profile }: { office: Office; profile: Profile }) {
           </address>
         )}
         <OfficeMap office={office} profile={profile} />
-        {office.mapUrl && (
-          <a className="underline" href={office.mapUrl} target="_blank" rel="noreferrer">
-            View map
-          </a>
-        )}
       </CardContent>
     </Card>
   );

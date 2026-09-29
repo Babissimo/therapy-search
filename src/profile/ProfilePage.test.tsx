@@ -98,4 +98,13 @@ describe("ProfilePage's content", () => {
     expect(fees.compareDocumentPosition(screen.getByRole("heading", { name: "What I can help with" })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     screen.getByText("£90 per session");
   });
+
+  it("links each office's name to its map", async () => {
+    const mapped = { ...office("Brighton Office", "£70"), mapUrl: "https://maps.example/?q=Brighton" };
+    renderAt(["/therapist/Test-ABCDEFGH"], { ...PROFILE, offices: [mapped, office("London Office", "£70")] });
+    const link = await screen.findByRole("link", { name: "Brighton Office, map" });
+    expect(link.getAttribute("href")).toBe("https://maps.example/?q=Brighton");
+    screen.getByText("London Office");
+    expect(screen.queryByRole("link", { name: /London Office/ })).toBeNull();
+  });
 });
