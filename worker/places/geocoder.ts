@@ -1,4 +1,4 @@
-import { classifyLocation, type Candidate, type PlaceLookup, type PlaceOptions } from "../../shared/location";
+import { classifyLocation, type Candidate, type NearestLookup, type PlaceLookup, type PlaceOptions } from "../../shared/location";
 import type { Fetch } from "../ukcp/client";
 
 const POSTCODES_IO = "https://api.postcodes.io";
@@ -34,6 +34,14 @@ export class Geocoder {
     const name = location.kind === "place" ? location.name : location.rest;
     const candidates = name ? await this.#places(name, options) : [];
     return candidates.length > 0 ? { found: true, kind: "place", candidates } : { found: false, reason: "not-found" };
+  }
+
+  /** The postcode nearest a point, as far out as postcodes.io looks: 2 km. */
+  async nearest(lat: number, lng: number): Promise<NearestLookup> {
+    const query = new URLSearchParams({ lon: String(lng), lat: String(lat), radius: "2000", limit: "1" });
+    const body = await this.#json<{ result: { postcode: string }[] | null }>(`${POSTCODES_IO}/postcodes?${query}`);
+    const postcode = body?.result?.[0]?.postcode;
+    return postcode ? { found: true, postcode } : { found: false };
   }
 
   /** A postcode's or outcode's position, or null when postcodes.io doesn't know it or holds none. */

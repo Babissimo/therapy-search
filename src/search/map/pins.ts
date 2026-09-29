@@ -2,7 +2,9 @@ import { canonicalLocation, classifyLocation, type PlaceLookup } from "@shared/l
 import type { TherapistCard } from "@shared/types";
 import { choosePoint, milesBetween, type Point } from "./geo";
 
-export type Pin = { key: string; point: Point; therapists: TherapistCard[] };
+/** `kind` is what placed the pin, which can be less than a card gives when a postcode or district is unknown. */
+export type Pin = { key: string; point: Point; therapists: TherapistCard[]; kind: PlacedKind };
+type PlacedKind = Extract<PlaceLookup, { found: true }>["kind"];
 export type UnplacedReason = "too-general" | "not-matched" | "failed";
 export type Unplaced = { therapist: TherapistCard; reason: UnplacedReason };
 /** A settled lookup of a card's location; `ok: false` when the lookup itself failed. */
@@ -52,9 +54,54 @@ export function layoutPins(
     const key = `${point.lat.toFixed(5)},${point.lng.toFixed(5)}`;
     const pin = pins.get(key);
     if (pin) pin.therapists.push(therapist);
-    else pins.set(key, { key, point, therapists: [therapist] });
+    else pins.set(key, { key, point, therapists: [therapist], kind: lookup.kind });
   }
   return { pins: [...pins.values()], unplaced };
+}
+
+/** A row of the results list: one therapist, or everyone at a stacked pin. */
+export type Entry = { key: string; pin?: Pin; therapist: TherapistCard } | { key: string; pin: Pin; therapist?: undefined };
+
+/** The results in their own order, with everyone at a stacked pin gathered where the first of them comes. */
+export function listEntries(therapists: TherapistCard[], pins: Pin[]): Entry[] {
+  const pinOf = new Map(pins.flatMap((pin) => pin.therapists.map((t) => [t.slug, pin] as const)));
+  const gathered = new Set<string>();
+  const entries: Entry[] = [];
+  for (const therapist of therapists) {
+    const pin = pinOf.get(therapist.slug);
+    if (!pin || pin.therapists.length === 1) entries.push({ key: therapist.slug, pin, therapist });
+    else if (!gathered.has(pin.key)) {
+      gathered.add(pin.key);
+      entries.push({ key: pin.key, pin });
+    }
+  }
+  return entries;
+}
+
+/** What everyone at a pin lists: the location they share, or else the postcodes, districts or places that placed them. */
+export function pinLabel(pin: Pin): string {
+  const listed = pin.therapists.map((t) => t.location ?? "");
+  if (new Set(listed.map(canonicalLocation)).size === 1) return listed[0]?.trim() ?? "";
+  const placed = new Map<string, string>();
+  for (const location of listed) {
+    const shown = placedBy(location, pin.kind);
+    if (!placed.has(shown.toUpperCase())) placed.set(shown.toUpperCase(), shown);
+  }
+  return [...placed.values()].join(", ");
+}
+
+/** The part of a card's location that placed it, as the geocoder falls back from a postcode to its district to its place. */
+function placedBy(location: string, kind: PlacedKind): string {
+  const text = classifyLocation(location);
+  if (text.kind === "too-general") return "";
+  if (kind === "postcode" && text.kind === "postcode") return text.postcode;
+  if (kind !== "place" && text.kind !== "place") return text.outcode;
+  const name = text.kind === "place" ? text.name : text.rest;
+  // A place as the therapist writes it, rather than in the capitals it is compared in.
+  const written = location.trim().replace(/\s+/g, " ");
+  const upper = written.toUpperCase();
+  const at = upper.length === written.length ? upper.indexOf(name) : -1;
+  return at === -1 ? name : written.slice(at, at + name.length);
 }
 
 /** A remote-only therapist's location says nothing about travel. */

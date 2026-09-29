@@ -19,6 +19,7 @@ const pin = (point: typeof BRIGHTON, ...slugs: string[]): Pin => ({
   key: `${point.lat.toFixed(5)},${point.lng.toFixed(5)}`,
   point,
   therapists: slugs.map((slug) => therapist(slug)),
+  kind: "outcode",
 });
 
 const onMap = (children: ReactNode) => (

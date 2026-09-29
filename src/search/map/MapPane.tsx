@@ -19,7 +19,7 @@ export type MapPaneProps = {
   placing: boolean;
   /** The store of the therapist whose card is hovered or focused, which the pins subscribe to. */
   highlight: Highlight;
-  /** The pin whose therapists the results show "At this pin". */
+  /** The pin whose place the results list marks. */
   selected?: Pin;
   onSelect: (pin: Pin) => void;
 };

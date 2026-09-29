@@ -1,7 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Link, Route, Routes, useLocation, useParams } from "react-router";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { AboutPage } from "@/layout/AboutPage";
 import { SiteLayout } from "@/layout/SiteLayout";
 import { ProfileDrawer } from "@/profile/ProfileDrawer";
 import { ProfilePage } from "@/profile/ProfilePage";
@@ -34,7 +33,6 @@ export function AppRoutes() {
       <Routes location={background ?? location}>
         <Route path="/" element={<SearchPage />} />
         <Route path="/therapist/:slug" element={<ProfileRoute />} />
-        <Route path="/about" element={<AboutPage />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
       {background && (

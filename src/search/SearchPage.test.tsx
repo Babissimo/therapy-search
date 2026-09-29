@@ -113,6 +113,16 @@ const results = () => screen.getByRole("region", { name: "Results" });
 const loaded = () => within(results()).findByText(/^\d+ of 30/);
 /** The results' scrolling list, which holds everything but their header and footer. */
 const list = () => results().querySelector<HTMLElement>(".overflow-y-auto")!;
+const names = () => within(results()).getAllByRole("link", { name: /^Therapist/ }).map((link) => link.textContent);
+
+const BRIGHTON = { lat: 50.8225, lng: -0.1372 };
+const HOVE = { lat: 50.835, lng: -0.178 };
+/** A pin's key, as the pins make it from its point. */
+const key = ({ lat, lng }: { lat: number; lng: number }) => `${lat.toFixed(5)},${lng.toFixed(5)}`;
+/** Places a location by its postal district alone: BN3 in Hove, anywhere else in Brighton. */
+function placeByDistrict() {
+  vi.spyOn(api, "place").mockImplementation(async (text) => ({ found: true, kind: "outcode", candidates: [text.endsWith("BN3") ? HOVE : BRIGHTON] }));
+}
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -212,6 +222,13 @@ describe("SearchPage", () => {
     expect(screen.queryByRole("region", { name: "Refine your search" })).toBeNull();
   });
 
+  it("leaves the outside-UK tick out of the Filters count, as Clear all keeps it", async () => {
+    screenIs(true);
+    renderAt("/?LocationSearchOutsideUK=true&Languages=French");
+    await loaded();
+    expect(screen.getByRole("button", { name: "Filters, 1 ticked" })).toBeTruthy();
+  });
+
   it("opens the filters in a sheet on narrow screens", async () => {
     screenIs(false);
     renderAt(SEARCH);
@@ -274,17 +291,35 @@ describe("SearchPage", () => {
     expect(list().scrollTop).toBe(400);
   });
 
-  it("ends an invalid search link with the disclaimer too", () => {
+  it("heads an invalid search link with the site's name", () => {
     renderAt("/?OnlyProfilesWithPhotos=yes");
     expect(screen.getByRole("alert").textContent).toContain("This search link isn't valid");
-    expect(screen.getByText(/Not affiliated with or endorsed by UKCP/)).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 1, name: "Find a UKCP therapist" })).toBeTruthy();
   });
 
-  it("closes the results with the disclaimer", async () => {
+  it("heads the side bar with the site's name and theme switch, which hide with the results", async () => {
     screenIs(true);
     renderAt(SEARCH);
     await loaded();
-    expect(within(results()).getByText(/Not affiliated with or endorsed by UKCP/)).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 1, name: "Find a UKCP therapist" })).toBeTruthy();
+    expect(screen.getByRole("group", { name: "Theme" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Hide results" }));
+    expect(screen.queryByRole("heading", { level: 1 })).toBeNull();
+    expect(screen.queryByRole("group", { name: "Theme" })).toBeNull();
+  });
+
+  it("heads the list in the sheet with the site's name and theme switch on narrow screens", async () => {
+    screenIs(false);
+    renderAt(SEARCH);
+    await loaded();
+    expect(within(list()).getByRole("heading", { level: 1, name: "Find a UKCP therapist" })).toBeTruthy();
+    expect(within(list()).getByRole("group", { name: "Theme" })).toBeTruthy();
+  });
+
+  it("names the filters button's ticks for screen readers", async () => {
+    screenIs(true);
+    renderAt(`${SEARCH}&Languages=French`);
+    expect(await screen.findByRole("button", { name: "Filters, 1 ticked" })).toBeTruthy();
   });
 
   it("says which therapists the map can't place, and why", async () => {
@@ -296,31 +331,71 @@ describe("SearchPage", () => {
     expect(within(results()).getByText("Pins show the postcode or area each therapist lists.")).toBeTruthy();
   });
 
-  it("shows who is at a pin above the results until cleared, raising the sheet halfway and marking the pin", async () => {
-    screenIs(false);
-    vi.spyOn(api, "place").mockResolvedValue({ found: true, kind: "outcode", candidates: [{ lat: 50.83, lng: -0.15 }] });
-    renderAt(SEARCH, [therapist("a", "BRIGHTON BN3"), therapist("b", "Hove BN3")]);
-    fireEvent.click(screen.getByRole("button", { name: "Show map" }));
-    const pin = await screen.findByRole("button", { name: /^Pin / });
-    fireEvent.click(pin);
-    const here = screen.getByRole("region", { name: "At this pin" });
-    expect(within(here).getAllByRole("link").map((link) => link.textContent)).toEqual(["Therapist a", "Therapist b"]);
-    expect(results().dataset.position).toBe("half");
-    expect(screen.getByTestId("map").dataset.selected).toBe(pin.textContent?.replace(/^Pin /, ""));
-    fireEvent.click(screen.getByRole("button", { name: "Clear selection" }));
-    expect(screen.queryByRole("region", { name: "At this pin" })).toBeNull();
-    expect(screen.getByTestId("map").dataset.selected).toBe("");
+  it("gathers everyone at a pin under the place they list, where the first of them comes", async () => {
+    screenIs(true);
+    placeByDistrict();
+    renderAt(SEARCH, [therapist("a", "BRIGHTON BN3"), therapist("b", "BRIGHTON BN1"), therapist("c", "Hove BN3")]);
+    const here = await within(results()).findByRole("group", { name: "BN3 2 therapists" });
+    expect(within(here).getAllByRole("heading").map((h) => [h.tagName, h.textContent])).toEqual([
+      ["H2", "BN3 2 therapists"],
+      ["H3", "Therapist a"],
+      ["H3", "Therapist c"],
+    ]);
+    expect(names()).toEqual(["Therapist a", "Therapist c", "Therapist b"]);
   });
 
-  it("adds whoever joins the selected pin as more results load", async () => {
+  it("marks a selected pin's place in the list until the pin is activated again, raising the sheet halfway", async () => {
+    screenIs(false);
+    placeByDistrict();
+    renderAt(SEARCH, [therapist("a", "BRIGHTON BN3"), therapist("b", "BRIGHTON BN1"), therapist("c", "Hove BN3")]);
+    fireEvent.click(screen.getByRole("button", { name: "Show map" }));
+    const here = await within(results()).findByRole("group", { name: "BN3 2 therapists" });
+    const pin = screen.getByRole("button", { name: `Pin ${key(HOVE)}` });
+    fireEvent.click(pin);
+    expect(here.closest("li")?.getAttribute("aria-current")).toBe("true");
+    expect(results().dataset.position).toBe("half");
+    expect(screen.getByTestId("map").dataset.selected).toBe(key(HOVE));
+    fireEvent.click(pin);
+    expect(here.closest("li")?.hasAttribute("aria-current")).toBe(false);
+    expect(screen.getByTestId("map").dataset.selected).toBe("");
+    // A therapist on their own is marked just the same.
+    fireEvent.click(screen.getByRole("button", { name: `Pin ${key(BRIGHTON)}` }));
+    expect(screen.getByRole("link", { name: "Therapist b" }).closest("li")?.getAttribute("aria-current")).toBe("true");
+  });
+
+  it("scrolls a selected pin's place into view, unless it is in view already", async () => {
     screenIs(true);
-    vi.spyOn(api, "place").mockResolvedValue({ found: true, kind: "outcode", candidates: [{ lat: 50.83, lng: -0.15 }] });
-    renderAt(SEARCH, [therapist("a", "BRIGHTON BN3"), therapist("b", "Hove BN3")], [therapist("c", "Brighton BN3")]);
-    fireEvent.click(await screen.findByRole("button", { name: /^Pin / }));
-    const here = () => within(screen.getByRole("region", { name: "At this pin" })).getAllByRole("link").map((link) => link.textContent);
-    expect(here()).toEqual(["Therapist a", "Therapist b"]);
+    placeByDistrict();
+    renderAt(SEARCH, [therapist("a", "BRIGHTON BN1"), therapist("b", "Hove BN3"), therapist("c", "Hove BN3")]);
+    await within(results()).findByRole("group", { name: "Hove BN3 2 therapists" });
+    const scrollTo = vi.fn();
+    Object.defineProperty(list(), "scrollTo", { value: scrollTo });
+    const box = (top: number, bottom: number) => ({ top, bottom }) as DOMRect;
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+      if (this === list()) return box(100, 500);
+      return this.dataset.pin === key(HOVE) ? box(700, 900) : box(120, 300);
+    });
+    list().scrollTop = 50;
+    fireEvent.click(screen.getByRole("button", { name: `Pin ${key(BRIGHTON)}` }));
+    expect(scrollTo).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: `Pin ${key(HOVE)}` }));
+    expect(scrollTo).toHaveBeenLastCalledWith({ top: 50 + 700 - 100 - 8, behavior: "smooth" });
+    // A list the selection opens starts at the entry rather than gliding there.
+    fireEvent.click(screen.getByRole("button", { name: `Pin ${key(HOVE)}` }));
+    fireEvent.click(screen.getByRole("button", { name: "Hide results" }));
+    fireEvent.click(screen.getByRole("button", { name: `Pin ${key(HOVE)}` }));
+    expect(scrollTo).toHaveBeenLastCalledWith({ top: 50 + 700 - 100 - 8, behavior: "auto" });
+  });
+
+  it("gathers whoever joins a pin as more results load into its place in the list", async () => {
+    screenIs(true);
+    placeByDistrict();
+    renderAt(SEARCH, [therapist("a", "BRIGHTON BN3"), therapist("b", "BRIGHTON BN1")], [therapist("c", "Hove BN3"), therapist("d", "BRIGHTON BN3")]);
+    await within(results()).findByText("2 of 4");
+    expect(names()).toEqual(["Therapist a", "Therapist b"]);
     fireEvent.click(screen.getByRole("button", { name: "Load more" }));
-    await waitFor(() => expect(here()).toEqual(["Therapist a", "Therapist b", "Therapist c"]));
+    await within(results()).findByRole("group", { name: "BN3 3 therapists" });
+    expect(names()).toEqual(["Therapist a", "Therapist c", "Therapist d", "Therapist b"]);
   });
 
   it("rings the pin of the card in focus", async () => {

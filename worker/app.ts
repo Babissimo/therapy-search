@@ -1,12 +1,15 @@
 import { Hono, type Context } from "hono";
-import { LOCATION_MAX_LENGTH, canonicalLocation, placeQuery, type PlaceLookup, type PlaceOptions } from "../shared/location";
+import { LOCATION_MAX_LENGTH, canonicalLocation, nearestQuery, placeQuery, type NearestLookup, type PlaceLookup, type PlaceOptions } from "../shared/location";
 import { ALLOWED } from "../shared/options";
 import { InvalidParam, readParams, toQuery } from "../shared/query";
 import { UpstreamError, type UkcpClient } from "./ukcp/client";
 
 export type RateLimit = { limit(options: { key: string }): Promise<{ success: boolean }> };
 export type Env = { UPSTREAM_LIMIT: RateLimit; PLACE_LIMIT: RateLimit; SITE_URL: string };
-export type PlaceFinder = { lookup(text: string, options: PlaceOptions): Promise<PlaceLookup> };
+export type PlaceFinder = {
+  lookup(text: string, options: PlaceOptions): Promise<PlaceLookup>;
+  nearest(lat: number, lng: number): Promise<NearestLookup>;
+};
 type Ctx = Context<{ Bindings: Env }>;
 
 const SEARCH_MAX_AGE = 15 * 60;
@@ -17,6 +20,7 @@ const PLACE_MISSING_MAX_AGE = 24 * 60 * 60;
 export const UPSTREAM_DOWN = "UKCP's search isn't responding. Try again, or search on UKCP directly.";
 export const TOO_MANY = "Too many searches in a short time. Wait a minute and try again.";
 export const PLACE_DOWN = "Couldn't look up that place just now.";
+export const NEAREST_DOWN = "Couldn't find your postcode just now.";
 // UKCP builds slugs from names, so they can carry accents and apostrophes.
 const SLUG = /^[\p{L}\p{N}][\p{L}\p{M}\p{N}'’.-]{2,119}$/u;
 
@@ -81,6 +85,25 @@ export function createApp(clientFor: (env: Env) => UkcpClient, placesFor: (env: 
     return c.json(lookup, 200, { "Cache-Control": `public, max-age=${lookup.found ? PLACE_FOUND_MAX_AGE : PLACE_MISSING_MAX_AGE}` });
   });
 
+  app.get("/api/nearest", async (c) => {
+    const url = new URL(c.req.url);
+    const lat = coordinate(url.searchParams.get("lat"), "lat", 90);
+    const lng = coordinate(url.searchParams.get("lng"), "lng", 180);
+    const canonical = nearestQuery(lat, lng);
+    // The browser rounds the point before asking; anything finer is redirected, so it is never looked up or cached.
+    if (new URLSearchParams(url.search).toString() !== canonical) return c.redirect(`/api/nearest?${canonical}`, 301);
+    if (!(await allow(c, c.env.PLACE_LIMIT))) return c.json({ error: TOO_MANY }, 429);
+    let nearest: NearestLookup;
+    try {
+      nearest = await placesFor(c.env).nearest(lat, lng);
+    } catch (error) {
+      // The message names the service and status, never the point looked up.
+      console.error(error instanceof Error ? `${error.name}: ${error.message}` : "nearest lookup failed");
+      return c.json({ error: NEAREST_DOWN }, 502);
+    }
+    return c.json(nearest, 200, { "Cache-Control": `public, max-age=${nearest.found ? PLACE_FOUND_MAX_AGE : PLACE_MISSING_MAX_AGE}` });
+  });
+
   app.notFound((c) => c.json({ error: "Not found" }, 404));
 
   app.onError((error, c) => {
@@ -95,6 +118,12 @@ export function createApp(clientFor: (env: Env) => UkcpClient, placesFor: (env: 
   });
 
   return app;
+}
+
+function coordinate(text: string | null, param: string, limit: number): number {
+  const degrees = Number(text);
+  if (!text?.trim() || !Number.isFinite(degrees) || Math.abs(degrees) > limit) throw new InvalidParam(param, `${param} must be a number from -${limit} to ${limit}`);
+  return degrees;
 }
 
 /** Passes on a page only if it has the element its parser starts from, so an error page is never cached. */

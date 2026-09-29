@@ -65,3 +65,13 @@ export function settlementRank(type: string | undefined): number {
   const rank = SETTLEMENTS.indexOf(SETTLEMENT_ALIASES[type ?? ""] ?? type ?? "");
   return rank === -1 ? SETTLEMENTS.length : rank;
 }
+
+/** The postcode nearest the visitor, for a search from where they are. */
+export type NearestLookup = { found: true; postcode: string } | { found: false };
+
+/** The one query string for a nearest-postcode lookup, rounded to about 100 metres: near enough to place a postcode, not to pinpoint a home. */
+export function nearestQuery(lat: number, lng: number): string {
+  // Math.round turns a small negative into -0, which prints without its sign, so each point has one spelling.
+  const rounded = (degrees: number) => (Math.round(degrees * 1000) / 1000).toFixed(3);
+  return new URLSearchParams({ lat: rounded(lat), lng: rounded(lng) }).toString();
+}

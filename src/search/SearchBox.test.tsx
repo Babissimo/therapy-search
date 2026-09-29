@@ -1,0 +1,99 @@
+// @vitest-environment jsdom
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { emptyParams, type SearchParams } from "@shared/query";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { ApiError, api } from "@/lib/api";
+import { SearchBox } from "./SearchBox";
+import { NO_POSTCODE, REFUSED } from "./useLocate";
+import { useSearchDrafts } from "./useSearchDrafts";
+
+function Harness({ params, onChange }: { params: SearchParams; onChange: (next: SearchParams) => void }) {
+  const drafts = useSearchDrafts(params, onChange);
+  return (
+    <>
+      <SearchBox params={params} drafts={drafts} />
+      <input aria-label="Keyword" value={drafts.keyword} onChange={(e) => drafts.setKeyword(e.target.value)} />
+    </>
+  );
+}
+
+const renderBox = (onChange = vi.fn()) =>
+  render(
+    <TooltipProvider>
+      <Harness params={emptyParams()} onChange={onChange} />
+    </TooltipProvider>,
+  );
+
+/** Gives the page a geolocation that answers each request with `answer`. */
+function geolocation(answer: (ok: PositionCallback, fail: PositionErrorCallback) => void) {
+  const getCurrentPosition = vi.fn((ok: PositionCallback, fail?: PositionErrorCallback | null) => answer(ok, fail!));
+  Object.defineProperty(navigator, "geolocation", { value: { getCurrentPosition }, configurable: true });
+  return getCurrentPosition;
+}
+const at = (latitude: number, longitude: number) => (ok: PositionCallback) => ok({ coords: { latitude, longitude } } as GeolocationPosition);
+const failing = (code: number) => (_: PositionCallback, fail: PositionErrorCallback) => fail({ code } as GeolocationPositionError);
+
+const locate = () => fireEvent.click(screen.getByRole("button", { name: "Use my location" }));
+const location = () => screen.getByRole<HTMLInputElement>("textbox", { name: "Location" });
+
+afterEach(() => {
+  Reflect.deleteProperty(navigator, "geolocation");
+  vi.restoreAllMocks();
+});
+
+describe("SearchBox", () => {
+  it("searches the postcode nearest the visitor, with the typed keyword", async () => {
+    geolocation(at(50.82614, -0.15987));
+    const nearest = vi.spyOn(api, "nearest").mockResolvedValue({ found: true, postcode: "BN3 1FG" });
+    const onChange = vi.fn();
+    renderBox(onChange);
+    fireEvent.change(location(), { target: { value: "Leeds" } });
+    fireEvent.change(screen.getByRole("textbox", { name: "Keyword" }), { target: { value: "grief" } });
+    locate();
+    await waitFor(() => expect(onChange).toHaveBeenCalledOnce());
+    expect(nearest).toHaveBeenCalledWith(50.82614, -0.15987);
+    expect(onChange.mock.calls[0]?.[0].text).toMatchObject({ Location: "BN3 1FG", KeywordFilter: "grief" });
+    expect(location().value).toBe("BN3 1FG");
+  });
+
+  it("says so when the browser won't share the position, until the box is typed in", async () => {
+    geolocation(failing(1));
+    renderBox();
+    locate();
+    expect((await screen.findByRole("alert")).textContent).toBe(REFUSED);
+    fireEvent.change(location(), { target: { value: "L" } });
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("says so when no UK postcode is near", async () => {
+    geolocation(at(48.85, 2.35));
+    vi.spyOn(api, "nearest").mockResolvedValue({ found: false });
+    const onChange = vi.fn();
+    renderBox(onChange);
+    locate();
+    expect((await screen.findByRole("alert")).textContent).toBe(NO_POSTCODE);
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("passes on the Worker's reason when the lookup fails", async () => {
+    geolocation(at(50.826, -0.16));
+    vi.spyOn(api, "nearest").mockRejectedValue(new ApiError(502, "Couldn't find your postcode just now."));
+    renderBox();
+    locate();
+    expect((await screen.findByRole("alert")).textContent).toBe("Couldn't find your postcode just now.");
+  });
+
+  it("ignores a second press while the first is locating", () => {
+    const getCurrentPosition = geolocation(() => {});
+    renderBox();
+    locate();
+    locate();
+    expect(getCurrentPosition).toHaveBeenCalledOnce();
+  });
+
+  it("offers no button where the browser can't locate", () => {
+    renderBox();
+    expect(screen.queryByRole("button", { name: "Use my location" })).toBeNull();
+  });
+});
