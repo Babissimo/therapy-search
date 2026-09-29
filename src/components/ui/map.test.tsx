@@ -10,10 +10,10 @@ afterEach(() => vi.unstubAllGlobals());
 describe("tileSource", () => {
   it("uses CARTO's light tiles when there is a key, and its dark tiles in the dark theme", () => {
     const { url, attribution } = tileSource("k&y");
-    expect(url).toBe("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png?key=k%26y");
+    expect(url).toBe("https://basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}{r}.png?key=k%26y");
     expect(attribution).toContain("OpenStreetMap");
     expect(attribution).toContain("CARTO");
-    expect(tileSource("k", true).url).toBe("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png?key=k");
+    expect(tileSource("k", true).url).toBe("https://basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png?key=k");
   });
 
   it("falls back to OpenStreetMap's tiles without one, in either theme", () => {
