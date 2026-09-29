@@ -145,7 +145,7 @@ Each office card holds a still map centred on that office, the therapist's photo
 | Result card | `Card` with `Avatar` (photo or initials) and `Badge` tags |
 | Paging | `Pagination` |
 | Loading | `Skeleton` cards |
-| Profile sections | `Card`s with `Separator`s |
+| Profile sections | Headed sections with a `Separator` between each; offices as `Card`s |
 | Contact details | A header that stays in view, listing each way to reach the therapist by an icon |
 | Unofficial notice | The about text, shown from the site's name |
 

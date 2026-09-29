@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, type ReactNode } from "react";
+import { Fragment, lazy, Suspense, useEffect, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Check, ChevronLeft, ExternalLink } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router";
@@ -9,6 +9,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api";
 import { ContactList } from "./ContactList";
@@ -80,6 +81,7 @@ export function ProfileBody({ slug, back, close }: { slug: string } & Exits) {
   const matches = matchingTags(profile, isMatch);
   const priced = profile.offices.filter((office) => office.cost);
   const languages: ProfileSection = { heading: "Languages", paragraphs: [], items: profile.languages, details: [] };
+  const aside = profile.languages.length > 0 ? [languages, ...profile.practical] : profile.practical;
   return (
     <article className="@container space-y-8">
       <StickyHeader back={back} close={close}>
@@ -99,25 +101,26 @@ export function ProfileBody({ slug, back, close }: { slug: string } & Exits) {
       </StickyHeader>
 
       {(matches.length > 0 || priced.length > 0) && (
-        <div className="grid gap-4 @2xl:grid-cols-2">
-          {matches.length > 0 && (
-            <SectionView section={{ heading: "Matches your search", paragraphs: [], items: matches, details: [] }} isMatch={isMatch} announce={false} />
-          )}
-          {priced.length > 0 && <Fees offices={priced} />}
-        </div>
+        <>
+          <div className="grid gap-8 @2xl:grid-cols-2">
+            {matches.length > 0 && (
+              <SectionView section={{ heading: "Matches your search", paragraphs: [], items: matches, details: [] }} isMatch={isMatch} announce={false} />
+            )}
+            {matches.length > 0 && priced.length > 0 && <Separator className="@2xl:hidden" />}
+            {priced.length > 0 && <Fees offices={priced} />}
+          </div>
+          <Separator />
+        </>
       )}
 
       <div className="grid gap-8 @4xl:grid-cols-[minmax(0,1fr)_20rem]">
         <div className="space-y-8">
-          {profile.about.map((section, i) => (
-            <SectionView key={i} section={section} isMatch={isMatch} />
-          ))}
+          <Sections sections={profile.about} isMatch={isMatch} />
         </div>
-        <aside className="space-y-6">
-          {profile.languages.length > 0 && <SectionView section={languages} isMatch={isMatch} />}
-          {profile.practical.map((section, i) => (
-            <SectionView key={i} section={section} isMatch={isMatch} />
-          ))}
+        <aside className="space-y-8">
+          {/* In one column the aside follows the about sections, so it opens with a rule of its own. */}
+          {profile.about.length > 0 && aside.length > 0 && <Separator className="@4xl:hidden" />}
+          <Sections sections={aside} isMatch={isMatch} />
           {profile.offices.map((office, i) => (
             <OfficeCard key={i} office={office} profile={profile} />
           ))}
@@ -147,6 +150,16 @@ type SectionProps = {
   /** Tells screen readers which tags match, where the heading doesn't already say so. */
   announce?: boolean;
 };
+
+/** Sections one after another, with a rule between each. */
+function Sections({ sections, isMatch }: { sections: ProfileSection[]; isMatch: SectionProps["isMatch"] }) {
+  return sections.map((section, i) => (
+    <Fragment key={i}>
+      {i > 0 && <Separator />}
+      <SectionView section={section} isMatch={isMatch} />
+    </Fragment>
+  ));
+}
 
 function SectionView({ section, isMatch, announce = true }: SectionProps) {
   return (
