@@ -4,7 +4,6 @@ import { MemoryRouter, useLocation } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { TherapistCard } from "@shared/types";
 import { saveView } from "../viewMemory";
-import { milesBetween } from "./geo";
 import { createHighlight } from "./highlight";
 import MapPane, { type MapPaneProps } from "./MapPane";
 import type { Pin } from "./pins";
@@ -33,8 +32,11 @@ vi.mock("@/components/ui/map", async () => {
 vi.mock("./FitView", async () => {
   const { createElement } = await import("react");
   return {
-    FitView: ({ restored }: { restored?: { fitKey: string; pins: number } }) =>
-      createElement("div", { "data-testid": "fit", "data-restored": restored ? `${restored.fitKey} with ${restored.pins} pins` : "" }),
+    FitView: ({ restored }: { restored?: { fitKey: string; pins: number; reach?: number } }) =>
+      createElement("div", {
+        "data-testid": "fit",
+        "data-restored": restored ? `${restored.fitKey} with ${restored.pins} pins${restored.reach === undefined ? "" : ` to ${restored.reach} miles`}` : "",
+      }),
   };
 });
 const moveend = vi.hoisted(() => ({ current: () => {} }));
@@ -85,29 +87,32 @@ function pointerCanHover(hover: boolean) {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("MapPane", () => {
-  it("draws a circle around the centre out to the furthest pin", () => {
+  it("draws a circle around the centre out to the furthest of UKCP's distances, wherever the pins fall", () => {
     const lewes = { ...pin("c"), point: { lat: 50.87, lng: 0.01 } };
-    renderPane({ fitKey: "Location=Brighton", centre: BRIGHTON, pins: [pin("a", "b"), lewes] });
-    expect(Number(screen.getByTestId("circle").dataset.radius)).toBeCloseTo(milesBetween(BRIGHTON, lewes.point) * 1609.344);
+    renderPane({ fitKey: "Location=Brighton", centre: BRIGHTON, reachMiles: 0.4, pins: [pin("a", "b"), lewes] });
+    expect(Number(screen.getByTestId("circle").dataset.radius)).toBeCloseTo(0.4 * 1609.344);
     expect(screen.getByRole("region", { name: "Map of results" })).toBeTruthy();
   });
 
-  it("draws no circle without a centre, or without pins", () => {
-    renderPane({ pins: [pin("a")] });
+  it("draws no circle without a centre, or before any card is further than 0 miles", () => {
+    renderPane({ reachMiles: 2, pins: [pin("a")] });
     expect(screen.queryByTestId("circle")).toBeNull();
     cleanup();
-    renderPane({ fitKey: "Location=Brighton", centre: BRIGHTON });
+    renderPane({ fitKey: "Location=Brighton", centre: BRIGHTON, pins: [pin("a")] });
+    expect(screen.queryByTestId("circle")).toBeNull();
+    cleanup();
+    renderPane({ fitKey: "Location=Brighton", centre: BRIGHTON, reachMiles: 0, pins: [pin("a")] });
     expect(screen.queryByTestId("circle")).toBeNull();
   });
 
-  it("remembers its view and pins for the history entry, and opens there again for the same search", () => {
-    const { unmount } = renderPane({ fitKey: "Location=Leeds", entry: "remembered", pins: [pin("a"), pin("b", "c")] });
+  it("remembers its view, pins and circle for the history entry, and opens there again for the same search", () => {
+    const { unmount } = renderPane({ fitKey: "Location=Leeds", entry: "remembered", reachMiles: 2, pins: [pin("a"), pin("b", "c")] });
     expect(screen.getByTestId("map").dataset.view).toBe("54.5,-3@5");
     moveend.current();
     unmount();
     renderPane({ fitKey: "Location=Leeds", entry: "remembered" });
     expect(screen.getByTestId("map").dataset.view).toBe("51.5,-0.12@11");
-    expect(screen.getByTestId("fit").dataset.restored).toBe("Location=Leeds with 2 pins");
+    expect(screen.getByTestId("fit").dataset.restored).toBe("Location=Leeds with 2 pins to 2 miles");
   });
 
   it("frames a different search afresh", () => {

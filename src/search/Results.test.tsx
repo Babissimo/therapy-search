@@ -4,7 +4,7 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { useRef } from "react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { emptyParams, type SearchParams } from "@shared/query";
+import { BATCH_SIZE, emptyParams, type SearchParams } from "@shared/query";
 import type { SearchResult } from "@shared/types";
 import { api, ApiError } from "@/lib/api";
 import { LoadMore } from "./LoadMore";
@@ -15,14 +15,17 @@ import { useResults } from "./useResults";
 
 const TOO_MANY = "Too many searches in a short time. Wait a minute and try again.";
 
-/** Thirty results, twelve a page, page n's cards n tenths of a mile away. `fail` names a page that fails. */
-function answerPages({ total = 30, fail }: { total?: number; fail?: number } = {}) {
+/**
+ * UKCP answering each request for a batch with `size` results, batch n's cards n tenths of a mile away. Answering
+ * twelve, fewer than the site asks for, makes every Load more a request. `fail` names a batch that fails.
+ */
+function answerBatches({ total = 30, size = 12, fail }: { total?: number; size?: number; fail?: number } = {}) {
   return vi.spyOn(api, "search").mockImplementation(async (query): Promise<SearchResult> => {
     const q = new URLSearchParams(query);
     const page = Number(q.get("page") ?? 1);
     if (page === fail) throw new ApiError(429, TOO_MANY);
-    const from = (page - 1) * 12 + 1;
-    const to = Math.min(page * 12, total);
+    const from = (page - 1) * size + 1;
+    const to = Math.min(page * size, total);
     const therapists = Array.from({ length: to - from + 1 }, (_, i) => ({
       slug: `p${page}-${i}`,
       name: `Therapist ${page}-${i}`,
@@ -68,7 +71,7 @@ afterEach(() => vi.restoreAllMocks());
 
 describe("Results", () => {
   it("shows the nearest page, and adds the next with Load more", async () => {
-    answerPages();
+    answerBatches();
     renderResults(leeds);
     await screen.findByText("Nearest 12 of 30, up to 0.1 miles away");
     fireEvent.click(screen.getByRole("button", { name: "Load more" }));
@@ -76,8 +79,41 @@ describe("Results", () => {
     expect(cards()).toHaveLength(24);
   });
 
+  it("shows the next twelve from the batch in hand without asking UKCP again", async () => {
+    const search = answerBatches({ size: BATCH_SIZE });
+    renderResults(leeds);
+    await screen.findByText("Nearest 12 of 30, up to 0.1 miles away");
+    fireEvent.click(screen.getByRole("button", { name: "Load more" }));
+    await screen.findByText(/^Nearest 24 of 30/);
+    fireEvent.click(screen.getByRole("button", { name: "Load more" }));
+    await screen.findByText(/^Nearest 30 of 30/);
+    expect(search).toHaveBeenCalledOnce();
+  });
+
+  it("asks for the next batch once the one in hand runs out", async () => {
+    const search = answerBatches({ size: 24 });
+    renderResults(leeds);
+    fireEvent.click(await screen.findByRole("button", { name: "Load more" }));
+    await screen.findByText(/^Nearest 24 of 30/);
+    expect(search).toHaveBeenCalledOnce();
+    fireEvent.click(screen.getByRole("button", { name: "Load more" }));
+    await screen.findByText(/^Nearest 30 of 30/);
+    expect(search.mock.calls.map(([query]) => new URLSearchParams(query).get("page"))).toEqual([null, "2"]);
+  });
+
+  it("steps by the batches UKCP gives when it answers fewer than asked for", async () => {
+    answerBatches({ size: 18 });
+    renderResults(leeds);
+    await screen.findByText(/^Nearest 12 of 30/);
+    fireEvent.click(screen.getByRole("button", { name: "Load more" }));
+    await screen.findByText(/^Nearest 18 of 30/);
+    fireEvent.click(screen.getByRole("button", { name: "Load more" }));
+    await screen.findByText(/^Nearest 30 of 30/);
+    expect(cards()).toHaveLength(30);
+  });
+
   it("keeps Load more in reach of the keyboard while the next page loads, and says it is loading", async () => {
-    const search = answerPages();
+    const search = answerBatches();
     renderResults(leeds);
     const more = await screen.findByRole("button", { name: "Load more" });
     const answer = search.getMockImplementation();
@@ -103,7 +139,7 @@ describe("Results", () => {
   });
 
   it("stops offering more once everything is loaded", async () => {
-    answerPages();
+    answerBatches();
     renderResults(leeds);
     fireEvent.click(await screen.findByRole("button", { name: "Load more" }));
     await screen.findByText(/^Nearest 24 of 30/);
@@ -113,7 +149,7 @@ describe("Results", () => {
   });
 
   it("carries keyboard focus from Load more to the first card of the last page", async () => {
-    answerPages();
+    answerBatches();
     renderResults(leeds);
     const more = await screen.findByRole("button", { name: "Load more" });
     act(() => more.focus());
@@ -126,7 +162,7 @@ describe("Results", () => {
   });
 
   it("carries keyboard focus on to the first new entry once the last page's cards have found their pins", async () => {
-    answerPages({ total: 24 });
+    answerBatches({ total: 24 });
     const view = renderResults(leeds);
     const more = await screen.findByRole("button", { name: "Load more" });
     view.rerender(leeds, { placing: true });
@@ -142,7 +178,7 @@ describe("Results", () => {
   });
 
   it("leaves focus alone when Load more didn't have it", async () => {
-    answerPages();
+    answerBatches();
     renderResults(leeds);
     fireEvent.click(await screen.findByRole("button", { name: "Load more" }));
     await screen.findByText(/^Nearest 24 of 30/);
@@ -152,7 +188,7 @@ describe("Results", () => {
   });
 
   it("leaves focus where the visitor moved it while the last page loaded", async () => {
-    const search = answerPages({ total: 24 });
+    const search = answerBatches({ total: 24 });
     renderResults(leeds);
     const more = await screen.findByRole("button", { name: "Load more" });
     const answer = search.getMockImplementation();
@@ -165,19 +201,20 @@ describe("Results", () => {
     fireEvent.click(more);
     const elsewhere = screen.getByRole("link", { name: "Therapist 1-0" });
     act(() => elsewhere.focus());
+    await waitFor(() => expect(search).toHaveBeenCalledTimes(2));
     await act(async () => release());
     await screen.findByText(/^Nearest 24 of 24/);
     expect(document.activeElement).toBe(elsewhere);
   });
 
   it("counts plainly when the search has no location", async () => {
-    answerPages();
+    answerBatches();
     renderResults(emptyParams());
     expect(await screen.findByText("12 of 30")).toBeTruthy();
   });
 
   it("keeps what loaded when the next page fails, and tries again", async () => {
-    const search = answerPages({ fail: 2 });
+    const search = answerBatches({ fail: 2 });
     renderResults(leeds);
     fireEvent.click(await screen.findByRole("button", { name: "Load more" }));
     expect((await screen.findByRole("alert")).textContent).toContain(TOO_MANY);
@@ -187,7 +224,7 @@ describe("Results", () => {
   });
 
   it("carries keyboard focus from Load more to Try again when the next page fails", async () => {
-    answerPages({ fail: 2 });
+    answerBatches({ fail: 2 });
     renderResults(leeds);
     const more = await screen.findByRole("button", { name: "Load more" });
     act(() => more.focus());
@@ -197,7 +234,7 @@ describe("Results", () => {
   });
 
   it("keeps keyboard focus on the same button through a failed page and its retry", async () => {
-    const search = answerPages();
+    const search = answerBatches();
     renderResults(leeds);
     const more = await screen.findByRole("button", { name: "Load more" });
     search.mockRejectedValueOnce(new ApiError(429, TOO_MANY));
@@ -211,7 +248,7 @@ describe("Results", () => {
   });
 
   it("carries keyboard focus to the first new card when a retried last page arrives", async () => {
-    const search = answerPages({ total: 24 });
+    const search = answerBatches({ total: 24 });
     renderResults(leeds);
     const more = await screen.findByRole("button", { name: "Load more" });
     search.mockRejectedValueOnce(new ApiError(429, TOO_MANY));
@@ -223,13 +260,13 @@ describe("Results", () => {
   });
 
   it("offers UKCP's own search when the first page fails", async () => {
-    answerPages({ fail: 1 });
+    answerBatches({ fail: 1 });
     renderResults(leeds);
     expect((await screen.findByRole("link", { name: "Search on UKCP" })).getAttribute("href")).toContain("Location=Leeds");
   });
 
   it("starts again from the nearest page when the search changes", async () => {
-    answerPages();
+    answerBatches();
     const { rerender } = renderResults(leeds);
     fireEvent.click(await screen.findByRole("button", { name: "Load more" }));
     await screen.findByText(/^Nearest 24 of 30/);

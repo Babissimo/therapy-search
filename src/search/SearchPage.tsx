@@ -16,7 +16,7 @@ import { createHighlight } from "./map/highlight";
 import { layoutPins, type Pin } from "./map/pins";
 import { useCardLookups, useCentre } from "./map/usePlaces";
 import { LoadMore } from "./LoadMore";
-import { resultCount } from "./reach";
+import { reachMiles, resultCount } from "./reach";
 import { Results } from "./Results";
 import { ResultsPanel } from "./ResultsPanel";
 import { ResultsSheet, type SheetPosition } from "./ResultsSheet";
@@ -162,6 +162,7 @@ function SearchView({ params, onChange }: ViewProps) {
             fitKey={fitKey}
             entry={entry}
             centre={centre.point}
+            reachMiles={reachMiles(results.therapists)}
             centreSettled={centreSettled}
             pins={pins}
             placing={placing}

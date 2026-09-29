@@ -10,7 +10,10 @@ export type FlagParam = (typeof FLAG_PARAMS)[number];
 
 /** How far every location search reaches, in miles: the furthest UKCP's form offers. Results come nearest first, so the extra reach only lengthens the list. */
 export const SEARCH_MILES = 30;
+/** Results shown at a time, by "Load more". */
 export const PAGE_SIZE = 12;
+/** Results asked of UKCP at once, since pages asked for a minute apart come from different shuffles. */
+export const BATCH_SIZE = 40 * PAGE_SIZE;
 export const TEXT_MAX_LENGTH = 200;
 /** Our pages draw shuffle seeds from this many values, so shuffled searches share cache entries. */
 export const ORDER_SEED_POOL = 64;

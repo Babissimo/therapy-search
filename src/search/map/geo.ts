@@ -14,11 +14,6 @@ export function milesBetween(a: Point, b: Point): number {
   return 2 * EARTH_RADIUS_MILES * Math.asin(Math.sqrt(h));
 }
 
-/** How far from `centre` the furthest of `points` is, in miles. */
-export function furthestMiles(centre: Point, points: Point[]): number | undefined {
-  return points.length === 0 ? undefined : Math.max(...points.map((point) => milesBetween(centre, point)));
-}
-
 /** A place name can match several places: take the one nearest the search, or failing that the most settled. */
 export function choosePoint(lookup: Found, centre?: Point): Point | undefined {
   const candidates = [...lookup.candidates];

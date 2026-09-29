@@ -1,6 +1,6 @@
 import { writeFileSync } from "node:fs";
 import { parse } from "node-html-parser";
-import { emptyParams, type SearchParams } from "../shared/query";
+import { emptyParams, PAGE_SIZE, type SearchParams } from "../shared/query";
 import { redact } from "./redact";
 import { pause, scriptClient } from "./ukcp";
 
@@ -14,21 +14,22 @@ async function save(name: string, html: string) {
   await pause();
 }
 
-function search(change: (p: SearchParams) => void): SearchParams {
+/** A page of UKCP's default size, since the parsers read a card the same way in a batch of any size. */
+function search(change: (p: SearchParams) => void): Promise<string> {
   const params = emptyParams();
   change(params);
-  return params;
+  return client.search(params, PAGE_SIZE);
 }
 
 const form = parse(await client.searchPage()).querySelector("form#FindATherapistSearch");
 if (!form) throw new Error("the search page has no form#FindATherapistSearch");
 await save("search-form.html", form.outerHTML);
 
-const brighton = await client.search(search((p) => (p.text.Location = "Brighton")));
+const brighton = await search((p) => (p.text.Location = "Brighton"));
 await save("results-location.html", brighton);
-await save("results-no-location.html", await client.search(search((p) => (p.orderSeed = 42))));
-await save("results-unknown-location.html", await client.search(search((p) => (p.text.Location = "Nowhereville Zzz"))));
-await save("results-empty.html", await client.search(search((p) => (p.text.KeywordFilter = "zzqqxx-no-such-word"))));
+await save("results-no-location.html", await search((p) => (p.orderSeed = 42)));
+await save("results-unknown-location.html", await search((p) => (p.text.Location = "Nowhereville Zzz")));
+await save("results-empty.html", await search((p) => (p.text.KeywordFilter = "zzqqxx-no-such-word")));
 
 const slug = /href="therapist\/([^"]+)"/.exec(brighton)?.[1];
 if (!slug) throw new Error("the Brighton search returned no therapists");

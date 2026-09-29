@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { choosePoint, furthestMiles, milesBetween } from "./geo";
+import { choosePoint, milesBetween } from "./geo";
 
 const BRIGHTON = { lat: 50.8225, lng: -0.1372 };
 const CORNWALL_HAMLET = { lat: 50.352, lng: -4.947, type: "hamlet" };
@@ -9,15 +9,6 @@ describe("milesBetween", () => {
   it("measures great-circle distance in miles", () => {
     // Brighton to central London is about 47 miles as the crow flies.
     expect(milesBetween(BRIGHTON, { lat: 51.5074, lng: -0.1278 })).toBeCloseTo(47.3, 0);
-  });
-});
-
-describe("furthestMiles", () => {
-  it("measures to the furthest point, if there is one", () => {
-    const LONDON = { lat: 51.5074, lng: -0.1278 };
-    expect(furthestMiles(BRIGHTON, [BRIGHTON, LONDON, BRIGHTON_CITY])).toBeCloseTo(47.3, 0);
-    expect(furthestMiles(BRIGHTON, [BRIGHTON])).toBe(0);
-    expect(furthestMiles(BRIGHTON, [])).toBeUndefined();
   });
 });
 

@@ -120,7 +120,11 @@ describe("searchForm", () => {
     expect(form.get("OnlyProfilesWithPhotos")).toBe("false");
     expect(form.get("Distance")).toBe("30");
     expect(form.get("Pager.CurrentPage")).toBe("3");
-    expect(form.get("Pager.PageSize")).toBe("12");
+    expect(form.get("Pager.PageSize")).toBe("480");
     expect(form.get("OrderSeed")).toBe("7");
+  });
+
+  it("asks for a smaller page when told to", () => {
+    expect(searchForm(emptyParams(), 12).get("Pager.PageSize")).toBe("12");
   });
 });

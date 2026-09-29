@@ -1,6 +1,6 @@
 import "./dom";
 import { OPTIONS } from "../shared/options";
-import { emptyParams, PAGE_SIZE } from "../shared/query";
+import { BATCH_SIZE, emptyParams } from "../shared/query";
 import { sectionDrift } from "../shared/sections";
 import { parseOptions } from "../shared/ukcp/parseOptions";
 import { parseProfile } from "../shared/ukcp/parseProfile";
@@ -27,8 +27,9 @@ await pause();
 
 const params = emptyParams();
 params.text.Location = "London";
+// The site's own batch, so a cap on UKCP's page size shows here before it shortens anyone's list.
 const results = parseResults(await client.search(params));
-expect(results.total > PAGE_SIZE && results.therapists.length === PAGE_SIZE, `expected a full page of London results, got ${results.therapists.length} of ${results.total}`);
+expect(results.total > BATCH_SIZE && results.therapists.length === BATCH_SIZE, `expected a full batch of London results, got ${results.therapists.length} of ${results.total}`);
 expect(results.locationSearched !== undefined, "the London search reported no resolved location");
 await pause();
 
