@@ -8,6 +8,7 @@ import { emptyParams, type SearchParams } from "@shared/query";
 import type { SearchResult } from "@shared/types";
 import { api, ApiError } from "@/lib/api";
 import { LoadMore } from "./LoadMore";
+import type { Pin } from "./map/pins";
 import { Results } from "./Results";
 import { withText } from "./state";
 import { useResults } from "./useResults";
@@ -33,28 +34,31 @@ function answerPages({ total = 30, fail }: { total?: number; fail?: number } = {
   });
 }
 
-function Harness({ params }: { params: SearchParams }) {
+/** The pins and whether they are still being placed, as the search page would pass them. */
+type Placing = { pins?: Pin[]; placing?: boolean };
+
+function Harness({ params, pins, placing }: { params: SearchParams } & Placing) {
   const results = useResults(params);
   const listRef = useRef<HTMLUListElement>(null);
   return (
     <>
-      <Results params={params} results={results} listRef={listRef} />
-      <LoadMore results={results} listRef={listRef} />
+      <Results params={params} results={results} listRef={listRef} pins={pins} />
+      <LoadMore results={results} listRef={listRef} placing={placing} />
     </>
   );
 }
 
 function renderResults(params: SearchParams) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  const ui = (next: SearchParams) => (
+  const ui = (next: SearchParams, placing: Placing = {}) => (
     <QueryClientProvider client={client}>
       <MemoryRouter>
-        <Harness params={next} />
+        <Harness params={next} {...placing} />
       </MemoryRouter>
     </QueryClientProvider>
   );
   const view = render(ui(params));
-  return { rerender: (next: SearchParams) => view.rerender(ui(next)) };
+  return { rerender: (next: SearchParams, placing?: Placing) => view.rerender(ui(next, placing)) };
 }
 
 const leeds = withText(emptyParams(), "Location", "Leeds");
@@ -119,6 +123,22 @@ describe("Results", () => {
     fireEvent.click(more);
     await screen.findByText(/^Nearest 30 of 30/);
     expect(document.activeElement).toBe(screen.getByRole("link", { name: "Therapist 3-0" }));
+  });
+
+  it("carries keyboard focus on to the first new entry once the last page's cards have found their pins", async () => {
+    answerPages({ total: 24 });
+    const view = renderResults(leeds);
+    const more = await screen.findByRole("button", { name: "Load more" });
+    view.rerender(leeds, { placing: true });
+    act(() => more.focus());
+    fireEvent.click(more);
+    await screen.findByText(/^Nearest 24 of 24/);
+    expect(document.activeElement).toBe(document.body);
+    const card = (slug: string) => ({ slug, name: `Therapist ${slug.slice(1)}`, initials: "T", tags: [] });
+    const pin = (...slugs: string[]): Pin => ({ key: slugs.join(), point: { lat: 53.8, lng: -1.55 }, therapists: slugs.map(card), kind: "outcode" });
+    // One of the new cards joins a card already listed, and the next two share a pin of their own.
+    view.rerender(leeds, { pins: [pin("p1-0", "p2-0"), pin("p2-1", "p2-2")] });
+    expect(document.activeElement).toBe(screen.getByRole("link", { name: "Therapist 2-1" }));
   });
 
   it("leaves focus alone when Load more didn't have it", async () => {

@@ -48,7 +48,7 @@ vi.mock("react-leaflet", () => ({
 
 const BRIGHTON = { lat: 50.82, lng: -0.14 };
 const therapist = (slug: string): TherapistCard => ({ slug, name: `Therapist ${slug}`, initials: "T", tags: [] });
-const pin = (...slugs: string[]): Pin => ({ key: slugs.join(" "), point: BRIGHTON, therapists: slugs.map((slug) => therapist(slug)) });
+const pin = (...slugs: string[]): Pin => ({ key: slugs.join(" "), point: BRIGHTON, therapists: slugs.map((slug) => therapist(slug)), kind: "outcode" });
 
 function Path() {
   return <output data-testid="path">{useLocation().pathname}</output>;
