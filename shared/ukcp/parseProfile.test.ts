@@ -10,6 +10,7 @@ describe("parseProfile on a captured page", () => {
   it("reads the header", () => {
     expect(p).toMatchObject({ slug: "Test-Therapist-1-TESTID01", name: "Test Therapist 1", location: "Testtown", email: "therapist@example.com" });
     expect(p.contactId).toMatch(/^\d+$/);
+    expect(p.emailInContact).toBe(true);
     expect([p.languages, p.social]).toEqual([[], []]);
   });
 
@@ -50,6 +51,11 @@ describe("parseProfile details", () => {
   it("offers no contact reveal when UKCP marks the profile as having none", () => {
     const p = parseProfile(page(`<div class="therapist-contacts-details" data-id="1" data-nodata="true"></div>`), "Jo-Bloggs-ABCDEFGH");
     expect(p.contactId).toBeUndefined();
+  });
+
+  it("notes whether UKCP shows the email among the contact details", () => {
+    const shows = (attrs: string) => parseProfile(page(`<div class="therapist-contacts-details" data-id="1" ${attrs}></div>`), "Jo-Bloggs-ABCDEFGH").emailInContact;
+    expect([shows(`data-email="true"`), shows("")]).toEqual([true, false]);
   });
 
   it("reads the address from a mailto link with a subject or a stray percent sign", () => {

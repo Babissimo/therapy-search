@@ -24,6 +24,7 @@ export function parseProfile(html: string, slug: string): Profile {
       .filter(Boolean),
     email: mailto ? mailtoAddress(mailto) : undefined,
     contactId: details && details.getAttribute("data-nodata") !== "true" ? (details.getAttribute("data-id") ?? undefined) : undefined,
+    emailInContact: doc.querySelector('.therapist-contacts-details[data-email="true"]') !== null,
     social: socialLinks(doc),
     about: sectionsIn(doc.querySelector(".profile-bio")),
     practical: sectionsIn(doc.querySelector(".profile-practical-information")),

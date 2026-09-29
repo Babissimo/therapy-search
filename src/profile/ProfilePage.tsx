@@ -1,8 +1,7 @@
-import { useEffect } from "react";
+import { useEffect, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronLeft } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router";
-import { ukcpProfileUrl } from "@shared/query";
 import type { Office, ProfileSection } from "@shared/types";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -12,19 +11,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api";
-import { ContactReveal } from "./ContactReveal";
+import { ContactList } from "./ContactList";
 
 /** A profile as a page of its own, for a visitor who followed a link to it. */
 export function ProfilePage({ slug }: { slug: string }) {
   useEffect(() => {
     window.scrollTo({ top: 0 });
   }, [slug]);
-  return (
-    <div className="space-y-4">
-      <BackButton />
-      <ProfileBody slug={slug} />
-    </div>
-  );
+  return <ProfileBody slug={slug} back={<BackButton />} />;
 }
 
 /** Back to wherever the visitor came from, usually their search, or to a new search when they arrived here directly. */
@@ -52,44 +46,49 @@ function BackButton() {
   );
 }
 
+/** The ways out of a profile: a page's goes above it, a drawer's closes it from the corner. */
+type Exits = { back?: ReactNode; close?: ReactNode };
+
 /** A therapist's profile, laid out by the width it is given, whether a page's or a drawer's. */
-export function ProfileBody({ slug }: { slug: string }) {
+export function ProfileBody({ slug, back, close }: { slug: string } & Exits) {
   const { data: profile, error, isPending } = useQuery({ queryKey: ["profile", slug], queryFn: () => api.profile(slug) });
 
-  if (isPending) return <Skeleton className="h-64 w-full rounded-xl" aria-busy />;
+  if (isPending) {
+    return (
+      <div className="space-y-4">
+        <StickyHeader back={back} close={close} />
+        <Skeleton className="h-64 w-full rounded-xl" aria-busy />
+      </div>
+    );
+  }
   if (error) {
     return (
-      <Alert variant="destructive">
-        <AlertDescription>{error.message}</AlertDescription>
-      </Alert>
+      <div className="space-y-4">
+        <StickyHeader back={back} close={close} />
+        <Alert variant="destructive">
+          <AlertDescription>{error.message}</AlertDescription>
+        </Alert>
+      </div>
     );
   }
 
   return (
     <article className="@container space-y-8">
-      <header className="flex flex-col gap-6 @lg:flex-row @lg:items-start">
-        <Avatar className="size-28 shrink-0">
-          <AvatarImage src={profile.photoUrl} alt="" />
-          <AvatarFallback className="text-2xl">{profile.initials}</AvatarFallback>
-        </Avatar>
-        <div className="space-y-3">
-          <h1 className="text-3xl font-semibold">{profile.name}</h1>
-          {profile.location && <p className="text-muted-foreground">{profile.location}</p>}
-          <div className="flex flex-wrap gap-2">
-            {profile.email && (
-              <Button asChild>
-                <a href={`mailto:${profile.email}`}>Email therapist</a>
-              </Button>
-            )}
-            <Button variant="outline" asChild>
-              <a href={ukcpProfileUrl(profile.slug)} target="_blank" rel="noreferrer">
-                View on UKCP
-              </a>
-            </Button>
+      <StickyHeader back={back} close={close}>
+        <div className="flex items-start gap-4">
+          <Avatar className="size-14 shrink-0 @lg:size-20">
+            <AvatarImage src={profile.photoUrl} alt="" />
+            <AvatarFallback className="@lg:text-xl">{profile.initials}</AvatarFallback>
+          </Avatar>
+          <div className="min-w-0 space-y-1.5">
+            <div>
+              <h1 className="text-2xl leading-tight font-semibold">{profile.name}</h1>
+              {profile.location && <p className="text-sm text-muted-foreground">{profile.location}</p>}
+            </div>
+            <ContactList profile={profile} />
           </div>
-          {profile.contactId && <ContactReveal id={profile.contactId} />}
         </div>
-      </header>
+      </StickyHeader>
 
       <div className="grid gap-8 @4xl:grid-cols-[minmax(0,1fr)_20rem]">
         <div className="space-y-8">
@@ -107,6 +106,20 @@ export function ProfileBody({ slug }: { slug: string }) {
         </aside>
       </div>
     </article>
+  );
+}
+
+/** Who the profile is and how to reach them, kept in view as the visitor reads on. */
+function StickyHeader({ back, close, children }: Exits & { children?: ReactNode }) {
+  return (
+    // A drawer is drawn in the popover colour, which the header matches so text scrolling beneath it stays hidden.
+    <header className="sticky top-0 z-10 space-y-2 border-b bg-background py-3 in-data-[slot=sheet-content]:bg-popover">
+      {back}
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0 flex-1">{children}</div>
+        {close}
+      </div>
+    </header>
   );
 }
 

@@ -7,7 +7,7 @@ import type { Profile } from "@shared/types";
 import { api, ApiError } from "@/lib/api";
 import { ProfilePage } from "./ProfilePage";
 
-const PROFILE: Profile = { slug: "Test-ABCDEFGH", name: "Test Therapist", initials: "TT", languages: [], social: [], about: [], practical: [], offices: [] };
+const PROFILE: Profile = { slug: "Test-ABCDEFGH", name: "Test Therapist", initials: "TT", languages: [], emailInContact: false, social: [], about: [], practical: [], offices: [] };
 
 function renderAt(entries: string[], result: Profile | ApiError = PROFILE) {
   const profile = vi.spyOn(api, "profile");
@@ -53,5 +53,13 @@ describe("ProfilePage's way back", () => {
     await screen.findByText("This profile isn't on UKCP any more.");
     fireEvent.click(screen.getByRole("button", { name: "Back to results" }));
     await screen.findByText("Search page");
+  });
+});
+
+describe("ProfilePage's header", () => {
+  it("lists the profile's email among the ways to reach them", async () => {
+    renderAt(["/therapist/Test-ABCDEFGH"], { ...PROFILE, email: "test@example.com" });
+    const email = await screen.findByRole("link", { name: "Email: test@example.com" });
+    expect(email.closest("header")).not.toBeNull();
   });
 });
