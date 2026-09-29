@@ -29,6 +29,12 @@ describe("api", () => {
     expect(fetch).toHaveBeenCalledWith("/api/place?q=BRIGHTON+BN3&centre=true");
   });
 
+  it("asks for the postcode nearest a point rounded to about 100 metres", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ found: true, postcode: "BN3 1FG" })));
+    await expect(api.nearest(50.82614, -0.15987)).resolves.toEqual({ found: true, postcode: "BN3 1FG" });
+    expect(fetch).toHaveBeenCalledWith("/api/nearest?lat=50.826&lng=-0.160");
+  });
+
   it("passes on the Worker's error for a place lookup", async () => {
     answer(JSON.stringify({ error: "Couldn't look up that place just now." }), 502);
     await expect(api.place("BN3")).rejects.toMatchObject({ status: 502, message: "Couldn't look up that place just now." });

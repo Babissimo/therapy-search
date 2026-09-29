@@ -30,6 +30,11 @@ export function AboutText() {
         asks them on your behalf, so they never see your IP address, and each answer is reused for every visitor.
       </p>
       <p>
+        "Use my location" asks your browser for your position, which it shares only if you allow it. The page rounds it to about 100 metres
+        before this site asks postcodes.io for the nearest postcode, which is then searched, and shown in the page's address, like one you
+        typed.
+      </p>
+      <p>
         If you're from UKCP, or have any concern about this site,{" "}
         <a className="underline" href={CONTACT_URL}>
           get in touch

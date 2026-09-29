@@ -9,6 +9,8 @@ export type SearchDrafts = {
   setKeyword: (keyword: string) => void;
   /** Searches for `next`, taking whatever is typed in the location and keyword boxes with it. */
   submit: (next: SearchParams) => void;
+  /** Searches `location`, putting it in the box in place of whatever is typed there, and takes the typed keyword with it. */
+  submitAt: (next: SearchParams, location: string) => void;
   /** Searches the typed location with no filters: the location places the search rather than narrowing it. */
   clear: () => void;
 };
@@ -23,6 +25,11 @@ export function useSearchDrafts(params: SearchParams, onChange: (next: SearchPar
     keyword,
     setKeyword,
     submit: (next) => onChange(withText(withText(next, "Location", location), "KeywordFilter", keyword)),
+    submitAt: (next, at) => {
+      // Set here as well, as a search the page already shows leaves the draft alone.
+      setLocation(at);
+      onChange(withText(withText(next, "Location", at), "KeywordFilter", keyword));
+    },
     clear: () => {
       setKeyword("");
       onChange(withFlag(withText(emptyParams(), "Location", location), "LocationSearchOutsideUK", params.flags.LocationSearchOutsideUK));

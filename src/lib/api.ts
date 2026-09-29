@@ -2,7 +2,7 @@ import { parseContact } from "@shared/ukcp/parseContact";
 import { parseProfile } from "@shared/ukcp/parseProfile";
 import { parseResults } from "@shared/ukcp/parseResults";
 import { ParseError } from "@shared/ukcp/text";
-import { placeQuery, type PlaceLookup, type PlaceOptions } from "@shared/location";
+import { nearestQuery, placeQuery, type NearestLookup, type PlaceLookup, type PlaceOptions } from "@shared/location";
 
 export const UNREADABLE = "UKCP's pages have changed, so this site can't read them yet. Search on UKCP directly.";
 
@@ -34,13 +34,16 @@ async function request<T>(url: string, read: (html: string) => T, init?: Request
   }
 }
 
+async function json<T>(url: string): Promise<T> {
+  const res = await fetch(url);
+  if (!res.ok) throw await failure(res);
+  return (await res.json()) as T;
+}
+
 export const api = {
   search: (query: string) => request(`/api/search${query ? `?${query}` : ""}`, parseResults),
   profile: (slug: string) => request(`/api/therapist/${encodeURIComponent(slug)}`, (html) => parseProfile(html, slug)),
   contact: (id: string) => request(`/api/contact/${encodeURIComponent(id)}`, parseContact, { method: "POST" }),
-  place: async (text: string, options: PlaceOptions = {}): Promise<PlaceLookup> => {
-    const res = await fetch(`/api/place?${placeQuery(text, options)}`);
-    if (!res.ok) throw await failure(res);
-    return (await res.json()) as PlaceLookup;
-  },
+  place: (text: string, options: PlaceOptions = {}) => json<PlaceLookup>(`/api/place?${placeQuery(text, options)}`),
+  nearest: (lat: number, lng: number) => json<NearestLookup>(`/api/nearest?${nearestQuery(lat, lng)}`),
 };

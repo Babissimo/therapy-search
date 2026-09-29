@@ -174,7 +174,7 @@ function MapToolbar({ params, onChange, drafts, wide }: ViewProps & { drafts: Se
   return (
     // Only the toolbar's own controls take the pointer; the map shows through the rest of it.
     <div className="pointer-events-none absolute inset-3 z-10 flex flex-col items-start gap-2 lg:right-auto lg:w-96">
-      <div className="pointer-events-auto flex w-full gap-2 rounded-xl border bg-background p-2 shadow-md">
+      <div className="pointer-events-auto flex w-full items-start gap-2 rounded-xl border bg-background p-2 shadow-md">
         <SearchBox params={params} drafts={drafts} className="min-w-0 flex-1" />
         {wide ? (
           <FiltersButton
