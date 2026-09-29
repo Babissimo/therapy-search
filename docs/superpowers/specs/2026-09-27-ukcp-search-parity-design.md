@@ -25,7 +25,7 @@ Out of scope for v1:
   - Send upstream only what a visitor's action on UKCP would send: one search POST per uncached search, one profile GET per opened profile, one contact POST per click. Never prefetch or crawl.
   - Identify ourselves in the `User-Agent` with a link to the site, so UKCP can see and contact us.
   - Cap uncached upstream requests per visitor IP (§4.3).
-- **Clearly unofficial.** A persistent notice that the site is not affiliated with UKCP, and a "View on UKCP" link on every profile.
+- **Clearly unofficial.** The site's name opens the about text, which says the site is not affiliated with UKCP, and every profile has a "View on UKCP" link.
 - **No health data at rest.** Search terms such as "Trauma" are special-category data under UK GDPR. The Worker logs no query strings or bodies, and cache keys never include the visitor's IP.
 
 ## 3. The UKCP interface
@@ -116,11 +116,11 @@ Browser (React + shadcn/ui)  ──/api──▶  Worker (Hono)  ──▶  www.
 
 ### 4.1 Front end
 
-Vite, React, Tailwind and shadcn/ui (Radix primitives), with React Router (v8, declarative mode) for the three routes (`/` search, `/therapist/:slug` profile, `/about`) and TanStack Query for fetching and loading states, with retries off so a failure never repeats a request to UKCP.
+Vite, React, Tailwind and shadcn/ui (Radix primitives), with React Router (v8, declarative mode) for the two routes (`/` search, `/therapist/:slug` profile) and TanStack Query for fetching and loading states, with retries off so a failure never repeats a request to UKCP.
 
 The search state lives in the page URL using UKCP's own parameter names (§3.2), with `page` for the page number, as UKCP does, so a search can be bookmarked or shared and maps one-to-one onto a UKCP URL. As on UKCP, checkboxes and the distance slider apply as soon as they change, text fields apply on Enter or the Search button, and any change returns to page 1. The visitor's `OrderSeed` is drawn once from a pool of 64 values and kept in `localStorage`, so the order stays stable while paging and shuffled searches still share cache entries. It is sent only when there is no location, since location searches are ordered by distance band.
 
-A switch in the header picks a light, dark or system theme, the last following `prefers-color-scheme`. A light or dark choice is kept in `localStorage`, and an inline script in `index.html` applies it before first paint so a dark page never flashes white.
+A switch beside the site's name picks a light, dark or system theme, the last following `prefers-color-scheme`. A light or dark choice is kept in `localStorage`, and an inline script in `index.html` applies it before first paint so a dark page never flashes white.
 
 | UKCP element | shadcn/ui |
 |---|---|
@@ -137,7 +137,7 @@ A switch in the header picks a light, dark or system theme, the last following `
 | Loading | `Skeleton` cards |
 | Profile sections | `Card`s with `Separator`s |
 | Show contact details | `Button` that swaps in the returned details |
-| Unofficial notice | Footer text and an about page |
+| Unofficial notice | The about text, shown from the site's name |
 
 ### 4.2 Worker API
 

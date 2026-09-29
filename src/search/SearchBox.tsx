@@ -1,5 +1,6 @@
+import { Search } from "lucide-react";
 import { TEXT_MAX_LENGTH, type SearchParams } from "@shared/query";
-import { Button } from "@/components/ui/button";
+import { IconButton } from "@/components/IconButton";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import type { SearchDrafts } from "./useSearchDrafts";
@@ -24,7 +25,9 @@ export function SearchBox({ params, drafts, className }: Props) {
         value={drafts.location}
         onChange={(e) => drafts.setLocation(e.target.value)}
       />
-      <Button type="submit">Search</Button>
+      <IconButton type="submit" label="Search">
+        <Search aria-hidden />
+      </IconButton>
     </form>
   );
 }

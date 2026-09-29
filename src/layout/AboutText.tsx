@@ -1,9 +1,9 @@
 import { CONTACT_URL } from "@/site";
 
-export function AboutPage() {
+/** What the site is and how it treats UKCP, the geocoders and visitors, shown from the site's name. */
+export function AboutText() {
   return (
-    <article className="max-w-2xl space-y-4">
-      <h1 className="text-2xl font-semibold">About this site</h1>
+    <>
       <p>
         This is an unofficial, simpler page for searching the{" "}
         <a className="underline" href="https://www.psychotherapy.org.uk/find-a-therapist/">
@@ -36,6 +36,6 @@ export function AboutPage() {
         </a>
         .
       </p>
-    </article>
+    </>
   );
 }
