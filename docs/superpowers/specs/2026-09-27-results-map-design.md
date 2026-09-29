@@ -67,21 +67,23 @@ For outside-UK searches (`LocationSearchOutsideUK`), which postcodes.io cannot a
 
 ### 4.1 Page layout
 
-- The search page fills the viewport below the site header, with the map filling the space the results leave. On this page `SiteLayout` drops its width cap, padding and footer; the footer's disclaimer closes the results list instead (§4.4). Other pages keep their layout.
+- The search page fills the viewport, with the map filling the space the results leave. There is no site header. On this page `SiteLayout` drops its width cap, padding and footer, and the site's name and the theme switch head the results instead (§4.2, §4.3). Other pages keep their layout, with those two in the footer.
+- The site's name is not a link. Resting the mouse on it shows the about text in a card; a click, tap or Enter pins the card open and moves focus into it, so touch and the keyboard reach its links.
 - From the `lg` breakpoint (1024px) the results sit in a panel beside the map (§4.2); below it, in a sheet over the map (§4.3). Both hold the same results component.
 - The map pane loads as its own chunk, so the results render without waiting for Leaflet; until it arrives the pane is a plain muted background.
-- The attribution control carries "© OpenStreetMap contributors © CARTO", as the tile terms require. The about page gains a data-sources line for postcodes.io (Ordnance Survey, Royal Mail and ONS data under the Open Government Licence) and Nominatim (OpenStreetMap).
+- The attribution control carries "© OpenStreetMap contributors © CARTO", as the tile terms require. The about text gains a data-sources line for postcodes.io (Ordnance Survey, Royal Mail and ONS data under the Open Government Licence) and Nominatim (OpenStreetMap).
 
 ### 4.2 Results panel (wide screens)
 
 - A 24rem panel down the left, beside the map rather than over it, so no pin hides behind it. It is an ordinary region, not a dialog: the map stays usable and focus is never trapped.
-- Its header gives the count (§4.4) and an icon button, "Hide results", that collapses it to a narrow strip holding a "Show results" icon button, giving the map the full width. Both name themselves in a tooltip and carry `aria-expanded` and `aria-controls`. The panel opens on every visit; its state is not stored. The map is told its size changed (Leaflet's `invalidateSize`) whenever the panel opens or closes.
+- It opens with the site's name and the theme switch (§4.1). Beneath them, its header gives the count (§4.4) and an icon button, "Hide results", that collapses the whole panel, name and switch included, to a narrow strip holding a "Show results" icon button, giving the map the full width. Both name themselves in a tooltip and carry `aria-expanded` and `aria-controls`. The panel opens on every visit; its state is not stored. The map is told its size changed (Leaflet's `invalidateSize`) whenever the panel opens or closes.
 - Hovering or focusing a card highlights its pin (§4.6).
 
 ### 4.3 Results sheet (narrow screens)
 
 - A sheet over the bottom of the map with three positions: peek (the sheet's header alone: its handle, the count and its button), half, and full (up to just below the search box, leaving a strip of map). It opens at full on a search, so a phone starts on the list, and at half on the prompt (§4.10), so the map shows beside it; it moves between the two as a search replaces the prompt or is cleared.
 - The header's button moves it: "Show map" lowers it to peek, and "Show list" raises it to full. Dragging the header moves it too, settling at the nearest position. Only the header drags; the list inside scrolls normally, so the two gestures never compete.
+- The site's name and the theme switch open its list (§4.1), and scroll away with it.
 - Like the panel, it is an ordinary region, and the map above it stays usable at every position.
 - It is the page's own component rather than shadcn's `Drawer`, whose underlying library, vaul, is no longer maintained.
 
@@ -95,7 +97,7 @@ For outside-UK searches (`LocationSearchOutsideUK`), which postcodes.io cannot a
 
 ### 4.5 Search and filters over the map
 
-- Along the top of the map sit the location box with its Search button and a "Filters" button showing how many filters are ticked (`TickedCount`), with the active-filter chips (`FilterChips`) beneath. On narrow screens the chips form one row that scrolls sideways.
+- Along the top of the map sit the location box with its Search icon button and a Filters icon button carrying on its corner how many filters are ticked (`TickedCount`), with the active-filter chips (`FilterChips`) beneath. Both icon buttons name themselves in a tooltip. On narrow screens the chips form one row that scrolls sideways.
 - On wide screens "Filters" opens the filter panel beneath the search box, floating over the map and scrolling within itself, with its "Refine your search" heading and close button on one line. It is closed on arrival. On narrow screens it opens the existing "Refine your search" sheet.
 - The filter panel keeps everything but the location box: "Clear all filters" (§4.10), keyword, "Search locations outside the UK" and the option groups. The location and keyword share one draft, so any change submits whatever is typed in either, as the filter panel does today.
 - Every location search reaches 30 miles, the furthest UKCP's form offers, and links to UKCP's own page ask for the same. There is no distance setting, and a `Distance` in an old link is ignored: results come nearest first, so the reach only lengthens the list, and the circle shows how far it goes (§4.7).
@@ -209,7 +211,7 @@ One pull request, whose commits build it in this order:
 4. The map components: the vendored `map.tsx` and its dependencies.
 5. The fixed 30-mile search (§4.5).
 6. The map-centred page: its layout, the results panel and sheet, the search and filters over the map, and the map pane with its circle, fit, themed tiles and attribution.
-7. The pins: pins, stacked pins, clusters, selection, card highlighting, the circle they reach, the unplaced lines and the about page's data sources.
+7. The pins: pins, stacked pins, clusters, selection, card highlighting, the circle they reach, the unplaced lines and the about text's data sources.
 8. The prompt (§4.10).
 9. The profile drawer (§4.11).
 

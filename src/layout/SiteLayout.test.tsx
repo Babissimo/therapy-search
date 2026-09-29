@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it } from "vitest";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -17,12 +17,16 @@ const at = (path: string | { pathname: string; state: unknown }) =>
   );
 
 describe("SiteLayout", () => {
-  it("closes a document page with the disclaimer", () => {
-    at("/about");
-    expect(screen.getByRole("contentinfo").textContent).toContain("Not affiliated with or endorsed by UKCP");
+  it("closes a document page with the site's name and theme switch", () => {
+    at("/therapist/Jo-ABCDEFGH");
+    const footer = screen.getByRole("contentinfo");
+    expect(within(footer).getByRole("button", { name: "Find a UKCP therapist" })).toBeTruthy();
+    expect(within(footer).getByRole("group", { name: "Theme" })).toBeTruthy();
+    // The page's own heading is its h1.
+    expect(screen.queryByRole("heading", { name: "Find a UKCP therapist" })).toBeNull();
   });
 
-  it("leaves the search page's disclaimer to its results", () => {
+  it("leaves the search page's name and theme switch to its results", () => {
     at("/?Location=Leeds");
     expect(screen.queryByRole("contentinfo")).toBeNull();
   });

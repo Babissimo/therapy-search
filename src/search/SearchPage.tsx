@@ -1,12 +1,13 @@
 import { MapPin, SlidersHorizontal, X } from "lucide-react";
-import { lazy, Suspense, useEffect, useId, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useId, useRef, useState, type ComponentProps } from "react";
 import { Link, useLocation } from "react-router";
 import { OPTIONS } from "@shared/options";
 import { SEARCH_MILES, toQuery, type SearchParams } from "@shared/query";
+import { IconButton } from "@/components/IconButton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { Disclaimer } from "@/layout/Disclaimer";
+import { Masthead } from "@/layout/Masthead";
 import { useMediaQuery } from "@/lib/useMediaQuery";
 import { cn } from "@/lib/utils";
 import { FilterChips } from "./FilterChips";
@@ -40,7 +41,8 @@ export function SearchPage() {
   const { params, error, update } = useSearchState();
   if (!params) {
     return (
-      <div className="m-4">
+      <div className="m-4 space-y-4">
+        <Masthead />
         <Alert variant="destructive">
           <AlertDescription>
             This search link isn't valid: {error?.message}.{" "}
@@ -49,7 +51,6 @@ export function SearchPage() {
             </Link>
           </AlertDescription>
         </Alert>
-        <Disclaimer className="mt-8 text-xs" />
       </div>
     );
   }
@@ -109,30 +110,33 @@ function SearchView({ params, onChange }: ViewProps) {
   const count = results.first?.total;
   const title = results.searchedPlace === undefined || count === undefined ? resultCount(count) : `${resultCount(count)} within your area`;
 
-  const list = (
-    <>
-      {searching ? (
-        <Results
-          params={params}
-          results={results}
-          listRef={listRef}
-          unplaced={unplaced}
-          selection={selected}
-          onClearSelection={() => setSelection(undefined)}
-          onHighlight={highlight.set}
-        />
-      ) : (
-        <SearchPrompt />
-      )}
-      <Disclaimer className="mt-8 text-xs" />
-    </>
+  const list = searching ? (
+    <Results
+      params={params}
+      results={results}
+      listRef={listRef}
+      unplaced={unplaced}
+      selection={selected}
+      onClearSelection={() => setSelection(undefined)}
+      onHighlight={highlight.set}
+    />
+  ) : (
+    <SearchPrompt />
   );
   const footer = <LoadMore results={results} listRef={listRef} />;
 
   return (
     <div className="flex min-h-0 flex-1">
       {wide && (
-        <ResultsPanel open={panelOpen} onOpenChange={setPanelOpen} title={title} scrollRef={scroll.ref} onScroll={scroll.save} footer={footer}>
+        <ResultsPanel
+          open={panelOpen}
+          onOpenChange={setPanelOpen}
+          title={title}
+          masthead={<Masthead className="border-b px-4 py-3" />}
+          scrollRef={scroll.ref}
+          onScroll={scroll.save}
+          footer={footer}
+        >
           {list}
         </ResultsPanel>
       )}
@@ -153,6 +157,7 @@ function SearchView({ params, onChange }: ViewProps) {
         <MapToolbar params={params} onChange={onChange} drafts={drafts} wide={wide} />
         {!wide && (
           <ResultsSheet position={sheet} onPositionChange={setSheet} title={title} scrollRef={scroll.ref} onScroll={scroll.save} footer={footer}>
+            <Masthead className="pb-3" />
             {list}
           </ResultsSheet>
         )}
@@ -172,17 +177,12 @@ function MapToolbar({ params, onChange, drafts, wide }: ViewProps & { drafts: Se
       <div className="pointer-events-auto flex w-full gap-2 rounded-xl border bg-background p-2 shadow-md">
         <SearchBox params={params} drafts={drafts} className="min-w-0 flex-1" />
         {wide ? (
-          <Button
-            type="button"
-            variant="outline"
+          <FiltersButton
+            ticked={ticked}
             aria-expanded={filtersOpen}
             aria-controls={filtersOpen ? filtersId : undefined}
             onClick={() => setFiltersOpen((open) => !open)}
-          >
-            <SlidersHorizontal aria-hidden />
-            Filters
-            <TickedCount count={ticked} />
-          </Button>
+          />
         ) : (
           <MobileFilters params={params} drafts={drafts} ticked={ticked} />
         )}
@@ -221,7 +221,10 @@ function SearchPrompt() {
       <MapPin aria-hidden className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
       <div className="space-y-2 text-sm">
         <p className="font-medium">Search a town, city or postcode to see the UKCP therapists within your area, nearest first.</p>
-        <p className="text-muted-foreground">Filters narrow the search by what therapists help with, how they work, the languages they speak and more.</p>
+        <p className="text-muted-foreground">
+          Filters <SlidersHorizontal aria-hidden className="inline size-3.5 align-[-0.125em]" /> narrow the search by what therapists help with, how
+          they work, the languages they speak and more.
+        </p>
       </div>
     </div>
   );
@@ -232,11 +235,7 @@ function MobileFilters({ params, drafts, ticked }: { params: SearchParams; draft
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
-        <Button variant="outline">
-          <SlidersHorizontal aria-hidden />
-          Filters
-          <TickedCount count={ticked} />
-        </Button>
+        <FiltersButton ticked={ticked} />
       </SheetTrigger>
       <SheetContent side="left" className="overflow-y-auto">
         <SheetHeader>
@@ -248,5 +247,15 @@ function MobileFilters({ params, drafts, ticked }: { params: SearchParams; draft
         </div>
       </SheetContent>
     </Sheet>
+  );
+}
+
+/** With the number of ticked filters on its corner. */
+function FiltersButton({ ticked, className, ...props }: Omit<ComponentProps<typeof IconButton>, "label"> & { ticked: number }) {
+  return (
+    <IconButton label="Filters" variant="outline" className={cn("relative", className)} {...props}>
+      <SlidersHorizontal aria-hidden />
+      <TickedCount count={ticked} className="absolute -top-1.5 -right-1.5 h-4 min-w-4 px-1 text-[0.625rem]" />
+    </IconButton>
   );
 }

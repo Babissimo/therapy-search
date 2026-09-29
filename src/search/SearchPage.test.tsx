@@ -274,17 +274,35 @@ describe("SearchPage", () => {
     expect(list().scrollTop).toBe(400);
   });
 
-  it("ends an invalid search link with the disclaimer too", () => {
+  it("heads an invalid search link with the site's name", () => {
     renderAt("/?OnlyProfilesWithPhotos=yes");
     expect(screen.getByRole("alert").textContent).toContain("This search link isn't valid");
-    expect(screen.getByText(/Not affiliated with or endorsed by UKCP/)).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 1, name: "Find a UKCP therapist" })).toBeTruthy();
   });
 
-  it("closes the results with the disclaimer", async () => {
+  it("heads the side bar with the site's name and theme switch, which hide with the results", async () => {
     screenIs(true);
     renderAt(SEARCH);
     await loaded();
-    expect(within(results()).getByText(/Not affiliated with or endorsed by UKCP/)).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 1, name: "Find a UKCP therapist" })).toBeTruthy();
+    expect(screen.getByRole("group", { name: "Theme" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Hide results" }));
+    expect(screen.queryByRole("heading", { level: 1 })).toBeNull();
+    expect(screen.queryByRole("group", { name: "Theme" })).toBeNull();
+  });
+
+  it("heads the list in the sheet with the site's name and theme switch on narrow screens", async () => {
+    screenIs(false);
+    renderAt(SEARCH);
+    await loaded();
+    expect(within(list()).getByRole("heading", { level: 1, name: "Find a UKCP therapist" })).toBeTruthy();
+    expect(within(list()).getByRole("group", { name: "Theme" })).toBeTruthy();
+  });
+
+  it("names the filters button's ticks for screen readers", async () => {
+    screenIs(true);
+    renderAt(`${SEARCH}&Languages=French`);
+    expect(await screen.findByRole("button", { name: "Filters, 1 ticked" })).toBeTruthy();
   });
 
   it("says which therapists the map can't place, and why", async () => {
