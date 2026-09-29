@@ -1,11 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
-import type { PlaceLookup } from "../shared/location";
+import { LOOKUP_VERSION, type PlaceLookup } from "../shared/location";
 import { createApp, NEAREST_DOWN, PLACE_DOWN, rateKey, TOO_MANY, UPSTREAM_DOWN, type Env, type PlaceFinder } from "./app";
 import { GeocodeError } from "./places/geocoder";
 import { UpstreamError, type UkcpClient } from "./ukcp/client";
 
 const RESULTS = `<span class="results-no">1-1 of 1 results</span>
 <div class="profile-listing"><a href="therapist/Jo-Bloggs-ABCDEFGH"><h2>Jo Bloggs</h2></a></div>`;
+const v = `v=${LOOKUP_VERSION}`;
 const FOUND: PlaceLookup = { found: true, kind: "outcode", candidates: [{ lat: 50.835, lng: -0.178 }] };
 
 function setup({ allow = true, allowPlaces = true, client = {} as Partial<UkcpClient>, places = {} as Partial<PlaceFinder> } = {}) {
@@ -139,7 +140,7 @@ describe("rateKey", () => {
 describe("GET /api/place", () => {
   it("returns a found place for 30 days, counted against the place limit only", async () => {
     const { request, finder, placeLimit, limit } = setup();
-    const res = await request("/api/place?q=BRIGHTON+BN3");
+    const res = await request(`/api/place?q=BRIGHTON+BN3&${v}`);
     expect([res.status, res.headers.get("Cache-Control")]).toEqual([200, "public, max-age=2592000"]);
     expect(await res.json()).toEqual(FOUND);
     expect(finder.lookup).toHaveBeenCalledWith("BRIGHTON BN3", { centre: false, outsideUK: false });
@@ -149,13 +150,13 @@ describe("GET /api/place", () => {
 
   it("keeps a miss for a day", async () => {
     const { request } = setup({ places: { lookup: vi.fn(async (): Promise<PlaceLookup> => ({ found: false, reason: "not-found" })) } });
-    const res = await request("/api/place?q=NOWHERE");
+    const res = await request(`/api/place?q=NOWHERE&${v}`);
     expect([res.status, res.headers.get("Cache-Control")]).toEqual([200, "public, max-age=86400"]);
   });
 
   it("passes the centre and outside-UK flags on", async () => {
     const { request, finder } = setup();
-    expect((await request("/api/place?q=PARIS&centre=true&outsideUK=true")).status).toBe(200);
+    expect((await request(`/api/place?q=PARIS&centre=true&outsideUK=true&${v}`)).status).toBe(200);
     expect(finder.lookup).toHaveBeenCalledWith("PARIS", { centre: true, outsideUK: true });
   });
 
@@ -163,7 +164,15 @@ describe("GET /api/place", () => {
     const { request, finder } = setup();
     const res = await request("/api/place?centre=false&q=brighton%20%20bn3");
     expect(res.status).toBe(301);
-    expect(res.headers.get("Location")).toBe("/api/place?q=BRIGHTON+BN3");
+    expect(res.headers.get("Location")).toBe(`/api/place?q=BRIGHTON+BN3&${v}`);
+    expect(finder.lookup).not.toHaveBeenCalled();
+  });
+
+  it("redirects a lookup from an older version to the current one", async () => {
+    const { request, finder } = setup();
+    const res = await request("/api/place?q=BRIGHTON&v=2000-01-01");
+    // Never kept, or a rollback would bounce between two versions until the entry expired.
+    expect([res.status, res.headers.get("Location"), res.headers.get("Cache-Control")]).toEqual([301, `/api/place?q=BRIGHTON&${v}`, "no-store"]);
     expect(finder.lookup).not.toHaveBeenCalled();
   });
 
@@ -175,7 +184,7 @@ describe("GET /api/place", () => {
 
   it("answers 429 over the place limit without looking anything up", async () => {
     const { request, finder } = setup({ allowPlaces: false });
-    const res = await request("/api/place?q=BRIGHTON");
+    const res = await request(`/api/place?q=BRIGHTON&${v}`);
     expect([res.status, (await res.json()).error]).toEqual([429, TOO_MANY]);
     expect(finder.lookup).not.toHaveBeenCalled();
   });
@@ -183,7 +192,7 @@ describe("GET /api/place", () => {
   it("answers 502, uncached, when a geocoder fails", async () => {
     const { request } = setup({ places: { lookup: vi.fn(async () => Promise.reject(new GeocodeError("api.postcodes.io answered 500"))) } });
     const log = vi.spyOn(console, "error").mockImplementation(() => {});
-    const res = await request("/api/place?q=BN3");
+    const res = await request(`/api/place?q=BN3&${v}`);
     expect([res.status, res.headers.get("Cache-Control"), (await res.json()).error]).toEqual([502, "no-store", PLACE_DOWN]);
     expect(log).toHaveBeenCalledWith("GeocodeError: api.postcodes.io answered 500");
   });
@@ -192,7 +201,7 @@ describe("GET /api/place", () => {
 describe("GET /api/nearest", () => {
   it("answers the postcode nearest a rounded point, which the edge may cache for 30 days", async () => {
     const { request, finder, placeLimit } = setup();
-    const res = await request("/api/nearest?lat=50.826&lng=-0.160");
+    const res = await request(`/api/nearest?lat=50.826&lng=-0.160&${v}`);
     expect([res.status, res.headers.get("Cache-Control")]).toEqual([200, "public, max-age=2592000"]);
     expect(await res.json()).toEqual({ found: true, postcode: "BN3 1FG" });
     expect(finder.nearest).toHaveBeenCalledWith(50.826, -0.16);
@@ -201,7 +210,7 @@ describe("GET /api/nearest", () => {
 
   it("keeps a point with no postcode near it for a day", async () => {
     const { request } = setup({ places: { nearest: vi.fn(async () => ({ found: false }) as const) } });
-    const res = await request("/api/nearest?lat=59.000&lng=-3.000");
+    const res = await request(`/api/nearest?lat=59.000&lng=-3.000&${v}`);
     expect([res.status, res.headers.get("Cache-Control")]).toEqual([200, "public, max-age=86400"]);
   });
 
@@ -209,7 +218,7 @@ describe("GET /api/nearest", () => {
     const { request, finder } = setup();
     const res = await request("/api/nearest?lat=50.82614&lng=-0.15987");
     expect(res.status).toBe(301);
-    expect(res.headers.get("Location")).toBe("/api/nearest?lat=50.826&lng=-0.160");
+    expect(res.headers.get("Location")).toBe(`/api/nearest?lat=50.826&lng=-0.160&${v}`);
     expect(finder.nearest).not.toHaveBeenCalled();
   });
 
@@ -223,7 +232,7 @@ describe("GET /api/nearest", () => {
 
   it("answers 429 over the place limit without looking anything up", async () => {
     const { request, finder } = setup({ allowPlaces: false });
-    const res = await request("/api/nearest?lat=50.826&lng=-0.160");
+    const res = await request(`/api/nearest?lat=50.826&lng=-0.160&${v}`);
     expect([res.status, (await res.json()).error]).toEqual([429, TOO_MANY]);
     expect(finder.nearest).not.toHaveBeenCalled();
   });
@@ -231,7 +240,7 @@ describe("GET /api/nearest", () => {
   it("answers 502, uncached, when postcodes.io fails, logging no position", async () => {
     const { request } = setup({ places: { nearest: vi.fn(async () => Promise.reject(new GeocodeError("api.postcodes.io answered 500"))) } });
     const log = vi.spyOn(console, "error").mockImplementation(() => {});
-    const res = await request("/api/nearest?lat=50.826&lng=-0.160");
+    const res = await request(`/api/nearest?lat=50.826&lng=-0.160&${v}`);
     expect([res.status, res.headers.get("Cache-Control"), (await res.json()).error]).toEqual([502, "no-store", NEAREST_DOWN]);
     expect(log).toHaveBeenCalledWith("GeocodeError: api.postcodes.io answered 500");
   });

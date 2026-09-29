@@ -146,11 +146,12 @@ When the visitor typed a location but UKCP searched "United Kingdom" (parity §3
 
 | Route | Upstream | Cache |
 |---|---|---|
-| `GET /api/place?q=<text>[&centre=true][&outsideUK=true]` | postcodes.io or Nominatim | 30 days when found; 1 day when not found or too general |
-| `GET /api/nearest?lat=<degrees>&lng=<degrees>` | postcodes.io | 30 days when found; 1 day when not found |
+| `GET /api/place?q=<text>[&centre=true][&outsideUK=true]&v=<version>` | postcodes.io or Nominatim | 30 days when found; 1 day when not found or too general |
+| `GET /api/nearest?lat=<degrees>&lng=<degrees>&v=<version>` | postcodes.io | 30 days when found; 1 day when not found |
 
 - One string per request, so Workers Caching (parity §4.2) keys each string on its own and shares it across visitors, where a batch URL would rarely repeat. A page needs at most 13 lookups (12 cards and the centre), fewer once repeated strings are merged, sent in parallel over one HTTP/2 connection.
 - `q` must be 1–100 characters after trimming. The route canonicalises it with `shared/location.ts` and redirects to the canonical URL when it differs, as `/api/search` does (parity §4.2), so equal strings share one entry. The browser requests the canonical form in the first place.
+- `v` is `LOOKUP_VERSION` from `shared/location.ts`, part of both routes' canonical forms. Cached answers outlive a deploy (parity §4.2), so a change to what either route answers sets it to that day's date, never a value used before, and every lookup moves to new URLs rather than waiting up to 30 days for the old answers to expire. A tab still running older code is answered from the old version's entries while the edge holds them, and otherwise redirected to the current version.
 - `/api/nearest` answers the postcode nearest the visitor, for a search from where they are. Its canonical form rounds the point to three decimal places, about 100 metres, so neither the Worker nor any cache sees a finer position; a finer one is redirected before any lookup.
 - Upstream requests, each with a 5-second timeout:
 
