@@ -11,7 +11,9 @@ const FOUND: PlaceLookup = { found: true, kind: "outcode", candidates: [{ lat: 5
 function setup({ allow = true, allowPlaces = true, client = {} as Partial<UkcpClient>, places = {} as Partial<PlaceFinder> } = {}) {
   const limit = vi.fn(async () => ({ success: allow }));
   const placeLimit = vi.fn(async () => ({ success: allowPlaces }));
-  const env: Env = { UPSTREAM_LIMIT: { limit }, PLACE_LIMIT: { limit: placeLimit }, SITE_URL: "https://example.test" };
+  // The routes are given a client, so the session store is never reached.
+  const store = { get: async () => null, put: async () => {} };
+  const env: Env = { UPSTREAM_LIMIT: { limit }, PLACE_LIMIT: { limit: placeLimit }, UKCP_SESSION: store, SITE_URL: "https://example.test" };
   const stub = { search: vi.fn(async () => RESULTS), profile: vi.fn(), contact: vi.fn(), ...client } as unknown as UkcpClient;
   const finder: PlaceFinder = { lookup: vi.fn(async () => FOUND), nearest: vi.fn(async () => ({ found: true, postcode: "BN3 1FG" }) as const), ...places };
   const app = createApp(

@@ -2,10 +2,10 @@ import { Hono, type Context } from "hono";
 import { LOCATION_MAX_LENGTH, canonicalLocation, nearestQuery, placeQuery, type NearestLookup, type PlaceLookup, type PlaceOptions } from "../shared/location";
 import { ALLOWED } from "../shared/options";
 import { InvalidParam, readParams, toQuery } from "../shared/query";
-import { UpstreamError, type UkcpClient } from "./ukcp/client";
+import { UpstreamError, type SessionStore, type UkcpClient } from "./ukcp/client";
 
 export type RateLimit = { limit(options: { key: string }): Promise<{ success: boolean }> };
-export type Env = { UPSTREAM_LIMIT: RateLimit; PLACE_LIMIT: RateLimit; SITE_URL: string };
+export type Env = { UPSTREAM_LIMIT: RateLimit; PLACE_LIMIT: RateLimit; UKCP_SESSION: SessionStore; SITE_URL: string };
 export type PlaceFinder = {
   lookup(text: string, options: PlaceOptions): Promise<PlaceLookup>;
   nearest(lat: number, lng: number): Promise<NearestLookup>;

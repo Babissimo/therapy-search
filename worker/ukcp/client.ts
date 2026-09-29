@@ -1,10 +1,19 @@
 import { BATCH_SIZE, FLAG_PARAMS, MULTI_PARAMS, SEARCH_MILES, UKCP_ORIGIN, type SearchParams } from "../../shared/query";
 const SESSION_TTL_MS = 20 * 60 * 1000;
+// A failure this soon after a session's fetch more likely lies with the request than its server.
+const DROP_AFTER_MS = 60 * 1000;
+const SESSION_KEY = "session";
 const TIMEOUT_MS = 10_000;
 const TOKEN = /<input[^>]*name="__RequestVerificationToken"[^>]*value="([^"]+)"/;
 
 export type Fetch = (url: string, init?: RequestInit) => Promise<Response>;
 type Session = { cookie: string; token: string; fetchedAt: number };
+
+/** Where isolates share the session, so each need not fetch UKCP's 245 KB search page for its own: the site's KV namespace. */
+export type SessionStore = {
+  get(key: string): Promise<string | null>;
+  put(key: string, value: string, options: { expirationTtl: number }): Promise<void>;
+};
 
 export class UpstreamError extends Error {
   override name = "UpstreamError";
@@ -18,17 +27,23 @@ export class UpstreamError extends Error {
 
 /**
  * Talks to UKCP the way its own pages do. One instance lives per Worker isolate and reuses the
- * anti-forgery session; only plain strings are kept between requests, never in-flight promises,
- * because Workers cannot share I/O across requests.
+ * anti-forgery session, taking it from the store when another isolate has one; only plain strings
+ * are kept between requests, never in-flight promises, because Workers cannot share I/O across requests.
  */
 export class UkcpClient {
   #session?: Session;
+  #dropped?: string;
+  readonly #store?: SessionStore;
+  readonly #now: () => number;
 
   constructor(
     private readonly fetchImpl: Fetch,
     private readonly userAgent: string,
-    private readonly now: () => number = Date.now,
-  ) {}
+    { store, now = Date.now }: { store?: SessionStore; now?: () => number } = {},
+  ) {
+    this.#store = store;
+    this.#now = now;
+  }
 
   /** The search page's HTML, from which the scripts read UKCP's option lists. */
   async searchPage(): Promise<string> {
@@ -52,11 +67,15 @@ export class UkcpClient {
   }
 
   async #postWithSession(path: string, form: URLSearchParams): Promise<string> {
+    let session: Session | undefined;
     try {
-      return await this.#post(path, form, await this.#getSession());
+      session = await this.#getSession();
+      return await this.#post(path, form, session);
     } catch (error) {
-      if (!(error instanceof UpstreamError && error.status === 400)) throw error;
-      return this.#post(path, form, await this.#getSession({ renew: true }));
+      if (error instanceof UpstreamError && error.status === 400) return this.#post(path, form, await this.#getSession({ renew: true }));
+      // Its ARRAffinity cookie ties a session to one of UKCP's servers, so a failing server's session is not used again.
+      if (session && serverFailed(error) && this.#now() - session.fetchedAt >= DROP_AFTER_MS) this.#dropped = session.token;
+      throw error;
     }
   }
 
@@ -76,8 +95,12 @@ export class UkcpClient {
   }
 
   async #getSession({ renew = false } = {}): Promise<Session> {
-    const current = this.#session;
-    if (!renew && current && this.now() - current.fetchedAt < SESSION_TTL_MS) return current;
+    if (!renew) {
+      const fresh = (session?: Session) =>
+        session && session.token !== this.#dropped && this.#now() - session.fetchedAt < SESSION_TTL_MS ? session : undefined;
+      const current = fresh(this.#session) ?? fresh(await this.#sharedSession());
+      if (current) return (this.#session = current);
+    }
     const res = await this.#fetch("/find-a-therapist/");
     const cookie = res.headers
       .getSetCookie()
@@ -85,8 +108,25 @@ export class UkcpClient {
       .join("; ");
     const token = TOKEN.exec(await bodyOf(res))?.[1];
     if (!token || !cookie) throw new UpstreamError(502, "search page had no anti-forgery token or cookie");
-    this.#session = { cookie, token, fetchedAt: this.now() };
+    this.#session = { cookie, token, fetchedAt: this.#now() };
+    await this.#shareSession(this.#session);
     return this.#session;
+  }
+
+  // The store only saves fetches, so when it fails the isolate fetches and keeps a session of its own.
+  async #sharedSession(): Promise<Session | undefined> {
+    try {
+      const value = await this.#store?.get(SESSION_KEY);
+      return value ? (JSON.parse(value) as Session) : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  async #shareSession(session: Session): Promise<void> {
+    try {
+      await this.#store?.put(SESSION_KEY, JSON.stringify(session), { expirationTtl: SESSION_TTL_MS / 1000 });
+    } catch {}
   }
 
   #fetch(path: string, init: RequestInit = {}): Promise<Response> {
@@ -94,6 +134,11 @@ export class UkcpClient {
     headers.set("User-Agent", this.userAgent);
     return this.fetchImpl(UKCP_ORIGIN + path, { ...init, headers, signal: AbortSignal.timeout(TIMEOUT_MS) });
   }
+}
+
+/** What a failing server gives, as against a rejected token. */
+function serverFailed(error: unknown): boolean {
+  return (error instanceof UpstreamError && error.status >= 500) || (error as { name?: unknown } | null)?.name === "TimeoutError";
 }
 
 async function bodyOf(res: Response): Promise<string> {
