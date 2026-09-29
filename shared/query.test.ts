@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { emptyParams, InvalidParam, readParams, toQuery, ukcpSearchUrl, type AllowedValues } from "./query";
 
 const read = (query: string, allowed?: AllowedValues) => readParams(new URLSearchParams(query), allowed);
-const canonical = (query: string, options?: { withSeed?: boolean }) => toQuery(read(query), options);
+const canonical = (query: string) => toQuery(read(query));
 
 describe("canonical query", () => {
   it("puts keys in a fixed order, sorts and de-duplicates values, trims text and drops defaults", () => {
@@ -21,14 +21,9 @@ describe("canonical query", () => {
     expect(canonical("HelpWith=Trauma,%20Anxiety,Trauma,")).toBe("HelpWith=Anxiety%2C+Trauma");
   });
 
-  it("ignores keys UKCP's form does not have", () => {
+  it("ignores keys UKCP's form does not have, and its shuffle seed, which UKCP ignores", () => {
     expect(canonical("utm_source=newsletter&Location=Leeds")).toBe("Location=Leeds");
-  });
-
-  it("sends the seed only when asked and only without a location", () => {
     expect(canonical("OrderSeed=7&HelpWithAdvanced=Anxiety")).toBe("HelpWithAdvanced=Anxiety");
-    expect(canonical("OrderSeed=7&HelpWithAdvanced=Anxiety", { withSeed: true })).toBe("HelpWithAdvanced=Anxiety&OrderSeed=7");
-    expect(canonical("OrderSeed=7&Location=Leeds", { withSeed: true })).toBe("Location=Leeds");
   });
 
   it("is empty for the default search", () => {
@@ -41,9 +36,6 @@ describe("readParams rejects what UKCP's form could not send", () => {
     ["page=0", "page"],
     ["OnlyProfilesWithPhotos=yes", "OnlyProfilesWithPhotos"],
     [`Location=${"x".repeat(201)}`, "Location"],
-    ["OrderSeed=abc", "OrderSeed"],
-    ["OrderSeed=0", "OrderSeed"],
-    ["OrderSeed=65", "OrderSeed"],
   ])("%s", (query, param) => {
     expect(() => read(query)).toThrow(expect.objectContaining({ name: "InvalidParam", param }));
   });

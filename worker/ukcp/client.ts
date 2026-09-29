@@ -113,6 +113,5 @@ export function searchForm(params: SearchParams, pageSize = BATCH_SIZE): URLSear
   for (const name of FLAG_PARAMS) form.set(name, String(params.flags[name]));
   form.set("Pager.CurrentPage", String(params.page));
   form.set("Pager.PageSize", String(pageSize));
-  if (params.orderSeed !== undefined) form.set("OrderSeed", String(params.orderSeed));
   return form;
 }

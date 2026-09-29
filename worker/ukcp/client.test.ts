@@ -106,12 +106,11 @@ describe("UkcpClient.contact", () => {
 });
 
 describe("searchForm", () => {
-  it("sends every field UKCP's form sends, with repeated keys for multiple values", () => {
+  it("sends the fields UKCP's form sends bar its shuffle seed, with repeated keys for multiple values", () => {
     const params = emptyParams();
     params.multi.Languages = ["French", "Spanish"];
     params.flags.OnlyWheelchairAccessible = true;
     params.page = 3;
-    params.orderSeed = 7;
 
     const form = searchForm(params);
 
@@ -121,7 +120,7 @@ describe("searchForm", () => {
     expect(form.get("Distance")).toBe("30");
     expect(form.get("Pager.CurrentPage")).toBe("3");
     expect(form.get("Pager.PageSize")).toBe("480");
-    expect(form.get("OrderSeed")).toBe("7");
+    expect(form.has("OrderSeed")).toBe(false);
   });
 
   it("asks for a smaller page when told to", () => {
