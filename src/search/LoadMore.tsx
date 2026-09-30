@@ -2,6 +2,7 @@ import { Loader2 } from "lucide-react";
 import { useEffect, useRef, type RefObject } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import type { SearchResults } from "./useResults";
 
 type Props = {
@@ -10,10 +11,12 @@ type Props = {
   listRef: RefObject<HTMLUListElement | null>;
   /** True while any loaded card's location is still being looked up. */
   placing?: boolean;
+  /** At the list's end, scrolling with it, rather than in a strip held beneath it. */
+  atEnd?: boolean;
 };
 
-/** The next page's button, for beneath the list, with the error from a failed page above it. */
-export function LoadMore({ results: { query }, listRef, placing = false }: Props) {
+/** The next page's button, with the error from a failed page above it. */
+export function LoadMore({ results: { query }, listRef, placing = false, atEnd = false }: Props) {
   // How many entries were listed when the button was pressed while focused, until that fetch settles.
   const focusFrom = useRef<number | null>(null);
   const pages = query.data?.pages.length;
@@ -29,7 +32,7 @@ export function LoadMore({ results: { query }, listRef, placing = false }: Props
   // A next page that failed is still to come, so this stays for its retry.
   if (!query.hasNextPage || query.isPlaceholderData) return null;
   return (
-    <div className="space-y-3 border-t bg-background p-4">
+    <div className={cn("space-y-3", atEnd ? "pt-4" : "border-t bg-background p-4")}>
       {query.isFetchNextPageError && (
         <Alert variant="destructive">
           <AlertDescription>{query.error?.message}</AlertDescription>

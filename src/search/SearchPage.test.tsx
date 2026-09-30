@@ -1069,13 +1069,22 @@ describe("SearchPage online", () => {
     expect(await screen.findByRole("dialog", { name: "Refine your search" })).toBeTruthy();
   });
 
-  it("keeps Load more beneath the list rather than at its end", async () => {
-    screenIs(false);
+  it.each([
+    { screen: "wide", wide: true },
+    { screen: "narrow", wide: false },
+  ])("puts Load more at the list's end, scrolling with it, and only beside the results on $screen screens", async ({ wide }) => {
+    screenIs(wide);
+    shortlist.add(therapist("a"));
     renderAt(GREEK);
     await loaded();
     const more = screen.getByRole("button", { name: "Load more" });
-    expect(results().contains(more)).toBe(true);
-    expect(list().contains(more)).toBe(false);
+    expect(list().contains(more)).toBe(true);
+    const last = within(results()).getAllByRole("link", { name: /^Therapist p/ }).at(-1)!;
+    expect(last.compareDocumentPosition(more) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const tab = screen.getByRole("tab", { name: /^Shortlist/ });
+    fireEvent.mouseDown(tab);
+    fireEvent.click(tab);
+    expect(screen.queryByRole("button", { name: "Load more" })).toBeNull();
   });
 
   it("returns to the same place in the list after Back from a profile", async () => {
