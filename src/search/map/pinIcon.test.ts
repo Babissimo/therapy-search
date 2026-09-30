@@ -4,7 +4,8 @@ import type { TherapistCard } from "@shared/types";
 import { centreIcon, pinIcon } from "./pinIcon";
 
 const card = (slug: string, extra: Partial<TherapistCard> = {}): TherapistCard => ({ slug, name: slug, initials: slug.toUpperCase(), tags: [], ...extra });
-const html = (therapists: TherapistCard[]) => pinIcon(therapists).options.html as HTMLElement;
+const html = (therapists: TherapistCard[], shortlisted?: string[]) => pinIcon(therapists, new Set(shortlisted)).options.html as HTMLElement;
+const badged = (root: HTMLElement) => root.querySelector('[title="On your shortlist"]') !== null;
 
 describe("pinIcon", () => {
   it("shows one therapist's photo over their initials", () => {
@@ -54,6 +55,21 @@ describe("pinIcon", () => {
     const root = html(["ab", "cd", "ef", "gh"].map((slug) => card(slug)));
     expect(root.getAttribute("role")).toBe("img");
     expect(root.getAttribute("aria-label")).toBe("4 therapists here");
+  });
+
+  it("badges a shortlisted therapist's pin and names it so", () => {
+    const root = html([card("jo", { name: "Jo Cole", sessionTypes: "Remote" })], ["jo"]);
+    expect(badged(root)).toBe(true);
+    expect(root.getAttribute("aria-label")).toBe("Jo Cole, remote sessions only, on your shortlist");
+    expect(badged(html([card("jo")], ["al"]))).toBe(false);
+  });
+
+  it("leads a stack with its shortlisted therapists, badges it, and counts them in its name", () => {
+    const root = html(["ab", "cd", "ef", "gh"].map((slug) => card(slug)), ["gh", "cd"]);
+    expect([...root.querySelectorAll(".pin-avatar")].map((a) => a.textContent)).toEqual(["CD", "GH", "AB"]);
+    expect(badged(root)).toBe(true);
+    expect(root.getAttribute("aria-label")).toBe("4 therapists here, 2 on your shortlist");
+    expect(badged(html(["ab", "cd"].map((slug) => card(slug))))).toBe(false);
   });
 });
 

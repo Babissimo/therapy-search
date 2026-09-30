@@ -46,7 +46,7 @@ const NO_CENTRE = { settled: true };
 const REVEAL_GAP_PX = 8;
 
 /** What the map shows of the list that is open. */
-type MapView = Pick<MapPaneProps, "label" | "fitKey" | "centre" | "centreSettled" | "pins" | "placing">;
+type MapView = Pick<MapPaneProps, "label" | "fitKey" | "centre" | "centreSettled" | "pins" | "marksShortlist" | "placing">;
 
 export function SearchPage() {
   const { params, error, update } = useSearchState();
@@ -100,7 +100,7 @@ function SearchView({ params, onChange, wide }: ViewProps) {
   const shortlistPins = usePins(shortlisted, NO_CENTRE, false);
   const mapView: MapView = mapsShortlist
     ? { label: "Map of your shortlist", fitKey: `${fitKey} shortlist`, centreSettled: true, pins: shortlistPins.pins, placing: shortlistPins.placing }
-    : { label: "Map of results", fitKey, centre: centre.point, centreSettled, pins, placing };
+    : { label: "Map of results", fitKey, centre: centre.point, centreSettled, pins, marksShortlist: true, placing };
   // Kept by key, so the selection follows its pin as Load more adds to it; a new search clears it.
   const [selection, setSelection] = useState<{ fitKey: string; pinKey: string }>();
   const selected = selection?.fitKey === fitKey ? mapView.pins.find((pin) => pin.key === selection.pinKey) : undefined;

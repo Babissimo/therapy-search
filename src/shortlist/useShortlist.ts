@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useSyncExternalStore } from "react";
+import { createContext, useContext, useEffect, useMemo, useSyncExternalStore } from "react";
 import type { TherapistCard } from "@shared/types";
 import { browserStorage } from "@/lib/storage";
 import { createShortlistStore, type Shortlist, type ShortlistEntry, type ShortlistStore } from "./store";
@@ -23,6 +23,14 @@ const NOBODY: Shortlist = [];
 export function useShortlistIf(wanted: boolean): Shortlist {
   const store = useShortlistStore();
   return useSyncExternalStore(store.subscribe, () => (wanted ? store.get() : NOBODY));
+}
+
+const NO_SLUGS: ReadonlySet<string> = new Set();
+
+/** Who is on the shortlist while `wanted`, as a set that changes only as someone joins or leaves, not as it is reordered. */
+export function useShortlistedSlugs(wanted: boolean): ReadonlySet<string> {
+  const members = useShortlistIf(wanted).map((entry) => entry.card.slug).sort().join(" ");
+  return useMemo(() => (members ? new Set(members.split(" ")) : NO_SLUGS), [members]);
 }
 
 export function useShortlistEntry(slug: string): ShortlistEntry | undefined {
