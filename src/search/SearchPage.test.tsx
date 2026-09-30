@@ -380,12 +380,12 @@ describe("SearchPage", () => {
     expect(screen.getByRole("button", { name: "Filters, 1 ticked" })).toBeTruthy();
   });
 
-  it("opens the filters in a sheet on narrow screens", async () => {
+  it("opens the filters in a sheet from the right on narrow screens", async () => {
     screenIs(false);
     renderAt(SEARCH);
     await loaded();
     fireEvent.click(screen.getByRole("button", { name: "Filters" }));
-    expect(await screen.findByRole("dialog", { name: "Refine your search" })).toBeTruthy();
+    expect((await screen.findByRole("dialog", { name: "Refine your search" })).dataset.side).toBe("right");
   });
 
   it("searches from the box with the typed keyword", async () => {
@@ -1066,11 +1066,11 @@ describe("SearchPage online", () => {
     expect(body?.contains(within(filters()).getByRole("heading", { name: "Refine your search" }))).toBe(false);
   });
 
-  it("opens its filters in a sheet on narrow screens", async () => {
+  it("opens its filters in a sheet from the right on narrow screens", async () => {
     screenIs(false);
     renderAt(ONLINE);
     fireEvent.click(screen.getByRole("button", { name: "Filters" }));
-    expect(await screen.findByRole("dialog", { name: "Refine your search" })).toBeTruthy();
+    expect((await screen.findByRole("dialog", { name: "Refine your search" })).dataset.side).toBe("right");
   });
 
   it.each([
