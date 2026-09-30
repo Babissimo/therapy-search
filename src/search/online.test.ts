@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { emptyParams, type SearchParams } from "@shared/query";
-import { nearMeParams, onlineParams, onlineSearch, rememberPlace } from "./online";
+import { narrowsOnline, nearMeParams, onlineParams, onlineSearch, rememberPlace } from "./online";
 import { withFlag, withMulti, withText } from "./state";
 
 const sessions = (...values: string[]): SearchParams => values.reduce((p, v) => withMulti(p, "TypesOfSession", v, true), emptyParams());
@@ -30,6 +30,20 @@ describe("onlineSearch", () => {
 
   it("asks for no place, even one a link carries", () => {
     expect(onlineSearch(inLeeds).text.Location).toBe("");
+  });
+});
+
+describe("narrowsOnline", () => {
+  it("wants a filter besides the session types, which alone leave thousands", () => {
+    expect(narrowsOnline(emptyParams())).toBe(false);
+    expect(narrowsOnline(sessions("Online Therapy", "Telephone Therapy"))).toBe(false);
+    expect(narrowsOnline(withMulti(emptyParams(), "Languages", "Greek", true))).toBe(true);
+    expect(narrowsOnline(withText(emptyParams(), "KeywordFilter", "grief"))).toBe(true);
+    expect(narrowsOnline(withFlag(emptyParams(), "OnlyProfilesWithPhotos", true))).toBe(true);
+  });
+
+  it("takes neither a place nor a session type needing one as a filter", () => {
+    expect(narrowsOnline(withFlag(withText(sessions("Home Visits"), "Location", "Leeds"), "LocationSearchOutsideUK", true))).toBe(false);
   });
 });
 

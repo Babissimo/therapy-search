@@ -14,7 +14,8 @@ import { FiltersSection, MobileFilters } from "./Filters";
 import { ListPanels, ListTabs, type ListTab } from "./ListTabs";
 import { LoadMore } from "./LoadMore";
 import { ModeSwitch } from "./ModeSwitch";
-import { onlineSearch } from "./online";
+import { narrowsOnline, onlineSearch } from "./online";
+import { FiltersIcon, Prompt } from "./Prompt";
 import { Results } from "./Results";
 import { tickedFilters } from "./state";
 import { useResults } from "./useResults";
@@ -28,7 +29,9 @@ export function OnlineView({ params, onChange, wide }: Props) {
   const { key: entry } = useLocation();
   const drafts = useSearchDrafts(params, onChange);
   const search = onlineSearch(params);
-  const results = useResults(search);
+  // As Near me waits for a place, this waits for a filter, asking UKCP for nothing until then.
+  const searching = narrowsOnline(params);
+  const results = useResults(search, searching);
   useShortlistRefresh(results.therapists);
   const filtersId = useId();
   // Kept by search, so a new one shows its results whichever tab was open.
@@ -36,7 +39,7 @@ export function OnlineView({ params, onChange, wide }: Props) {
   const [tabChoice, setTabChoice] = useState<{ query: string; tab: ListTab }>();
   const tab = tabChoice?.query === query ? tabChoice.tab : "results";
   // The shortlist keeps its place apart from the results', under a key of its own.
-  const scroll = useRememberedScroll(tab === "results" ? entry : `${entry} shortlist`, tab === "shortlist" || !results.query.isPending);
+  const scroll = useRememberedScroll(tab === "results" ? entry : `${entry} shortlist`, tab === "shortlist" || !searching || !results.query.isPending);
   const listRef = useRef<HTMLUListElement>(null);
 
   const toolbar = (
@@ -57,7 +60,7 @@ export function OnlineView({ params, onChange, wide }: Props) {
     <ListPanels
       tab={tab}
       shortlist={<ShortlistTab sought={soughtTerms(search)} online />}
-      results={<Results params={search} results={results} listRef={listRef} online />}
+      results={searching ? <Results params={search} results={results} listRef={listRef} online /> : <OnlinePrompt wide={wide} />}
     />
   );
   const footer = tab === "results" ? <LoadMore results={results} listRef={listRef} /> : undefined;
@@ -105,5 +108,22 @@ export function OnlineView({ params, onChange, wide }: Props) {
         </Tabs.Root>
       </div>
     </>
+  );
+}
+
+/** In place of the results until a filter narrows the search. The filters sit beside it on wide screens, behind their button otherwise. */
+function OnlinePrompt({ wide }: { wide: boolean }) {
+  return (
+    <Prompt ask="Choose a filter to see the UKCP therapists who work online or by phone." className="py-10 sm:py-16">
+      {wide ? (
+        "The filters"
+      ) : (
+        <>
+          Filters <FiltersIcon />
+        </>
+      )}{" "}
+      narrow the search by what therapists help with, how they work, the languages they speak and more. Thousands work online or by phone, so choosing
+      between the two isn't enough on its own.
+    </Prompt>
   );
 }

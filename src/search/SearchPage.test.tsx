@@ -955,25 +955,48 @@ describe("SearchPage online", () => {
   /** The search the page last asked UKCP for. */
   const asked = () => vi.mocked(api.search).mock.lastCall?.[0];
   const filters = () => screen.getByRole("region", { name: "Refine your search" });
-  const EVERYONE_ONLINE = "TypesOfSession=Online+Therapy&TypesOfSession=Telephone+Therapy";
+  /** The online view narrowed by a filter, so it has something to search for. */
+  const GREEK = `${ONLINE}?Languages=Greek`;
+  const GREEK_ONLINE = "TypesOfSession=Online+Therapy&TypesOfSession=Telephone+Therapy&Languages=Greek";
+  const prompt = () => screen.queryByText(/^Choose a filter to see/);
 
-  it("lists everyone working online or by phone, with no place to search and no map", async () => {
+  it("lists everyone working online or by phone who matches its filters, with no place to search and no map", async () => {
     screenIs(true);
-    renderAt(ONLINE);
+    renderAt(GREEK);
     await loaded();
     await mapLoads();
     expect(screen.queryByTestId("map")).toBeNull();
     expect(screen.queryByRole("textbox", { name: "Location" })).toBeNull();
-    expect(asked()).toBe(EVERYONE_ONLINE);
+    expect(asked()).toBe(GREEK_ONLINE);
     expect(within(results()).getByText("Only therapists who say they work online or by phone.")).toBeTruthy();
     expect(within(results()).queryByText(/^Pins show/)).toBeNull();
   });
 
+  it("searches nothing until a filter besides online or phone narrows the search, and nothing again once it is removed", async () => {
+    screenIs(true);
+    renderAt(ONLINE);
+    expect(prompt()).toBeTruthy();
+    fireEvent.click(within(filters()).getByRole("button", { name: /^Type of Session/ }));
+    fireEvent.click(within(filters()).getByRole("checkbox", { name: "Telephone Therapy" }));
+    expect(url().toString()).toBe("TypesOfSession=Telephone+Therapy");
+    expect(prompt()).toBeTruthy();
+    expect(api.search).not.toHaveBeenCalled();
+    fireEvent.click(within(filters()).getByRole("button", { name: /^Additional Filters/ }));
+    fireEvent.click(within(filters()).getByRole("checkbox", { name: "Only show profiles with photos" }));
+    await loaded();
+    expect(prompt()).toBeNull();
+    expect(asked()).toBe("TypesOfSession=Telephone+Therapy&OnlyProfilesWithPhotos=true");
+    fireEvent.click(screen.getByRole("button", { name: "Remove Only show profiles with photos" }));
+    expect(prompt()).toBeTruthy();
+    expect(within(results()).queryByRole("link", { name: /^Therapist/ })).toBeNull();
+    expect(api.search).toHaveBeenCalledOnce();
+  });
+
   it("asks for no place, nor a session type needing one, that a link carries", async () => {
     screenIs(true);
-    renderAt(`${ONLINE}?Location=Leeds&TypesOfSession=Face+to+Face+-+Long+Term`);
+    renderAt(`${GREEK}&Location=Leeds&TypesOfSession=Face+to+Face+-+Long+Term`);
     await loaded();
-    expect(asked()).toBe(EVERYONE_ONLINE);
+    expect(asked()).toBe(GREEK_ONLINE);
   });
 
   it("goes online from a search near a place, taking its filters, and comes back to the place", async () => {
@@ -996,7 +1019,6 @@ describe("SearchPage online", () => {
     await loaded();
     fireEvent.click(screen.getByRole("link", { name: "Online" }));
     expect(document.activeElement).toBe(screen.getByRole("link", { name: "Online" }));
-    await loaded();
   });
 
   it("takes Near me back to the place last seen, however online was reached", async () => {
@@ -1005,14 +1027,13 @@ describe("SearchPage online", () => {
     await loaded();
     cleanup();
     renderAt(ONLINE);
-    await loaded();
     expect(screen.getByRole("link", { name: "Near me" }).getAttribute("href")).toBe("/?Location=York");
   });
 
   it("picks out the same sought terms on the shortlist as in the results", async () => {
     screenIs(true);
     shortlist.add({ ...therapist("a"), tags: ["Online Therapy"] });
-    renderAt(ONLINE, [{ ...therapist("a"), tags: ["Online Therapy"] }]);
+    renderAt(GREEK, [{ ...therapist("a"), tags: ["Online Therapy"] }]);
     await within(results()).findByText(/^1 of 1/);
     const inResults = within(screen.getByRole("tabpanel", { name: "Results" })).getByText("Online Therapy").outerHTML;
     const tab = screen.getByRole("tab", { name: /^Shortlist/ });
@@ -1023,21 +1044,20 @@ describe("SearchPage online", () => {
 
   it("keeps its filters open beside the list on wide screens, offering only video and phone among the session types", async () => {
     screenIs(true);
-    renderAt(ONLINE);
+    renderAt(GREEK);
     await loaded();
     expect(screen.queryByRole("button", { name: "Filters" })).toBeNull();
     fireEvent.click(within(filters()).getByRole("button", { name: /^Type of Session/ }));
     expect(within(filters()).queryByRole("checkbox", { name: "Face to Face - Long Term" })).toBeNull();
     fireEvent.click(within(filters()).getByRole("checkbox", { name: "Telephone Therapy" }));
-    expect(url().toString()).toBe("TypesOfSession=Telephone+Therapy");
-    await waitFor(() => expect(asked()).toBe("TypesOfSession=Telephone+Therapy"));
+    expect(url().toString()).toBe("TypesOfSession=Telephone+Therapy&Languages=Greek");
+    await waitFor(() => expect(asked()).toBe("TypesOfSession=Telephone+Therapy&Languages=Greek"));
     await loaded();
   });
 
   it("keeps the filters' heading still as they scroll on wide screens", async () => {
     screenIs(true);
     renderAt(ONLINE);
-    await loaded();
     const body = screen.getByRole("searchbox", { name: "Keyword search" }).closest(".overflow-y-auto");
     expect(body?.contains(within(filters()).getByRole("heading", { name: "Refine your search" }))).toBe(false);
   });
@@ -1045,14 +1065,13 @@ describe("SearchPage online", () => {
   it("opens its filters in a sheet on narrow screens", async () => {
     screenIs(false);
     renderAt(ONLINE);
-    await loaded();
     fireEvent.click(screen.getByRole("button", { name: "Filters" }));
     expect(await screen.findByRole("dialog", { name: "Refine your search" })).toBeTruthy();
   });
 
   it("keeps Load more beneath the list rather than at its end", async () => {
     screenIs(false);
-    renderAt(ONLINE);
+    renderAt(GREEK);
     await loaded();
     const more = screen.getByRole("button", { name: "Load more" });
     expect(results().contains(more)).toBe(true);
@@ -1061,7 +1080,7 @@ describe("SearchPage online", () => {
 
   it("returns to the same place in the list after Back from a profile", async () => {
     screenIs(true);
-    renderAt(ONLINE);
+    renderAt(GREEK);
     await loaded();
     list().scrollTop = 400;
     fireEvent.scroll(list());
@@ -1071,22 +1090,43 @@ describe("SearchPage online", () => {
     expect(list().scrollTop).toBe(400);
   });
 
-  it("keeps the shortlist in a tab beside the list", async () => {
+  it("keeps the shortlist in a tab beside the list, and beside the prompt before a search", async () => {
     screenIs(true);
     shortlist.add(therapist("a"));
     renderAt(ONLINE);
-    await loaded();
+    expect(prompt()).toBeTruthy();
+    expect(api.search).not.toHaveBeenCalled();
     const tab = screen.getByRole("tab", { name: /^Shortlist/ });
     fireEvent.mouseDown(tab);
     fireEvent.click(tab);
     expect(within(screen.getByRole("tabpanel", { name: /^Shortlist/ })).getByRole("link", { name: "Therapist a" })).toBeTruthy();
   });
 
+  it("keeps the shortlist's scroll to itself beside the prompt", () => {
+    screenIs(true);
+    shortlist.add(therapist("a"));
+    renderAt(ONLINE);
+    const pick = (name: RegExp) => {
+      const tab = screen.getByRole("tab", { name });
+      fireEvent.mouseDown(tab);
+      fireEvent.click(tab);
+    };
+    const scrollTo = (top: number) => {
+      list().scrollTop = top;
+      fireEvent.scroll(list());
+    };
+    scrollTo(100);
+    pick(/^Shortlist/);
+    scrollTo(400);
+    pick(/^Results/);
+    expect(list().scrollTop).toBe(100);
+  });
+
   it("leaves where therapists are and how they meet off the cards, in the results and on the shortlist", async () => {
     screenIs(true);
     const a = { ...therapist("a", "London E8"), sessionTypes: "In-person & Remote" };
     shortlist.add(a);
-    renderAt(ONLINE, [a]);
+    renderAt(GREEK, [a]);
     await within(results()).findByText(/^1 of 1/);
     const saysNeither = (panel: HTMLElement) => {
       expect(within(panel).getByRole("link", { name: "Therapist a" })).toBeTruthy();
