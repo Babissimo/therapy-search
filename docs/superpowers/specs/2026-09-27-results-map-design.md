@@ -27,7 +27,7 @@ Out of scope:
 The parity constraints still hold (parity §2). In addition:
 
 - **Pins use only what the result card shows.** UKCP publishes no coordinates. A card has one free-text location, seen live as ` BN31FG`, `BRIGHTON BN3`, `Brighton ` or `Brighton BN`, and profile map links are Google text searches. The map geocodes that text at the precision the therapist gave, full postcodes included.
-- **Respectful of the geocoders.** postcodes.io and Nominatim are free services. Each distinct string is looked up once and cached for every visitor (§5.1), requests carry the Worker's existing `User-Agent`, and uncached lookups are capped per visitor (§5.3). Nominatim's policy (at most one request a second, results cached, data attributed) is met by using it only for search centres and outside-UK searches (§3.3).
+- **Respectful of the geocoders.** postcodes.io and Nominatim are free services. Each distinct string is looked up once and cached for every visitor (§5.1), requests carry the Worker's existing `User-Agent`, and uncached lookups are capped per visitor (§5.3). Nominatim's policy (at most one request a second, results cached, data attributed) is met by using it only for search centres, outside-UK searches (§3.3) and profile offices abroad (parity §4.1).
 - **Third parties never see search terms.** The browser's only third-party requests are map tiles, which reveal the area in view. The default referrer policy sends the tile server our origin alone, never the page URL with its filters, and must stay that way. Place lookups go through the Worker, so the geocoders never see a visitor's IP.
 - **Free to run.** CARTO's raster tiles need a key, free for non-commercial use up to 5 million tile requests a month. Each page of results adds at most 13 Worker requests (§5.1), well inside the free plan's daily allowance at this site's scale.
 
@@ -146,12 +146,13 @@ When the visitor typed a location but UKCP searched "United Kingdom" (parity §3
 
 | Route | Upstream | Cache |
 |---|---|---|
-| `GET /api/place?q=<text>[&centre=true][&outsideUK=true]&v=<version>` | postcodes.io or Nominatim | 30 days when found; 1 day when not found or too general |
+| `GET /api/place?q=<text>[&centre=true][&outsideUK=true][&country=<code>]&v=<version>` | postcodes.io or Nominatim | 30 days when found; 1 day when not found or too general |
 | `GET /api/nearest?lat=<degrees>&lng=<degrees>&v=<version>` | postcodes.io | 30 days when found; 1 day when not found |
 
 - One string per request, so Workers Caching (parity §4.2) keys each string on its own and shares it across visitors, where a batch URL would rarely repeat. A page needs at most 13 lookups (12 cards and the centre), fewer once repeated strings are merged, sent in parallel over one HTTP/2 connection.
 - `q` must be 1–100 characters after trimming. The route canonicalises it with `shared/location.ts` and redirects to the canonical URL when it differs, as `/api/search` does (parity §4.2), so equal strings share one entry. The browser requests the canonical form in the first place.
 - `v` is `LOOKUP_VERSION` from `shared/location.ts`, part of both routes' canonical forms. Cached answers outlive a deploy (parity §4.2), so a change to what either route answers sets it to that day's date, never a value used before, and every lookup moves to new URLs rather than waiting up to 30 days for the old answers to expire. A tab still running older code is answered from the old version's entries while the edge holds them, and otherwise redirected to the current version.
+- `country`, a two-letter code, keeps a lookup to that country: the text goes whole to Nominatim there, since the UK's postcode rules mean nothing abroad.
 - `/api/nearest` answers the postcode nearest the visitor, for a search from where they are. Its canonical form rounds the point to three decimal places, about 100 metres, so neither the Worker nor any cache sees a finer position; a finer one is redirected before any lookup.
 - Upstream requests, each with a 5-second timeout:
 
@@ -160,7 +161,7 @@ When the visitor typed a location but UKCP searched "United Kingdom" (parity §3
 | Postcode | `api.postcodes.io/postcodes/<postcode>` |
 | Outcode | `api.postcodes.io/outcodes/<outcode>` |
 | Place, on a card | `api.postcodes.io/places?q=<name>&limit=10` |
-| Place, as the centre or in an outside-UK search | `nominatim.openstreetmap.org/search?q=<name>&format=jsonv2&countrycodes=gb`, with `limit=1` for a centre and `limit=10` for a card, and no `countrycodes` outside the UK |
+| Place, as the centre, in an outside-UK search or in a given country | `nominatim.openstreetmap.org/search?q=<name>&format=jsonv2&countrycodes=gb`, with `limit=1` for a centre and `limit=10` for a card, no `countrycodes` outside the UK, and the given country's code for one |
 | Nearest postcode | `api.postcodes.io/postcodes?lon=<lng>&lat=<lat>&radius=2000&limit=1`, 2 km being as far as postcodes.io looks |
 
 ### 5.2 Response

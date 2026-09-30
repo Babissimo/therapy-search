@@ -83,6 +83,14 @@ describe("Geocoder.lookup", () => {
     await expect(geocoder.lookup("Paris", { outsideUK: true })).resolves.toMatchObject({ found: true, kind: "place" });
   });
 
+  it("asks Nominatim within a given country for the text whole, whatever UK postcode it resembles", async () => {
+    const { geocoder, fetch } = upstream({
+      [`${N}/search?q=DUBLIN+D02+AF30&format=jsonv2&limit=1&countrycodes=ie`]: json([{ lat: "53.34", lon: "-6.26", addresstype: "city" }]),
+    });
+    await expect(geocoder.lookup("Dublin D02 AF30", { centre: true, country: "ie" })).resolves.toMatchObject({ found: true, kind: "place" });
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
   it("reports text too general to place without asking anyone", async () => {
     const { geocoder, fetch } = upstream({});
     await expect(geocoder.lookup(" BN")).resolves.toEqual({ found: false, reason: "too-general" });

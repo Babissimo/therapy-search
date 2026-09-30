@@ -1,4 +1,4 @@
-import { classifyLocation, type Candidate, type NearestLookup, type PlaceLookup, type PlaceOptions } from "../../shared/location";
+import { canonicalLocation, classifyLocation, type Candidate, type NearestLookup, type PlaceLookup, type PlaceOptions } from "../../shared/location";
 import type { Fetch } from "../ukcp/client";
 
 const POSTCODES_IO = "https://api.postcodes.io";
@@ -21,6 +21,7 @@ export class Geocoder {
 
   /** An unknown postcode falls back to its outcode, and an unknown outcode to the words beside it. */
   async lookup(text: string, options: PlaceOptions = {}): Promise<PlaceLookup> {
+    if (options.country) return found(await this.#places(canonicalLocation(text), options));
     const location = classifyLocation(text);
     if (location.kind === "too-general") return { found: false, reason: "too-general" };
     if (location.kind === "postcode") {
@@ -32,8 +33,7 @@ export class Geocoder {
       if (point) return { found: true, kind: "outcode", candidates: [point] };
     }
     const name = location.kind === "place" ? location.name : location.rest;
-    const candidates = name ? await this.#places(name, options) : [];
-    return candidates.length > 0 ? { found: true, kind: "place", candidates } : { found: false, reason: "not-found" };
+    return found(name ? await this.#places(name, options) : []);
   }
 
   /** The postcode nearest a point, as far out as postcodes.io looks: 2 km. */
@@ -52,10 +52,11 @@ export class Geocoder {
     return { lat: result.latitude, lng: result.longitude };
   }
 
-  async #places(name: string, { centre = false, outsideUK = false }: PlaceOptions): Promise<Candidate[]> {
-    if (centre || outsideUK) {
+  async #places(name: string, { centre = false, outsideUK = false, country }: PlaceOptions): Promise<Candidate[]> {
+    if (centre || outsideUK || country) {
       const query = new URLSearchParams({ q: name, format: "jsonv2", limit: centre ? "1" : "10" });
-      if (!outsideUK) query.set("countrycodes", "gb");
+      const countrycodes = country ?? (outsideUK ? undefined : "gb");
+      if (countrycodes) query.set("countrycodes", countrycodes);
       const places = await this.#json<{ lat: string; lon: string; addresstype?: string }[]>(`${NOMINATIM}/search?${query}`);
       return (places ?? []).map((p) => ({ lat: Number(p.lat), lng: Number(p.lon), type: p.addresstype?.toLowerCase() }));
     }
@@ -74,4 +75,8 @@ export class Geocoder {
     if (!res.ok) throw new GeocodeError(`${new URL(url).host} answered ${res.status}`);
     return (await res.json()) as T;
   }
+}
+
+function found(candidates: Candidate[]): PlaceLookup {
+  return candidates.length > 0 ? { found: true, kind: "place", candidates } : { found: false, reason: "not-found" };
 }

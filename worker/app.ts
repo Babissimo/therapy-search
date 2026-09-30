@@ -80,7 +80,13 @@ export function createApp(clientFor: (env: Env) => UkcpClient, placesFor: (env: 
     const url = new URL(c.req.url);
     const text = canonicalLocation(url.searchParams.get("q") ?? "");
     if (text.length === 0 || text.length > LOCATION_MAX_LENGTH) throw new InvalidParam("q", `q must be 1 to ${LOCATION_MAX_LENGTH} characters`);
-    const options = { centre: url.searchParams.get("centre") === "true", outsideUK: url.searchParams.get("outsideUK") === "true" };
+    const country = url.searchParams.get("country");
+    if (country !== null && !/^[a-z]{2}$/i.test(country)) throw new InvalidParam("country", "country must be a two-letter country code");
+    const options: PlaceOptions = {
+      centre: url.searchParams.get("centre") === "true",
+      outsideUK: url.searchParams.get("outsideUK") === "true",
+      ...(country === null ? {} : { country: country.toLowerCase() }),
+    };
     const canonical = placeQuery(text, options);
     // Compared as parsed parameters, as for searches, so re-encoding can't cause a redirect loop.
     if (new URLSearchParams(url.search).toString() !== canonical) return c.redirect(`/api/place?${canonical}`, 301);

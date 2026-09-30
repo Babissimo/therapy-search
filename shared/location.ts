@@ -2,7 +2,8 @@
 
 export const LOCATION_MAX_LENGTH = 100;
 
-export type PlaceOptions = { centre?: boolean; outsideUK?: boolean };
+/** `country`, a two-letter code, keeps Nominatim to that country and skips the UK's postcode rules. */
+export type PlaceOptions = { centre?: boolean; outsideUK?: boolean; country?: string };
 
 export type Candidate = { lat: number; lng: number; type?: string };
 
@@ -55,10 +56,11 @@ function placeName(text: string): string {
 export const LOOKUP_VERSION = "2026-09-29";
 
 /** The one query string for a lookup: fixed key order, flags only when set. */
-export function placeQuery(text: string, { centre = false, outsideUK = false }: PlaceOptions = {}): string {
+export function placeQuery(text: string, { centre = false, outsideUK = false, country }: PlaceOptions = {}): string {
   const query = new URLSearchParams({ q: canonicalLocation(text) });
   if (centre) query.set("centre", "true");
   if (outsideUK) query.set("outsideUK", "true");
+  if (country) query.set("country", country.toLowerCase());
   query.set("v", LOOKUP_VERSION);
   return query.toString();
 }
