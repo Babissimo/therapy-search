@@ -25,6 +25,8 @@ import { useShortlist, useShortlistStore } from "./useShortlist";
 type Props = {
   /** The search's terms, which pick out tags as they do in the results. */
   sought: ReadonlySet<string>;
+  /** Beside a list of therapists met online or by phone, drawing its cards as that list does. */
+  online?: boolean;
   /** The shortlist's pins, while the map shows them. */
   pins?: Pin[];
   /** How many shortlisted therapists the map can't place, while it shows them. */
@@ -36,7 +38,7 @@ type Props = {
 };
 
 /** The shortlist beside the search's results. */
-export function ShortlistTab({ sought, pins = [], unplaced = 0, selected, onHighlight }: Props) {
+export function ShortlistTab({ sought, online = false, pins = [], unplaced = 0, selected, onHighlight }: Props) {
   const store = useShortlistStore();
   const shortlist = useShortlist();
   const shown = useShown(shortlist);
@@ -88,6 +90,7 @@ export function ShortlistTab({ sought, pins = [], unplaced = 0, selected, onHigh
                   card={card}
                   listed={listed.has(card.slug)}
                   sought={sought}
+                  online={online}
                   pinKey={pinKey}
                   marked={pinKey !== undefined && pinKey === selected?.key}
                   onHighlight={onHighlight}
@@ -105,6 +108,7 @@ type EntryProps = {
   card: ShortlistCard;
   listed: boolean;
   sought: ReadonlySet<string>;
+  online: boolean;
   pinKey?: string;
   /** At the pin selected on the map. */
   marked: boolean;
@@ -112,7 +116,7 @@ type EntryProps = {
 };
 
 /** A card with a handle to move it by; a therapist removed here can't be moved until they are added back. */
-function SortableEntry({ card, listed, sought, pinKey, marked, onHighlight }: EntryProps) {
+function SortableEntry({ card, listed, sought, online, pinKey, marked, onHighlight }: EntryProps) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
     id: card.slug,
     disabled: { draggable: !listed },
@@ -149,6 +153,7 @@ function SortableEntry({ card, listed, sought, pinKey, marked, onHighlight }: En
         <TherapistCard
           therapist={card}
           sought={sought}
+          online={online}
           action={<ShortlistButton therapist={card} />}
           onHighlight={(on) => onHighlight?.(on ? card.slug : undefined)}
         />

@@ -1058,4 +1058,22 @@ describe("SearchPage online", () => {
     fireEvent.click(tab);
     expect(within(screen.getByRole("tabpanel", { name: /^Shortlist/ })).getByRole("link", { name: "Therapist a" })).toBeTruthy();
   });
+
+  it("leaves where therapists are and how they meet off the cards, in the results and on the shortlist", async () => {
+    screenIs(true);
+    const a = { ...therapist("a", "London E8"), sessionTypes: "In-person & Remote" };
+    shortlist.add(a);
+    renderAt(ONLINE, [a]);
+    await within(results()).findByText(/^1 of 1/);
+    const saysNeither = (panel: HTMLElement) => {
+      expect(within(panel).getByRole("link", { name: "Therapist a" })).toBeTruthy();
+      expect(within(panel).queryByText("London E8")).toBeNull();
+      expect(within(panel).queryByText("In-person & Remote")).toBeNull();
+    };
+    saysNeither(screen.getByRole("tabpanel", { name: "Results" }));
+    const tab = screen.getByRole("tab", { name: /^Shortlist/ });
+    fireEvent.mouseDown(tab);
+    fireEvent.click(tab);
+    saysNeither(screen.getByRole("tabpanel", { name: /^Shortlist/ }));
+  });
 });

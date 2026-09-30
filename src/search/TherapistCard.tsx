@@ -13,18 +13,21 @@ type Props = {
   sought: ReadonlySet<string>;
   /** In a pin's box, whose heading names the place: the name drops to an h3 and the card gives only the distance. */
   grouped?: boolean;
+  /** Among therapists met online or by phone: the card says nothing of where they are, nor of meeting in person unless that is all they offer. */
+  online?: boolean;
   /** A control beside the name, such as the shortlist's bookmark. */
   action?: ReactNode;
   onHighlight?: (on: boolean) => void;
 };
 
-export function TherapistCard({ therapist: t, sought, grouped = false, action, onHighlight }: Props) {
+export function TherapistCard({ therapist: t, sought, grouped = false, online = false, action, onHighlight }: Props) {
   const profile = useProfileLink();
   const Heading = grouped ? "h3" : "h2";
-  const where = grouped ? undefined : placeOf(t);
+  const where = grouped || online ? undefined : placeOf(t);
   // UKCP's "0.2 miles from E8 3DQ" repeats the searched place, which the list already names.
-  const away = t.distance?.replace(/\bfrom\b.*$/, "away");
+  const away = online ? undefined : t.distance?.replace(/\bfrom\b.*$/, "away");
   const place = where && away ? `${where} (${away})` : (where ?? away);
+  const meets = online && /remote/i.test(t.sessionTypes ?? "") ? undefined : t.sessionTypes;
   const tags = t.tags.filter((tag) => sought.has(tag.toLowerCase()));
 
   return (
@@ -49,7 +52,7 @@ export function TherapistCard({ therapist: t, sought, grouped = false, action, o
               </Link>
             </Heading>
             {place && <p className="text-sm">{place}</p>}
-            {t.sessionTypes && <p className="text-sm text-muted-foreground">{t.sessionTypes}</p>}
+            {meets && <p className="text-sm text-muted-foreground">{meets}</p>}
           </div>
           {/* Raised above the stretched link, which would otherwise take its clicks. */}
           {action && <div className="relative z-10 -mt-1 -mr-1 self-start">{action}</div>}

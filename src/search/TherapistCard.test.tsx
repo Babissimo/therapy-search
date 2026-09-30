@@ -18,10 +18,10 @@ const therapist = (extra: Partial<Therapist> = {}): Therapist => ({
   ...extra,
 });
 
-function renderCard(t: Therapist, sought: string[] = [], { grouped, action }: { grouped?: boolean; action?: ReactNode } = {}) {
+function renderCard(t: Therapist, sought: string[] = [], { grouped, action, online }: { grouped?: boolean; action?: ReactNode; online?: boolean } = {}) {
   render(
     <MemoryRouter>
-      <TherapistCard therapist={t} sought={new Set(sought)} grouped={grouped} action={action} />
+      <TherapistCard therapist={t} sought={new Set(sought)} grouped={grouped} action={action} online={online} />
     </MemoryRouter>,
   );
 }
@@ -60,6 +60,18 @@ describe("TherapistCard", () => {
   it("keeps the town when there is no searched place to measure from", () => {
     renderCard(therapist({ distance: undefined }));
     screen.getByText("London E8");
+  });
+
+  it("says neither where the therapist is nor whether they also meet in person online", () => {
+    renderCard(therapist(), [], { online: true });
+    screen.getByText("Summary text.");
+    expect(screen.queryByText(/E8|away/)).toBeNull();
+    expect(screen.queryByText("In-person & Remote")).toBeNull();
+  });
+
+  it("says online that a therapist meets only in person", () => {
+    renderCard(therapist({ sessionTypes: "In-person" }), [], { online: true });
+    screen.getByText("In-person");
   });
 
   it("shows only the tags the search asked for", () => {

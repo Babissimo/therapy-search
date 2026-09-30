@@ -25,8 +25,8 @@ type Props = {
   selected?: Pin;
   /** The therapist whose card the pointer or focus is on, for the map to ring their pin. */
   onHighlight?: (slug: string | undefined) => void;
-  /** Beneath the count, on what the list shows. */
-  note?: string;
+  /** Among therapists met online or by phone, with no place to show. */
+  online?: boolean;
 };
 
 // How long a search runs before the list says why.
@@ -43,7 +43,7 @@ export function Results(props: Props) {
   );
 }
 
-function ResultsList({ params, results, listRef, pins = [], unplaced = [], selected, onHighlight, note = "Pins show the postcode or area each therapist lists." }: Props) {
+function ResultsList({ params, results, listRef, pins = [], unplaced = [], selected, onHighlight, online = false }: Props) {
   const { query, first, therapists, searchedPlace } = results;
   if (query.isPending) {
     return (
@@ -70,7 +70,9 @@ function ResultsList({ params, results, listRef, pins = [], unplaced = [], selec
         {therapists.length > 0 && (
           <>
             <p className="text-sm text-muted-foreground">{unplaced.length > 0 ? `${reach} · ${unplaced.length} not on the map` : reach}</p>
-            <p className="text-xs text-muted-foreground">{note}</p>
+            <p className="text-xs text-muted-foreground">
+              {online ? "Only therapists who say they work online or by phone." : "Pins show the postcode or area each therapist lists."}
+            </p>
           </>
         )}
       </div>
@@ -93,7 +95,7 @@ function ResultsList({ params, results, listRef, pins = [], unplaced = [], selec
               className={cn("rounded-xl", marked && t && "ring-2 ring-sky-500")}
             >
               {t ? (
-                <TherapistCard therapist={t} sought={sought} action={<ShortlistButton therapist={t} />} onHighlight={highlight(t.slug)} />
+                <TherapistCard therapist={t} sought={sought} online={online} action={<ShortlistButton therapist={t} />} onHighlight={highlight(t.slug)} />
               ) : (
                 <PinGroup pin={entry.pin} marked={marked} sought={sought} highlight={highlight} />
               )}
