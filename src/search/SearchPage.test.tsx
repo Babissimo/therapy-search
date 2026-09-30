@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation, useNavigate } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SearchResult, TherapistCard } from "@shared/types";
@@ -36,9 +36,10 @@ vi.mock("./map/MapPane", async () => {
     selected?: Pin;
     onSelect: (pin: Pin) => void;
     onSearchArea: (postcode: string) => boolean;
+    outsideUK?: boolean;
   };
   return {
-    default: ({ label, fitKey, reachMiles, centreSettled, pins, highlight, selected, onSelect, onSearchArea }: Props) => {
+    default: ({ label, fitKey, reachMiles, centreSettled, pins, highlight, selected, onSelect, onSearchArea, outsideUK }: Props) => {
       const slug = useSyncExternalStore(highlight.subscribe, highlight.get);
       return createElement(
         "div",
@@ -51,6 +52,7 @@ vi.mock("./map/MapPane", async () => {
           "data-settled": String(centreSettled),
           "data-highlighted": slug ?? "",
           "data-selected": selected?.key ?? "",
+          "data-outside-uk": String(Boolean(outsideUK)),
         },
         pins.map((pin) =>
           createElement(
@@ -205,6 +207,17 @@ describe("SearchPage", () => {
     await loaded();
     expect(await screen.findByTestId("map")).toBeTruthy();
     expect(screen.queryByText(/^Search a town, city or postcode/)).toBeNull();
+  });
+
+  it("lets the map leave the UK only for a search outside it", async () => {
+    screenIs(true);
+    renderAt(SEARCH);
+    await loaded();
+    expect((await screen.findByTestId("map")).dataset.outsideUk).toBe("false");
+    cleanup();
+    renderAt("/?Location=Paris&LocationSearchOutsideUK=true");
+    await loaded();
+    expect((await screen.findByTestId("map")).dataset.outsideUk).toBe("true");
   });
 
   it("takes the outside-UK tick alone as nothing to search for", async () => {

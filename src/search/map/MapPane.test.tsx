@@ -4,6 +4,7 @@ import { MemoryRouter, useLocation } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { TherapistCard } from "@shared/types";
 import { saveView } from "../viewMemory";
+import { UK_BOUNDS } from "./geo";
 import { createHighlight } from "./highlight";
 import MapPane, { type MapPaneProps } from "./MapPane";
 import type { Pin } from "./pins";
@@ -14,7 +15,8 @@ vi.mock("@/components/ui/map", async () => {
   return {
     Map: ({ center, zoom, children }: { center: [number, number]; zoom: number; children?: unknown }) =>
       createElement("div", { "data-testid": "map", "data-view": `${center.join(",")}@${zoom}` }, children as never),
-    MapTileLayer: () => createElement("div", { "data-testid": "tiles" }),
+    MapTileLayer: ({ bounds }: { bounds?: unknown }) => createElement("div", { "data-testid": "tiles", "data-bounds": JSON.stringify(bounds ?? null) }),
+    MapBounds: ({ bounds }: { bounds?: unknown }) => createElement("div", { "data-testid": "bounds", "data-bounds": JSON.stringify(bounds ?? null) }),
     MapZoomControl: () => null,
     MapCircle: ({ radius }: { radius: number }) => createElement("div", { "data-testid": "circle", "data-radius": radius }),
     MapMarkerClusterGroup: ({ children }: { children?: unknown }) => createElement(Fragment, null, children as never),
@@ -190,6 +192,19 @@ describe("MapPane", () => {
     renderPane({ fitKey: "Location=York", entry: "afresh" });
     expect(screen.getByTestId("map").dataset.view).toBe("54.5,-3@5");
     expect(screen.getByTestId("fit").dataset.restored).toBe("");
+  });
+
+  it("keeps the map to the UK from the start, and its tiles once they show, unless the search reads its location anywhere in the world", () => {
+    const bounds = (testId: string) => JSON.parse(screen.getByTestId(testId).dataset.bounds!);
+    renderPane();
+    expect(bounds("bounds")).toEqual(UK_BOUNDS);
+    fireEvent.click(screen.getByTestId("fit"));
+    expect(bounds("tiles")).toEqual(UK_BOUNDS);
+    cleanup();
+    renderPane({ fitKey: "Location=Paris&LocationSearchOutsideUK=true", outsideUK: true });
+    expect(bounds("bounds")).toBeNull();
+    fireEvent.click(screen.getByTestId("fit"));
+    expect(bounds("tiles")).toBeNull();
   });
 
   it("holds a search's tiles back until it is framed, framing it without animation", () => {

@@ -1,6 +1,6 @@
 import "leaflet/dist/leaflet.css";
 import "leaflet.markercluster/dist/MarkerCluster.css";
-import L, { type DivIcon, type LatLngExpression, type Map as LeafletMap, type Marker, type MarkerCluster, type MarkerClusterGroupOptions } from "leaflet";
+import L, { type DivIcon, type LatLngBoundsLiteral, type LatLngExpression, type Map as LeafletMap, type Marker, type MarkerCluster, type MarkerClusterGroupOptions } from "leaflet";
 import type {} from "leaflet.markercluster";
 import { MinusIcon, PlusIcon } from "lucide-react";
 import { useEffect, useRef, useState, type ComponentProps, type ReactNode, type Ref } from "react";
@@ -11,7 +11,6 @@ import {
   TileLayer,
   Tooltip,
   useMap,
-  useMapEvents,
   type CircleProps,
   type MapContainerProps,
   type MarkerProps,
@@ -79,8 +78,9 @@ function tileSource(cartoKey: string | undefined, dark = false): TileSource {
 function MapTileLayer(props: Omit<TileLayerProps, "url" | "attribution">) {
   const dark = useDarkTheme();
   const { url, attribution } = tileSource(import.meta.env.VITE_CARTO_KEY, dark);
-  // Keyed by URL, so a theme change swaps the layer rather than relying on Leaflet to redraw it in place.
-  return <TileLayer key={url} url={url} attribution={attribution} {...props} />;
+  // Keyed by URL, so a theme change swaps the layer rather than relying on Leaflet to redraw it in place, and by bounds,
+  // which a layer reads only as it is made.
+  return <TileLayer key={JSON.stringify([url, props.bounds])} url={url} attribution={attribution} {...props} />;
 }
 
 /** `data` rides along in the Leaflet marker's options, so a cluster can tell what its markers stand for. */
@@ -134,10 +134,59 @@ function MapTooltip({ className, ...props }: TooltipProps & { ref?: Ref<L.Toolti
   return <Tooltip direction="top" opacity={1} className={cn("w-fit text-xs", className)} {...props} />;
 }
 
+/** The furthest out a map can zoom and still show `limits` whole. */
+function wholeZoom(map: LeafletMap, limits: L.LatLngBounds): number {
+  const size = map.getSize();
+  const span = map.project(limits.getSouthEast(), 0).subtract(map.project(limits.getNorthWest(), 0));
+  return Math.max(0, Math.floor(Math.log2(Math.min(size.x / span.x, size.y / span.y))));
+}
+
+/**
+ * Keeps the view within `bounds`, zooming out no further than shows them whole. Without bounds the map roams freely.
+ * `bounds` is compared by identity, so pass a constant.
+ */
+function MapBounds({ bounds }: { bounds?: LatLngBoundsLiteral }) {
+  const map = useMap();
+  useEffect(() => {
+    if (!bounds) return;
+    const limits = L.latLngBounds(bounds);
+    const { minZoom, maxBoundsViscosity } = map.options;
+    // Unanimated, so a new map has settled before its other parts listen for moves.
+    const showWhole = () => {
+      // Never below the map's own minimum, so restoring that minimum can't move the view.
+      const floor = Math.max(minZoom ?? 0, wholeZoom(map, limits));
+      if (map.getZoom() < floor) map.setZoom(floor, { animate: false });
+      map.setMinZoom(floor);
+    };
+    map.options.maxBoundsViscosity = 1;
+    showWhole();
+    map.panInsideBounds(limits, { animate: false });
+    map.setMaxBounds(limits);
+    map.on("resize", showWhole);
+    return () => {
+      map.off("resize", showWhole);
+      map.setMaxBounds(undefined);
+      map.setMinZoom(minZoom ?? 0);
+      map.options.maxBoundsViscosity = maxBoundsViscosity;
+    };
+  }, [map, bounds]);
+  return null;
+}
+
+const zoomLevels = (map: LeafletMap) => ({ zoom: map.getZoom(), min: map.getMinZoom(), max: map.getMaxZoom() });
+
 function MapZoomControl({ className }: { className?: string }) {
   const map = useMap();
-  const [zoom, setZoom] = useState(() => map.getZoom());
-  useMapEvents({ zoomend: () => setZoom(map.getZoom()) });
+  const [{ zoom, min, max }, setLevels] = useState(() => zoomLevels(map));
+  // The limits move without the zoom as a bounded map's container resizes, and a sibling may move them before this listens.
+  useEffect(() => {
+    const update = () => setLevels(zoomLevels(map));
+    update();
+    map.on("zoomend zoomlevelschange", update);
+    return () => {
+      map.off("zoomend zoomlevelschange", update);
+    };
+  }, [map]);
   return (
     <MapControlContainer className={cn("top-2 left-2", className)}>
       <div role="group" aria-label="Zoom" className="flex flex-col gap-1">
@@ -148,7 +197,7 @@ function MapZoomControl({ className }: { className?: string }) {
           className="border"
           aria-label="Zoom in"
           title="Zoom in"
-          disabled={zoom >= map.getMaxZoom()}
+          disabled={zoom >= max}
           onClick={() => map.zoomIn()}
         >
           <PlusIcon />
@@ -160,7 +209,7 @@ function MapZoomControl({ className }: { className?: string }) {
           className="border"
           aria-label="Zoom out"
           title="Zoom out"
-          disabled={zoom <= map.getMinZoom()}
+          disabled={zoom <= min}
           onClick={() => map.zoomOut()}
         >
           <MinusIcon />
@@ -182,4 +231,4 @@ function MapControlContainer({ className, ...props }: ComponentProps<"div">) {
   return <div ref={ref} className={cn("absolute z-1000 size-fit cursor-default", className)} {...props} />;
 }
 
-export { Map, MapCircle, MapControlContainer, MapMarker, MapMarkerClusterGroup, MapTileLayer, MapTooltip, MapZoomControl, elementIcon, markerData, tileSource };
+export { Map, MapBounds, MapCircle, MapControlContainer, MapMarker, MapMarkerClusterGroup, MapTileLayer, MapTooltip, MapZoomControl, elementIcon, markerData, tileSource };

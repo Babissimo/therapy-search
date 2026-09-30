@@ -1,9 +1,9 @@
 import { useReducer, useState } from "react";
 import { useMapEvents } from "react-leaflet";
-import { Map, MapCircle, MapMarker, MapTileLayer, MapZoomControl } from "@/components/ui/map";
+import { Map, MapBounds, MapCircle, MapMarker, MapTileLayer, MapZoomControl } from "@/components/ui/map";
 import { savedView, saveView } from "../viewMemory";
 import { FitView } from "./FitView";
-import { METRES_PER_MILE, UK_VIEW, type Point } from "./geo";
+import { METRES_PER_MILE, UK_BOUNDS, UK_VIEW, type Point } from "./geo";
 import type { Highlight } from "./highlight";
 import { centreIcon } from "./pinIcon";
 import type { Pin } from "./pins";
@@ -31,6 +31,8 @@ export type MapPaneProps = {
   onSelect: (pin: Pin) => void;
   /** Searches at the postcode nearest the middle of the map, answering false when it is the one already searched. */
   onSearchArea: (postcode: string) => boolean;
+  /** The search reads its location as a place anywhere in the world, so the map isn't kept to the UK. */
+  outsideUK?: boolean;
 };
 
 /**
@@ -50,6 +52,7 @@ export default function MapPane({
   selected,
   onSelect,
   onSearchArea,
+  outsideUK,
 }: MapPaneProps) {
   const saved = savedView(entry).map;
   const restored = saved?.fitKey === fitKey ? saved : undefined;
@@ -61,10 +64,13 @@ export default function MapPane({
   // The frame takes in every loaded pin, so it waits until they are placed.
   const framing = !centreSettled || placing;
   const points = pins.map((p) => p.point);
+  const bounds = outsideUK ? undefined : UK_BOUNDS;
   return (
     <div role="region" aria-label={label} className="isolate size-full">
       <Map center={restored?.centre ?? UK_VIEW.centre} zoom={restored?.zoom ?? UK_VIEW.zoom}>
-        {tiles && <MapTileLayer />}
+        {/* Tiles stop at the bounds, which a view wider or taller than them reaches past. */}
+        {tiles && <MapTileLayer bounds={bounds} />}
+        <MapBounds bounds={bounds} />
         <MapZoomControl className="top-auto right-2 bottom-8 left-auto max-lg:hidden" />
         {/* Pins mark only the district or town a card lists, so one can sit a little either side of the edge. */}
         {centre && reachMiles !== undefined && reachMiles > 0 && (
