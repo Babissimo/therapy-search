@@ -26,9 +26,15 @@ describe("tileSource", () => {
     expect(tileSource("k", true).url).toBe("https://basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png?key=k");
   });
 
+  it("says which tiles are dark, for their tint to follow", () => {
+    expect(tileSource("k").dark).toBe(false);
+    expect(tileSource("k", true).dark).toBe(true);
+  });
+
   it("falls back to OpenStreetMap's tiles without one, in either theme", () => {
     expect(tileSource(undefined).url).toBe("https://tile.openstreetmap.org/{z}/{x}/{y}.png");
     expect(tileSource("", true).url).toBe("https://tile.openstreetmap.org/{z}/{x}/{y}.png");
+    expect(tileSource("", true).dark).toBe(false);
     expect(tileSource("").attribution).not.toContain("CARTO");
   });
 });

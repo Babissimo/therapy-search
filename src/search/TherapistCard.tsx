@@ -2,8 +2,8 @@ import type { ComponentProps, ReactNode } from "react";
 import { Link } from "react-router";
 import { classifyLocation } from "@shared/location";
 import type { TherapistCard as Therapist } from "@shared/types";
+import { Portrait } from "@/components/Portrait";
 import { SkeletonText } from "@/components/SkeletonText";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -40,10 +40,7 @@ export function TherapistCard({ therapist: t, sought, grouped = false, online = 
       onBlur={() => onHighlight?.(false)}
       heading={grouped ? "h3" : "h2"}
       photo={
-        <Avatar className="size-full">
-          <AvatarImage src={t.photoUrl} alt="" />
-          <AvatarFallback className="text-xl">{t.initials}</AvatarFallback>
-        </Avatar>
+        <Portrait photoUrl={t.photoUrl} initials={t.initials} className="size-full" initialsClassName="text-3xl" />
       }
       // The stretched link makes the whole card clickable, as UKCP's is.
       name={
@@ -65,7 +62,7 @@ export function TherapistCardSkeleton({ online = false }: { online?: boolean }) 
   return (
     <CardLayout
       aria-hidden
-      photo={<Skeleton className="size-full rounded-full" />}
+      photo={<Skeleton className="size-full rounded-md" />}
       name={<SkeletonText className="w-3/5" />}
       place={!online && <SkeletonText className="w-2/5" />}
       meets={!online && <SkeletonText className="w-1/3" />}

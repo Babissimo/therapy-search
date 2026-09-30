@@ -3,10 +3,10 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, ChevronLeft, ExternalLink } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router";
 import type { Office, Profile, ProfileSection } from "@shared/types";
+import { Portrait } from "@/components/Portrait";
 import { SkeletonText } from "@/components/SkeletonText";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -86,10 +86,7 @@ export function ProfileBody({ slug, back, close }: { slug: string } & Exits) {
       <StickyHeader back={back} close={close} bookmark={<ProfileBookmark profile={profile} />}>
         <Identity
           photo={
-            <Avatar className="size-full">
-              <AvatarImage src={profile.photoUrl} alt="" />
-              <AvatarFallback className="@lg:text-xl">{profile.initials}</AvatarFallback>
-            </Avatar>
+            <Portrait photoUrl={profile.photoUrl} initials={profile.initials} className="size-full" initialsClassName="text-xl @lg:text-2xl" />
           }
           name={profile.name}
           location={profile.location}
@@ -146,7 +143,7 @@ function ProfileSkeleton({ back, close }: Exits) {
       <StickyHeader back={back} close={close}>
         <div aria-hidden>
           <Identity
-            photo={<Skeleton className="size-full rounded-full" />}
+            photo={<Skeleton className="size-full rounded-md" />}
             name={<SkeletonText className="w-56" />}
             location={<SkeletonText className="w-16" />}
             contacts={<ContactListSkeleton />}
@@ -310,7 +307,7 @@ const READING = "max-w-prose text-[1.0625rem] leading-relaxed";
 function Section({ heading, children }: { heading: ReactNode; children: ReactNode }) {
   return (
     <section className="space-y-3">
-      <h2 className="eyebrow text-muted-foreground">{heading}</h2>
+      <h2 className="eyebrow text-primary">{heading}</h2>
       {children}
     </section>
   );

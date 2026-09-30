@@ -14,9 +14,9 @@ const VIDEO_SVG =
 const CENTRE: [number, number] = [27, 33];
 // lucide's "map-pin", filled and ringed, in a view cropped to it so its tip meets the bottom edge.
 const CENTRE_SVG =
-  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="3 1 18 22" class="size-full drop-shadow-sm"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0" class="fill-sky-500 stroke-background" stroke-width="1.5"/><circle cx="12" cy="10" r="3" class="fill-background"/></svg>';
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="3 1 18 22" class="size-full drop-shadow-sm"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0" class="fill-highlight stroke-background" stroke-width="1.5"/><circle cx="12" cy="10" r="3" class="fill-background"/></svg>';
 
-/** Where the search is centred: blue, which shows on light and dark tiles alike, and a pin rather than an avatar, so it reads as no therapist. */
+/** Where the search is centred: amber, which shows on the tinted tiles light and dark, and a pin rather than an avatar, so it reads as no therapist. */
 export function centreIcon(): DivIcon {
   const pin = element("span", "block size-full");
   pin.setAttribute("aria-hidden", "true");
@@ -60,9 +60,11 @@ function holder(avatars: HTMLElement[]): HTMLElement {
 }
 
 function avatar(therapist: TherapistCard, size: string): HTMLElement {
+  // Initials without a photo stand on slate, as on the cards; with one, they stay muted beneath it while it loads.
+  const colour = therapist.photoUrl ? "bg-muted text-muted-foreground" : "bg-primary font-heading text-primary-foreground";
   const circle = element(
     "span",
-    `pin-avatar relative flex ${size} shrink-0 items-center justify-center rounded-full bg-muted font-medium text-muted-foreground shadow-md ring-2 ring-background`,
+    `pin-avatar relative flex ${size} shrink-0 items-center justify-center rounded-full font-medium shadow-md ring-2 ring-background ${colour}`,
   );
   circle.textContent = therapist.initials;
   if (therapist.photoUrl) {
