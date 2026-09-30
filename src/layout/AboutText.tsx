@@ -5,48 +5,42 @@ export function AboutText() {
   return (
     <>
       <p>
-        This is an unofficial, simpler page for searching the{" "}
+        An unofficial, simpler way to search the{" "}
         <a className="underline" href="https://www.psychotherapy.org.uk/find-a-therapist/">
           UK Council for Psychotherapy's therapist directory
         </a>
         . It is not run by, affiliated with or endorsed by UKCP.
       </p>
       <p>
-        Every search and profile is fetched from UKCP's own site when you ask for it, and shown as UKCP returns it. Nothing is copied into a
-        database here. Identical searches are reused for 15 minutes and profiles for an hour, so that repeated visits don't add load to UKCP's
-        servers, and each visitor's requests are rate-limited.
+        Searches and profiles come from UKCP's site as you ask for them, and nothing is copied into a database here. To spare UKCP's servers,
+        identical searches are reused for 15 minutes and profiles for an hour, and each visitor's requests are rate-limited.
       </p>
-      <p>
-        Cloudflare, which hosts this site, records the address of each request along with your IP address, so your search is never put in
-        one: it travels inside the request, and sits after the # in the page's address, which your browser doesn't send. When this site has no
-        stored answer and asks OpenStreetMap about a place, or UKCP for a profile, Cloudflare records that request too, with the place or
-        profile in its address and your internet provider and country, but not your IP address. Therapists' photos load straight from UKCP,
-        so UKCP sees your IP address and whose photos are shown.
-      </p>
-      <p>
-        Your browser keeps your shortlist, your choice of light or dark theme if you pick one, and one random number that holds results in
-        the same order when you come back to a search. None of these is sent to this site or to UKCP.
-      </p>
-      <p>
-        The map's tiles come from CARTO, with map data from OpenStreetMap contributors. Your browser fetches them directly, so CARTO sees the
-        area you're looking at, but not your search. Therapists' locations are placed using{" "}
-        <a className="underline" href="https://postcodes.io">
-          postcodes.io
-        </a>{" "}
-        (which contains Ordnance Survey, Royal Mail and ONS data under the Open Government Licence) and OpenStreetMap's Nominatim. This site
-        asks them on your behalf, so they never see your IP address, and each answer is reused for every visitor.
-      </p>
-      <p>
-        "Use my location" asks your browser for your position, which it shares only if you allow it. The page rounds it to about 100 metres
-        before this site asks postcodes.io for the nearest postcode, which is then searched, and shown in the page's address, like one you
-        typed.
-      </p>
+      <h3 className="font-medium">Who sees what</h3>
+      <ul className="list-disc space-y-1.5 pl-4">
+        <li>
+          Your browser keeps your shortlist, your theme and a random number that holds results in the same order, and shares none of them.
+        </li>
+        <li>
+          Cloudflare hosts the site and logs your IP address, but never alongside your searches or the profiles you open. A place or profile the
+          site fetches afresh is logged with your internet provider and country instead.
+        </li>
+        <li>UKCP sees your IP address and whose photos you're shown, as photos load straight from its site.</li>
+        <li>CARTO sees your IP address and the area of map you view, as your browser fetches its map tiles.</li>
+        <li>postcodes.io and OpenStreetMap place therapists on the map. This site asks them for you, so they never see your IP address.</li>
+      </ul>
+      <p>"Use my location" rounds your position to about 100 metres before it leaves your browser, then searches the nearest postcode.</p>
       <p>
         If you're from UKCP, or have any concern about this site,{" "}
         <a className="underline" href={CONTACT_URL}>
           get in touch
         </a>
         .
+      </p>
+      <p className="text-xs text-muted-foreground">
+        <a className="underline" href="https://postcodes.io">
+          postcodes.io
+        </a>{" "}
+        contains Ordnance Survey, Royal Mail and ONS data under the Open Government Licence.
       </p>
     </>
   );
