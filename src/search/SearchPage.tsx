@@ -3,6 +3,7 @@ import { lazy, Suspense, useEffect, useId, useLayoutEffect, useRef, useState } f
 import { Link, useLocation, useMatch } from "react-router";
 import { canonicalLocation } from "@shared/location";
 import { toQuery, type SearchParams } from "@shared/query";
+import { Morph, startMorph } from "@/components/Morph";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
 import { Masthead } from "@/layout/Masthead";
@@ -67,8 +68,13 @@ export function SearchPage() {
       </div>
     );
   }
-  if (online) return <OnlineView params={onlineParams(params)} onChange={update} wide={wide} />;
-  return <SearchView params={params} onChange={update} wide={wide} />;
+  // What no Morph within carries, such as the map, fades out with the layout it leaves as the next fades in. A Morph of its
+  // own would not: React animates one appearing or leaving only when no element appearing or leaving with it encloses it.
+  return (
+    <Morph name="search-view">
+      {online ? <OnlineView params={onlineParams(params)} onChange={update} wide={wide} /> : <SearchView params={params} onChange={update} wide={wide} />}
+    </Morph>
+  );
 }
 
 type ViewProps = { params: SearchParams; onChange: (next: SearchParams) => void; wide: boolean };
@@ -76,10 +82,12 @@ type ViewProps = { params: SearchParams; onChange: (next: SearchParams) => void;
 /** Therapists near a place, on a map of where they are. */
 function SearchView({ params, onChange, wide }: ViewProps) {
   const { key: entry } = useLocation();
-  const drafts = useSearchDrafts(params, onChange);
   // Only a place makes a search here: without one UKCP would list everyone matching in a random order, which answers no
   // one looking nearby. Ticks and the keyword wait in the URL for one.
-  const searching = params.text.Location !== "";
+  const searching = placed(params);
+  // Beginning or clearing a search sets the page out afresh, its pieces gliding to their new places.
+  const change = (next: SearchParams) => (placed(next) === searching ? onChange(next) : startMorph(() => onChange(next)));
+  const drafts = useSearchDrafts(params, change);
   // The search, which the tab chosen and a selection belong to.
   const fitKey = searching ? toQuery(params) : "";
   const results = useResults(params, searching);
@@ -197,7 +205,7 @@ function SearchView({ params, onChange, wide }: ViewProps) {
     <Toolbar
       placement={placement}
       params={params}
-      onChange={onChange}
+      onChange={change}
       drafts={drafts}
       wide={wide}
       // The side bar's toggle, left over the top left as the side bar hides, moves the toolbar aside.
@@ -270,6 +278,11 @@ function SearchView({ params, onChange, wide }: ViewProps) {
   );
 }
 
+/** Whether `params` have a place to search near. */
+function placed(params: SearchParams): boolean {
+  return params.text.Location !== "";
+}
+
 /** Whether a location is `postcode`, whatever its case or spacing. */
 function samePostcode(postcode: string, location: string): boolean {
   const squeezed = (text: string) => canonicalLocation(text).replaceAll(" ", "");
@@ -324,25 +337,29 @@ function Toolbar({
           besideToggle && "left-14",
         )}
       >
-        <div className={cn("pointer-events-auto flex w-full flex-col gap-2 rounded-xl border bg-background p-2", overMap && "shadow-md")}>
-          <ModeSwitch online={false} params={params} />
-          <div className="flex items-start gap-2">
-            {/* A search for a place puts the filters away to show where it is; ticks and the keyword leave them open for more. */}
-            <SearchBox params={params} drafts={drafts} onPlaceSearch={() => onFiltersOpenChange(false)} className="min-w-0 flex-1" />
-            {wide ? (
-              overMap && (
-                <FiltersButton
-                  ticked={ticked}
-                  aria-expanded={filtersOpen}
-                  aria-controls={filtersOpen ? filtersId : undefined}
-                  onClick={() => onFiltersOpenChange(!filtersOpen)}
-                />
-              )
-            ) : (
-              <FiltersSheetButton ticked={ticked} />
-            )}
+        <Morph name="toolbar">
+          <div className={cn("pointer-events-auto flex w-full flex-col gap-2 rounded-xl border bg-background p-2", overMap && "shadow-md")}>
+            <ModeSwitch online={false} params={params} />
+            <div className="flex items-start gap-2">
+              {/* A search for a place puts the filters away to show where it is; ticks and the keyword leave them open for more. */}
+              <Morph name="place">
+                <SearchBox params={params} drafts={drafts} onPlaceSearch={() => onFiltersOpenChange(false)} className="min-w-0 flex-1" />
+              </Morph>
+              {wide ? (
+                overMap && (
+                  <FiltersButton
+                    ticked={ticked}
+                    aria-expanded={filtersOpen}
+                    aria-controls={filtersOpen ? filtersId : undefined}
+                    onClick={() => onFiltersOpenChange(!filtersOpen)}
+                  />
+                )
+              ) : (
+                <FiltersSheetButton ticked={ticked} />
+              )}
+            </div>
           </div>
-        </div>
+        </Morph>
         <FilterChips
           params={params}
           onChange={onChange}

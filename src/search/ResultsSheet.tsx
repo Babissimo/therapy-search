@@ -1,4 +1,5 @@
 import { useRef, useState, type MouseEvent, type PointerEvent, type ReactNode, type Ref } from "react";
+import { Morph } from "@/components/Morph";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -62,44 +63,46 @@ export function ResultsSheet({ position, onPositionChange, tabs, scrollRef, onSc
   }
 
   return (
-    <section
-      ref={sheet}
-      aria-label="Results and shortlist"
-      data-position={position}
-      style={{ height: dragHeight === null ? HEIGHT[position] : `${dragHeight}px` }}
-      className={cn(
-        // Clipped, so the footer never shows below a sheet lowered to its header.
-        "absolute inset-x-0 bottom-0 z-20 flex flex-col overflow-hidden rounded-t-2xl border-t bg-background shadow-lg",
-        dragHeight === null && "transition-[height] duration-200",
-      )}
-    >
-      <div
-        onPointerDown={start}
-        onPointerMove={move}
-        onPointerUp={end}
-        onPointerCancel={end}
-        onClick={raiseForTab}
-        className="relative flex h-14 shrink-0 cursor-grab touch-none items-center justify-between gap-2 px-4"
+    <Morph name="list">
+      <section
+        ref={sheet}
+        aria-label="Results and shortlist"
+        data-position={position}
+        style={{ height: dragHeight === null ? HEIGHT[position] : `${dragHeight}px` }}
+        className={cn(
+          // Clipped, so the footer never shows below a sheet lowered to its header.
+          "absolute inset-x-0 bottom-0 z-20 flex flex-col overflow-hidden rounded-t-2xl border-t bg-background shadow-lg",
+          dragHeight === null && "transition-[height] duration-200",
+        )}
       >
-        <span aria-hidden className="absolute top-1.5 left-1/2 h-1 w-10 -translate-x-1/2 rounded-full bg-muted-foreground/40" />
-        {tabs}
-        <Button type="button" variant="outline" size="sm" onClick={() => onPositionChange(position === "full" ? "peek" : "full")}>
-          {position === "full" ? "Show map" : "Show list"}
-        </Button>
-      </div>
-      {/* Positioned so that visually hidden text is placed inside the list rather than stretching the page. */}
-      <div
-        ref={scrollRef}
-        inert={position === "peek"}
-        onScroll={(e) => onScroll?.(e.currentTarget.scrollTop)}
-        className="relative min-h-0 flex-1 overflow-y-auto px-4 pb-4"
-      >
-        {children}
-      </div>
-      <div inert={position === "peek"} className="shrink-0">
-        {footer}
-      </div>
-    </section>
+        <div
+          onPointerDown={start}
+          onPointerMove={move}
+          onPointerUp={end}
+          onPointerCancel={end}
+          onClick={raiseForTab}
+          className="relative flex h-14 shrink-0 cursor-grab touch-none items-center justify-between gap-2 px-4"
+        >
+          <span aria-hidden className="absolute top-1.5 left-1/2 h-1 w-10 -translate-x-1/2 rounded-full bg-muted-foreground/40" />
+          {tabs}
+          <Button type="button" variant="outline" size="sm" onClick={() => onPositionChange(position === "full" ? "peek" : "full")}>
+            {position === "full" ? "Show map" : "Show list"}
+          </Button>
+        </div>
+        {/* Positioned so that visually hidden text is placed inside the list rather than stretching the page. */}
+        <div
+          ref={scrollRef}
+          inert={position === "peek"}
+          onScroll={(e) => onScroll?.(e.currentTarget.scrollTop)}
+          className="relative min-h-0 flex-1 overflow-y-auto px-4 pb-4"
+        >
+          {children}
+        </div>
+        <div inert={position === "peek"} className="shrink-0">
+          {footer}
+        </div>
+      </section>
+    </Morph>
   );
 }
 

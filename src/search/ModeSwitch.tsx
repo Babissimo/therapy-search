@@ -1,7 +1,8 @@
 import { MapPin, Video } from "lucide-react";
 import { useEffect, useRef, type MouseEvent } from "react";
-import { Link } from "react-router";
+import { Link, useNavigate, type To } from "react-router";
 import { toQuery, type SearchParams } from "@shared/query";
+import { startMorph } from "@/components/Morph";
 import { nearMeParams, ONLINE_PATH, onlineParams, rememberPlace } from "./online";
 
 // As the side bar's tabs look, full width, the page showing marked as the open tab.
@@ -18,6 +19,7 @@ export function ModeSwitch({ online, params }: Props) {
   const near = online ? nearMeParams(params) : params;
   const remote = online ? params : onlineParams(params);
   const current = useRef<HTMLAnchorElement>(null);
+  const navigate = useNavigate();
   useEffect(() => {
     if (switching) current.current?.focus();
     switching = false;
@@ -26,13 +28,23 @@ export function ModeSwitch({ online, params }: Props) {
   useEffect(() => {
     if (!online) rememberPlace(params);
   });
+  const toNear = { pathname: "/", search: toQuery(near) };
+  const toOnline = { pathname: ONLINE_PATH, search: toQuery(remote) };
+  // Followed here rather than by the link, so the page's pieces glide from their places in one view to the other's, the place
+  // to search sliding the way the switch goes.
+  function leave(e: MouseEvent, to: To) {
+    if (!inPlace(e)) return;
+    e.preventDefault();
+    switching = true;
+    startMorph(() => navigate(to), online ? "to-near" : "to-online");
+  }
   return (
     <nav aria-label="Where to meet" className="flex h-8 rounded-lg bg-muted p-[3px]">
       <Link
         ref={online ? undefined : current}
-        to={{ pathname: "/", search: toQuery(near) }}
+        to={toNear}
         aria-current={online ? undefined : "page"}
-        onClick={(e) => (switching = online && inPlace(e))}
+        onClick={online ? (e) => leave(e, toNear) : undefined}
         className={OPTION}
       >
         <MapPin aria-hidden className="size-4 shrink-0" />
@@ -40,9 +52,9 @@ export function ModeSwitch({ online, params }: Props) {
       </Link>
       <Link
         ref={online ? current : undefined}
-        to={{ pathname: ONLINE_PATH, search: toQuery(remote) }}
+        to={toOnline}
         aria-current={online ? "page" : undefined}
-        onClick={(e) => (switching = !online && inPlace(e))}
+        onClick={online ? undefined : (e) => leave(e, toOnline)}
         className={OPTION}
       >
         <Video aria-hidden className="size-4 shrink-0" />

@@ -3,6 +3,7 @@ import { useState, type ComponentProps, type ReactNode } from "react";
 import type { SearchParams } from "@shared/query";
 import type { FilterGroup } from "@shared/types";
 import { IconButton } from "@/components/IconButton";
+import { Morph } from "@/components/Morph";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
@@ -15,21 +16,23 @@ type PanelProps = { params: SearchParams; drafts: SearchDrafts; groups?: FilterG
 /** The filters under their heading, which stays in view, with a close button when they can be put away. */
 export function FiltersSection({ id, onClose, className, ...panel }: PanelProps & { id: string; onClose?: () => void; className?: string }) {
   return (
-    <section aria-labelledby={`${id}-heading`} id={id} className={cn("flex min-h-0 flex-col overflow-hidden rounded-xl border bg-background", className)}>
-      <div className="flex items-center justify-between gap-2 border-b p-3 pl-4">
-        <h2 id={`${id}-heading`} className="font-semibold">
-          Refine your search
-        </h2>
-        {onClose && (
-          <Button type="button" variant="ghost" size="icon-sm" aria-label="Close filters" onClick={onClose}>
-            <X aria-hidden />
-          </Button>
-        )}
-      </div>
-      <div className="min-h-0 overflow-y-auto p-4">
-        <FilterPanel {...panel} />
-      </div>
-    </section>
+    <Morph name="filters">
+      <section aria-labelledby={`${id}-heading`} id={id} className={cn("flex min-h-0 flex-col overflow-hidden rounded-xl border bg-background", className)}>
+        <div className="flex items-center justify-between gap-2 border-b p-3 pl-4">
+          <h2 id={`${id}-heading`} className="font-semibold">
+            Refine your search
+          </h2>
+          {onClose && (
+            <Button type="button" variant="ghost" size="icon-sm" aria-label="Close filters" onClick={onClose}>
+              <X aria-hidden />
+            </Button>
+          )}
+        </div>
+        <div className="min-h-0 overflow-y-auto p-4">
+          <FilterPanel {...panel} />
+        </div>
+      </section>
+    </Morph>
   );
 }
 
