@@ -169,4 +169,19 @@ describe("ProfilePage's content", () => {
     screen.getByText("London Office");
     expect(screen.queryByRole("link", { name: /London Office/ })).toBeNull();
   });
+
+  it("looks an office up once at home, and abroad until one of its texts is found in its country", async () => {
+    const place = vi.spyOn(api, "place").mockImplementation(async (text) =>
+      text === "BERLIN 12689" ? { found: true, kind: "place", candidates: [{ lat: 52.57, lng: 13.57 }] } : { found: false, reason: "not-found" },
+    );
+    const london = { ...office("London Office", "£70"), address: ["Fitzrovia", "London W1W", "United Kingdom (UK)"] };
+    const berlin = { ...office("Berlin Office", "£70"), address: ["Belzinger Ring", "Berlin 12689", "Germany"] };
+    renderAt(["/therapist/Test-ABCDEFGH"], { ...PROFILE, offices: [london, berlin] });
+    await screen.findByRole("region", { name: "Map of Berlin Office" });
+    expect(place.mock.calls).toEqual([
+      ["LONDON W1W", { outsideUK: false }],
+      ["BELZINGER RING BERLIN 12689", { centre: true, country: "de" }],
+      ["BERLIN 12689", { centre: true, country: "de" }],
+    ]);
+  });
 });
