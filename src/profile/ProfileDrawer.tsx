@@ -5,8 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetClose, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { ProfileBody } from "./ProfilePage";
 
-/** A profile opened from the search, in a drawer over it; closing it goes back to the search, just as it was. */
-export function ProfileDrawer({ slug }: { slug: string }) {
+/**
+ * A profile opened from the search, in a drawer over it; closing it goes back to the search, just as it was. Going back
+ * any other way closes it too, as `open` follows the history.
+ */
+export function ProfileDrawer({ slug, open }: { slug: string; open: boolean }) {
   const navigate = useNavigate();
   // The card or pin that opened it. The drawer has no trigger of its own, which is where the dialog would send focus back.
   const [opener] = useState(() => document.activeElement);
@@ -20,7 +23,8 @@ export function ProfileDrawer({ slug }: { slug: string }) {
     </SheetClose>
   );
   return (
-    <Sheet open onOpenChange={(open) => !open && navigate(-1)}>
+    // Once closed, it can still be dismissed as it slides away, which must not go back a second time.
+    <Sheet open={open} onOpenChange={(next) => !next && open && navigate(-1)}>
       <SheetContent
         side="right"
         showCloseButton={false}

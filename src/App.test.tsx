@@ -68,6 +68,23 @@ describe("AppRoutes", () => {
     await waitFor(() => expect(document.activeElement).toBe(card));
   });
 
+  it("hands the keyboard back to whatever opened a profile, opened before from elsewhere or not", async () => {
+    renderAt("/?Location=Leeds");
+    const card = await screen.findByRole("link", { name: "Jo Bloggs" });
+    card.focus();
+    fireEvent.click(card);
+    fireEvent.click(within(await screen.findByRole("dialog", { name: "Therapist profile" })).getByRole("button", { name: "Close" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    fireEvent.click(screen.getByRole("button", { name: "Add Jo Bloggs to your shortlist" }));
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Shortlist, 1 therapist" }));
+    const entry = within(screen.getByRole("tabpanel", { name: /^Shortlist/ })).getByRole("link", { name: "Jo Bloggs" });
+    entry.focus();
+    fireEvent.click(entry);
+    fireEvent.click(within(await screen.findByRole("dialog", { name: "Therapist profile" })).getByRole("button", { name: "Close" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    await waitFor(() => expect(document.activeElement).toBe(entry));
+  });
+
   it("opens a profile from the online list in a drawer over it, and closing it goes back to the list", async () => {
     renderAt("/online");
     expect(screen.getByRole("link", { name: "Online" }).getAttribute("aria-current")).toBe("page");

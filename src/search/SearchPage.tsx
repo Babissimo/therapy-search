@@ -5,6 +5,7 @@ import { Link, useLocation, useMatch } from "react-router";
 import { canonicalLocation } from "@shared/location";
 import { toQuery, type SearchParams } from "@shared/query";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
 import { Masthead } from "@/layout/Masthead";
 import { useMediaQuery } from "@/lib/useMediaQuery";
 import { cn } from "@/lib/utils";
@@ -295,41 +296,44 @@ function MapToolbar({
   const filtersId = useId();
   const ticked = tickedFilters(params);
   return (
-    // Only the toolbar's own controls take the pointer; the map shows through the rest of it.
-    <div className={cn("pointer-events-none absolute inset-3 z-10 flex flex-col items-start gap-2 lg:right-auto lg:w-96", besideToggle && "left-14")}>
-      <div className="pointer-events-auto flex w-full flex-col gap-2 rounded-xl border bg-background p-2 shadow-md">
-        <ModeSwitch online={false} params={params} />
-        <div className="flex items-start gap-2">
-          {/* A search for a place puts the filters away to show where it is; ticks and the keyword leave them open for more. */}
-          <SearchBox params={params} drafts={drafts} onPlaceSearch={() => onFiltersOpenChange(false)} className="min-w-0 flex-1" />
-          {wide ? (
-            <FiltersButton
-              ticked={ticked}
-              aria-expanded={filtersOpen}
-              aria-controls={filtersOpen ? filtersId : undefined}
-              onClick={() => onFiltersOpenChange(!filtersOpen)}
-            />
-          ) : (
-            <MobileFilters params={params} drafts={drafts} ticked={ticked} />
-          )}
+    // Only the toolbar's own controls take the pointer; the map shows through the rest of it. It steps aside for the side
+    // bar's toggle as the side bar slides, and in time with it.
+    <Collapsible open={wide && filtersOpen} asChild>
+      <div
+        className={cn(
+          "pointer-events-none absolute inset-3 z-10 flex flex-col items-start gap-2 motion-safe:transition-[left] motion-safe:duration-200 lg:right-auto lg:w-96",
+          besideToggle && "left-14",
+        )}
+      >
+        <div className="pointer-events-auto flex w-full flex-col gap-2 rounded-xl border bg-background p-2 shadow-md">
+          <ModeSwitch online={false} params={params} />
+          <div className="flex items-start gap-2">
+            {/* A search for a place puts the filters away to show where it is; ticks and the keyword leave them open for more. */}
+            <SearchBox params={params} drafts={drafts} onPlaceSearch={() => onFiltersOpenChange(false)} className="min-w-0 flex-1" />
+            {wide ? (
+              <FiltersButton
+                ticked={ticked}
+                aria-expanded={filtersOpen}
+                aria-controls={filtersOpen ? filtersId : undefined}
+                onClick={() => onFiltersOpenChange(!filtersOpen)}
+              />
+            ) : (
+              <MobileFilters params={params} drafts={drafts} ticked={ticked} />
+            )}
+          </div>
         </div>
-      </div>
-      <FilterChips
-        params={params}
-        onChange={onChange}
-        // Only as wide as its chips, up to the toolbar's width, so it covers no more of the map than they do.
-        className={cn("pointer-events-auto", !wide && "max-w-full flex-nowrap overflow-x-auto [&>li]:shrink-0")}
-      />
-      {wide && filtersOpen && (
-        <FiltersSection
-          id={filtersId}
+        <FilterChips
           params={params}
-          drafts={drafts}
-          onClose={() => onFiltersOpenChange(false)}
-          className="pointer-events-auto w-full shadow-lg"
+          onChange={onChange}
+          // Only as wide as its chips, up to the toolbar's width, so it covers no more of the map than they do.
+          className={cn("pointer-events-auto", !wide && "max-w-full flex-nowrap overflow-x-auto [&>li]:shrink-0")}
         />
-      )}
-    </div>
+        {/* Shrinks with the toolbar, scrolling the filters within. Its shadow is its own, as it clips the filters' as it unrolls. */}
+        <CollapsibleContent className="flex min-h-0 w-full flex-col rounded-xl shadow-lg">
+          <FiltersSection id={filtersId} params={params} drafts={drafts} onClose={() => onFiltersOpenChange(false)} className="pointer-events-auto" />
+        </CollapsibleContent>
+      </div>
+    </Collapsible>
   );
 }
 
@@ -337,7 +341,12 @@ function MapToolbar({
 function SearchPrompt({ besideFilters, besideToggle }: { besideFilters: boolean; besideToggle: boolean }) {
   return (
     // Clear of the toolbar over its top, or beside the filters open beneath it.
-    <div className={cn("flex size-full overflow-y-auto", besideFilters ? ["py-6 pr-6", besideToggle ? "pl-116" : "pl-105"] : "px-6 py-28")}>
+    <div
+      className={cn(
+        "flex size-full overflow-y-auto motion-safe:transition-[padding] motion-safe:duration-200",
+        besideFilters ? ["py-6 pr-6", besideToggle ? "pl-116" : "pl-105"] : "px-6 py-28",
+      )}
+    >
       {/* Centred by its margins, so text taller than the space scrolls from its top rather than being cut off there. */}
       <div className="m-auto max-w-2xl space-y-4 text-center text-balance sm:space-y-6">
         <p className="text-2xl font-semibold tracking-tight sm:text-4xl">
