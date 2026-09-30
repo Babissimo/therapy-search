@@ -10,7 +10,7 @@ In scope:
 
 - The search form and all its filters (§3.2)
 - The results list with paging (§3.3)
-- The therapist profile, including click-to-reveal contact details (§3.4)
+- The therapist profile, including the contact details UKCP reveals on request (§3.4)
 
 Out of scope for v1:
 
@@ -22,7 +22,7 @@ Out of scope for v1:
 - **Free to run.** Cloudflare Workers free plan: 100,000 Worker requests a day and 10 ms of CPU per request. With Workers Caching on (§4.2), cached answers and static files count as requests too.
 - **Respectful of UKCP.**
   - Cache identical searches (15 minutes, or 6 hours without a location, §4.2), and profiles and their contact details (1 hour), and collapse concurrent identical requests, so repeated traffic never reaches UKCP.
-  - Send upstream only what a visitor's action on UKCP would send, except that a search asks for 480 results at once where UKCP's page asks for 12, or for every result when it has no location (map spec §4.4): one search POST per uncached batch of results, one profile GET per opened profile, one contact POST per click. Never prefetch or crawl.
+  - Send upstream only what a visitor's action on UKCP would send, with two exceptions: a search asks for 480 results at once where UKCP's page asks for 12, or for every result when it has no location (map spec §4.4), and an opened profile asks for its contact details where UKCP's page waits for a click (§3.4). That makes one search POST per uncached batch of results, and one profile GET and one contact POST per opened profile. Never prefetch or crawl.
   - Identify ourselves in the `User-Agent` with a link to the site, so UKCP can see and contact us.
   - Cap uncached upstream requests per visitor IP (§4.3).
 - **Clearly unofficial.** The site's name opens the about text, which says the site is not affiliated with UKCP, and every profile has a "View on UKCP" link.
@@ -97,13 +97,15 @@ A zero-result response has no `.results-no` and a "No therapists can be found" n
 | Element | Meaning |
 |---|---|
 | `.therapist-header h1`, `img.therapist-photo`, `.profile-intro-locations` | Name (its presence marks a profile page), photo, location |
+| `.profile-intro-languages` | The languages they work in, comma-separated, on some profiles |
+| `.profile-intro-social-media a` | Social media links, repeated for each of the page's layouts. Each `aria-label` names the form field the link was entered in, which need not match the site (a Threads link sits under "Twitter"), so the page names a link by its address |
 | `.profile-bio > section` | "About" sections, of which there may be none: `h2` heading, then `p` text (with `<br>` breaks), a `ul` list, or `.accordion-item`s (Special Interests: title plus long text) |
 | `.profile-practical-information > section` | Side sections such as Types of sessions and UKCP College: `h3`/`h2` heading and a `ul` |
 | `.profile-locations > section` | One office each: `h3` name (a `.fa-star` marks the main address), `address` lines, `a.mini-cta` map link, and the element after the "Cost:" `h4`, which is free text |
 | `.therapist-contacts a[href^="mailto:"]` | "Email Therapist" address, shown inline |
-| `.therapist-contacts-details` | `data-id` (numeric Umbraco id) and `data-nodata` |
+| `.therapist-contacts-details` | `data-id` (numeric Umbraco id), `data-nodata`, and `data-email` on the containers that show the email |
 
-Unless `data-nodata="true"`, UKCP's JS adds a "Show Contact Details" button. It sends `POST /Umbraco/Surface/ProfileSurface/ContactDetails` with `__RequestVerificationToken` and `id=<data-id>`, and gets back a fragment with `.therapist-contacts-details-tel`, `-email` and `-web` blocks, each holding one link. We reproduce this through the Worker, which caches each answer as it does profiles (§4.2), so UKCP sees roughly one contact request per therapist an hour from this site, not one per reveal. An unknown id gets an empty page, which is never cached.
+Unless `data-nodata="true"`, UKCP's JS adds a "Show Contact Details" button. It sends `POST /Umbraco/Surface/ProfileSurface/ContactDetails` with `__RequestVerificationToken` and `id=<data-id>`, and gets back a fragment with `.therapist-contacts-details-tel`, `-email` and `-web` blocks, each holding one link, then strips the email block from every container without `data-email="true"`. We make the same request as a profile opens, and show the email only where UKCP's page would. The Worker caches each answer as it does profiles (§4.2), so UKCP sees roughly one contact request per therapist an hour from this site, not one per profile view. An unknown id gets an empty page, which is never cached.
 
 ## 4. Architecture
 
@@ -124,6 +126,8 @@ Results come in an order each browser keeps, since UKCP's own order changes on a
 
 A switch beside the site's name picks a light, dark or system theme, the last following `prefers-color-scheme`. A light or dark choice is kept in `localStorage`, and an inline script in `index.html` applies it before first paint so a dark page never flashes white.
 
+A profile's header stays at the top of the page or drawer as the visitor reads, with the way out (back to the search, or the drawer's close button), the photo and name, and every way to reach the therapist: telephone, email, website, social media links and the UKCP profile, each marked by an icon. Where the header is narrow they form one row that scrolls sideways, so the header stays short.
+
 | UKCP element | shadcn/ui |
 |---|---|
 | "I want help with" typeahead, multiple terms | `Popover` + `Command` combobox, choices shown as `Badge`s |
@@ -138,7 +142,7 @@ A switch beside the site's name picks a light, dark or system theme, the last fo
 | Paging | `Pagination` |
 | Loading | `Skeleton` cards |
 | Profile sections | `Card`s with `Separator`s |
-| Show contact details | `Button` that swaps in the returned details |
+| Contact details | A header that stays in view, listing each way to reach the therapist by an icon |
 | Unofficial notice | The about text, shown from the site's name |
 
 ### 4.2 Worker API
@@ -191,8 +195,11 @@ type ProfileSection = {
 
 type Profile = {
   slug: string; name: string; initials: string; photoUrl?: string; location?: string;
+  languages: string[];
   email?: string;      // inline "Email Therapist" address
-  contactId?: string;  // present when contact details can be revealed
+  contactId?: string;  // present when UKCP has contact details to give
+  emailInContact: boolean;  // a container carries data-email="true"
+  social: string[];    // social media links
   about: ProfileSection[];
   practical: ProfileSection[];
   offices: { name: string; isMain: boolean; address: string[]; mapUrl?: string; cost?: string }[];
@@ -227,5 +234,5 @@ Profile sections stay generic because their set varies between profiles; only of
 - **Parser:** unit tests, under jsdom, against HTML fixtures captured from UKCP with personal details replaced by placeholders (names, phones, emails and photo URLs). The capture script is committed so fixtures can be refreshed. Cases: a location search, a search without a location, a zero-result response, an unrecognised location, a profile with inline contact details, a profile with hidden contact details, and the contact-details response.
 - **Validation and canonicalisation:** unit tests, including invalid values, out-of-range numbers and equivalent queries that must canonicalise to the same URL.
 - **Worker routes:** Vitest calling the Hono app directly with a stub upstream `fetch` and a fake rate limiter. Cases: session refresh after `400`, the `502` paths, the rate-limit response, and the `Cache-Control` and `Content-Type` headers.
-- **Front end:** component tests for URL-to-form round-tripping and the contact reveal, tests of the API client's handling of pages it can't read, plus a manual pass in the browser against the deployed Worker.
+- **Front end:** component tests for URL-to-form round-tripping and the profile's contact list, tests of the API client's handling of pages it can't read, plus a manual pass in the browser against the deployed Worker.
 - **Contract canary:** a scheduled GitHub Actions workflow runs the parsers, under jsdom, against live UKCP once a day (four requests) and fails if the shapes in §3.3 and §3.4 stop parsing; GitHub's failure email is the alert. When the live option lists differ from `shared/options.json`, it runs the tests and type-check against the new lists and opens a pull request with them, so a change on UKCP's side becomes one merge, which deploys it. This needs the repository setting "Allow GitHub Actions to create and approve pull requests".

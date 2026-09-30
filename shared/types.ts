@@ -40,8 +40,13 @@ export type Profile = {
   initials: string;
   photoUrl?: string;
   location?: string;
+  languages: string[];
   email?: string;
   contactId?: string;
+  /** Whether UKCP's page shows the email among the contact details; its script strips it everywhere else. */
+  emailInContact: boolean;
+  /** Links from the header's social media icons. */
+  social: string[];
   about: ProfileSection[];
   practical: ProfileSection[];
   offices: Office[];
