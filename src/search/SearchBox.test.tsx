@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { emptyParams, type SearchParams } from "@shared/query";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ApiError, api } from "@/lib/api";
-import { SearchBox } from "./SearchBox";
+import { NO_PLACE, SearchBox } from "./SearchBox";
 import { NO_POSTCODE, REFUSED } from "./useLocate";
 import { useSearchDrafts } from "./useSearchDrafts";
 
@@ -57,15 +57,34 @@ describe("SearchBox", () => {
     expect(location().value).toBe("BN3 1FG");
   });
 
-  it("tells its owner when it searches a place, typed or located, but not with the box blank or no postcode found", async () => {
-    geolocation(at(48.85, 2.35));
-    const nearest = vi.spyOn(api, "nearest").mockResolvedValue({ found: false });
+  it("asks for a place rather than searching with the box blank, until the box is typed in or located", () => {
+    geolocation(() => {});
     const onPlaceSearch = vi.fn();
     const onChange = vi.fn();
     renderBox(onChange, onPlaceSearch);
+    const search = () => fireEvent.click(screen.getByRole("button", { name: "Search" }));
     fireEvent.change(location(), { target: { value: "  " } });
-    fireEvent.click(screen.getByRole("button", { name: "Search" }));
-    expect(onChange).toHaveBeenCalledOnce();
+    search();
+    expect(onChange).not.toHaveBeenCalled();
+    expect(onPlaceSearch).not.toHaveBeenCalled();
+    expect(screen.getByRole("alert").textContent).toBe(NO_PLACE);
+    expect(document.activeElement).toBe(location());
+    expect(location().getAttribute("aria-invalid")).toBe("true");
+    fireEvent.change(location(), { target: { value: "Y" } });
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(location().getAttribute("aria-invalid")).toBeNull();
+    fireEvent.change(location(), { target: { value: "" } });
+    search();
+    expect(screen.getByRole("alert").textContent).toBe(NO_PLACE);
+    locate();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("tells its owner when it searches a place, typed or located, but not when no postcode is found", async () => {
+    geolocation(at(48.85, 2.35));
+    const nearest = vi.spyOn(api, "nearest").mockResolvedValue({ found: false });
+    const onPlaceSearch = vi.fn();
+    renderBox(vi.fn(), onPlaceSearch);
     locate();
     await screen.findByRole("alert");
     expect(onPlaceSearch).not.toHaveBeenCalled();

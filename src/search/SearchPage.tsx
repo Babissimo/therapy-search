@@ -26,7 +26,7 @@ import { Results } from "./Results";
 import { ResultsPanel } from "./ResultsPanel";
 import { coverOf, ResultsSheet, type SheetPosition } from "./ResultsSheet";
 import { SearchBox } from "./SearchBox";
-import { tickedFilters, withFlag } from "./state";
+import { tickedFilters } from "./state";
 import { useResults } from "./useResults";
 import { useSearchDrafts, type SearchDrafts } from "./useSearchDrafts";
 import { useSearchState } from "./useSearchState";
@@ -75,9 +75,9 @@ type ViewProps = { params: SearchParams; onChange: (next: SearchParams) => void;
 function SearchView({ params, onChange, wide }: ViewProps) {
   const { key: entry } = useLocation();
   const drafts = useSearchDrafts(params, onChange);
-  // With nothing to search for, UKCP would list everyone in a random order, which answers no one's question. The
-  // outside-UK tick alone is nothing to search for: it only changes how a location is read.
-  const searching = toQuery(withFlag(params, "LocationSearchOutsideUK", false)) !== "";
+  // Only a place makes a search here: without one UKCP would list everyone matching in a random order, which answers no
+  // one looking nearby. Ticks and the keyword wait in the URL for one.
+  const searching = params.text.Location !== "";
   // The search, which the tab chosen and a selection belong to.
   const fitKey = searching ? toQuery(params) : "";
   const results = useResults(params, searching);

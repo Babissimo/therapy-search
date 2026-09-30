@@ -11,6 +11,7 @@ import { createShortlistStore, type ShortlistStore } from "@/shortlist/store";
 import { ShortlistContext } from "@/shortlist/useShortlist";
 import type { Highlight } from "./map/highlight";
 import { layoutPins, type Pin } from "./map/pins";
+import { NO_PLACE } from "./SearchBox";
 import { SearchPage } from "./SearchPage";
 
 // Results keep the order they are answered in here; order.test.ts and useResults.test.tsx cover the order itself.
@@ -226,23 +227,30 @@ describe("SearchPage", () => {
     expect((await screen.findByTestId("map")).dataset.outsideUk).toBe("true");
   });
 
-  it("takes the outside-UK tick alone as nothing to search for", async () => {
+  it("searches nothing until there is a place, keeping the ticks and keyword for the first one searched", async () => {
     screenIs(true);
-    renderAt("/?LocationSearchOutsideUK=true");
+    renderAt("/?Languages=French&KeywordFilter=grief&LocationSearchOutsideUK=true");
     await mapLoads();
     expect(screen.getByText(/^Search a town, city or postcode/)).toBeTruthy();
     expect(screen.queryByTestId("map")).toBeNull();
+    expect(screen.getByRole("button", { name: "Remove French" })).toBeTruthy();
     expect(api.search).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByRole("textbox", { name: "Location" }), { target: { value: "Paris" } });
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+    await loaded();
+    expect(vi.mocked(api.search).mock.lastCall?.[0]).toBe("Location=Paris&KeywordFilter=grief&Languages=French&LocationSearchOutsideUK=true");
   });
 
-  it("goes back to the prompt in place of the map and results when the location is cleared, and opens the next search on its list", async () => {
+  it("goes back to the prompt in place of the map and results when the search is cleared, and opens the next search on its list", async () => {
     screenIs(false);
     renderAt(SEARCH);
     await loaded();
     expect(await screen.findByTestId("map")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Show map" }));
     fireEvent.change(screen.getByRole("textbox", { name: "Location" }), { target: { value: "" } });
-    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+    fireEvent.click(screen.getByRole("button", { name: "Filters" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Clear all filters" }));
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
     expect(screen.getByText(/^Search a town, city or postcode/)).toBeTruthy();
     expect(screen.queryByRole("region", { name: "Results and shortlist" })).toBeNull();
     expect(screen.queryByTestId("map")).toBeNull();
@@ -250,6 +258,32 @@ describe("SearchPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "Search" }));
     expect(results().dataset.position).toBe("full");
     await loaded();
+  });
+
+  it("asks for a place rather than searching with the box emptied, leaving the search as it was", async () => {
+    screenIs(true);
+    renderAt(SEARCH);
+    await loaded();
+    fireEvent.change(screen.getByRole("textbox", { name: "Location" }), { target: { value: "" } });
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+    expect(screen.getByRole("alert").textContent).toBe(NO_PLACE);
+    expect(url().get("Location")).toBe("Leeds");
+    expect(results()).toBeTruthy();
+  });
+
+  it("leaves a search that nothing changes where it was, asking UKCP nothing more", async () => {
+    screenIs(true);
+    renderAt(SEARCH);
+    await loaded();
+    list().scrollTop = 400;
+    fireEvent.scroll(list());
+    fireEvent.change(screen.getByRole("textbox", { name: "Location" }), { target: { value: " Leeds " } });
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+    fireEvent.click(screen.getByRole("button", { name: "Filters" }));
+    fireEvent.click(screen.getByRole("button", { name: "Clear all filters" }));
+    await loaded();
+    expect(list().scrollTop).toBe(400);
+    expect(api.search).toHaveBeenCalledOnce();
   });
 
   it("keeps Load more beneath the list rather than at its end", async () => {
@@ -296,7 +330,7 @@ describe("SearchPage", () => {
     expect(screen.queryByRole("region", { name: "Refine your search" })).toBeNull();
   });
 
-  it("opens the filters beside the prompt on wide screens, open as they search until a search for a place puts them away", async () => {
+  it("opens the filters beside the prompt on wide screens, open as they are set until a search for a place puts them away", async () => {
     screenIs(true);
     renderAt("/");
     const filters = () => screen.queryByRole("region", { name: "Refine your search" });
@@ -306,12 +340,14 @@ describe("SearchPage", () => {
     const keyword = screen.getByRole("searchbox", { name: "Keyword search" });
     fireEvent.change(keyword, { target: { value: "grief" } });
     fireEvent.submit(keyword.closest("form")!);
-    await loaded();
+    expect(url().get("KeywordFilter")).toBe("grief");
+    expect(screen.getByText(/^Search a town, city or postcode/)).toBeTruthy();
     expect(filters()).toBeTruthy();
     fireEvent.change(screen.getByRole("textbox", { name: "Location" }), { target: { value: "York" } });
     fireEvent.click(screen.getByRole("button", { name: "Search" }));
     expect(filters()).toBeNull();
     await loaded();
+    expect(api.search).toHaveBeenCalledOnce();
   });
 
   it.each([
@@ -337,7 +373,6 @@ describe("SearchPage", () => {
   it("leaves the outside-UK tick out of the Filters count, as Clear all keeps it", async () => {
     screenIs(true);
     renderAt("/?LocationSearchOutsideUK=true&Languages=French");
-    await loaded();
     expect(screen.getByRole("button", { name: "Filters, 1 ticked" })).toBeTruthy();
   });
 
@@ -885,26 +920,10 @@ describe("SearchPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "Add Therapist p1-3 to your shortlist" }));
     fireEvent.click(screen.getByRole("button", { name: "Remove Therapist p1-3 from your shortlist" }));
     fireEvent.change(screen.getByRole("textbox", { name: "Location" }), { target: { value: "" } });
-    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+    fireEvent.click(screen.getByRole("button", { name: "Filters" }));
+    fireEvent.click(screen.getByRole("button", { name: "Clear all filters" }));
     expect(screen.getByText(/^Search a town, city or postcode/)).toBeTruthy();
     expect(screen.queryByRole("region", { name: "Results and shortlist" })).toBeNull();
-  });
-
-  it("times a slow first search from the search, not from the prompt shown beside the shortlist before it", () => {
-    vi.useFakeTimers();
-    screenIs(true);
-    shortlist.add(therapist("a"));
-    renderAt("/");
-    vi.mocked(api.search).mockImplementation(() => new Promise(() => {}));
-    act(() => vi.advanceTimersByTime(5000));
-    fireEvent.click(screen.getByRole("button", { name: "Filters" }));
-    const keyword = screen.getByRole("searchbox", { name: "Keyword search" });
-    fireEvent.change(keyword, { target: { value: "grief" } });
-    fireEvent.submit(keyword.closest("form")!);
-    const slow = () => screen.queryByText(/^Getting every result/);
-    expect(slow()).toBeNull();
-    act(() => vi.advanceTimersByTime(2000));
-    expect(slow()).toBeTruthy();
   });
 
   it("lowers the sheet beneath the prompt before a search, raising it for the shortlist", async () => {
