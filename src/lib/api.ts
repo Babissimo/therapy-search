@@ -21,8 +21,16 @@ async function failure(res: Response): Promise<ApiError> {
   return new ApiError(res.status, (body as { error?: string }).error ?? "Something went wrong.");
 }
 
+/**
+ * What is asked travels in the body, since Cloudflare's request analytics keep each address beside the visitor's IP;
+ * the Worker asks its cache by address in its place.
+ */
+function post(body: string | Record<string, string>): RequestInit {
+  return { method: "POST", body: new URLSearchParams(body) };
+}
+
 /** The Worker passes UKCP's HTML through untouched; the page reads it here, in the browser. */
-async function request<T>(url: string, read: (html: string) => T, init?: RequestInit): Promise<T> {
+async function request<T>(url: string, read: (html: string) => T, init: RequestInit): Promise<T> {
   const res = await fetch(url, init);
   if (!res.ok) throw await failure(res);
   const html = await res.text();
@@ -45,16 +53,16 @@ function listingsOf(html: string): Listings {
   return { ...found, listings: found.listings.map((listing) => ({ ...listing, read: () => readable(listing.read) })) };
 }
 
-async function json<T>(url: string): Promise<T> {
-  const res = await fetch(url);
+async function json<T>(url: string, init: RequestInit): Promise<T> {
+  const res = await fetch(url, init);
   if (!res.ok) throw await failure(res);
   return (await res.json()) as T;
 }
 
 export const api = {
-  search: (query: string) => request(`/api/search${query ? `?${query}` : ""}`, listingsOf),
-  profile: (slug: string) => request(`/api/therapist/${encodeURIComponent(slug)}`, (html) => parseProfile(html, slug)),
-  contact: (id: string) => request(`/api/contact/${encodeURIComponent(id)}`, parseContact),
-  place: (text: string, options: PlaceOptions = {}) => json<PlaceLookup>(`/api/place?${placeQuery(text, options)}`),
-  nearest: (lat: number, lng: number) => json<NearestLookup>(`/api/nearest?${nearestQuery(lat, lng)}`),
+  search: (query: string) => request("/api/search", listingsOf, post(query)),
+  profile: (slug: string) => request("/api/therapist", (html) => parseProfile(html, slug), post({ slug })),
+  contact: (id: string) => request("/api/contact", parseContact, post({ id })),
+  place: (text: string, options: PlaceOptions = {}) => json<PlaceLookup>("/api/place", post(placeQuery(text, options))),
+  nearest: (lat: number, lng: number) => json<NearestLookup>("/api/nearest", post(nearestQuery(lat, lng))),
 };

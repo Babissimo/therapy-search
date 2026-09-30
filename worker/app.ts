@@ -1,4 +1,5 @@
 import { Hono, type Context } from "hono";
+import { bodyLimit } from "hono/body-limit";
 import { LOCATION_MAX_LENGTH, canonicalLocation, nearestQuery, placeQuery, type NearestLookup, type PlaceLookup, type PlaceOptions } from "../shared/location";
 import { ALLOWED } from "../shared/options";
 import { InvalidParam, asksWhole, readParams, toQuery } from "../shared/query";
@@ -11,6 +12,8 @@ export type PlaceFinder = {
   lookup(text: string, options: PlaceOptions): Promise<PlaceLookup>;
   nearest(lat: number, lng: number): Promise<NearestLookup>;
 };
+/** The cached entrypoint, as the gateway reaches it. */
+export type Cached = { fetch(request: Request): Promise<Response> };
 type Ctx = Context<{ Bindings: Env }>;
 
 const SEARCH_MAX_AGE = 15 * 60;
@@ -26,100 +29,67 @@ const PLACE_FOUND_MAX_AGE = 30 * 24 * 60 * 60;
 const PLACE_MISSING_MAX_AGE = 24 * 60 * 60;
 // Vite names each built file by a hash of its content, so a browser can keep one for good.
 const ASSET_CACHE_CONTROL = "public, max-age=31536000, immutable";
+// Far more than the form can send; a body is read whole before it is checked.
+const BODY_MAX_BYTES = 64 * 1024;
+// The cache keys on path and query alone, so the host of the gateway's requests to it is arbitrary.
+const CACHE_ORIGIN = "https://cache.internal";
+/** Carries the visitor's allowance key from the gateway to the cached entrypoint; headers are no part of the cache key. */
+export const RATE_KEY = "x-rate-key";
 export const UPSTREAM_DOWN = "UKCP's search isn't responding. Try again, or search on UKCP directly.";
 export const TOO_MANY = "Too many searches in a short time. Wait a minute and try again.";
 export const PLACE_DOWN = "Couldn't look up that place just now.";
 export const NEAREST_DOWN = "Couldn't find the nearest postcode just now.";
+export const STALE_PAGE = "This page is out of date. Reload it to search.";
 // UKCP builds slugs from names, so they can carry accents and apostrophes.
 const SLUG = /^[\p{L}\p{N}][\p{L}\p{M}\p{N}'’.-]{2,119}$/u;
 
-export function createApp(clientFor: (env: Env) => UkcpClient, placesFor: (env: Env) => PlaceFinder) {
+/**
+ * The entrypoint visitors reach. Their searches arrive in request bodies, which Cloudflare's request analytics never
+ * record, and go on to the cached entrypoint by canonical URL, which stays inside the Worker.
+ */
+export function createGateway(cachedFor: (c: Ctx) => Cached) {
   const app = new Hono<{ Bindings: Env }>();
 
-  // Anything not explicitly cacheable must never be stored: errors and redirects to bad input.
+  // Nothing about a search is kept in the browser; what the edge keeps is the cached entrypoint's to say.
   app.use("/api/*", async (c, next) => {
     await next();
-    if (!c.res.headers.has("Cache-Control")) c.res.headers.set("Cache-Control", "no-store");
+    c.res.headers.set("Cache-Control", "no-store");
+  });
+  app.use("/api/*", bodyLimit({ maxSize: BODY_MAX_BYTES, onError: (c) => c.json({ error: "That request is too large." }, 413) }));
+
+  app.post("/api/search", async (c) => {
+    const query = toQuery(readParams(await formOf(c), ALLOWED));
+    return forward(c, `/api/search${query ? `?${query}` : ""}`);
   });
 
-  app.get("/api/search", async (c) => {
-    const url = new URL(c.req.url);
-    const params = readParams(url.searchParams, ALLOWED);
-    const canonical = toQuery(params);
-    // Compared as parsed parameters, so a proxy re-encoding the query can't cause a redirect loop.
-    if (new URLSearchParams(url.search).toString() !== canonical) {
-      return c.redirect(`/api/search${canonical ? `?${canonical}` : ""}`, 301);
-    }
-    if (!(await allow(c, c.env.UPSTREAM_LIMIT))) return c.json({ error: TOO_MANY }, 429);
-    const body = expectOpening(await clientFor(c.env).search(params), "results-no", "fat-search-alert");
-    return upstreamHtml(c, body, `public, max-age=${asksWhole(params) ? WHOLE_SEARCH_MAX_AGE : SEARCH_MAX_AGE}`);
-  });
-
-  app.get("/api/therapist/:slug", async (c) => {
-    const slug = c.req.param("slug");
+  app.post("/api/therapist", async (c) => {
+    const slug = (await formOf(c)).get("slug") ?? "";
     if (!SLUG.test(slug)) return c.json({ error: "That isn't a UKCP profile address." }, 400);
-    if (!(await allow(c, c.env.UPSTREAM_LIMIT))) return c.json({ error: TOO_MANY }, 429);
-    const html = await clientFor(c.env).profile(slug);
-    if (html === null) return c.json({ error: "This profile isn't on UKCP any more." }, 404);
-    return upstreamHtml(c, expectPage(html, "therapist-header"), `public, max-age=${PROFILE_MAX_AGE}`);
+    return forward(c, `/api/therapist/${encodeURIComponent(slug)}`);
   });
 
-  app.get("/api/contact/:id", async (c) => {
+  app.post("/api/contact", async (c) => {
     // Only our own pages may ask, so other sites can't make their visitors' browsers request contact details from UKCP.
     const site = c.req.header("sec-fetch-site");
     if (site === "cross-site" || site === "same-site") return c.json({ error: "Contact details can only be shown on this site." }, 403);
-    const id = c.req.param("id");
+    const id = (await formOf(c)).get("id") ?? "";
     if (!/^\d{1,10}$/.test(id)) return c.json({ error: "That isn't a UKCP contact id." }, 400);
-    if (!(await allow(c, c.env.UPSTREAM_LIMIT))) return c.json({ error: TOO_MANY }, 429);
-    const html = await clientFor(c.env).contact(id);
-    // UKCP answers an unknown id with an empty page, which is passed on but not kept, as is any page without details.
-    return upstreamHtml(c, html, html.includes("therapist-contacts-details-") ? `public, max-age=${PROFILE_MAX_AGE}` : "no-store");
+    return forward(c, `/api/contact/${id}`);
   });
 
-  app.get("/api/place", async (c) => {
-    const url = new URL(c.req.url);
-    const text = canonicalLocation(url.searchParams.get("q") ?? "");
-    if (text.length === 0 || text.length > LOCATION_MAX_LENGTH) throw new InvalidParam("q", `q must be 1 to ${LOCATION_MAX_LENGTH} characters`);
-    const country = url.searchParams.get("country");
-    if (country !== null && !/^[a-z]{2}$/i.test(country)) throw new InvalidParam("country", "country must be a two-letter country code");
-    const options: PlaceOptions = {
-      centre: url.searchParams.get("centre") === "true",
-      outsideUK: url.searchParams.get("outsideUK") === "true",
-      ...(country === null ? {} : { country: country.toLowerCase() }),
-    };
-    const canonical = placeQuery(text, options);
-    // Compared as parsed parameters, as for searches, so re-encoding can't cause a redirect loop.
-    if (new URLSearchParams(url.search).toString() !== canonical) return c.redirect(`/api/place?${canonical}`, 301);
-    if (!(await allow(c, c.env.PLACE_LIMIT))) return c.json({ error: TOO_MANY }, 429);
-    let lookup: PlaceLookup;
-    try {
-      lookup = await placesFor(c.env).lookup(text, options);
-    } catch (error) {
-      // The message names the service and status, never the text looked up.
-      console.error(error instanceof Error ? `${error.name}: ${error.message}` : "place lookup failed");
-      return c.json({ error: PLACE_DOWN }, 502);
-    }
-    return c.json(lookup, 200, { "Cache-Control": `public, max-age=${lookup.found ? PLACE_FOUND_MAX_AGE : PLACE_MISSING_MAX_AGE}` });
+  app.post("/api/place", async (c) => {
+    const { text, options } = placeOf(await formOf(c));
+    return forward(c, `/api/place?${placeQuery(text, options)}`);
   });
 
-  app.get("/api/nearest", async (c) => {
-    const url = new URL(c.req.url);
-    const lat = coordinate(url.searchParams.get("lat"), "lat", 90);
-    const lng = coordinate(url.searchParams.get("lng"), "lng", 180);
-    const canonical = nearestQuery(lat, lng);
-    // The browser rounds the point before asking; anything finer is redirected, so it is never looked up or cached.
-    if (new URLSearchParams(url.search).toString() !== canonical) return c.redirect(`/api/nearest?${canonical}`, 301);
-    if (!(await allow(c, c.env.PLACE_LIMIT))) return c.json({ error: TOO_MANY }, 429);
-    let nearest: NearestLookup;
-    try {
-      nearest = await placesFor(c.env).nearest(lat, lng);
-    } catch (error) {
-      // The message names the service and status, never the point looked up.
-      console.error(error instanceof Error ? `${error.name}: ${error.message}` : "nearest lookup failed");
-      return c.json({ error: NEAREST_DOWN }, 502);
-    }
-    return c.json(nearest, 200, { "Cache-Control": `public, max-age=${nearest.found ? PLACE_FOUND_MAX_AGE : PLACE_MISSING_MAX_AGE}` });
+  app.post("/api/nearest", async (c) => {
+    const { lat, lng } = pointOf(await formOf(c));
+    // Rounded before it reaches the cache, so a finer point is never looked up or kept.
+    return forward(c, `/api/nearest?${nearestQuery(lat, lng)}`);
   });
+
+  // Only a page loaded from an older deploy asks by URL; reloading brings one that doesn't.
+  app.get("/api/*", (c) => c.json({ error: STALE_PAGE }, 410));
 
   // Built files are marked here rather than by a _headers rule, which would also mark the app's page that assets answer
   // for a name the running deploy lacks, such as a chunk a tab from an older deploy asks for.
@@ -133,19 +103,119 @@ export function createApp(clientFor: (env: Env) => UkcpClient, placesFor: (env: 
   });
 
   app.notFound((c) => c.json({ error: "Not found" }, 404));
+  app.onError(answerError);
 
-  app.onError((error, c) => {
-    if (error instanceof InvalidParam) return c.json({ error: error.message, param: error.param }, 400);
-    if (error instanceof UpstreamError || error.name === "TimeoutError") {
-      // The message names the status, never the visitor's query.
-      console.error(`${error.name}: ${error.message}`);
-      return c.json({ error: UPSTREAM_DOWN }, 502);
-    }
-    console.error(error);
-    return c.json({ error: "Something went wrong." }, 500);
-  });
+  /** Asks the cached entrypoint, which counts a miss against the visitor's allowance. */
+  async function forward(c: Ctx, path: string): Promise<Response> {
+    const key = rateKey(c.req.header("cf-connecting-ip") ?? "unknown");
+    const res = await cachedFor(c).fetch(new Request(CACHE_ORIGIN + path, { headers: { [RATE_KEY]: key } }));
+    // Copied, since a response from another entrypoint arrives with its headers fixed.
+    return new Response(res.body, res);
+  }
 
   return app;
+}
+
+/**
+ * The cached entrypoint, reached only from the gateway and only by canonical URL. Workers Caching keeps its answers as
+ * their Cache-Control allows, so it runs, and a search reaches UKCP, only when the cache has no answer.
+ */
+export function createCache(clientFor: (env: Env) => UkcpClient, placesFor: (env: Env) => PlaceFinder) {
+  const app = new Hono<{ Bindings: Env }>();
+
+  // Anything not explicitly cacheable must never be stored, errors above all.
+  app.use("/api/*", async (c, next) => {
+    await next();
+    if (!c.res.headers.has("Cache-Control")) c.res.headers.set("Cache-Control", "no-store");
+  });
+
+  app.get("/api/search", async (c) => {
+    const params = readParams(new URL(c.req.url).searchParams, ALLOWED);
+    if (!(await allow(c, c.env.UPSTREAM_LIMIT))) return c.json({ error: TOO_MANY }, 429);
+    const body = expectOpening(await clientFor(c.env).search(params), "results-no", "fat-search-alert");
+    return upstreamHtml(c, body, `public, max-age=${asksWhole(params) ? WHOLE_SEARCH_MAX_AGE : SEARCH_MAX_AGE}`);
+  });
+
+  app.get("/api/therapist/:slug", async (c) => {
+    if (!(await allow(c, c.env.UPSTREAM_LIMIT))) return c.json({ error: TOO_MANY }, 429);
+    const slug = c.req.param("slug");
+    const html = await clientFor(c.env).profile(slug);
+    if (html === null) return c.json({ error: "This profile isn't on UKCP any more." }, 404);
+    return upstreamHtml(c, expectPage(html, "therapist-header"), `public, max-age=${PROFILE_MAX_AGE}`);
+  });
+
+  app.get("/api/contact/:id", async (c) => {
+    if (!(await allow(c, c.env.UPSTREAM_LIMIT))) return c.json({ error: TOO_MANY }, 429);
+    const html = await clientFor(c.env).contact(c.req.param("id"));
+    // UKCP answers an unknown id with an empty page, which is passed on but not kept, as is any page without details.
+    return upstreamHtml(c, html, html.includes("therapist-contacts-details-") ? `public, max-age=${PROFILE_MAX_AGE}` : "no-store");
+  });
+
+  app.get("/api/place", async (c) => {
+    const { text, options } = placeOf(new URL(c.req.url).searchParams);
+    if (!(await allow(c, c.env.PLACE_LIMIT))) return c.json({ error: TOO_MANY }, 429);
+    let lookup: PlaceLookup;
+    try {
+      lookup = await placesFor(c.env).lookup(text, options);
+    } catch (error) {
+      // The message names the service and status, never the text looked up.
+      console.error(error instanceof Error ? `${error.name}: ${error.message}` : "place lookup failed");
+      return c.json({ error: PLACE_DOWN }, 502);
+    }
+    return c.json(lookup, 200, { "Cache-Control": `public, max-age=${lookup.found ? PLACE_FOUND_MAX_AGE : PLACE_MISSING_MAX_AGE}` });
+  });
+
+  app.get("/api/nearest", async (c) => {
+    const { lat, lng } = pointOf(new URL(c.req.url).searchParams);
+    if (!(await allow(c, c.env.PLACE_LIMIT))) return c.json({ error: TOO_MANY }, 429);
+    let nearest: NearestLookup;
+    try {
+      nearest = await placesFor(c.env).nearest(lat, lng);
+    } catch (error) {
+      // The message names the service and status, never the point looked up.
+      console.error(error instanceof Error ? `${error.name}: ${error.message}` : "nearest lookup failed");
+      return c.json({ error: NEAREST_DOWN }, 502);
+    }
+    return c.json(nearest, 200, { "Cache-Control": `public, max-age=${nearest.found ? PLACE_FOUND_MAX_AGE : PLACE_MISSING_MAX_AGE}` });
+  });
+
+  app.notFound((c) => c.json({ error: "Not found" }, 404));
+  app.onError(answerError);
+
+  return app;
+}
+
+function answerError(error: Error, c: Context): Response {
+  if (error instanceof InvalidParam) return c.json({ error: error.message, param: error.param }, 400);
+  if (error instanceof UpstreamError || error.name === "TimeoutError") {
+    // The message names the status, never the visitor's query.
+    console.error(`${error.name}: ${error.message}`);
+    return c.json({ error: UPSTREAM_DOWN }, 502);
+  }
+  console.error(error);
+  return c.json({ error: "Something went wrong." }, 500);
+}
+
+async function formOf(c: Ctx): Promise<URLSearchParams> {
+  return new URLSearchParams(await c.req.text());
+}
+
+/** The text and options of a place lookup, in their canonical form. */
+function placeOf(query: URLSearchParams): { text: string; options: PlaceOptions } {
+  const text = canonicalLocation(query.get("q") ?? "");
+  if (text.length === 0 || text.length > LOCATION_MAX_LENGTH) throw new InvalidParam("q", `q must be 1 to ${LOCATION_MAX_LENGTH} characters`);
+  const country = query.get("country");
+  if (country !== null && !/^[a-z]{2}$/i.test(country)) throw new InvalidParam("country", "country must be a two-letter country code");
+  const options: PlaceOptions = {
+    centre: query.get("centre") === "true",
+    outsideUK: query.get("outsideUK") === "true",
+    ...(country === null ? {} : { country: country.toLowerCase() }),
+  };
+  return { text, options };
+}
+
+function pointOf(query: URLSearchParams): { lat: number; lng: number } {
+  return { lat: coordinate(query.get("lat"), "lat", 90), lng: coordinate(query.get("lng"), "lng", 180) };
 }
 
 function coordinate(text: string | null, param: string, limit: number): number {
@@ -173,7 +243,7 @@ function upstreamHtml(c: Ctx, html: string | Uint8Array<ArrayBuffer>, cacheContr
 
 /** Counts a request that will reach an upstream service against the visitor's per-minute allowance for it. */
 async function allow(c: Ctx, limiter: RateLimit): Promise<boolean> {
-  const { success } = await limiter.limit({ key: rateKey(c.req.header("cf-connecting-ip") ?? "unknown") });
+  const { success } = await limiter.limit({ key: c.req.header(RATE_KEY) ?? "unknown" });
   return success;
 }
 

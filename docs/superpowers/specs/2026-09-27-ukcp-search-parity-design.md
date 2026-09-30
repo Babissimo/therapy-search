@@ -27,7 +27,7 @@ Out of scope for v1:
   - Identify ourselves in the `User-Agent` with a link to the site, so UKCP can see and contact us.
   - Cap uncached upstream requests per visitor IP (§4.3).
 - **Clearly unofficial.** The site's name opens the about text, which says the site is not affiliated with UKCP, and every profile has a "View on UKCP" link.
-- **No health data at rest.** Search terms such as "Trauma" are special-category data under UK GDPR. The Worker logs no query strings or bodies, and cache keys never include the visitor's IP.
+- **No health data at rest.** Search terms such as "Trauma" are special-category data under UK GDPR. The Worker logs no query strings or bodies, and cache keys never include the visitor's IP. Cloudflare's request analytics keep every request's URL beside the visitor's IP, so the API takes what a visitor asks in request bodies (§4.2).
 
 ## 3. The UKCP interface
 
@@ -158,25 +158,25 @@ Each office card holds the office's fees and a still map centred on it, the ther
 
 ### 4.2 Worker API
 
-| Route | Upstream | Cache |
-|---|---|---|
-| `GET /api/search?<UKCP params>` | Search POST (§3.2) | 15 minutes; 6 hours without a location |
-| `GET /api/therapist/:slug` | Profile GET (§3.4) | 1 hour |
-| `GET /api/contact/:id` | ContactDetails POST (§3.4) | 1 hour |
+| Route | Body | Cached as | Upstream | Cache |
+|---|---|---|---|---|
+| `POST /api/search` | UKCP's params | `/api/search?<UKCP params>` | Search POST (§3.2) | 15 minutes; 6 hours without a location |
+| `POST /api/therapist` | `slug` | `/api/therapist/:slug` | Profile GET (§3.4) | 1 hour |
+| `POST /api/contact` | `id` | `/api/contact/:id` | ContactDetails POST (§3.4) | 1 hour |
 
-Search and contact details are GETs on our side so the responses can be cached by URL. The Worker **validates** every parameter against the option lists (including each `HelpWith` term) and the numeric ranges in §3.2, rejecting anything else with `400`, so nothing arbitrary is forwarded. It then **canonicalises** the query (fixed key order, sorted values and `HelpWith` terms, defaults and keys it doesn't forward dropped) and redirects to the canonical URL when it differs, so equivalent searches share one cache entry. It **forwards** the query as a form POST for a batch of 480 results, or for every result when there is no location, with `page` counting batches (map spec §4.4). It returns UKCP's HTML byte for byte, never decoded, since decoding the 8.5 MB of the largest search would take most of a request's 10 ms of CPU, as `text/plain` with `X-Content-Type-Options: nosniff` so it can never render as a page on our origin. The front end parses it (§5).
+Cloudflare's request analytics record each request's full URL with the visitor's IP, network and browser, and keep them for days on every plan, with no setting to stop it; they never record a body. So the browser sends what it asks as a form body, and the Worker has two entrypoints. The default one, which visitors reach, **validates** every parameter against the option lists (including each `HelpWith` term) and the numeric ranges in §3.2, rejecting anything else with `400`, so nothing arbitrary is forwarded. It then **canonicalises** the query (fixed key order, sorted values and `HelpWith` terms, defaults and keys it doesn't forward dropped) and asks the `CachedApi` entrypoint for the canonical URL through `ctx.exports`, a call that stays inside the Worker, so equivalent searches share one cache entry. It answers the browser `no-store`, so nothing searched stays in the browser's cache. `CachedApi` **forwards** the query as a form POST for a batch of 480 results, or for every result when there is no location, with `page` counting batches (map spec §4.4). It returns UKCP's HTML byte for byte, never decoded, since decoding the 8.5 MB of the largest search would take most of a request's 10 ms of CPU, as `text/plain` with `X-Content-Type-Options: nosniff` so it can never render as a page on our origin. The front end parses it (§5). A page loaded from an older deploy may still ask by URL, and is answered `410` with a message to reload.
 
 A search without a location is kept for 6 hours. Asking UKCP for all of it is the heaviest request the site makes, and the order a visitor sees comes from the browser (§4.1), so the entry's age decides only how soon a therapist who joins UKCP appears.
 
 The contact route refuses requests that the browser marks as coming from another site (`Sec-Fetch-Site`), so other sites cannot make their visitors' browsers request contact details from UKCP.
 
-Caching uses Workers Caching (`cache.enabled` in the Wrangler config, `Cache-Control: public, max-age=…` on responses). It keys by path and query and collapses concurrent misses, and it works on `workers.dev`. Entries outlive a deploy (`cache.cross_version_cache`), since the Worker's answers rarely change between deploys: a change that alters them reaches a cached URL only as its entry expires, within an hour for searches and profiles. A route whose answers are kept longer carries a version in its query instead, raised when they change.
+Caching uses Workers Caching (`cache.enabled` in the Wrangler config, `Cache-Control: public, max-age=…` on responses). It never caches a POST, so the default entrypoint runs for every API request, and its own cache holds only built files. It keys by entrypoint, path and query and collapses concurrent misses, and it works on `workers.dev`. Entries outlive a deploy (`cache.cross_version_cache`), since the Worker's answers rarely change between deploys: a change that alters them reaches a cached URL only as its entry expires, within an hour for searches and profiles. A route whose answers are kept longer carries a version in its query instead, raised when they change.
 
 Built files under `/assets` are named by a hash of their content, so the Worker serves them marked `immutable` for a year and a returning browser asks for none of them. A name the running deploy lacks, such as a chunk requested by a tab from an older deploy, gets an uncached `404` once the edge no longer holds it, rather than the app's page, which the assets would otherwise send and a `_headers` rule would mark immutable.
 
 ### 4.3 Rate limit
 
-Each IP may cause at most 20 uncached upstream requests a minute (IPv6 addresses count per /64, since one visitor usually holds a whole /64), enforced with the Workers rate-limiting binding. Past that, the API returns `429` and the UI shows "Too many searches in a short time. Wait a minute and try again." Cached responses are never limited.
+Each IP may cause at most 20 uncached upstream requests a minute (IPv6 addresses count per /64, since one visitor usually holds a whole /64), enforced with the Workers rate-limiting binding. Past that, the API returns `429` and the UI shows "Too many searches in a short time. Wait a minute and try again." Cached responses are never limited: `CachedApi` counts the request, and runs only on a miss. The default entrypoint passes it the visitor's key in a header, since headers are no part of the cache key, where `ctx.props` would split the cache by visitor.
 
 ### 4.4 Shortlist
 
