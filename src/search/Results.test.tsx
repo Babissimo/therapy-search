@@ -99,6 +99,13 @@ describe("Results", () => {
     expect(screen.queryByText(SLOW)).toBeNull();
   });
 
+  it("keeps the list's stand-in from screen readers while a search loads", () => {
+    vi.spyOn(api, "search").mockImplementation(() => new Promise(() => {}));
+    renderResults(leeds);
+    expect(screen.queryAllByRole("heading")).toEqual([]);
+    expect(screen.queryAllByRole("alert")).toEqual([]);
+  });
+
   it("heads the list with how many a searched place has within its area", async () => {
     answerBatches();
     renderResults(leeds);

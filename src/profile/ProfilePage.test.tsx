@@ -71,6 +71,12 @@ describe("ProfilePage's way back", () => {
 });
 
 describe("ProfilePage's header", () => {
+  it("names no one to screen readers until the profile arrives", async () => {
+    renderAt(["/therapist/Test-ABCDEFGH"]);
+    expect(screen.queryAllByRole("heading")).toEqual([]);
+    await screen.findByRole("heading", { name: "Test Therapist" });
+  });
+
   it("lists the profile's email among the ways to reach them", async () => {
     renderAt(["/therapist/Test-ABCDEFGH"], { ...PROFILE, email: "test@example.com" });
     const email = await screen.findByRole("link", { name: "Email: test@example.com" });

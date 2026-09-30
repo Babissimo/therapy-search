@@ -1,9 +1,10 @@
+import type { ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { AtSign, ExternalLink, Globe, Mail, Phone, type LucideIcon } from "lucide-react";
 import { ukcpProfileUrl } from "@shared/query";
 import type { Profile } from "@shared/types";
+import { SkeletonText } from "@/components/SkeletonText";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api";
 
 /** `title` gives the whole of a text that is shortened or may be cut off. */
@@ -32,8 +33,7 @@ export function ContactList({ profile }: { profile: Profile }) {
 
   return (
     <div className="space-y-1">
-      {/* One row that scrolls sideways where the header is narrow, so the header stays short enough to keep in view. */}
-      <ul className="flex gap-x-4 gap-y-1 overflow-x-auto text-sm whitespace-nowrap [scrollbar-width:none] @lg:flex-wrap @lg:overflow-visible">
+      <ContactRow>
         {items.map((item) => (
           <li key={item.href} className="shrink-0 @lg:max-w-full @lg:min-w-0 @lg:shrink">
             <a
@@ -49,12 +49,12 @@ export function ContactList({ profile }: { profile: Profile }) {
           </li>
         ))}
         {contact.isLoading && (
-          <li className="flex shrink-0 items-center">
-            <Skeleton className="h-4 w-36" />
+          <li className="shrink-0">
+            <SkeletonText className="w-36" />
             <span className="sr-only">Loading contact details</span>
           </li>
         )}
-      </ul>
+      </ContactRow>
       {contact.error && (
         <p className="text-sm text-destructive">
           {contact.error.message}{" "}
@@ -64,6 +64,28 @@ export function ContactList({ profile }: { profile: Profile }) {
         </p>
       )}
     </div>
+  );
+}
+
+/** The contact row while the profile loads, with room for the usual phone, email, website and link to UKCP. */
+export function ContactListSkeleton() {
+  return (
+    <ContactRow>
+      {["w-24", "w-40", "w-44", "w-24"].map((width, i) => (
+        <li key={i} className="shrink-0">
+          <SkeletonText className={width} />
+        </li>
+      ))}
+    </ContactRow>
+  );
+}
+
+/** One row that scrolls sideways where the header is narrow, so the header stays short enough to keep in view. */
+function ContactRow({ children }: { children: ReactNode }) {
+  return (
+    <ul className="flex gap-x-4 gap-y-1 overflow-x-auto text-sm whitespace-nowrap [scrollbar-width:none] @lg:flex-wrap @lg:overflow-visible">
+      {children}
+    </ul>
   );
 }
 

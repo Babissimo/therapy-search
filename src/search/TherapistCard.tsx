@@ -1,10 +1,13 @@
-import type { ReactNode } from "react";
+import type { ComponentProps, ReactNode } from "react";
 import { Link } from "react-router";
 import { classifyLocation } from "@shared/location";
 import type { TherapistCard as Therapist } from "@shared/types";
+import { SkeletonText } from "@/components/SkeletonText";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 import { useProfileLink } from "@/profile/profileLink";
 
 type Props = {
@@ -22,42 +25,83 @@ type Props = {
 
 export function TherapistCard({ therapist: t, sought, grouped = false, online = false, action, onHighlight }: Props) {
   const profile = useProfileLink();
-  const Heading = grouped ? "h3" : "h2";
   const where = grouped || online ? undefined : placeOf(t);
   // UKCP's "0.2 miles from E8 3DQ" repeats the searched place, which the list already names.
   const away = online ? undefined : t.distance?.replace(/\bfrom\b.*$/, "away");
   const place = where && away ? `${where} (${away})` : (where ?? away);
   const meets = online && /remote/i.test(t.sessionTypes ?? "") ? undefined : t.sessionTypes;
-  const tags = t.tags.filter((tag) => sought.has(tag.toLowerCase()));
 
   return (
-    <Card
-      className="relative transition-colors hover:bg-muted/40"
+    <CardLayout
+      className="transition-colors hover:bg-muted/40"
       onPointerEnter={() => onHighlight?.(true)}
       onPointerLeave={() => onHighlight?.(false)}
       onFocus={() => onHighlight?.(true)}
       onBlur={() => onHighlight?.(false)}
-    >
+      heading={grouped ? "h3" : "h2"}
+      photo={
+        <Avatar className="size-full">
+          <AvatarImage src={t.photoUrl} alt="" />
+          <AvatarFallback className="text-xl">{t.initials}</AvatarFallback>
+        </Avatar>
+      }
+      // The stretched link makes the whole card clickable, as UKCP's is.
+      name={
+        <Link {...profile(t.slug)} className="after:absolute after:inset-0">
+          {t.name}
+        </Link>
+      }
+      place={place}
+      meets={meets}
+      action={action}
+      summary={t.summary}
+      tags={t.tags.filter((tag) => sought.has(tag.toLowerCase()))}
+    />
+  );
+}
+
+/** A card still loading, laid out as the card is. Among therapists met online there is usually nothing under the name. */
+export function TherapistCardSkeleton({ online = false }: { online?: boolean }) {
+  return (
+    <CardLayout
+      aria-hidden
+      photo={<Skeleton className="size-full rounded-full" />}
+      name={<SkeletonText className="w-3/5" />}
+      place={!online && <SkeletonText className="w-2/5" />}
+      meets={!online && <SkeletonText className="w-1/3" />}
+      summary={<SkeletonText lines={5} className="w-2/3" />}
+    />
+  );
+}
+
+type LayoutProps = ComponentProps<typeof Card> & {
+  heading?: "h2" | "h3";
+  /** Sized to the photo's place. */
+  photo: ReactNode;
+  name: ReactNode;
+  place?: ReactNode;
+  meets?: ReactNode;
+  action?: ReactNode;
+  summary?: ReactNode;
+  tags?: string[];
+};
+
+/** The card's layout, which the card and its skeleton share. */
+function CardLayout({ heading: Heading = "h2", photo, name, place, meets, action, summary, tags = [], className, ...card }: LayoutProps) {
+  return (
+    <Card className={cn("relative", className)} {...card}>
       <CardContent className="space-y-3">
         <div className="flex items-center gap-4">
-          <Avatar className="size-24 shrink-0">
-            <AvatarImage src={t.photoUrl} alt="" />
-            <AvatarFallback className="text-xl">{t.initials}</AvatarFallback>
-          </Avatar>
+          <div className="size-24 shrink-0">{photo}</div>
           <div className="min-w-0 flex-1 space-y-1.5">
-            <Heading className="font-semibold">
-              {/* The stretched link makes the whole card clickable, as UKCP's is. */}
-              <Link {...profile(t.slug)} className="after:absolute after:inset-0">
-                {t.name}
-              </Link>
-            </Heading>
+            <Heading className="font-semibold">{name}</Heading>
             {place && <p className="text-sm">{place}</p>}
             {meets && <p className="text-sm text-muted-foreground">{meets}</p>}
           </div>
           {/* Raised above the stretched link, which would otherwise take its clicks. */}
           {action && <div className="relative z-10 -mt-1 -mr-1 self-start">{action}</div>}
         </div>
-        {t.summary && <p className="text-sm">{t.summary}</p>}
+        {summary && <p className="text-sm">{summary}</p>}
         {tags.length > 0 && (
           <ul className="flex flex-wrap gap-1.5">
             {tags.map((tag) => (

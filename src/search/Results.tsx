@@ -1,9 +1,9 @@
 import { MapPin } from "lucide-react";
-import { useEffect, useId, useState, type Ref } from "react";
+import { useEffect, useId, useState, type ReactNode, type Ref } from "react";
 import { asksWhole, type SearchParams } from "@shared/query";
 import type { TherapistCard as Therapist } from "@shared/types";
+import { SkeletonText } from "@/components/SkeletonText";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { ShortlistButton } from "@/shortlist/ShortlistButton";
 import { soughtTerms } from "./activeFilters";
@@ -11,7 +11,7 @@ import { LocationNotice } from "./LocationNotice";
 import { listEntries, pinLabel, type Pin } from "./map/pins";
 import { reachLine, resultCount } from "./reach";
 import { ResultsError } from "./ResultsError";
-import { TherapistCard } from "./TherapistCard";
+import { TherapistCard, TherapistCardSkeleton } from "./TherapistCard";
 import type { SearchResults } from "./useResults";
 
 type Props = {
@@ -48,8 +48,24 @@ function ResultsList({ params, results, listRef, pins = [], unplaced = [], selec
   if (query.isPending) {
     return (
       <div className="space-y-4" aria-busy>
+        <div aria-hidden className="space-y-4">
+          <Summary title={<SkeletonText className="w-48" />} reach={<SkeletonText className="w-56" />} note={<SkeletonText className="w-64" />} />
+          {/* A search near a place names the place, and UKCP notes how it orders the results around it. */}
+          {!online && (
+            <>
+              <p className="text-sm">
+                <SkeletonText className="w-52" />
+              </p>
+              <Alert>
+                <AlertDescription>
+                  <SkeletonText lines={3} className="w-2/5" />
+                </AlertDescription>
+              </Alert>
+            </>
+          )}
+        </div>
         {Array.from({ length: 4 }, (_, i) => (
-          <Skeleton key={i} className="h-32 w-full rounded-xl" />
+          <TherapistCardSkeleton key={i} online={online} />
         ))}
       </div>
     );
@@ -64,18 +80,15 @@ function ResultsList({ params, results, listRef, pins = [], unplaced = [], selec
 
   return (
     <section aria-busy={query.isPlaceholderData} className={cn("space-y-4", query.isPlaceholderData && "opacity-60")}>
-      <div className="space-y-1">
-        <h2 className="text-sm font-semibold">{title}</h2>
-        {/* With no one found, the heading has said so. */}
-        {therapists.length > 0 && (
-          <>
-            <p className="text-sm text-muted-foreground">{unplaced.length > 0 ? `${reach} · ${unplaced.length} not on the map` : reach}</p>
-            <p className="text-xs text-muted-foreground">
-              {online ? "Only therapists who say they work online or by phone." : "Pins show the postcode or area each therapist lists."}
-            </p>
-          </>
-        )}
-      </div>
+      {/* With no one found, the heading has said so. */}
+      <Summary
+        title={title}
+        reach={therapists.length > 0 && (unplaced.length > 0 ? `${reach} · ${unplaced.length} not on the map` : reach)}
+        note={
+          therapists.length > 0 &&
+          (online ? "Only therapists who say they work online or by phone." : "Pins show the postcode or area each therapist lists.")
+        }
+      />
       <LocationNotice typed={params.text.Location} searched={first?.locationSearched} />
       {first?.notices.map((notice) => (
         <Alert key={notice}>
@@ -104,6 +117,17 @@ function ResultsList({ params, results, listRef, pins = [], unplaced = [], selec
         })}
       </ul>
     </section>
+  );
+}
+
+/** The list's heading and the lines under it, shared by the list and its skeleton. */
+function Summary({ title, reach, note }: { title: ReactNode; reach?: ReactNode; note?: ReactNode }) {
+  return (
+    <div className="space-y-1">
+      <h2 className="text-sm font-semibold">{title}</h2>
+      {reach && <p className="text-sm text-muted-foreground">{reach}</p>}
+      {note && <p className="text-xs text-muted-foreground">{note}</p>}
+    </div>
   );
 }
 

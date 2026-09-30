@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, ChevronLeft, ExternalLink } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router";
 import type { Office, Profile, ProfileSection } from "@shared/types";
+import { SkeletonText } from "@/components/SkeletonText";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -16,7 +17,7 @@ import { cn } from "@/lib/utils";
 import { cachedCard } from "@/search/useResults";
 import { ShortlistButton } from "@/shortlist/ShortlistButton";
 import type { ShortlistCard } from "@/shortlist/store";
-import { ContactList } from "./ContactList";
+import { ContactList, ContactListSkeleton } from "./ContactList";
 import { useOfficePlace } from "./place";
 import { sectionsBySize } from "./sectionsBySize";
 import { matchingTags, useSearchMatch } from "./searchedTerms";
@@ -64,14 +65,7 @@ export function ProfileBody({ slug, back, close }: { slug: string } & Exits) {
   const { data: profile, error, isPending } = useQuery({ queryKey: ["profile", slug], queryFn: () => api.profile(slug) });
   const isMatch = useSearchMatch();
 
-  if (isPending) {
-    return (
-      <div className="space-y-4">
-        <StickyHeader back={back} close={close} />
-        <Skeleton className="h-64 w-full rounded-xl" aria-busy />
-      </div>
-    );
-  }
+  if (isPending) return <ProfileSkeleton back={back} close={close} />;
   if (error) {
     return (
       <div className="space-y-4">
@@ -86,57 +80,152 @@ export function ProfileBody({ slug, back, close }: { slug: string } & Exits) {
   const matches = matchingTags(profile, isMatch);
   const { long, short } = sectionsBySize(profile);
   const hasMatches = matches.length > 0;
-  // A wide page puts the long sections, under the matches, in a wide column beside the short ones. With no long
-  // sections the short ones keep the whole width.
   const besideLong = long.length > 0;
   return (
     <article className="@container space-y-8">
       <StickyHeader back={back} close={close} bookmark={<ProfileBookmark profile={profile} />}>
-        <div className="flex items-start gap-4">
-          <Avatar className="size-14 shrink-0 @lg:size-20">
-            <AvatarImage src={profile.photoUrl} alt="" />
-            <AvatarFallback className="@lg:text-xl">{profile.initials}</AvatarFallback>
-          </Avatar>
-          <div className="min-w-0 space-y-1.5">
-            <div>
-              <h1 className="text-2xl leading-tight font-semibold">{profile.name}</h1>
-              {profile.location && <p className="text-sm text-muted-foreground">{profile.location}</p>}
-            </div>
-            <ContactList profile={profile} />
-          </div>
-        </div>
+        <Identity
+          photo={
+            <Avatar className="size-full">
+              <AvatarImage src={profile.photoUrl} alt="" />
+              <AvatarFallback className="@lg:text-xl">{profile.initials}</AvatarFallback>
+            </Avatar>
+          }
+          name={profile.name}
+          location={profile.location}
+          contacts={<ContactList profile={profile} />}
+        />
       </StickyHeader>
 
-      <div className={cn("grid gap-8", besideLong && "@4xl:grid-cols-[minmax(0,1fr)_20rem]")}>
-        {(hasMatches || besideLong) && (
-          <div className="space-y-8">
-            {hasMatches && (
-              <>
-                <SectionView
-                  section={{ heading: "Matches your search", paragraphs: [], items: matches, details: [] }}
-                  isMatch={isMatch}
-                  announce={false}
-                />
-                <Separator />
-              </>
-            )}
-            <Sections sections={long} isMatch={isMatch} />
-          </div>
-        )}
-        {(short.length > 0 || profile.offices.length > 0) && (
-          <aside className={cn("space-y-8", besideLong && "@4xl:col-2")}>
-            <ShortSections sections={short} isMatch={isMatch} besideLong={besideLong} />
-            {profile.offices.length > 0 && (
-              <div className={cn("grid gap-8 @xl:grid-cols-2", besideLong && "@4xl:grid-cols-1")}>
-                {profile.offices.map((office, i) => (
-                  <OfficeCard key={i} office={office} profile={profile} />
+      <Columns
+        besideLong={besideLong}
+        main={
+          (hasMatches || besideLong) && (
+            <>
+              {hasMatches && (
+                <>
+                  <SectionView
+                    section={{ heading: "Matches your search", paragraphs: [], items: matches, details: [] }}
+                    isMatch={isMatch}
+                    announce={false}
+                  />
+                  <Separator />
+                </>
+              )}
+              <Sections sections={long} isMatch={isMatch} />
+            </>
+          )
+        }
+        aside={
+          (short.length > 0 || profile.offices.length > 0) && (
+            <>
+              <ShortSections besideLong={besideLong}>
+                {short.map((section, i) => (
+                  <SectionView key={i} section={section} isMatch={isMatch} />
                 ))}
-              </div>
-            )}
-          </aside>
-        )}
-      </div>
+              </ShortSections>
+              {profile.offices.length > 0 && (
+                <div className={cn("grid gap-8 @xl:grid-cols-2", besideLong && "@4xl:grid-cols-1")}>
+                  {profile.offices.map((office, i) => (
+                    <OfficeCard key={i} office={office} profile={profile} />
+                  ))}
+                </div>
+              )}
+            </>
+          )
+        }
+      />
     </article>
+  );
+}
+
+/** A profile still loading, laid out as most are: long sections beside short ones. */
+function ProfileSkeleton({ back, close }: Exits) {
+  return (
+    <div aria-busy className="@container space-y-8">
+      <StickyHeader back={back} close={close}>
+        <div aria-hidden>
+          <Identity
+            photo={<Skeleton className="size-full rounded-full" />}
+            name={<SkeletonText className="w-56" />}
+            location={<SkeletonText className="w-16" />}
+            contacts={<ContactListSkeleton />}
+          />
+        </div>
+      </StickyHeader>
+      <div aria-hidden>
+        <Columns
+          besideLong
+          main={
+            <>
+              <SectionSkeleton lines={6} />
+              <Separator />
+              <SectionSkeleton lines={4} />
+            </>
+          }
+          aside={
+            <ShortSections besideLong>
+              {[4, 1, 3].map((tags, i) => (
+                <SectionSkeleton key={i} tags={tags} />
+              ))}
+            </ShortSections>
+          }
+        />
+      </div>
+    </div>
+  );
+}
+
+// Tags of a skeleton's short sections, which vary in width as tags do.
+const TAG_WIDTHS = ["w-20", "w-14", "w-24", "w-16"];
+
+function SectionSkeleton({ lines = 0, tags = 0 }: { lines?: number; tags?: number }) {
+  return (
+    <Section heading={<SkeletonText className="w-40" />}>
+      {lines > 0 && (
+        <p>
+          <SkeletonText lines={lines} className="w-1/2" />
+        </p>
+      )}
+      {tags > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {Array.from({ length: tags }, (_, i) => (
+            <Badge key={i} variant="secondary" className={cn("animate-pulse", TAG_WIDTHS[i % TAG_WIDTHS.length])} />
+          ))}
+        </div>
+      )}
+    </Section>
+  );
+}
+
+type IdentityProps = { photo: ReactNode; name: ReactNode; location?: ReactNode; contacts: ReactNode };
+
+/** Who the therapist is and how to reach them, laid out for the header of the profile and of its skeleton. */
+function Identity({ photo, name, location, contacts }: IdentityProps) {
+  return (
+    <div className="flex items-start gap-4">
+      <div className="size-14 shrink-0 @lg:size-20">{photo}</div>
+      <div className="min-w-0 space-y-1.5">
+        <div>
+          <h1 className="text-2xl leading-tight font-semibold">{name}</h1>
+          {location && <p className="text-sm text-muted-foreground">{location}</p>}
+        </div>
+        {contacts}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The profile's columns, shared by the profile and its skeleton. A wide page puts the long sections, under the matches,
+ * in a wide column beside the short ones; with no long sections the short ones keep the whole width.
+ */
+function Columns({ main, aside, besideLong }: { main?: ReactNode; aside?: ReactNode; besideLong: boolean }) {
+  return (
+    <div className={cn("grid gap-8", besideLong && "@4xl:grid-cols-[minmax(0,1fr)_20rem]")}>
+      {main && <div className="space-y-8">{main}</div>}
+      {aside && <aside className={cn("space-y-8", besideLong && "@4xl:col-2")}>{aside}</aside>}
+    </div>
   );
 }
 
@@ -192,19 +281,19 @@ function Sections({ sections, isMatch }: { sections: ProfileSection[]; isMatch: 
   ));
 }
 
-type ShortProps = { sections: ProfileSection[]; isMatch: SectionProps["isMatch"]; besideLong: boolean };
-
 /**
  * Short sections, two to a line once there is room, each under a rule of its own. The first line has none where only a
  * rule or the header is above it: with no long sections, or at the top of a wide page's short column.
  */
-function ShortSections({ sections, isMatch, besideLong }: ShortProps) {
-  if (sections.length === 0) return null;
+function ShortSections({ besideLong, children }: { besideLong: boolean; children: ReactNode[] }) {
+  if (children.length === 0) return null;
   const first = besideLong ? "@4xl:first:border-t-0 @4xl:first:pt-0" : "first:border-t-0 first:pt-0 @xl:nth-2:border-t-0 @xl:nth-2:pt-0";
   return (
     <div className={cn("grid gap-8 @xl:grid-cols-2", besideLong && "@4xl:grid-cols-1")}>
-      {sections.map((section, i) => (
-        <SectionView key={i} section={section} isMatch={isMatch} className={cn("border-t pt-8", first)} />
+      {children.map((section, i) => (
+        <div key={i} className={cn("border-t pt-8", first)}>
+          {section}
+        </div>
       ))}
     </div>
   );
@@ -214,10 +303,19 @@ function ShortSections({ sections, isMatch, besideLong }: ShortProps) {
 // wrap; the thinner padding keeps a one-line tag at the badge's height.
 const TAG = "h-auto py-px whitespace-normal";
 
-function SectionView({ section, isMatch, announce = true, className }: SectionProps & { className?: string }) {
+/** A section's heading above what it says, laid out for the profile and its skeleton. */
+function Section({ heading, children }: { heading: ReactNode; children: ReactNode }) {
   return (
-    <section className={cn("space-y-3", className)}>
-      <h2 className="text-lg font-semibold">{section.heading}</h2>
+    <section className="space-y-3">
+      <h2 className="text-lg font-semibold">{heading}</h2>
+      {children}
+    </section>
+  );
+}
+
+function SectionView({ section, isMatch, announce = true }: SectionProps) {
+  return (
+    <Section heading={section.heading}>
       {section.paragraphs.map((text, i) => (
         <p key={i} className="whitespace-pre-line">
           {text}
@@ -256,7 +354,7 @@ function SectionView({ section, isMatch, announce = true, className }: SectionPr
           ))}
         </Accordion>
       )}
-    </section>
+    </Section>
   );
 }
 
