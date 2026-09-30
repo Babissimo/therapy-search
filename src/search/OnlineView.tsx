@@ -1,4 +1,3 @@
-import { Video } from "lucide-react";
 import { Tabs } from "radix-ui";
 import { useId, useRef, useState } from "react";
 import { useLocation } from "react-router";
@@ -46,10 +45,7 @@ export function OnlineView({ params, onChange, wide }: Props) {
     <div className="flex flex-col gap-2 rounded-xl border bg-background p-2">
       <ModeSwitch online params={params} />
       <div className="flex items-center gap-2">
-        <p className="flex min-w-0 flex-1 items-center gap-2 px-1 text-sm">
-          <Video aria-hidden className="size-4 shrink-0 text-muted-foreground" />
-          Online or by phone, wherever you are
-        </p>
+        <p className="min-w-0 flex-1 px-1 text-sm">Online or by phone, wherever you are</p>
         {!wide && <MobileFilters params={params} drafts={drafts} groups={ONLINE_FILTER_GROUPS} ticked={tickedFilters(params)} />}
       </div>
     </div>

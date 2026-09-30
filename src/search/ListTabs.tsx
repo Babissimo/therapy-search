@@ -1,3 +1,4 @@
+import { Bookmark, List } from "lucide-react";
 import type { ReactNode, Ref } from "react";
 import { Badge } from "@/components/ui/badge";
 import { TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -10,8 +11,12 @@ export function ListTabs({ ref }: { ref?: Ref<HTMLDivElement> }) {
   const count = useShortlist().length;
   return (
     <TabsList ref={ref}>
-      <TabsTrigger value="results">Results</TabsTrigger>
+      <TabsTrigger value="results">
+        <List data-icon="inline-start" aria-hidden />
+        Results
+      </TabsTrigger>
       <TabsTrigger value="shortlist">
+        <Bookmark data-icon="inline-start" aria-hidden />
         Shortlist
         {count > 0 && (
           <Badge variant="secondary" className="h-4 min-w-4 px-1 text-[0.625rem]">
