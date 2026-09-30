@@ -17,22 +17,23 @@ const at = (path: string | { pathname: string; state: unknown }) =>
   );
 
 describe("SiteLayout", () => {
-  it("closes a document page with the site's name and theme switch", () => {
+  it("opens a document page with the site's name and theme switch", () => {
     at("/therapist/Jo-ABCDEFGH");
-    const footer = screen.getByRole("contentinfo");
-    expect(within(footer).getByRole("button", { name: "Find a UKCP therapist" })).toBeTruthy();
-    expect(within(footer).getByRole("group", { name: "Theme" })).toBeTruthy();
+    const header = screen.getByRole("banner");
+    expect(within(header).getByRole("button", { name: "Find a UKCP therapist" })).toBeTruthy();
+    expect(within(header).getByRole("group", { name: "Theme" })).toBeTruthy();
+    expect(header.compareDocumentPosition(screen.getByText("Page")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     // The page's own heading is its h1.
     expect(screen.queryByRole("heading", { name: "Find a UKCP therapist" })).toBeNull();
   });
 
   it("leaves the search page's name and theme switch to its results", () => {
     at("/?Location=Leeds");
-    expect(screen.queryByRole("contentinfo")).toBeNull();
+    expect(screen.queryByRole("banner")).toBeNull();
   });
 
   it("keeps the search page's layout beneath a profile opened over it", () => {
     at({ pathname: "/therapist/Jo-ABCDEFGH", state: { background: { pathname: "/", search: "?Location=Leeds" } } });
-    expect(screen.queryByRole("contentinfo")).toBeNull();
+    expect(screen.queryByRole("banner")).toBeNull();
   });
 });
