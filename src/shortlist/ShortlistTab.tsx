@@ -54,7 +54,7 @@ export function ShortlistTab({ sought, online = false, pins = [], unplaced = 0, 
   );
   if (shown.length === 0) {
     return (
-      <div className="flex gap-3 py-2">
+      <div className="flex gap-3 py-2 fade-in-0 motion-safe:animate-in">
         <Bookmark aria-hidden className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
         <p className="text-sm">
           Bookmark anyone who might suit you, from their card or profile, to compare them here. It's fine to contact a few before choosing one.
@@ -74,7 +74,7 @@ export function ShortlistTab({ sought, online = false, pins = [], unplaced = 0, 
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 fade-in-0 motion-safe:animate-in">
       <p className="text-sm text-muted-foreground">Kept in this browser only{unplaced > 0 && ` · ${unplaced} not on the map`}.</p>
       <DndContext
         sensors={sensors}

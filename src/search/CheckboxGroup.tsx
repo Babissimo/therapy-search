@@ -87,7 +87,7 @@ export function CheckboxGroup({ group, searchable, isChecked, onToggle }: Props)
                     <p className="py-1 text-sm text-muted-foreground">{section.heading}</p>
                   ) : (
                     <CollapsibleTrigger className="flex w-full items-center gap-1.5 rounded-md py-1 text-left text-sm outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50">
-                      <ChevronRight className={cn("size-4 shrink-0 text-muted-foreground transition-transform", expanded && "rotate-90")} aria-hidden />
+                      <ChevronRight className={cn("size-4 shrink-0 text-muted-foreground motion-safe:transition-transform", expanded && "rotate-90")} aria-hidden />
                       <span className="flex-1">{section.heading}</span>
                       <TickedCount count={section.fields.filter(isChecked).length} />
                     </CollapsibleTrigger>

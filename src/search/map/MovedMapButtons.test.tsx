@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { useEffect } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import { ApiError, api } from "@/lib/api";
 import type { View } from "./geo";
 import { viewAround } from "./geo.testing";
@@ -153,6 +153,31 @@ describe("MovedMapButtons", () => {
     rerender(<MovedMapButtons centre={BRIGHTON} settled onSearch={vi.fn(() => true)} />);
     expect(document.activeElement).toBe(button());
     rerender(<MovedMapButtons centre={BRIGHTON} settled={false} onSearch={vi.fn(() => true)} />);
+    expect(document.activeElement).toBe(leaflet.container);
+  });
+
+  it("hands focus to the map as it starts to go, before it fades out of reach", () => {
+    // The exit animation the page's styles give it, which jsdom reads but never plays.
+    const styles = document.head.appendChild(Object.assign(document.createElement("style"), { textContent: "[data-leaving] { animation-name: exit; }" }));
+    onTestFinished(() => styles.remove());
+    leaflet.start(viewAround(BRIGHTON, 5));
+    const { rerender } = render(<MovedMapButtons centre={BRIGHTON} settled onSearch={vi.fn(() => true)} />);
+    act(() => leaflet.show(viewAround(HOVE, 5)));
+    button()!.focus();
+    rerender(<MovedMapButtons centre={BRIGHTON} settled={false} onSearch={vi.fn(() => true)} />);
+    expect(document.activeElement).toBe(leaflet.container);
+    const leaving = button()!.closest("[inert]")!;
+    // jsdom has no AnimationEvent.
+    act(() => void leaving.dispatchEvent(Object.assign(new Event("animationend"), { animationName: "exit" })));
+    expect(button()).toBeNull();
+  });
+
+  it("hands focus to the map as a framing mounts it afresh while it still offers a search", () => {
+    leaflet.start(viewAround(BRIGHTON, 5));
+    const { unmount } = render(<MovedMapButtons centre={BRIGHTON} settled onSearch={vi.fn(() => true)} />);
+    act(() => leaflet.show(viewAround(HOVE, 5)));
+    button()!.focus();
+    unmount();
     expect(document.activeElement).toBe(leaflet.container);
   });
 

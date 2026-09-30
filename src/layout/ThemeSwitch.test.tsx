@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeSwitch } from "./ThemeSwitch";
 
 let systemDark = false;
+let reducedMotion = false;
 const listeners = new Set<() => void>();
 
 function setSystemDark(dark: boolean) {
@@ -13,9 +14,9 @@ function setSystemDark(dark: boolean) {
 }
 
 beforeEach(() => {
-  vi.stubGlobal("matchMedia", () => ({
+  vi.stubGlobal("matchMedia", (query: string) => ({
     get matches() {
-      return systemDark;
+      return query === "(prefers-reduced-motion: reduce)" ? reducedMotion : systemDark;
     },
     addEventListener: (_: string, l: () => void) => listeners.add(l),
     removeEventListener: (_: string, l: () => void) => listeners.delete(l),
@@ -26,6 +27,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
   listeners.clear();
   systemDark = false;
+  reducedMotion = false;
   localStorage.clear();
   document.documentElement.classList.remove("dark");
 });
@@ -71,4 +73,31 @@ describe("ThemeSwitch", () => {
     expect(isDark()).toBe(true);
     expect(localStorage.getItem("theme")).toBeNull();
   });
+
+  it("cross-fades into a pick, changing the page only once the fade has captured it as it was", () => {
+    const start = withViewTransitions();
+    renderSwitch();
+    fireEvent.click(screen.getByRole("radio", { name: "Dark" }));
+    expect(isDark()).toBe(false);
+    act(() => start.mock.calls[0]![0]());
+    expect(isDark()).toBe(true);
+    expect(screen.getByRole<HTMLInputElement>("radio", { name: "Dark" }).checked).toBe(true);
+  });
+
+  it("changes at once, without the fade, under reduced motion", () => {
+    reducedMotion = true;
+    const start = withViewTransitions();
+    renderSwitch();
+    fireEvent.click(screen.getByRole("radio", { name: "Dark" }));
+    expect(isDark()).toBe(true);
+    expect(start).not.toHaveBeenCalled();
+  });
 });
+
+/** Gives jsdom the browser's view transitions, whose update a test runs itself, each skipped as in a hidden tab. */
+function withViewTransitions() {
+  const start = vi.fn((_update: () => void) => ({ ready: Promise.reject(new DOMException("Skipped", "InvalidStateError")) }));
+  Object.defineProperty(document, "startViewTransition", { configurable: true, value: start });
+  onTestFinished(() => void Reflect.deleteProperty(document, "startViewTransition"));
+  return start;
+}
