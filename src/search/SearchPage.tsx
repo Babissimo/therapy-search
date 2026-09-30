@@ -237,9 +237,9 @@ function MapToolbar({
         <section
           id={filtersId}
           aria-labelledby={`${filtersId}-heading`}
-          className="pointer-events-auto min-h-0 w-full overflow-y-auto rounded-xl border bg-background p-4 shadow-lg"
+          className="pointer-events-auto flex min-h-0 w-full flex-col overflow-hidden rounded-xl border bg-background shadow-lg"
         >
-          <div className="-mt-1 -mr-1 flex items-center justify-between gap-2">
+          <div className="flex items-center justify-between gap-2 border-b p-3 pl-4">
             <h2 id={`${filtersId}-heading`} className="font-semibold">
               Refine your search
             </h2>
@@ -247,7 +247,9 @@ function MapToolbar({
               <X aria-hidden />
             </Button>
           </div>
-          <FilterPanel params={params} drafts={drafts} />
+          <div className="min-h-0 overflow-y-auto p-4">
+            <FilterPanel params={params} drafts={drafts} />
+          </div>
         </section>
       )}
     </div>
@@ -280,11 +282,11 @@ function MobileFilters({ params, drafts, ticked }: { params: SearchParams; draft
       <SheetTrigger asChild>
         <FiltersButton ticked={ticked} />
       </SheetTrigger>
-      <SheetContent side="left" className="overflow-y-auto">
-        <SheetHeader>
+      <SheetContent side="left" className="gap-0">
+        <SheetHeader className="border-b">
           <SheetTitle>Refine your search</SheetTitle>
         </SheetHeader>
-        <div className="px-4 pb-6">
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 pt-4 pb-6">
           {/* Searching closes the sheet to show its results; ticks leave it open for more. */}
           <FilterPanel params={params} drafts={drafts} onSearch={() => setOpen(false)} />
         </div>

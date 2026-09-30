@@ -251,6 +251,19 @@ describe("SearchPage", () => {
     await loaded();
   });
 
+  it.each([
+    { screen: "wide", wide: true, close: "Close filters" },
+    { screen: "narrow", wide: false, close: "Close" },
+  ])("keeps the filters' heading and close button still as they scroll on $screen screens", async ({ wide, close }) => {
+    screenIs(wide);
+    renderAt(SEARCH);
+    await loaded();
+    fireEvent.click(screen.getByRole("button", { name: "Filters" }));
+    const body = (await screen.findByRole("searchbox", { name: "Keyword search" })).closest(".overflow-y-auto");
+    expect(body?.contains(screen.getByRole("heading", { name: "Refine your search" }))).toBe(false);
+    expect(body?.contains(screen.getByRole("button", { name: close }))).toBe(false);
+  });
+
   it("keeps the filters shut on a phone's prompt that widens, as they open only on arriving wide", () => {
     const resize = screenIs(false);
     renderAt("/");
