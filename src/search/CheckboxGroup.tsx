@@ -8,6 +8,10 @@ import { cn } from "@/lib/utils";
 import { isMulti } from "./state";
 import { TickedCount } from "./TickedCount";
 
+// A long list scrolls within its group. The padding holds the checkboxes' enlarged hit areas, which otherwise overhang the
+// last row and let a list that fits scroll a little; the margin takes it back out of the layout.
+const SCROLL_BOX = "-mb-1.5 max-h-64 overflow-y-auto pr-1 pb-1.5";
+
 type Props = {
   group: FilterGroup;
   searchable: boolean;
@@ -68,7 +72,7 @@ export function CheckboxGroup({ group, searchable, isChecked, onToggle }: Props)
         </p>
       )}
       {sections ? (
-        <ul className="space-y-1">
+        <ul className={cn("space-y-1", SCROLL_BOX)}>
           {sections.map((section, i) => {
             const fields = inView(section.fields);
             if (fields.length === 0) return null;
@@ -101,7 +105,7 @@ export function CheckboxGroup({ group, searchable, isChecked, onToggle }: Props)
           {nothing}
         </ul>
       ) : (
-        <ul className="max-h-64 space-y-2 overflow-y-auto pr-1">
+        <ul className={cn("space-y-2", SCROLL_BOX)}>
           {shown.map(item)}
           {nothing}
         </ul>
