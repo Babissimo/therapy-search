@@ -25,12 +25,6 @@ export function useShortlistIf(wanted: boolean): Shortlist {
   return useSyncExternalStore(store.subscribe, () => (wanted ? store.get() : NOBODY));
 }
 
-/** Whether anyone is on the shortlist, which changes far less often than who is. */
-export function useHasShortlist(): boolean {
-  const store = useShortlistStore();
-  return useSyncExternalStore(store.subscribe, () => store.get().length > 0);
-}
-
 export function useShortlistEntry(slug: string): ShortlistEntry | undefined {
   const store = useShortlistStore();
   return useSyncExternalStore(store.subscribe, () => store.get().find((entry) => entry.card.slug === slug));

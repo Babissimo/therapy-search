@@ -1,5 +1,5 @@
 import { Tabs } from "radix-ui";
-import { lazy, Suspense, useEffect, useId, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { Link, useLocation, useMatch } from "react-router";
 import { canonicalLocation } from "@shared/location";
 import { toQuery, type SearchParams } from "@shared/query";
@@ -9,10 +9,11 @@ import { Masthead } from "@/layout/Masthead";
 import { useMediaQuery } from "@/lib/useMediaQuery";
 import { cn } from "@/lib/utils";
 import { ShortlistTab } from "@/shortlist/ShortlistTab";
-import { useHasShortlist, useShortlistIf, useShortlistRefresh } from "@/shortlist/useShortlist";
+import { useShortlistIf, useShortlistRefresh } from "@/shortlist/useShortlist";
 import { soughtTerms } from "./activeFilters";
 import { FilterChips } from "./FilterChips";
-import { FiltersButton, FiltersSection, MobileFilters } from "./Filters";
+import { FiltersButton, FiltersSection, FiltersSheet, FiltersSheetButton } from "./Filters";
+import { ListColumn } from "./ListColumn";
 import { ListPanels, ListTabs, type ListTab } from "./ListTabs";
 import { createHighlight } from "./map/highlight";
 import type { MapPaneProps } from "./map/MapPane";
@@ -90,7 +91,7 @@ function SearchView({ params, onChange, wide }: ViewProps) {
   const { pins, unplaced, placing } = usePins(results.therapists, centre, params.flags.LocationSearchOutsideUK);
   // Kept by key, so a new search shows its results whichever tab was open.
   const [tabChoice, setTabChoice] = useState<{ fitKey: string; tab: ListTab }>();
-  const tab = tabChoice?.fitKey === fitKey ? tabChoice.tab : searching ? "results" : "shortlist";
+  const tab = tabChoice?.fitKey === fitKey ? tabChoice.tab : "results";
   // Beside a search, the map shows whichever list is open, framing each afresh as its tab opens.
   const mapsShortlist = searching && tab === "shortlist";
   const shortlisted = useShortlistIf(mapsShortlist).map((entry) => entry.card);
@@ -109,28 +110,33 @@ function SearchView({ params, onChange, wide }: ViewProps) {
     highlight.set(undefined);
   }, [highlight, fitKey]);
   const [panelOpen, setPanelOpen] = useState(true);
-  // The side bar lists a search's results or, before a search, the shortlist if there is one. Once beside the prompt it
-  // stays until a search, so a therapist removed from the shortlist can still be put back.
-  const hasShortlist = useHasShortlist();
-  const [shortlistKept, setShortlistKept] = useState(!searching && hasShortlist);
-  const shortlistBeside = !searching && (hasShortlist || shortlistKept);
-  if (shortlistBeside !== shortlistKept) setShortlistKept(shortlistBeside);
-  const sideBar = searching || shortlistBeside;
-  // Open on arriving at the prompt on a wide screen, where there is no map for them to cover, unless the side bar would
-  // leave the prompt too little room beside them.
-  const [filtersOpen, setFiltersOpen] = useState(wide && !sideBar);
-  // The sheet opens on a search's list, and lowered beneath the prompt, which it would otherwise cover.
-  const [sheet, setSheet] = useState<SheetPosition>(searching ? "full" : "peek");
-  const [sheetFor, setSheetFor] = useState(searching);
-  if (sheetFor !== searching) {
-    setSheetFor(searching);
-    setSheet(searching ? "full" : "peek");
+  // Whether the filters are open beneath the search box over the map. Right of the prompt on wide screens they show
+  // regardless, and stay open over the map when a tick or the keyword starts a search; a search for a place puts them away.
+  const [filtersOpen, setFiltersOpen] = useState(!searching && wide);
+  const [sheet, setSheet] = useState<SheetPosition>("full");
+  const layout = searching ? "search" : wide ? "prompt beside filters" : "prompt";
+  const [laidOutFor, setLaidOutFor] = useState(layout);
+  if (laidOutFor !== layout) {
+    setLaidOutFor(layout);
+    // A search opens on its list.
+    if (searching) setSheet("full");
+    else setFiltersOpen(wide);
   }
   // The shortlist keeps its place apart from the results', under a key of its own.
-  const scroll = useRememberedScroll(tab === "results" ? entry : `${entry} shortlist`, tab === "shortlist" || !results.query.isPending);
+  const scroll = useRememberedScroll(tab === "results" ? entry : `${entry} shortlist`, tab === "shortlist" || !searching || !results.query.isPending);
   const listRef = useRef<HTMLUListElement>(null);
   // Whether the list was showing when a pin was selected, so it can glide to the pin's entry rather than jump.
   const listShowing = useRef(false);
+  const tabsRef = useRef<HTMLDivElement>(null);
+  const wasSearching = useRef(searching);
+  // On a phone the toolbar leaves the list for the map as a search begins, so the keyboard, dropped with the box it was in,
+  // goes to the new search's open tab rather than the top of the page.
+  useLayoutEffect(() => {
+    if (searching && !wasSearching.current && document.activeElement === document.body) {
+      tabsRef.current?.querySelector<HTMLElement>('[aria-selected="true"]')?.focus();
+    }
+    wasSearching.current = searching;
+  }, [searching]);
 
   function select(pin: Pin) {
     // Activating the selected pin lets it go.
@@ -173,8 +179,7 @@ function SearchView({ params, onChange, wide }: ViewProps) {
   const lists = (
     <ListPanels
       tab={tab}
-      // Until a search there is nothing to list, and nothing loading whose wait could be timed.
-      results={searching && list}
+      results={searching ? list : <NearPrompt wide={wide} />}
       shortlist={
         <ShortlistTab
           sought={soughtTerms(params)}
@@ -187,80 +192,81 @@ function SearchView({ params, onChange, wide }: ViewProps) {
     />
   );
   const footer = tab === "results" ? <LoadMore results={results} listRef={listRef} placing={placing} /> : undefined;
-  const tabs = <ListTabs searching={searching} />;
-  // The side bar's toggle, left over the top left as the side bar hides, moves the toolbar aside.
-  const besideToggle = wide && sideBar && !panelOpen;
+  const tabs = <ListTabs ref={tabsRef} />;
+  const toolbar = (placement: Placement) => (
+    <Toolbar
+      placement={placement}
+      params={params}
+      onChange={onChange}
+      drafts={drafts}
+      wide={wide}
+      // The side bar's toggle, left over the top left as the side bar hides, moves the toolbar aside.
+      besideToggle={wide && searching && !panelOpen}
+      filtersOpen={filtersOpen}
+      onFiltersOpenChange={setFiltersOpen}
+    />
+  );
 
-  // The toolbar keeps its place in the tree as the prompt gives way to a search, so what is typed or open in it stays.
+  // Before a search the list takes the page, as online's does, with the toolbar right of it on wide screens and atop it on
+  // a phone; a search gives the page to the map, the list beside or over it. On wide screens the toolbar keeps its place in
+  // the tree as it moves over the map, so what is typed, open or in focus in it stays; on a phone its filters' sheet does.
   return (
-    <>
-      {/* With no results to head, the site's name heads the page. */}
-      {!searching && <Masthead className="border-b px-4 py-3" />}
-      {/* The tabs' root is the rest of the page, as their list heads the side bar and their panels fill it. */}
+    <FiltersSheet phone={!wide} params={params} drafts={drafts}>
+      {/* The tabs' root spans the page, around wherever their list and panels sit. */}
       <Tabs.Root value={tab} onValueChange={pickTab} asChild>
         <div className="group/tabs flex min-h-0 flex-1">
-          {wide && sideBar && (
-            <ResultsPanel
-              open={panelOpen}
-              onOpenChange={setPanelOpen}
-              tabs={tabs}
-              masthead={searching && <Masthead />}
-              scrollRef={scroll.ref}
-              onScroll={scroll.save}
-              footer={footer}
-            >
+          {!searching ? (
+            <ListColumn wide={wide} tabs={tabs} top={!wide && toolbar("list")} scroll={scroll}>
               {lists}
-            </ResultsPanel>
-          )}
-          <div className="relative min-w-0 flex-1">
-            {searching ? (
-              <Suspense fallback={<div className="size-full bg-muted" />}>
-                <MapPane
-                  {...mapView}
-                  entry={entry}
-                  highlight={highlight}
-                  selected={selected}
-                  onSelect={select}
-                  onSearchArea={(postcode) => {
-                    if (samePostcode(postcode, params.text.Location)) return false;
-                    drafts.submitAt(params, postcode);
-                    setFiltersOpen(false);
-                    return true;
-                  }}
-                  outsideUK={params.flags.LocationSearchOutsideUK}
-                  coveredBelow={wide ? undefined : (height) => coverOf(sheet, height)}
-                />
-              </Suspense>
-            ) : (
-              <SearchPrompt besideFilters={wide && filtersOpen} besideToggle={besideToggle} />
-            )}
-            <MapToolbar
-              params={params}
-              onChange={onChange}
-              drafts={drafts}
-              wide={wide}
-              besideToggle={besideToggle}
-              filtersOpen={filtersOpen}
-              onFiltersOpenChange={setFiltersOpen}
-            />
-            {!wide && sideBar && (
-              <ResultsSheet
-                position={sheet}
-                onPositionChange={setSheet}
+            </ListColumn>
+          ) : (
+            wide && (
+              <ResultsPanel
+                open={panelOpen}
+                onOpenChange={setPanelOpen}
                 tabs={tabs}
-                lowerLabel={searching ? "Show map" : "Hide list"}
+                masthead={<Masthead />}
                 scrollRef={scroll.ref}
                 onScroll={scroll.save}
                 footer={footer}
               >
-                {searching && <Masthead className="pb-3" />}
                 {lists}
-              </ResultsSheet>
-            )}
-          </div>
+              </ResultsPanel>
+            )
+          )}
+          {(searching || wide) && (
+            <div className={cn("relative", searching ? "min-w-0 flex-1" : "w-96 shrink-0 border-l")}>
+              {searching && (
+                <Suspense fallback={<div className="size-full bg-muted" />}>
+                  <MapPane
+                    {...mapView}
+                    entry={entry}
+                    highlight={highlight}
+                    selected={selected}
+                    onSelect={select}
+                    onSearchArea={(postcode) => {
+                      if (samePostcode(postcode, params.text.Location)) return false;
+                      drafts.submitAt(params, postcode);
+                      setFiltersOpen(false);
+                      return true;
+                    }}
+                    outsideUK={params.flags.LocationSearchOutsideUK}
+                    coveredBelow={wide ? undefined : (height) => coverOf(sheet, height)}
+                  />
+                </Suspense>
+              )}
+              {toolbar(searching ? "map" : "aside")}
+              {!wide && searching && (
+                <ResultsSheet position={sheet} onPositionChange={setSheet} tabs={tabs} scrollRef={scroll.ref} onScroll={scroll.save} footer={footer}>
+                  <Masthead className="pb-3" />
+                  {lists}
+                </ResultsSheet>
+              )}
+            </div>
+          )}
         </div>
       </Tabs.Root>
-    </>
+    </FiltersSheet>
   );
 }
 
@@ -279,12 +285,16 @@ function reveal(list: HTMLElement, entry: HTMLElement, glide: boolean) {
   list.scrollTo({ top: list.scrollTop + top - view.top - REVEAL_GAP_PX, behavior: smooth ? "smooth" : "auto" });
 }
 
+/** Where the toolbar stands: over the map, or before a search right of the list on wide screens and atop it on a phone. */
+type Placement = "map" | "aside" | "list";
+
 /**
- * The switch to online, search box, filters and active-filter chips, floating over the top of the map or the prompt.
- * The buttons the map offers once moved, to search there or recentre, are placed to keep clear of it, so a change to
- * its inset, width or height moves them too.
+ * The switch to online, search box, filters and active-filter chips. Over the map, the buttons the map offers once moved,
+ * to search there or recentre, are placed to keep clear of it, so a change to its inset, width or height moves them too.
+ * Beside the list the filters stay open, as online's do.
  */
-function MapToolbar({
+function Toolbar({
+  placement,
   params,
   onChange,
   drafts,
@@ -292,33 +302,44 @@ function MapToolbar({
   besideToggle,
   filtersOpen,
   onFiltersOpenChange,
-}: ViewProps & { drafts: SearchDrafts; besideToggle: boolean; filtersOpen: boolean; onFiltersOpenChange: (open: boolean) => void }) {
+}: ViewProps & {
+  placement: Placement;
+  drafts: SearchDrafts;
+  besideToggle: boolean;
+  filtersOpen: boolean;
+  onFiltersOpenChange: (open: boolean) => void;
+}) {
   const filtersId = useId();
   const ticked = tickedFilters(params);
+  const overMap = placement === "map";
   return (
-    // Only the toolbar's own controls take the pointer; the map shows through the rest of it. It steps aside for the side
-    // bar's toggle as the side bar slides, and in time with it.
-    <Collapsible open={wide && filtersOpen} asChild>
+    <Collapsible open={wide && (placement === "aside" || filtersOpen)} asChild>
       <div
         className={cn(
-          "pointer-events-none absolute inset-3 z-10 flex flex-col items-start gap-2 motion-safe:transition-[left] motion-safe:duration-200 lg:right-auto lg:w-96",
+          "flex flex-col items-start gap-2",
+          placement !== "list" && "absolute inset-3 z-10",
+          // Only the toolbar's own controls take the pointer; the map shows through the rest of it. It steps aside for the
+          // side bar's toggle as the side bar slides, and in time with it.
+          overMap && "pointer-events-none motion-safe:transition-[left] motion-safe:duration-200 lg:right-auto lg:w-96",
           besideToggle && "left-14",
         )}
       >
-        <div className="pointer-events-auto flex w-full flex-col gap-2 rounded-xl border bg-background p-2 shadow-md">
+        <div className={cn("pointer-events-auto flex w-full flex-col gap-2 rounded-xl border bg-background p-2", overMap && "shadow-md")}>
           <ModeSwitch online={false} params={params} />
           <div className="flex items-start gap-2">
             {/* A search for a place puts the filters away to show where it is; ticks and the keyword leave them open for more. */}
             <SearchBox params={params} drafts={drafts} onPlaceSearch={() => onFiltersOpenChange(false)} className="min-w-0 flex-1" />
             {wide ? (
-              <FiltersButton
-                ticked={ticked}
-                aria-expanded={filtersOpen}
-                aria-controls={filtersOpen ? filtersId : undefined}
-                onClick={() => onFiltersOpenChange(!filtersOpen)}
-              />
+              overMap && (
+                <FiltersButton
+                  ticked={ticked}
+                  aria-expanded={filtersOpen}
+                  aria-controls={filtersOpen ? filtersId : undefined}
+                  onClick={() => onFiltersOpenChange(!filtersOpen)}
+                />
+              )
             ) : (
-              <MobileFilters params={params} drafts={drafts} ticked={ticked} />
+              <FiltersSheetButton ticked={ticked} />
             )}
           </div>
         </div>
@@ -329,29 +350,32 @@ function MapToolbar({
           className={cn("pointer-events-auto", !wide && "max-w-full flex-nowrap overflow-x-auto [&>li]:shrink-0")}
         />
         {/* Shrinks with the toolbar, scrolling the filters within. Its shadow is its own, as it clips the filters' as it unrolls. */}
-        <CollapsibleContent className="flex min-h-0 w-full flex-col rounded-xl shadow-lg">
-          <FiltersSection id={filtersId} params={params} drafts={drafts} onClose={() => onFiltersOpenChange(false)} className="pointer-events-auto" />
+        <CollapsibleContent className={cn("flex min-h-0 w-full flex-col rounded-xl", overMap && "shadow-lg")}>
+          <FiltersSection
+            id={filtersId}
+            params={params}
+            drafts={drafts}
+            onClose={overMap ? () => onFiltersOpenChange(false) : undefined}
+            className="pointer-events-auto"
+          />
         </CollapsibleContent>
       </div>
     </Collapsible>
   );
 }
 
-/** In place of the map and results until there is something to search for, so no map tiles are fetched for nothing. */
-function SearchPrompt({ besideFilters, besideToggle }: { besideFilters: boolean; besideToggle: boolean }) {
+/** In place of the results until there is a place to search. */
+function NearPrompt({ wide }: { wide: boolean }) {
   return (
-    // Clear of the toolbar over its top, or beside the filters open beneath it.
-    <div
-      className={cn(
-        "flex size-full overflow-y-auto motion-safe:transition-[padding] motion-safe:duration-200",
-        besideFilters ? ["py-6 pr-6", besideToggle ? "pl-116" : "pl-105"] : "px-6 py-28",
-      )}
-    >
-      {/* Centred by its margins, so text taller than the space scrolls from its top rather than being cut off there. */}
-      <Prompt ask="Start with where you are." className="m-auto max-w-2xl">
-        Search a town, city or postcode to see the UKCP therapists nearest to it. Filters <FiltersIcon /> then narrow it down by what therapists
-        help with, how they work, the languages they speak and more.
-      </Prompt>
-    </div>
+    <Prompt ask="Start with where you are." className="py-10 sm:py-16">
+      {wide ? (
+        "Search a town, city or postcode in the box to the right to see the UKCP therapists nearest to it. The filters beneath it"
+      ) : (
+        <>
+          Search a town, city or postcode to see the UKCP therapists nearest to it. Filters <FiltersIcon />
+        </>
+      )}{" "}
+      then narrow it down by what therapists help with, how they work, the languages they speak and more.
+    </Prompt>
   );
 }

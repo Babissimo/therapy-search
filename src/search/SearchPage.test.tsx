@@ -204,13 +204,13 @@ describe("SearchPage", () => {
     expect(toolbar().className).not.toContain("left-14");
   });
 
-  it("asks for a search in place of the map and results when there is nothing to search for", async () => {
+  it("asks for a search in place of the results, with no map, when there is nothing to search for", async () => {
     screenIs(true);
     renderAt("/");
     await mapLoads();
-    expect(screen.getByText(/^Search a town, city or postcode/)).toBeTruthy();
+    expect(within(results()).getByText(/^Search a town, city or postcode/)).toBeTruthy();
+    expect(screen.getByRole("tab", { name: "Results" }).getAttribute("aria-selected")).toBe("true");
     expect(screen.getByRole("heading", { level: 1, name: "Find a UKCP therapist" })).toBeTruthy();
-    expect(screen.queryByRole("region", { name: "Results and shortlist" })).toBeNull();
     expect(screen.queryByTestId("map")).toBeNull();
     expect(api.search).not.toHaveBeenCalled();
     fireEvent.change(screen.getByRole("textbox", { name: "Location" }), { target: { value: "York" } });
@@ -255,8 +255,7 @@ describe("SearchPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "Filters" }));
     fireEvent.click(await screen.findByRole("button", { name: "Clear all filters" }));
     fireEvent.click(screen.getByRole("button", { name: "Close" }));
-    expect(screen.getByText(/^Search a town, city or postcode/)).toBeTruthy();
-    expect(screen.queryByRole("region", { name: "Results and shortlist" })).toBeNull();
+    expect(within(results()).getByText(/^Search a town, city or postcode/)).toBeTruthy();
     expect(screen.queryByTestId("map")).toBeNull();
     fireEvent.change(screen.getByRole("textbox", { name: "Location" }), { target: { value: "York" } });
     fireEvent.click(screen.getByRole("button", { name: "Search" }));
@@ -334,11 +333,13 @@ describe("SearchPage", () => {
     expect(screen.queryByRole("region", { name: "Refine your search" })).toBeNull();
   });
 
-  it("opens the filters beside the prompt on wide screens, open as they are set until a search for a place puts them away", async () => {
+  it("keeps the filters open right of the prompt on wide screens, as they are set, until a search for a place puts them away", async () => {
     screenIs(true);
     renderAt("/");
     const filters = () => screen.queryByRole("region", { name: "Refine your search" });
-    expect(filters()).toBeTruthy();
+    expect(results().compareDocumentPosition(filters()!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Filters" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Close filters" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Search" }));
     expect(filters()).toBeTruthy();
     const keyword = screen.getByRole("searchbox", { name: "Keyword search" });
@@ -347,11 +348,31 @@ describe("SearchPage", () => {
     expect(url().get("KeywordFilter")).toBe("grief");
     expect(screen.getByText(/^Search a town, city or postcode/)).toBeTruthy();
     expect(filters()).toBeTruthy();
-    fireEvent.change(screen.getByRole("textbox", { name: "Location" }), { target: { value: "York" } });
-    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+    const box = screen.getByRole("textbox", { name: "Location" });
+    box.focus();
+    fireEvent.change(box, { target: { value: "York" } });
+    fireEvent.submit(box.closest("form")!);
     expect(filters()).toBeNull();
+    // The toolbar moves over the map rather than being drawn afresh there.
+    expect(document.activeElement).toBe(box);
     await loaded();
     expect(api.search).toHaveBeenCalledOnce();
+  });
+
+  it("leaves the filters open over the map, and the keyboard where it was in them, when a tick beside the prompt starts a search", async () => {
+    screenIs(true);
+    renderAt("/");
+    const filters = () => screen.getByRole("region", { name: "Refine your search" });
+    fireEvent.change(screen.getByRole("textbox", { name: "Location" }), { target: { value: "York" } });
+    fireEvent.click(within(filters()).getByRole("button", { name: /^Languages/ }));
+    const french = within(filters()).getByRole("checkbox", { name: "French" });
+    french.focus();
+    fireEvent.click(french);
+    expect(url().toString()).toBe("Location=York&Languages=French");
+    await loaded();
+    expect(await screen.findByTestId("map")).toBeTruthy();
+    expect(document.activeElement).toBe(french);
+    expect(screen.getByRole("button", { name: "Close filters" })).toBeTruthy();
   });
 
   it.each([
@@ -367,17 +388,54 @@ describe("SearchPage", () => {
     expect(body?.contains(screen.getByRole("button", { name: close }))).toBe(false);
   });
 
-  it("keeps the filters shut on a phone's prompt that widens, as they open only on arriving wide", () => {
+  it("sets the toolbar above the list's tabs on a phone before a search, handing the keyboard to the search's list as it begins", async () => {
+    screenIs(false);
+    shortlist.add(therapist("a"));
+    renderAt("/");
+    await mapLoads();
+    expect(within(results()).getByText(/^Search a town, city or postcode/)).toBeTruthy();
+    expect(screen.queryByTestId("map")).toBeNull();
+    const box = screen.getByRole("textbox", { name: "Location" });
+    expect(box.compareDocumentPosition(screen.getByRole("tablist")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getAllByRole("heading", { level: 1, name: "Find a UKCP therapist" })).toHaveLength(1);
+    pick(/^Shortlist/);
+    expect(within(screen.getByRole("tabpanel", { name: /^Shortlist/ })).getByRole("link", { name: "Therapist a" })).toBeTruthy();
+    box.focus();
+    fireEvent.change(box, { target: { value: "York" } });
+    fireEvent.submit(box.closest("form")!);
+    const tab = screen.getByRole("tab", { name: "Results" });
+    expect(tab.getAttribute("aria-selected")).toBe("true");
+    expect(document.activeElement).toBe(tab);
+    expect(results().dataset.position).toBe("full");
+    await loaded();
+  });
+
+  it("keeps a phone's filters sheet open, and the keyboard in it, when a tick there starts a search from the prompt", async () => {
     const resize = screenIs(false);
     renderAt("/");
+    fireEvent.change(screen.getByRole("textbox", { name: "Location" }), { target: { value: "York" } });
+    fireEvent.click(screen.getByRole("button", { name: "Filters" }));
+    const sheet = await screen.findByRole("dialog", { name: "Refine your search" });
+    fireEvent.click(within(sheet).getByRole("button", { name: /^Languages/ }));
+    const french = within(sheet).getByRole("checkbox", { name: "French" });
+    french.focus();
+    fireEvent.click(french);
+    expect(url().toString()).toBe("Location=York&Languages=French");
+    expect(await screen.findByTestId("map")).toBeTruthy();
+    expect(screen.getByRole("dialog", { name: "Refine your search" })).toBe(sheet);
+    expect(document.activeElement).toBe(french);
+    await waitFor(() => expect(api.search).toHaveBeenCalledOnce());
+    // Widened, the sheet goes, and the filters stay shut over the map, as they were never open there.
     resize(true);
+    expect(screen.queryByRole("dialog")).toBeNull();
     expect(screen.queryByRole("region", { name: "Refine your search" })).toBeNull();
   });
 
   it("leaves the outside-UK tick out of the Filters count, as Clear all keeps it", async () => {
     screenIs(true);
-    renderAt("/?LocationSearchOutsideUK=true&Languages=French");
+    renderAt(`${SEARCH}&LocationSearchOutsideUK=true&Languages=French`);
     expect(screen.getByRole("button", { name: "Filters, 1 ticked" })).toBeTruthy();
+    await loaded();
   });
 
   it("opens the filters in a sheet from the right on narrow screens", async () => {
@@ -884,69 +942,20 @@ describe("SearchPage", () => {
     expect(results().dataset.position).toBe("full");
   });
 
-  it("lists a shortlist beside the prompt before a search, as there are no results yet", async () => {
+  it("keeps the shortlist in a tab beside the prompt before a search", async () => {
     screenIs(true);
     placeByDistrict();
     shortlist.add(therapist("a", "BRIGHTON BN1"));
     renderAt("/");
     await mapLoads();
-    expect(screen.getByText(/^Search a town, city or postcode/)).toBeTruthy();
     expect(screen.queryByTestId("map")).toBeNull();
-    expect(screen.getByRole("tab", { name: "Results" }).hasAttribute("disabled")).toBe(true);
+    pick(/^Shortlist/);
     expect(within(screen.getByRole("tabpanel", { name: /^Shortlist/ })).getByRole("link", { name: "Therapist a" })).toBeTruthy();
     // With no map, there is nothing to look their place up for or count them missing from.
     expect(screen.getByText("Kept in this browser only.")).toBeTruthy();
     expect(api.place).not.toHaveBeenCalled();
     expect(screen.getAllByRole("heading", { level: 1, name: "Find a UKCP therapist" })).toHaveLength(1);
     expect(api.search).not.toHaveBeenCalled();
-  });
-
-  it("leaves the filters shut beside a shortlist before a search, which would leave the prompt too little room", () => {
-    screenIs(true);
-    shortlist.add(therapist("a"));
-    renderAt("/");
-    expect(screen.queryByRole("region", { name: "Refine your search" })).toBeNull();
-  });
-
-  it("keeps the side bar before a search when its last therapist is removed, so they can be put back", () => {
-    screenIs(true);
-    shortlist.add(therapist("a"));
-    renderAt("/");
-    fireEvent.click(screen.getByRole("button", { name: "Remove Therapist a from your shortlist" }));
-    fireEvent.click(screen.getByRole("button", { name: "Add Therapist a to your shortlist" }));
-    expect(shortlist.has("a")).toBe(true);
-  });
-
-  it("sets no side bar beside the prompt for a shortlist emptied during a search", async () => {
-    screenIs(true);
-    renderAt(SEARCH);
-    await loaded();
-    fireEvent.click(screen.getByRole("button", { name: "Add Therapist p1-3 to your shortlist" }));
-    fireEvent.click(screen.getByRole("button", { name: "Remove Therapist p1-3 from your shortlist" }));
-    fireEvent.change(screen.getByRole("textbox", { name: "Location" }), { target: { value: "" } });
-    fireEvent.click(screen.getByRole("button", { name: "Filters" }));
-    fireEvent.click(screen.getByRole("button", { name: "Clear all filters" }));
-    expect(screen.getByText(/^Search a town, city or postcode/)).toBeTruthy();
-    expect(screen.queryByRole("region", { name: "Results and shortlist" })).toBeNull();
-  });
-
-  it("lowers the sheet beneath the prompt before a search, raising it for the shortlist", async () => {
-    screenIs(false);
-    shortlist.add(therapist("a"));
-    renderAt("/");
-    await mapLoads();
-    expect(screen.getByText(/^Search a town, city or postcode/)).toBeTruthy();
-    expect(results().dataset.position).toBe("peek");
-    pick(/^Shortlist/);
-    expect(results().dataset.position).toBe("full");
-    // There is no map yet for lowering the sheet to show.
-    expect(screen.getByRole("button", { name: "Hide list" })).toBeTruthy();
-    expect(screen.getAllByRole("heading", { level: 1, name: "Find a UKCP therapist" })).toHaveLength(1);
-    fireEvent.change(screen.getByRole("textbox", { name: "Location" }), { target: { value: "York" } });
-    fireEvent.click(screen.getByRole("button", { name: "Search" }));
-    expect(screen.getByRole("tab", { name: "Results" }).getAttribute("aria-selected")).toBe("true");
-    expect(results().dataset.position).toBe("full");
-    await loaded();
   });
 });
 
