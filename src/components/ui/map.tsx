@@ -59,26 +59,36 @@ function DataCreditsOnly() {
   return null;
 }
 
-export type TileSource = { url: string; attribution: string };
+/** `dark` says whether the tiles are drawn dark, which their tint (index.css) follows. */
+export type TileSource = { url: string; attribution: string; dark: boolean };
 
 const OSM_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
 
 /** CARTO's tiles need a key; without one, as in development and CI, OpenStreetMap's own light tiles stand in. */
 function tileSource(cartoKey: string | undefined, dark = false): TileSource {
-  if (!cartoKey) return { url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png", attribution: OSM_ATTRIBUTION };
+  if (!cartoKey) return { url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png", attribution: OSM_ATTRIBUTION, dark: false };
   return {
     // CARTO's documented form: one host, which HTTP/2 serves over a single connection.
     url: `https://basemaps.cartocdn.com/rastertiles/${dark ? "dark_all" : "light_all"}/{z}/{x}/{y}{r}.png?key=${encodeURIComponent(cartoKey)}`,
     attribution: `${OSM_ATTRIBUTION}, &copy; <a href="https://carto.com/attributions">CARTO</a>`,
+    dark,
   };
 }
 
 function MapTileLayer(props: Omit<TileLayerProps, "url" | "attribution">) {
   const dark = useDarkTheme();
-  const { url, attribution } = tileSource(import.meta.env.VITE_CARTO_KEY, dark);
+  const source = tileSource(import.meta.env.VITE_CARTO_KEY, dark);
   // Keyed by URL, so a theme change swaps the layer rather than relying on Leaflet to redraw it in place, and by bounds,
   // which a layer reads only as it is made.
-  return <TileLayer key={JSON.stringify([url, props.bounds])} url={url} attribution={attribution} {...props} />;
+  return (
+    <TileLayer
+      key={JSON.stringify([source.url, props.bounds])}
+      url={source.url}
+      attribution={source.attribution}
+      className={source.dark ? "tiles-dark" : "tiles-light"}
+      {...props}
+    />
+  );
 }
 
 /** `data` rides along in the Leaflet marker's options, so a cluster can tell what its markers stand for. */

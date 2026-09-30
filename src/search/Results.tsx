@@ -105,7 +105,7 @@ function ResultsList({ params, results, listRef, pins = [], unplaced = [], selec
               key={key}
               data-pin={pin?.key}
               aria-current={marked || undefined}
-              className={cn("rounded-xl", marked && t && "ring-2 ring-sky-500")}
+              className={cn("rounded-xl", marked && t && "ring-2 ring-highlight")}
             >
               {t ? (
                 <TherapistCard therapist={t} sought={sought} online={online} action={<ShortlistButton therapist={t} />} onHighlight={highlight(t.slug)} />
@@ -163,10 +163,10 @@ function PinGroup({ pin, marked, sought, highlight }: PinGroupProps) {
     <div
       role="group"
       aria-labelledby={headingId}
-      className={cn("space-y-3 rounded-xl border p-3 transition-colors", marked && "border-sky-500 bg-sky-500/10 ring-1 ring-sky-500")}
+      className={cn("space-y-3 rounded-xl border p-3 transition-colors", marked && "border-highlight bg-highlight/10 ring-1 ring-highlight")}
     >
-      <h2 id={headingId} className="eyebrow flex items-center gap-1.5">
-        <MapPin aria-hidden className={cn("size-4 shrink-0", marked ? "text-sky-600 dark:text-sky-400" : "text-muted-foreground")} />
+      <h2 id={headingId} className="eyebrow flex items-center gap-1.5 text-primary">
+        <MapPin aria-hidden className={cn("size-4 shrink-0", marked ? "text-highlight" : "text-muted-foreground")} />
         {/* The space parts the two in the group's name; the dot does so on screen, where spaced capitals run together. */}
         {pinLabel(pin)} <span aria-hidden>·</span> <span className="font-normal text-muted-foreground">{pin.therapists.length} therapists</span>
       </h2>

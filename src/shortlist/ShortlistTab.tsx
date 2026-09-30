@@ -149,7 +149,7 @@ function SortableEntry({ card, listed, sought, online, pinKey, marked, onHighlig
       >
         <GripVertical aria-hidden />
       </IconButton>
-      <div className={cn("min-w-0 flex-1 rounded-xl", marked && "ring-2 ring-sky-500")}>
+      <div className={cn("min-w-0 flex-1 rounded-xl", marked && "ring-2 ring-highlight")}>
         <TherapistCard
           therapist={card}
           sought={sought}
