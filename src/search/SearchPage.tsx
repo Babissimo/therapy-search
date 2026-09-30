@@ -296,10 +296,14 @@ function MapToolbar({
   const filtersId = useId();
   const ticked = tickedFilters(params);
   return (
-    // Only the toolbar's own controls take the pointer; the map shows through the rest of it.
+    // Only the toolbar's own controls take the pointer; the map shows through the rest of it. It steps aside for the side
+    // bar's toggle as the side bar slides, and in time with it.
     <Collapsible open={wide && filtersOpen} asChild>
       <div
-        className={cn("pointer-events-none absolute inset-3 z-10 flex flex-col items-start gap-2 lg:right-auto lg:w-96", besideToggle && "left-14")}
+        className={cn(
+          "pointer-events-none absolute inset-3 z-10 flex flex-col items-start gap-2 motion-safe:transition-[left] motion-safe:duration-200 lg:right-auto lg:w-96",
+          besideToggle && "left-14",
+        )}
       >
         <div className="pointer-events-auto flex w-full flex-col gap-2 rounded-xl border bg-background p-2 shadow-md">
           <ModeSwitch online={false} params={params} />

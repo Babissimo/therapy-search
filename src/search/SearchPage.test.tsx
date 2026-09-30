@@ -196,11 +196,11 @@ describe("SearchPage", () => {
     expect(await screen.findByTestId("map")).toBeTruthy();
     const toolbar = () => screen.getByRole("button", { name: "Filters" }).closest(".absolute")!;
     fireEvent.click(screen.getByRole("button", { name: "Hide list" }));
-    expect(screen.queryByRole("region", { name: "Results and shortlist" })).toBeNull();
+    expect(results().closest("[inert]")).not.toBeNull();
     // The toolbar stands aside for the toggle left over the map's top left.
     expect(toolbar().className).toContain("left-14");
     fireEvent.click(screen.getByRole("button", { name: "Show list" }));
-    expect(results()).toBeTruthy();
+    expect(results().closest("[inert]")).toBeNull();
     expect(toolbar().className).not.toContain("left-14");
   });
 
@@ -500,8 +500,8 @@ describe("SearchPage", () => {
     expect(screen.getByRole("heading", { level: 1, name: "Find a UKCP therapist" })).toBeTruthy();
     expect(screen.getByRole("group", { name: "Theme" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Hide list" }));
-    expect(screen.queryByRole("heading", { level: 1 })).toBeNull();
-    expect(screen.queryByRole("group", { name: "Theme" })).toBeNull();
+    expect(screen.getByRole("heading", { level: 1 }).closest("[inert]")).not.toBeNull();
+    expect(screen.getByRole("group", { name: "Theme" }).closest("[inert]")).not.toBeNull();
   });
 
   it("heads the list in the sheet with the site's name and theme switch on narrow screens", async () => {
