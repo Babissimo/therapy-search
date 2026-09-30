@@ -39,6 +39,7 @@ describe("placeQuery", () => {
     expect(placeQuery(" Brighton  bn3")).toBe(`q=BRIGHTON+BN3&${v}`);
     expect(placeQuery("Paris", { centre: true, outsideUK: true })).toBe(`q=PARIS&centre=true&outsideUK=true&${v}`);
     expect(placeQuery("Leeds", { centre: false, outsideUK: false })).toBe(`q=LEEDS&${v}`);
+    expect(placeQuery("Berlin 12689", { centre: true, country: "DE" })).toBe(`q=BERLIN+12689&centre=true&country=de&${v}`);
   });
 });
 

@@ -201,6 +201,14 @@ describe("GET /api/place", () => {
     expect(finder.lookup).toHaveBeenCalledWith("PARIS", { centre: true, outsideUK: true });
   });
 
+  it("passes a country on, and refuses anything but a two-letter code", async () => {
+    const { request, finder } = setup();
+    expect((await request(`/api/place?q=BERLIN&centre=true&country=de&${v}`)).status).toBe(200);
+    expect(finder.lookup).toHaveBeenCalledWith("BERLIN", { centre: true, outsideUK: false, country: "de" });
+    expect((await request(`/api/place?q=BERLIN&country=DE&${v}`)).headers.get("Location")).toBe(`/api/place?q=BERLIN&country=de&${v}`);
+    expect((await request(`/api/place?q=BERLIN&country=deu&${v}`)).status).toBe(400);
+  });
+
   it("redirects other spellings of a lookup to the canonical one without looking it up", async () => {
     const { request, finder } = setup();
     const res = await request("/api/place?centre=false&q=brighton%20%20bn3");

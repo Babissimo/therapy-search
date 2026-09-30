@@ -146,12 +146,13 @@ When the visitor typed a location but UKCP searched "United Kingdom" (parity §3
 
 | Route | Upstream | Cache |
 |---|---|---|
-| `GET /api/place?q=<text>[&centre=true][&outsideUK=true]&v=<version>` | postcodes.io or Nominatim | 30 days when found; 1 day when not found or too general |
+| `GET /api/place?q=<text>[&centre=true][&outsideUK=true][&country=<code>]&v=<version>` | postcodes.io or Nominatim | 30 days when found; 1 day when not found or too general |
 | `GET /api/nearest?lat=<degrees>&lng=<degrees>&v=<version>` | postcodes.io | 30 days when found; 1 day when not found |
 
 - One string per request, so Workers Caching (parity §4.2) keys each string on its own and shares it across visitors, where a batch URL would rarely repeat. A page needs at most 13 lookups (12 cards and the centre), fewer once repeated strings are merged, sent in parallel over one HTTP/2 connection.
 - `q` must be 1–100 characters after trimming. The route canonicalises it with `shared/location.ts` and redirects to the canonical URL when it differs, as `/api/search` does (parity §4.2), so equal strings share one entry. The browser requests the canonical form in the first place.
 - `v` is `LOOKUP_VERSION` from `shared/location.ts`, part of both routes' canonical forms. Cached answers outlive a deploy (parity §4.2), so a change to what either route answers sets it to that day's date, never a value used before, and every lookup moves to new URLs rather than waiting up to 30 days for the old answers to expire. A tab still running older code is answered from the old version's entries while the edge holds them, and otherwise redirected to the current version.
+- `country`, a two-letter code, keeps a lookup to that country: the text goes whole to Nominatim there, since the UK's postcode rules mean nothing abroad.
 - `/api/nearest` answers the postcode nearest the visitor, for a search from where they are. Its canonical form rounds the point to three decimal places, about 100 metres, so neither the Worker nor any cache sees a finer position; a finer one is redirected before any lookup.
 - Upstream requests, each with a 5-second timeout:
 
@@ -160,7 +161,7 @@ When the visitor typed a location but UKCP searched "United Kingdom" (parity §3
 | Postcode | `api.postcodes.io/postcodes/<postcode>` |
 | Outcode | `api.postcodes.io/outcodes/<outcode>` |
 | Place, on a card | `api.postcodes.io/places?q=<name>&limit=10` |
-| Place, as the centre or in an outside-UK search | `nominatim.openstreetmap.org/search?q=<name>&format=jsonv2&countrycodes=gb`, with `limit=1` for a centre and `limit=10` for a card, and no `countrycodes` outside the UK |
+| Place, as the centre, in an outside-UK search or in a given country | `nominatim.openstreetmap.org/search?q=<name>&format=jsonv2&countrycodes=gb`, with `limit=1` for a centre and `limit=10` for a card, no `countrycodes` outside the UK, and the given country's code for one |
 | Nearest postcode | `api.postcodes.io/postcodes?lon=<lng>&lat=<lat>&radius=2000&limit=1`, 2 km being as far as postcodes.io looks |
 
 ### 5.2 Response
