@@ -333,7 +333,10 @@ function Toolbar({
           placement !== "list" && "absolute inset-3 z-10",
           // Only the toolbar's own controls take the pointer; the map shows through the rest of it. It steps aside for the
           // side bar's toggle as the side bar slides, and in time with it.
-          overMap && "pointer-events-none motion-safe:transition-[left] motion-safe:duration-200 lg:right-auto lg:w-96",
+          overMap && "pointer-events-none motion-safe:transition-[left] motion-safe:duration-200",
+          // As wide as beside the list (a w-96 column less its border and p-3), so nothing in it shifts as it moves onto the
+          // map and back.
+          overMap && "lg:right-auto lg:w-[calc(24rem-1.5rem-1px)]",
           besideToggle && "left-14",
         )}
       >
