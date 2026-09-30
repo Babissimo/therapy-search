@@ -143,18 +143,22 @@ export function ProfileBody({ slug, back, close }: { slug: string } & Exits) {
 /** Who the profile is and how to reach them, kept in view as the visitor reads on. */
 function StickyHeader({ back, close, bookmark, children }: Exits & { bookmark?: ReactNode; children?: ReactNode }) {
   return (
-    // A drawer is drawn in the popover colour, which the header matches so text scrolling beneath it stays hidden.
-    <header className="sticky top-0 z-10 space-y-2 border-b bg-background py-3 in-data-[slot=sheet-content]:bg-popover">
-      {back}
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0 flex-1">{children}</div>
-        {/* Pulls the last icon out to the content's right edge, past the ghost button's padding. */}
-        {(bookmark || close) && (
-          <div className="-mr-2 flex shrink-0">
-            {bookmark}
-            {close}
-          </div>
-        )}
+    // A drawer is drawn in the popover colour, which the header matches so text scrolling beneath it stays hidden. The
+    // background reaches a little past the content either side, over the rings that cards and focused controls draw
+    // outside their boxes; the rule keeps to the content's width.
+    <header className="sticky top-0 z-10 -mx-1 bg-background px-1 in-data-[slot=sheet-content]:bg-popover">
+      <div className="space-y-2 border-b py-3">
+        {back}
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0 flex-1">{children}</div>
+          {/* Pulls the last icon out to the content's right edge, past the ghost button's padding. */}
+          {(bookmark || close) && (
+            <div className="-mr-2 flex shrink-0">
+              {bookmark}
+              {close}
+            </div>
+          )}
+        </div>
       </div>
     </header>
   );
