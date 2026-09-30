@@ -98,7 +98,7 @@ function CardLayout({ heading: Heading = "h2", photo, name, place, meets, action
           {/* Raised above the stretched link, which would otherwise take its clicks. */}
           {action && <div className="relative z-10 -mt-1 -mr-1 self-start">{action}</div>}
         </div>
-        {summary && <p className="text-sm">{summary}</p>}
+        {summary && <p className="text-base">{summary}</p>}
         {tags.length > 0 && (
           <ul className="flex flex-wrap gap-1.5">
             {tags.map((tag) => (

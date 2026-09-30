@@ -215,11 +215,12 @@ function Identity({ photo, name, location, contacts }: IdentityProps) {
 
 /**
  * The profile's columns, shared by the profile and its skeleton. A wide page puts the long sections, under the matches,
- * in a wide column beside the short ones; with no long sections the short ones keep the whole width.
+ * in a column as wide as their reading measure, with the short ones at the far side; with no long sections the short
+ * ones keep the whole width.
  */
 function Columns({ main, aside, besideLong }: { main?: ReactNode; aside?: ReactNode; besideLong: boolean }) {
   return (
-    <div className={cn("grid gap-8", besideLong && "@4xl:grid-cols-[minmax(0,1fr)_20rem]")}>
+    <div className={cn("grid gap-8", besideLong && "@4xl:grid-cols-[minmax(0,var(--container-reading))_20rem] @4xl:justify-between")}>
       {main && <div className="space-y-8">{main}</div>}
       {aside && <aside className={cn("space-y-8", besideLong && "@4xl:col-2")}>{aside}</aside>}
     </div>
@@ -301,7 +302,7 @@ function ShortSections({ besideLong, children }: { besideLong: boolean; children
 const TAG = "h-auto py-px whitespace-normal";
 
 // Therapists write at length about themselves, and visitors read it closely, so it is set for reading.
-const READING = "max-w-prose text-[1.0625rem] leading-relaxed";
+const READING = "max-w-reading text-[1.0625rem] leading-relaxed";
 
 /** A section's heading above what it says, laid out for the profile and its skeleton. */
 function Section({ heading, children }: { heading: ReactNode; children: ReactNode }) {
