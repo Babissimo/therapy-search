@@ -16,6 +16,8 @@ type Props = {
   instant?: boolean;
   /** How much of the map's bottom, in pixels, lies under something laid over it, given the map's height. */
   coveredBelow?: (height: number) => number;
+  /** Counts the visitor's asks to recentre, each of which frames the search again though nothing new has arrived. */
+  recentres?: number;
   onFramed?: () => void;
 };
 
@@ -28,18 +30,21 @@ const LEAST_ROOM = 128;
 const MAX_ZOOM = 14;
 
 /**
- * Frames each search as its first page is placed, and again whenever Load more places further pins: around the centre
- * and every pin, or the whole area searched when no pin is placed. With no centre it frames the pins alone. A view
- * restored on Back is left as it was until pins arrive beyond those it had.
+ * Frames each search as its first page is placed, and again whenever Load more places further pins or the visitor
+ * asks to recentre: around the centre and every pin, or the whole area searched when no pin is placed. With no centre
+ * it frames the pins alone. A view restored on Back is left as it was until pins arrive beyond those it had, or the
+ * visitor asks.
  * `onFramed` hears when the view is where the search puts it, or that there is nothing to frame.
  */
-export function FitView({ fitKey, centre, points, waiting, restored, instant, coveredBelow, onFramed }: Props) {
+export function FitView({ fitKey, centre, points, waiting, restored, instant, coveredBelow, recentres = 0, onFramed }: Props) {
   const map = useMap();
   const framed = useRef(restored);
+  const recentred = useRef(recentres);
   useEffect(() => {
     const last = framed.current;
-    const taken = last?.fitKey === fitKey && points.length <= last.pins;
+    const taken = recentres === recentred.current && last?.fitKey === fitKey && points.length <= last.pins;
     if (waiting || taken) return;
+    recentred.current = recentres;
     const bounds = L.latLngBounds(points.map((p) => [p.lat, p.lng]));
     if (centre) bounds.extend(points.length > 0 ? L.latLng(centre) : L.latLng(centre).toBounds(2 * SEARCH_MILES * METRES_PER_MILE));
     const height = map.getSize().y;
@@ -55,6 +60,6 @@ export function FitView({ fitKey, centre, points, waiting, restored, instant, co
     if (onFramed) map.once("moveend", onFramed);
     map.fitBounds(bounds, options);
     framed.current = { fitKey, pins: points.length };
-  }, [map, fitKey, centre, points, waiting, instant, coveredBelow, onFramed]);
+  }, [map, fitKey, centre, points, waiting, instant, coveredBelow, recentres, onFramed]);
   return null;
 }

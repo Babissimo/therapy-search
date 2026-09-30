@@ -50,11 +50,13 @@ vi.mock("./FitView", async () => {
       restored,
       instant,
       coveredBelow,
+      recentres,
       onFramed,
     }: {
       restored?: { fitKey: string; pins: number };
       instant?: boolean;
       coveredBelow?: (height: number) => number;
+      recentres?: number;
       onFramed?: () => void;
     }) =>
       createElement("button", {
@@ -62,28 +64,40 @@ vi.mock("./FitView", async () => {
         "data-testid": "fit",
         "data-instant": String(Boolean(instant)),
         "data-covered": coveredBelow?.(800) ?? "",
+        "data-recentres": recentres ?? 0,
         "data-restored": restored ? `${restored.fitKey} with ${restored.pins} pins` : "",
         onClick: onFramed,
       }),
   };
 });
-vi.mock("./SearchAreaButton", async () => {
-  const { createElement, useState } = await import("react");
+vi.mock("./MovedMapButtons", async () => {
+  const { createElement, Fragment, useState } = await import("react");
   let mounts = 0;
-  type Props = { centred: boolean; settled: boolean; coveredBelow?: (height: number) => number; onSearch: (postcode: string) => boolean };
+  type Props = {
+    centred: boolean;
+    settled: boolean;
+    coveredBelow?: (height: number) => number;
+    onSearch: (postcode: string) => boolean;
+    onRecentre?: () => void;
+  };
   return {
-    // Numbered as it mounts, and clicked to stand for a postcode found near the middle of the map.
-    SearchAreaButton: ({ centred, settled, coveredBelow, onSearch }: Props) => {
+    // Numbered as it mounts, and clicked to stand for a postcode found near the middle of the map, or a recentre.
+    MovedMapButtons: ({ centred, settled, coveredBelow, onSearch, onRecentre }: Props) => {
       const [mount] = useState(() => ++mounts);
-      return createElement("button", {
-        type: "button",
-        "data-testid": "search-area",
-        "data-mount": mount,
-        "data-centred": String(centred),
-        "data-settled": String(settled),
-        "data-covered": coveredBelow?.(800) ?? "",
-        onClick: () => onSearch("BN3 1FG"),
-      });
+      return createElement(
+        Fragment,
+        null,
+        createElement("button", {
+          type: "button",
+          "data-testid": "search-area",
+          "data-mount": mount,
+          "data-centred": String(centred),
+          "data-settled": String(settled),
+          "data-covered": coveredBelow?.(800) ?? "",
+          onClick: () => onSearch("BN3 1FG"),
+        }),
+        onRecentre && createElement("button", { type: "button", "data-testid": "recentre", onClick: onRecentre }),
+      );
     },
   };
 });
@@ -169,6 +183,20 @@ describe("MapPane", () => {
     const before = screen.getByTestId("search-area").dataset.mount;
     fireEvent.click(screen.getByTestId("fit"));
     expect(screen.getByTestId("search-area").dataset.mount).not.toBe(before);
+  });
+
+  it("frames the search again each time the visitor asks, if there is anything to frame", () => {
+    renderPane({ fitKey: "Location=Brighton", centre: BRIGHTON });
+    expect(screen.getByTestId("fit").dataset.recentres).toBe("0");
+    fireEvent.click(screen.getByTestId("recentre"));
+    fireEvent.click(screen.getByTestId("recentre"));
+    expect(screen.getByTestId("fit").dataset.recentres).toBe("2");
+    cleanup();
+    renderPane({ fitKey: "Languages=French", pins: [pin("a")] });
+    expect(screen.getByTestId("recentre")).toBeTruthy();
+    cleanup();
+    renderPane({ fitKey: "Languages=French" });
+    expect(screen.queryByTestId("recentre")).toBeNull();
   });
 
   it("frames and searches clear of whatever covers the map's bottom", () => {

@@ -98,6 +98,21 @@ describe("FitView", () => {
     expect(fit).toHaveBeenCalledOnce();
   });
 
+  it("frames again each time the visitor asks to recentre, even a view restored for this search", () => {
+    const fit = spyFit();
+    const restored = { fitKey: "a", pins: 1 };
+    const fitView = (recentres: number) => <FitView fitKey="a" centre={BRIGHTON} points={[HOVE]} waiting={false} restored={restored} recentres={recentres} />;
+    const { rerender } = render(onMap(fitView(0)));
+    expect(fit).not.toHaveBeenCalled();
+    rerender(onMap(fitView(1)));
+    expect(fit).toHaveBeenCalledOnce();
+    rerender(onMap(fitView(1)));
+    expect(fit).toHaveBeenCalledOnce();
+    rerender(onMap(fitView(2)));
+    expect(fit).toHaveBeenCalledTimes(2);
+    expect(framed(fit, 1)).toEqual(framed(fit, 0));
+  });
+
   it("tells the pane once it has framed, jumping there when asked to", () => {
     const fit = spyFit();
     const onFramed = vi.fn();

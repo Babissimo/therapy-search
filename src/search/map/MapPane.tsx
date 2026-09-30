@@ -5,10 +5,10 @@ import { savedView, saveView } from "../viewMemory";
 import { FitView } from "./FitView";
 import { UK_BOUNDS, UK_VIEW, type Point } from "./geo";
 import type { Highlight } from "./highlight";
+import { MovedMapButtons } from "./MovedMapButtons";
 import { centreIcon } from "./pinIcon";
 import type { Pin } from "./pins";
 import { PinsLayer } from "./PinsLayer";
-import { SearchAreaButton } from "./SearchAreaButton";
 
 export type MapPaneProps = {
   /** Names what the map shows, for screen readers. */
@@ -58,6 +58,7 @@ export default function MapPane({
   const [tiles, showTiles] = useState(restored !== undefined);
   const [centrePin] = useState(centreIcon);
   const [framings, countFraming] = useReducer((count: number) => count + 1, 0);
+  const [recentres, recentre] = useReducer((count: number) => count + 1, 0);
   // The frame takes in every loaded pin, so it waits until they are placed.
   const framing = !centreSettled || placing;
   const points = pins.map((p) => p.point);
@@ -82,13 +83,21 @@ export default function MapPane({
           // With no tiles drawn there is nothing to animate across, and they should load where the frame lands.
           instant={!tiles}
           coveredBelow={coveredBelow}
+          recentres={recentres}
           onFramed={() => {
             showTiles(true);
             countFraming();
           }}
         />
         {/* Mounted afresh on each frame, which it measures the visitor's moves from, and waiting as the frame does. */}
-        <SearchAreaButton key={framings} centred={centre !== undefined} settled={!framing} coveredBelow={coveredBelow} onSearch={onSearchArea} />
+        <MovedMapButtons
+          key={framings}
+          centred={centre !== undefined}
+          settled={!framing}
+          coveredBelow={coveredBelow}
+          onSearch={onSearchArea}
+          onRecentre={centre || pins.length > 0 ? recentre : undefined}
+        />
         <RememberView entry={entry} fitKey={fitKey} pins={pins.length} />
       </Map>
     </div>
