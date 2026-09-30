@@ -196,6 +196,10 @@ function ShortSections({ sections, isMatch, besideLong, underFees }: ShortProps)
   );
 }
 
+// A badge keeps to one line at a fixed height, and a tag as long as a college's name runs past a narrow column, so these
+// wrap; the thinner padding keeps a one-line tag at the badge's height.
+const TAG = "h-auto py-px whitespace-normal";
+
 function SectionView({ section, isMatch, announce = true, className }: SectionProps & { className?: string }) {
   return (
     <section className={cn("space-y-3", className)}>
@@ -210,13 +214,13 @@ function SectionView({ section, isMatch, announce = true, className }: SectionPr
           {section.items.map((item, i) => (
             <li key={i}>
               {isMatch(item) ? (
-                <Badge>
+                <Badge className={TAG}>
                   <Check data-icon="inline-start" aria-hidden />
                   {item}
                   {announce && <span className="sr-only">, in your search</span>}
                 </Badge>
               ) : (
-                <Badge variant="secondary">{item}</Badge>
+                <Badge variant="secondary" className={TAG}>{item}</Badge>
               )}
             </li>
           ))}
