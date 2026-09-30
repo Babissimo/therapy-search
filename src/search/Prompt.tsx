@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 export function Prompt({ ask, children, className }: { ask: ReactNode; children: ReactNode; className?: string }) {
   return (
     <div className={cn("space-y-4 text-center text-balance sm:space-y-6", className)}>
-      <p className="text-2xl font-semibold tracking-tight sm:text-4xl">{ask}</p>
+      <p className="font-heading text-3xl font-medium sm:text-4xl">{ask}</p>
       <p className="text-lg text-muted-foreground sm:text-xl">{children}</p>
     </div>
   );

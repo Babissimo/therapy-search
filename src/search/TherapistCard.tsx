@@ -94,7 +94,7 @@ function CardLayout({ heading: Heading = "h2", photo, name, place, meets, action
         <div className="flex items-center gap-4">
           <div className="size-24 shrink-0">{photo}</div>
           <div className="min-w-0 flex-1 space-y-1.5">
-            <Heading className="font-semibold">{name}</Heading>
+            <Heading className="font-heading text-lg leading-snug font-medium">{name}</Heading>
             {place && <p className="text-sm">{place}</p>}
             {meets && <p className="text-sm text-muted-foreground">{meets}</p>}
           </div>
