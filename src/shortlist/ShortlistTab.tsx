@@ -56,7 +56,10 @@ export function ShortlistTab({ sought, online = false, pins = [], unplaced = 0, 
     return (
       <div className="flex gap-3 py-2">
         <Bookmark aria-hidden className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
-        <p className="text-sm">Nothing shortlisted yet. The bookmark on a therapist's card or profile keeps them here, in this browser only.</p>
+        <p className="text-sm">
+          Bookmark anyone who might suit you, from their card or profile, to compare them here. It's fine to contact a few before choosing one.
+          Your shortlist is kept in this browser only.
+        </p>
       </div>
     );
   }

@@ -348,8 +348,9 @@ function SearchPrompt({ besideFilters, besideToggle }: { besideFilters: boolean;
       )}
     >
       {/* Centred by its margins, so text taller than the space scrolls from its top rather than being cut off there. */}
-      <Prompt ask="Search a town, city or postcode to see the UKCP therapists within your area, nearest first." className="m-auto max-w-2xl">
-        Filters <FiltersIcon /> narrow the search by what therapists help with, how they work, the languages they speak and more.
+      <Prompt ask="Start with where you are." className="m-auto max-w-2xl">
+        Search a town, city or postcode to see the UKCP therapists nearest to it. Filters <FiltersIcon /> then narrow it down by what therapists
+        help with, how they work, the languages they speak and more.
       </Prompt>
     </div>
   );

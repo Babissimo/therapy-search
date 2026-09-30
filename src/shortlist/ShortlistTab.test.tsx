@@ -74,7 +74,7 @@ const announced = () => screen.getByRole("status").textContent;
 describe("ShortlistTab", () => {
   it("says how to shortlist someone when the list is empty", () => {
     renderTab({});
-    screen.getByText(/^Nothing shortlisted yet/);
+    screen.getByText(/^Bookmark anyone who might suit you/);
   });
 
   it("lists shortlisted therapists newest first, each linking to their profile", () => {

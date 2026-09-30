@@ -878,7 +878,7 @@ describe("SearchPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "Show map" }));
     pick(/^Shortlist/);
     expect(results().dataset.position).toBe("full");
-    expect(screen.getByRole("tabpanel", { name: /^Shortlist/ }).textContent).toMatch(/^Nothing shortlisted yet/);
+    expect(screen.getByRole("tabpanel", { name: /^Shortlist/ }).textContent).toMatch(/^Bookmark anyone who might suit you/);
     fireEvent.click(screen.getByRole("button", { name: "Show map" }));
     pick(/^Shortlist/);
     expect(results().dataset.position).toBe("full");
