@@ -96,7 +96,7 @@ function SearchView({ params, onChange, wide }: ViewProps) {
   // The place searched comes with the results, so there is none until a first search's results arrive; while the next
   // search loads, the results, and so the place, are still the last search's.
   const centreSettled = centre.settled && !results.query.isPending && !results.query.isPlaceholderData;
-  const { pins, unplaced, placing } = usePins(results.therapists, centre, params.flags.LocationSearchOutsideUK);
+  const { pins, unplaced, placing, moving } = usePins(results.therapists, centre, params.flags.LocationSearchOutsideUK);
   // Kept by key, so a new search shows its results whichever tab was open.
   const [tabChoice, setTabChoice] = useState<{ fitKey: string; tab: ListTab }>();
   const tab = tabChoice?.fitKey === fitKey ? tabChoice.tab : "results";
@@ -199,7 +199,7 @@ function SearchView({ params, onChange, wide }: ViewProps) {
       }
     />
   );
-  const footer = tab === "results" ? <LoadMore results={results} listRef={listRef} placing={placing} /> : undefined;
+  const footer = tab === "results" ? <LoadMore results={results} listRef={listRef} placing={placing || moving} /> : undefined;
   const tabs = <ListTabs ref={tabsRef} />;
   const toolbar = (placement: Placement) => (
     <Toolbar

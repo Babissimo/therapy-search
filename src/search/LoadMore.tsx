@@ -9,7 +9,7 @@ type Props = {
   results: SearchResults;
   /** The results' entries, where the keyboard carries on once the last page is in. */
   listRef: RefObject<HTMLUListElement | null>;
-  /** True while any loaded card's location is still being looked up. */
+  /** True while any loaded card's place, its office's postcode included, is still being looked up. */
   placing?: boolean;
   /** At the list's end, scrolling with it, rather than in a strip held beneath it. */
   atEnd?: boolean;

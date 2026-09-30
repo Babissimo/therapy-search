@@ -2,16 +2,25 @@ import { canonicalLocation, classifyLocation, type PlaceLookup } from "@shared/l
 import type { TherapistCard } from "@shared/types";
 import { choosePoint, milesBetween, type Point } from "./geo";
 
-/** `kind` is what placed the pin, which can be less than a card gives when a postcode or district is unknown. */
-export type Pin = { key: string; point: Point; therapists: TherapistCard[]; kind: PlacedKind };
+/**
+ * `kind` is what placed the pin, which can be less than a card gives when a postcode or district is unknown. `offices`
+ * holds, by slug, the office postcode that placed each therapist here in place of their card's location.
+ */
+export type Pin = { key: string; point: Point; therapists: TherapistCard[]; kind: PlacedKind; offices?: Record<string, string> };
 type PlacedKind = Extract<PlaceLookup, { found: true }>["kind"];
-/** A settled lookup of a card's location; `ok: false` when the lookup itself failed. */
-export type LookupResult = { ok: true; lookup: PlaceLookup } | { ok: false };
+/** A settled lookup of a card's location, or of its office's postcode (`office`); `ok: false` when the lookup itself failed. */
+export type LookupResult = { ok: true; lookup: PlaceLookup; office?: string } | { ok: false };
 
 /** The text to look up for a card, or null when there is nothing a geocoder could place. */
 export function lookupText(location: string | undefined): string | null {
   if (!location || classifyLocation(location).kind === "too-general") return null;
   return canonicalLocation(location);
+}
+
+/** The district of a card that gives no more than that, whose office's full postcode the therapist's profile may give. */
+export function officeDistrict(location: string | undefined): string | undefined {
+  const text = location ? classifyLocation(location) : undefined;
+  return text?.kind === "outcode" ? text.outcode : undefined;
 }
 
 /**
@@ -40,9 +49,10 @@ export function layoutPins(
       continue;
     }
     const key = `${point.lat.toFixed(5)},${point.lng.toFixed(5)}`;
-    const pin = pins.get(key);
+    let pin = pins.get(key);
     if (pin) pin.therapists.push(therapist);
-    else pins.set(key, { key, point, therapists: [therapist], kind: lookup.kind });
+    else pins.set(key, (pin = { key, point, therapists: [therapist], kind: lookup.kind }));
+    if (result.office) pin.offices = { ...pin.offices, [therapist.slug]: result.office };
   }
   return { pins: [...pins.values()], unplaced };
 }
@@ -71,9 +81,12 @@ export function listEntries(therapists: TherapistCard[], pins: Pin[]): Entry[] {
   return entries;
 }
 
-/** What everyone at a pin lists: the location they share, or else the postcodes, districts or places that placed them. */
+/**
+ * What everyone at a pin lists: the location they share, or else the postcodes, districts or places that placed them. An
+ * office postcode stands in for the card's location of whoever it placed, as the card's district no longer says where they are.
+ */
 export function pinLabel(pin: Pin): string {
-  const listed = pin.therapists.map((t) => t.location ?? "");
+  const listed = pin.therapists.map((t) => pin.offices?.[t.slug] ?? t.location ?? "");
   if (new Set(listed.map(canonicalLocation)).size === 1) return listed[0]?.trim() ?? "";
   const placed = new Map<string, string>();
   for (const location of listed) {
