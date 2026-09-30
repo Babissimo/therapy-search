@@ -8,10 +8,18 @@ const answer = (body: string, status = 200) => vi.stubGlobal("fetch", vi.fn(asyn
 afterEach(() => vi.unstubAllGlobals());
 
 describe("api", () => {
-  it("reads UKCP's HTML in the browser", async () => {
+  it("reads UKCP's HTML in the browser, leaving a card's details until it is shown", async () => {
     answer(`<span class="results-no">1-1 of 1 results</span><div class="profile-listing"><a href="therapist/Jo-Bloggs-ABCDEFGH"><h2>Jo Bloggs</h2></a></div>`);
-    await expect(api.search("Location=Leeds")).resolves.toMatchObject({ total: 1, therapists: [{ slug: "Jo-Bloggs-ABCDEFGH", name: "Jo Bloggs" }] });
+    const found = await api.search("Location=Leeds");
+    expect(found).toMatchObject({ total: 1, listings: [{ slug: "Jo-Bloggs-ABCDEFGH" }] });
+    expect(found.listings[0]?.read()).toMatchObject({ slug: "Jo-Bloggs-ABCDEFGH", name: "Jo Bloggs" });
     expect(fetch).toHaveBeenCalledWith("/api/search?Location=Leeds", undefined);
+  });
+
+  it("reports a card it can't read as UKCP having changed, once the card is shown", async () => {
+    answer(`<span class="results-no">1-1 of 1 results</span><div class="profile-listing"><a href="therapist/Jo-Bloggs-ABCDEFGH"></a></div>`);
+    const [listing] = (await api.search("")).listings;
+    expect(() => listing?.read()).toThrow(expect.objectContaining({ status: 502, message: UNREADABLE }));
   });
 
   it("passes on the Worker's error message", async () => {

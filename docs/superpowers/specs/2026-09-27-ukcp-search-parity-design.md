@@ -120,6 +120,8 @@ Vite, React, Tailwind and shadcn/ui (Radix primitives), with React Router (v8, d
 
 The search state lives in the page URL using UKCP's own parameter names (§3.2), with `page` for the page number, as UKCP does, so a search can be bookmarked or shared and maps one-to-one onto a UKCP URL. As on UKCP, checkboxes and the distance slider apply as soon as they change, text fields apply on Enter or the Search button, and any change returns to page 1.
 
+Results come in an order each browser keeps, since UKCP's own order changes on almost every request (§3.2) and a search can run over days. The browser draws a random 32-bit seed on its first search and keeps it in `localStorage` with no expiry; where storage refuses it, the seed lasts for the page load. A therapist's rank is the 32-bit FNV-1a hash of `<seed>:<slug>`, ties broken by slug. A location search sorts by UKCP's distance first, so it stays nearest first and only people at the same distance move; a card without a distance counts as 0 miles, as UKCP ranks it. Any other search sorts by rank alone. A rank depends on nothing but the seed and the slug, so a therapist joining or leaving moves nobody else, and the seed never leaves the browser, so cached answers stay shared between visitors. Each batch of results (map spec §4.4) is put in order as it arrives, and a card is read in full only when it is shown (§5).
+
 A switch beside the site's name picks a light, dark or system theme, the last following `prefers-color-scheme`. A light or dark choice is kept in `localStorage`, and an inline script in `index.html` applies it before first paint so a dark page never flashes white.
 
 | UKCP element | shadcn/ui |
@@ -201,6 +203,8 @@ type Options = {
   groups: { label: string; help?: string; fields: { name: string; value: string; label: string }[] }[];
 };
 ```
+
+A results page is first read as listings: the `SearchResult` above with each card as `{ slug, distance?, read }`, whose `read()` gives the `TherapistCard`. A card's other details, which cost the most to read, are read only when it is shown.
 
 Profile sections stay generic because their set varies between profiles; only offices get dedicated fields, since the UI treats them specially. Parsers keep a photo, map or website link only when it is `http(s)`, so markup from upstream can never put a script URL into our page. `Options.groups` mirrors UKCP's filter panel, including the photo and wheelchair flags, so the UI renders what UKCP offers and the Worker validates against the same lists (§3.2).
 

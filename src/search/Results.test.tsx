@@ -5,13 +5,16 @@ import { useRef } from "react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { BATCH_SIZE, emptyParams, type SearchParams } from "@shared/query";
-import type { SearchResult } from "@shared/types";
 import { api, ApiError } from "@/lib/api";
+import { listed } from "@/lib/listed.testing";
 import { LoadMore } from "./LoadMore";
 import type { Pin } from "./map/pins";
 import { Results } from "./Results";
 import { withHelpWithTerms, withText } from "./state";
 import { useResults } from "./useResults";
+
+// Results keep the order they are answered in here; order.test.ts and useResults.test.tsx cover the order itself.
+vi.mock("./order", () => ({ orderSeed: () => 0, inOrder: <T,>(listings: T[]) => listings }));
 
 const TOO_MANY = "Too many searches in a short time. Wait a minute and try again.";
 
@@ -20,7 +23,7 @@ const TOO_MANY = "Too many searches in a short time. Wait a minute and try again
  * twelve, fewer than the site asks for, makes every Load more a request. `fail` names a batch that fails.
  */
 function answerBatches({ total = 30, size = 12, fail }: { total?: number; size?: number; fail?: number } = {}) {
-  return vi.spyOn(api, "search").mockImplementation(async (query): Promise<SearchResult> => {
+  return vi.spyOn(api, "search").mockImplementation(async (query) => {
     const q = new URLSearchParams(query);
     const page = Number(q.get("page") ?? 1);
     if (page === fail) throw new ApiError(429, TOO_MANY);
@@ -33,7 +36,7 @@ function answerBatches({ total = 30, size = 12, fail }: { total?: number; size?:
       tags: [],
       distance: `${page / 10} miles from Leeds`,
     }));
-    return { total, from, to, notices: [], therapists, locationSearched: q.get("Location") ?? undefined };
+    return listed({ total, from, to, notices: [], therapists, locationSearched: q.get("Location") ?? undefined });
   });
 }
 
@@ -210,7 +213,7 @@ describe("Results", () => {
   it("shows each card only the tags the search asked for, in a pin's box too", async () => {
     const tagged = (slug: string) => ({ slug, name: `Therapist ${slug}`, initials: "T", tags: ["Anxiety", "Trauma"] });
     const therapists = ["a", "b", "c"].map(tagged);
-    vi.spyOn(api, "search").mockResolvedValue({ total: 3, from: 1, to: 3, notices: [], therapists });
+    vi.spyOn(api, "search").mockResolvedValue(listed({ total: 3, from: 1, to: 3, notices: [], therapists }));
     const params = withHelpWithTerms(leeds, ["Anxiety"]);
     const view = renderResults(params);
     await screen.findByRole("link", { name: "Therapist a" });
