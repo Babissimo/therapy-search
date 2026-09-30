@@ -1,3 +1,4 @@
+import { Morph } from "@/components/Morph";
 import { cn } from "@/lib/utils";
 import { SiteTitle } from "./SiteTitle";
 import { ThemeSwitch } from "./ThemeSwitch";
@@ -6,8 +7,12 @@ import { ThemeSwitch } from "./ThemeSwitch";
 export function Masthead({ title, className }: { title?: "h1" | "p"; className?: string }) {
   return (
     <div className={cn("flex items-center justify-between gap-2", className)}>
-      <SiteTitle as={title} />
-      <ThemeSwitch />
+      <Morph name="site-title">
+        <SiteTitle as={title} />
+      </Morph>
+      <Morph name="theme-switch">
+        <ThemeSwitch />
+      </Morph>
     </div>
   );
 }

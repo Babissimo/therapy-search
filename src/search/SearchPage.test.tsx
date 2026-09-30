@@ -1039,6 +1039,23 @@ describe("SearchPage online", () => {
     expect(document.activeElement).toBe(screen.getByRole("link", { name: "Online" }));
   });
 
+  it("leaves a click that opens the other view in a new tab to the browser", async () => {
+    screenIs(true);
+    renderAt(SEARCH);
+    await loaded();
+    // Read after the page's handlers, then stopped, as jsdom can't open the tab.
+    let prevented: boolean | undefined;
+    const read = (event: Event) => {
+      prevented = event.defaultPrevented;
+      event.preventDefault();
+    };
+    document.addEventListener("click", read);
+    fireEvent.click(screen.getByRole("link", { name: "Online" }), { metaKey: true });
+    document.removeEventListener("click", read);
+    expect(prevented).toBe(false);
+    expect(path()).toBe("/");
+  });
+
   it("takes Near me back to the place last seen, however online was reached", async () => {
     screenIs(true);
     renderAt("/?Location=York");
@@ -1168,5 +1185,60 @@ describe("SearchPage online", () => {
     fireEvent.mouseDown(tab);
     fireEvent.click(tab);
     saysNeither(screen.getByRole("tabpanel", { name: /^Shortlist/ }));
+  });
+});
+
+describe("SearchPage's view transitions", () => {
+  /** The types of each view transition React starts, each then going ahead unanimated, as in a browser without them. */
+  let started: string[][];
+  beforeEach(() => {
+    started = [];
+    Object.defineProperty(document, "startViewTransition", {
+      configurable: true,
+      value: ({ types }: { types: string[] }) => {
+        started.push(types);
+        throw new Error("No view transitions here");
+      },
+    });
+  });
+  afterEach(() => {
+    delete (document as { startViewTransition?: unknown }).startViewTransition;
+  });
+
+  it("animates the switch between Near me and Online, either way, saying which", async () => {
+    screenIs(true);
+    renderAt(SEARCH);
+    await loaded();
+    fireEvent.click(screen.getByRole("link", { name: "Online" }));
+    expect(started).toEqual([["morph", "to-online"]]);
+    fireEvent.click(screen.getByRole("link", { name: "Near me" }));
+    expect(started).toEqual([
+      ["morph", "to-online"],
+      ["morph", "to-near"],
+    ]);
+    await loaded();
+  });
+
+  it("animates a search near a place beginning or clearing, and no tick or search for another place", async () => {
+    screenIs(true);
+    renderAt("/");
+    const filters = () => screen.getByRole("region", { name: "Refine your search" });
+    fireEvent.click(within(filters()).getByRole("button", { name: /^Languages/ }));
+    fireEvent.click(within(filters()).getByRole("checkbox", { name: "French" }));
+    expect(url().get("Languages")).toBe("French");
+    const search = (place: string) => {
+      fireEvent.change(screen.getByRole("textbox", { name: "Location" }), { target: { value: place } });
+      fireEvent.click(screen.getByRole("button", { name: "Search" }));
+    };
+    search("York");
+    expect(started).toEqual([["morph"]]);
+    await loaded();
+    search("Leeds");
+    expect(url().get("Location")).toBe("Leeds");
+    fireEvent.change(screen.getByRole("textbox", { name: "Location" }), { target: { value: "" } });
+    fireEvent.click(screen.getByRole("button", { name: /^Filters/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "Clear all filters" }));
+    expect(screen.getByText(/^Search a town, city or postcode/)).toBeTruthy();
+    expect(started).toEqual([["morph"], ["morph"]]);
   });
 });

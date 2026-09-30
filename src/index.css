@@ -216,6 +216,88 @@
   }
 }
 
+/* Only Morphs name what a view transition carries. Each piece glides to its new place in the side bar's time, fading from
+   how it looked to how it looks. Each look keeps its own size rather than stretching to the box's changing shape, pinned
+   to the box's top left; the list's, whose cards centre in a wide column, to its top centre. */
+::view-transition-group(*) {
+  animation-duration: 200ms;
+  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+::view-transition-old(*),
+::view-transition-new(*) {
+  height: 100%;
+  object-fit: none;
+  object-position: left top;
+}
+/* On a phone the site's name and the toolbar swap places, the name passing behind. */
+::view-transition-group(toolbar),
+::view-transition-group(place),
+::view-transition-group(chips),
+::view-transition-group(filters) {
+  z-index: 1;
+}
+/* Across the switch, the place to search slides out and the other view's in, leftwards to Online and rightwards back. Both
+   slide throughout, one gone before the other shows, so their words never cross. */
+:root:active-view-transition-type(to-online)::view-transition-image-pair(place) {
+  --place-shift: 1.5rem;
+}
+:root:active-view-transition-type(to-near)::view-transition-image-pair(place) {
+  --place-shift: -1.5rem;
+}
+/* Out to the toolbar's inner edge, or the Filters button beside it, each a p-2 or gap-2 away. */
+:root:active-view-transition-type(to-online, to-near)::view-transition-image-pair(place) {
+  clip-path: inset(0 -0.5rem);
+}
+:root:active-view-transition-type(to-online, to-near)::view-transition-old(place) {
+  animation:
+    place-slide-out 200ms cubic-bezier(0.4, 0, 0.2, 1) both,
+    place-fade-out 70ms linear both;
+}
+:root:active-view-transition-type(to-online, to-near)::view-transition-new(place) {
+  animation:
+    place-slide-in 200ms cubic-bezier(0.4, 0, 0.2, 1) both,
+    place-fade-in 130ms linear 70ms both;
+}
+@keyframes place-slide-out {
+  to {
+    translate: calc(-1 * var(--place-shift));
+  }
+}
+@keyframes place-slide-in {
+  from {
+    translate: var(--place-shift);
+  }
+}
+@keyframes place-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes place-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+::view-transition-old(list),
+::view-transition-new(list) {
+  object-position: center top;
+}
+/* The old list's cards are gone before most of the new list's show, rather than showing through them. */
+::view-transition-old(list) {
+  animation-duration: 100ms;
+}
+::view-transition-new(list) {
+  animation-delay: 60ms;
+  animation-duration: 140ms;
+}
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}
+
 @keyframes pin-pulse {
   from {
     box-shadow: 0 0 0 0 var(--color-highlight);

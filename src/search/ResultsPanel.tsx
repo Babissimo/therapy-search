@@ -1,6 +1,7 @@
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { useId, type ReactNode, type Ref } from "react";
 import { IconButton } from "@/components/IconButton";
+import { Morph } from "@/components/Morph";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -53,9 +54,11 @@ export function ResultsPanel({ open, onOpenChange, tabs, masthead, scrollRef, on
           {/* The panel and its list are positioned so that visually hidden text is placed inside them rather than stretching the page. */}
           <section aria-label="Results and shortlist" className="relative flex min-h-0 flex-1 flex-col border-t">
             <div className="flex items-center px-4 py-2">{tabs}</div>
-            <div ref={scrollRef} onScroll={(e) => onScroll?.(e.currentTarget.scrollTop)} className="relative min-h-0 flex-1 overflow-y-auto border-t p-4">
-              {children}
-            </div>
+            <Morph name="list">
+              <div ref={scrollRef} onScroll={(e) => onScroll?.(e.currentTarget.scrollTop)} className="relative min-h-0 flex-1 overflow-y-auto border-t p-4">
+                {children}
+              </div>
+            </Morph>
             {footer}
           </section>
         </div>

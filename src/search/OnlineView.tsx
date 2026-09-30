@@ -2,6 +2,7 @@ import { Tabs } from "radix-ui";
 import { useId, useRef, useState } from "react";
 import { useLocation } from "react-router";
 import { toQuery, type SearchParams } from "@shared/query";
+import { Morph } from "@/components/Morph";
 import { cn } from "@/lib/utils";
 import { ShortlistTab } from "@/shortlist/ShortlistTab";
 import { useShortlistRefresh } from "@/shortlist/useShortlist";
@@ -42,13 +43,18 @@ export function OnlineView({ params, onChange, wide }: Props) {
   const listRef = useRef<HTMLUListElement>(null);
 
   const toolbar = (
-    <div className="flex flex-col gap-2 rounded-xl border bg-background p-2">
-      <ModeSwitch online params={params} />
-      <div className="flex items-center gap-2">
-        <p className="min-w-0 flex-1 px-1 text-sm">Online or by phone, wherever you are</p>
-        {!wide && <MobileFilters params={params} drafts={drafts} groups={ONLINE_FILTER_GROUPS} ticked={tickedFilters(params)} />}
+    <Morph name="toolbar">
+      <div className="flex flex-col gap-2 rounded-xl border bg-background p-2">
+        <ModeSwitch online params={params} />
+        <div className="flex items-center gap-2">
+          <Morph name="place">
+            {/* As tall as Near me's search box, so the one gives way to the other in a toolbar of one size. */}
+            <p className="flex min-h-8 min-w-0 flex-1 items-center px-1 text-sm">Online or by phone, wherever you are</p>
+          </Morph>
+          {!wide && <MobileFilters params={params} drafts={drafts} groups={ONLINE_FILTER_GROUPS} ticked={tickedFilters(params)} />}
+        </div>
       </div>
-    </div>
+    </Morph>
   );
   const chips = <FilterChips params={params} onChange={onChange} className={cn(!wide && "flex-nowrap overflow-x-auto [&>li]:shrink-0")} />;
   const lists = (
