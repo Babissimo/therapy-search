@@ -147,6 +147,13 @@
   html {
     @apply font-sans;
     }
+  /* No word left alone on a paragraph's last line, and headings broken into even lines. */
+  p {
+    text-wrap: pretty;
+    }
+  h1, h2, h3 {
+    text-wrap: balance;
+    }
 }
 
 /* Leaflet's own elements, brought in line with the theme. */
