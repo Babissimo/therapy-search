@@ -9,7 +9,7 @@ import { lookupText } from "@/search/map/pins";
 const ZOOM: Record<Extract<PlaceLookup, { found: true }>["kind"], number> = { postcode: 15, outcode: 13, place: 11 };
 
 // A nation closing an address, alone on its line or after a comma, which no geocoder lookup wants.
-const NATION = /(?:^|,)\s*(?:England|Scotland|Wales|Northern Ireland|UK|United Kingdom)\.?$/i;
+const NATION = /(?:^|,)\s*(?:England|Scotland|Wales|Northern Ireland|UK|United Kingdom(?:\s*\(UK\))?)\.?$/i;
 
 /**
  * What to look up to place an office: its postcode; else, for the main office, the place UKCP lists the therapist

@@ -19,6 +19,8 @@ describe("officeText", () => {
     expect(officeText(office(["Soho", "London W1"]), undefined)).toBe("LONDON W1");
     expect(officeText(office(["Brighton", "England"]), undefined)).toBe("BRIGHTON");
     expect(officeText(office(["Swansea, Wales."]), undefined)).toBe("SWANSEA");
+    expect(officeText(office(["Fitzrovia", "London W1W", "United Kingdom (UK)"]), undefined)).toBe("LONDON W1W");
+    expect(officeText(office(["Fitzrovia", "London W1W, united kingdom (uk)"]), undefined)).toBe("LONDON W1W");
     expect(officeText(office(["New England"]), undefined)).toBe("NEW ENGLAND");
   });
 
