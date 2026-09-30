@@ -97,8 +97,7 @@ describe("MovedMapButtons", () => {
     // Stretched north by a pin far out, as a search's frame takes in every pin.
     const framed = viewAround({ lat: BRIGHTON.lat + 20 / 69.05, lng: BRIGHTON.lng }, 50);
     renderAt(viewAround(BRIGHTON, 5), { framed, onRecentre: vi.fn() });
-    expect(button()).toBeNull();
-    expect(recentreButton()).not.toBeNull();
+    expect(screen.queryByRole("group")).toBeNull();
   });
 
   it("takes the search's own place to be where the part of the map left uncovered is aimed", () => {
@@ -157,16 +156,14 @@ describe("MovedMapButtons", () => {
     expect(document.activeElement).toBe(leaflet.container);
   });
 
-  it("offers to recentre once the map is panned or zoomed at all, even too little to search elsewhere", () => {
+  it("offers to recentre only beside a search of the area, not after a move too small to search elsewhere", () => {
     const framed = viewAround(BRIGHTON, 5);
     renderAt({ ...framed, north: framed.north + 0.001, south: framed.south + 0.001 }, { onRecentre: vi.fn() });
-    expect(recentreButton()).not.toBeNull();
-    expect(button()).toBeNull();
-    act(() => leaflet.show(framed));
-    expect(recentreButton()).toBeNull();
+    expect(screen.queryByRole("group")).toBeNull();
     act(() => leaflet.show(viewAround(BRIGHTON, 3)));
-    expect(recentreButton()).not.toBeNull();
-    expect(button()).toBeNull();
+    expect(screen.queryByRole("group")).toBeNull();
+    act(() => leaflet.show(viewAround(HOVE, 5)));
+    expect([button(), recentreButton()].every(Boolean)).toBe(true);
   });
 
   it("offers nothing as the map is resized about its middle", () => {
@@ -176,7 +173,7 @@ describe("MovedMapButtons", () => {
     render(<MovedMapButtons centre={BRIGHTON} settled onSearch={vi.fn(() => true)} onRecentre={vi.fn()} />);
     // Twice as wide at the same scale, as when a panel beside it closes.
     act(() => leaflet.show({ ...framed, east: framed.east + half, west: framed.west - half }, { x: 800, y: 800 }));
-    expect(recentreButton()).toBeNull();
+    expect(screen.queryByRole("group")).toBeNull();
   });
 
   it("offers to recentre beside the search, going at once when pressed and handing focus to the map", () => {
