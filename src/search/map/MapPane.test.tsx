@@ -96,6 +96,7 @@ function renderPane(props: Partial<MapPaneProps> = {}) {
   return render(
     <MemoryRouter>
       <MapPane
+        label="Map of results"
         fitKey="Location=Leeds"
         entry={`entry-${++entries}`}
         centreSettled

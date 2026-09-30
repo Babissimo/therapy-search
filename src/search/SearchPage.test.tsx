@@ -27,7 +27,9 @@ vi.mock("./map/pins", async (importOriginal) => {
 vi.mock("./map/MapPane", async () => {
   const { createElement, useSyncExternalStore } = await import("react");
   type Props = {
+    label: string;
     fitKey: string;
+    reachMiles?: number;
     centreSettled: boolean;
     pins: Pin[];
     highlight: Highlight;
@@ -36,18 +38,27 @@ vi.mock("./map/MapPane", async () => {
     onSearchArea: (postcode: string) => boolean;
   };
   return {
-    default: ({ fitKey, centreSettled, pins, highlight, selected, onSelect, onSearchArea }: Props) => {
+    default: ({ label, fitKey, reachMiles, centreSettled, pins, highlight, selected, onSelect, onSearchArea }: Props) => {
       const slug = useSyncExternalStore(highlight.subscribe, highlight.get);
       return createElement(
         "div",
         {
+          role: "region",
+          "aria-label": label,
           "data-testid": "map",
           "data-fit-key": fitKey,
+          "data-reach": reachMiles ?? "",
           "data-settled": String(centreSettled),
           "data-highlighted": slug ?? "",
           "data-selected": selected?.key ?? "",
         },
-        pins.map((pin) => createElement("button", { key: pin.key, type: "button", onClick: () => onSelect(pin) }, `Pin ${pin.key}`)),
+        pins.map((pin) =>
+          createElement(
+            "button",
+            { key: pin.key, type: "button", "data-who": pin.therapists.map((t) => t.slug).join(" "), onClick: () => onSelect(pin) },
+            `Pin ${pin.key}`,
+          ),
+        ),
         createElement(
           "button",
           { type: "button", onClick: (event: { currentTarget: HTMLElement }) => (event.currentTarget.dataset.searched = String(onSearchArea("BN3 1FG"))) },
@@ -102,14 +113,19 @@ function Url() {
   return <output data-testid="url">{useLocation().search}</output>;
 }
 
-/** The page's shortlist, empty at each test's start. */
+/** The page's shortlist, empty at each test's start. Each addition is newer than the last, as a visitor's clicks are. */
 let shortlist: ShortlistStore;
 beforeEach(() => {
-  shortlist = createShortlistStore(null);
+  let now = 0;
+  shortlist = createShortlistStore(null, () => ++now);
 });
 
 function renderAt(url: string, ...pages: TherapistCard[][]) {
   answer(pages);
+  renderPage(url);
+}
+
+function renderPage(url: string) {
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
       <ShortlistContext.Provider value={shortlist}>
@@ -149,6 +165,9 @@ const BRIGHTON = { lat: 50.8225, lng: -0.1372 };
 const HOVE = { lat: 50.835, lng: -0.178 };
 /** A pin's key, as the pins make it from its point. */
 const key = ({ lat, lng }: { lat: number; lng: number }) => `${lat.toFixed(5)},${lng.toFixed(5)}`;
+const map = () => screen.getByTestId("map");
+/** Each pin on the map, with who is on it. */
+const mapPins = () => within(map()).queryAllByRole("button", { name: /^Pin / }).map((pin) => `${pin.textContent}: ${pin.dataset.who}`);
 /** Places a location by its postal district alone: BN3 in Hove, anywhere else in Brighton. */
 function placeByDistrict() {
   vi.spyOn(api, "place").mockImplementation(async (text) => ({ found: true, kind: "outcode", candidates: [text.endsWith("BN3") ? HOVE : BRIGHTON] }));
@@ -604,19 +623,176 @@ describe("SearchPage", () => {
     await loaded();
   });
 
-  it("goes back to the results to mark a selected pin's place, one selected already included", async () => {
+  it("maps the shortlist alone while its tab is open, framed apart from the results and with no circle", async () => {
     screenIs(true);
     placeByDistrict();
+    shortlist.add(therapist("c", "Hove BN3"));
+    renderAt(SEARCH, [therapist("a", "BRIGHTON BN1"), { ...therapist("b", "Hove BN3"), distance: "2 miles from Leeds" }]);
+    await waitFor(() => expect(mapPins()).toEqual([`Pin ${key(BRIGHTON)}: a`, `Pin ${key(HOVE)}: b`]));
+    const framed = map().dataset.fitKey;
+    expect(map().dataset.reach).toBe("2");
+    expect(screen.getByRole("region", { name: "Map of results" })).toBe(map());
+    pick(/^Shortlist/);
+    await waitFor(() => expect(mapPins()).toEqual([`Pin ${key(HOVE)}: c`]));
+    expect(map().dataset.fitKey).not.toBe(framed);
+    expect(map().dataset.reach).toBe("");
+    expect(screen.getByRole("region", { name: "Map of your shortlist" })).toBe(map());
+    pick("Results");
+    expect(mapPins()).toEqual([`Pin ${key(BRIGHTON)}: a`, `Pin ${key(HOVE)}: b`]);
+    expect(map().dataset.fitKey).toBe(framed);
+  });
+
+  it("takes a therapist's pin off the map as they leave the shortlist, though their card stays to put them back", async () => {
+    screenIs(true);
+    placeByDistrict();
+    shortlist.add(therapist("c", "Hove BN3"));
+    shortlist.add(therapist("d", "BRIGHTON BN1"));
     renderAt(SEARCH, [therapist("a", "BRIGHTON BN1")]);
     await within(results()).findByRole("link", { name: "Therapist a" });
-    const pin = await screen.findByRole("button", { name: `Pin ${key(BRIGHTON)}` });
-    const marked = () => screen.getByRole("link", { name: "Therapist a" }).closest("li")?.getAttribute("aria-current");
     pick(/^Shortlist/);
-    fireEvent.click(pin);
-    expect(marked()).toBe("true");
+    await waitFor(() => expect(mapPins()).toEqual([`Pin ${key(BRIGHTON)}: d`, `Pin ${key(HOVE)}: c`]));
+    fireEvent.click(screen.getByRole("button", { name: "Remove Therapist d from your shortlist" }));
+    expect(mapPins()).toEqual([`Pin ${key(HOVE)}: c`]);
+    fireEvent.click(screen.getByRole("button", { name: "Add Therapist d to your shortlist" }));
+    expect(mapPins()).toEqual([`Pin ${key(BRIGHTON)}: d`, `Pin ${key(HOVE)}: c`]);
+  });
+
+  it("looks up the shortlist's places only once the map shows it", async () => {
+    screenIs(true);
+    placeByDistrict();
+    shortlist.add(therapist("c", "Worthing BN11"));
+    renderAt(SEARCH, [therapist("a", "BRIGHTON BN1")]);
+    await within(results()).findByRole("link", { name: "Therapist a" });
+    await mapLoads();
+    await waitFor(() => expect(mapPins()).toEqual([`Pin ${key(BRIGHTON)}: a`]));
+    const looked = () => vi.mocked(api.place).mock.calls.map(([text]) => text);
+    expect(looked()).toEqual(["BRIGHTON BN1"]);
     pick(/^Shortlist/);
+    await waitFor(() => expect(mapPins()).toEqual([`Pin ${key(BRIGHTON)}: c`]));
+    expect(looked()).toEqual(["BRIGHTON BN1", "WORTHING BN11"]);
+  });
+
+  it("places the shortlist without regard to the search's centre, as it gathers therapists from any search", async () => {
+    screenIs(true);
+    const LEEDS = { lat: 53.8, lng: -1.55 };
+    const INVERNESS = { lat: 57.48, lng: -4.22 };
+    vi.spyOn(api, "place").mockImplementation(async (_, options) => ({ found: true, kind: "place", candidates: [options?.centre ? LEEDS : INVERNESS] }));
+    vi.spyOn(api, "search").mockResolvedValue(
+      listed({ total: 1, from: 1, to: 1, notices: [], therapists: [therapist("a", "Inverness")], locationSearched: "Leeds, UK" }),
+    );
+    shortlist.add(therapist("c", "Inverness"));
+    renderPage(SEARCH);
+    // Too far from the search's centre to be where its therapist is.
+    expect(await within(results()).findByText("Nearest 1 of 1 · 1 not on the map")).toBeTruthy();
+    pick(/^Shortlist/);
+    await waitFor(() => expect(mapPins()).toEqual([`Pin ${key(INVERNESS)}: c`]));
+  });
+
+  it("reads the shortlist's places as UK places, even beside a search outside the UK", async () => {
+    screenIs(true);
+    placeByDistrict();
+    shortlist.add(therapist("c", "Worthing BN11"));
+    renderAt(`${SEARCH}&LocationSearchOutsideUK=true`, [therapist("a", "BRIGHTON BN1")]);
+    await within(results()).findByRole("link", { name: "Therapist a" });
+    await mapLoads();
+    await waitFor(() => expect(mapPins()).toEqual([`Pin ${key(BRIGHTON)}: a`]));
+    pick(/^Shortlist/);
+    await waitFor(() => expect(mapPins()).toEqual([`Pin ${key(BRIGHTON)}: c`]));
+    expect(vi.mocked(api.place).mock.calls).toEqual([
+      ["BRIGHTON BN1", { outsideUK: true }],
+      ["WORTHING BN11", { outsideUK: false }],
+    ]);
+  });
+
+  it("raises a lowered sheet halfway to mark a shortlist pin's therapists, starting the list at them", async () => {
+    screenIs(false);
+    placeByDistrict();
+    shortlist.add(therapist("c", "Hove BN3"));
+    renderAt(SEARCH, [therapist("a", "BRIGHTON BN1")]);
+    await within(results()).findByRole("link", { name: "Therapist a" });
+    pick(/^Shortlist/);
+    fireEvent.click(screen.getByRole("button", { name: "Show map" }));
+    const pin = await screen.findByRole("button", { name: `Pin ${key(HOVE)}` });
+    const scrollTo = vi.fn();
+    Object.defineProperty(list(), "scrollTo", { value: scrollTo });
+    const box = (top: number, bottom: number) => ({ top, bottom }) as DOMRect;
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+      return this === list() ? box(100, 500) : box(700, 900);
+    });
     fireEvent.click(pin);
-    expect(marked()).toBe("true");
+    expect(results().dataset.position).toBe("half");
+    expect(screen.getByRole("tab", { name: /^Shortlist/ }).getAttribute("aria-selected")).toBe("true");
+    expect(screen.getByRole("link", { name: "Therapist c" }).closest("li")?.getAttribute("aria-current")).toBe("true");
+    expect(scrollTo).toHaveBeenLastCalledWith({ top: 700 - 100 - 8, behavior: "auto" });
+  });
+
+  it("marks a shortlist pin's therapists in the shortlist, which stays open, until the pin is activated again", async () => {
+    screenIs(true);
+    placeByDistrict();
+    shortlist.add(therapist("c", "Hove BN3"));
+    shortlist.add(therapist("d", "BRIGHTON BN1"));
+    shortlist.add(therapist("e", "Hove BN3"));
+    renderAt(SEARCH, [therapist("a", "Hove BN3")]);
+    await within(results()).findByRole("link", { name: "Therapist a" });
+    pick(/^Shortlist/);
+    const pin = await screen.findByRole("button", { name: `Pin ${key(HOVE)}` });
+    const marked = () =>
+      within(screen.getByRole("tabpanel", { name: /^Shortlist/ }))
+        .getAllByRole("link", { name: /^Therapist/ })
+        .filter((link) => link.closest("li")?.getAttribute("aria-current") === "true")
+        .map((link) => link.textContent);
+    fireEvent.click(pin);
+    expect(screen.getByRole("tab", { name: /^Shortlist/ }).getAttribute("aria-selected")).toBe("true");
+    expect(marked()).toEqual(["Therapist e", "Therapist c"]);
+    expect(map().dataset.selected).toBe(key(HOVE));
+    fireEvent.click(pin);
+    expect(marked()).toEqual([]);
+    fireEvent.click(pin);
+    expect(marked()).toEqual(["Therapist e", "Therapist c"]);
+    // The results have a pin there too, which is not the one selected.
+    pick("Results");
+    expect(map().dataset.selected).toBe("");
+  });
+
+  it("scrolls to a selected pin's place in the shortlist rather than in the results hidden behind it", async () => {
+    screenIs(true);
+    placeByDistrict();
+    shortlist.add(therapist("c", "Hove BN3"));
+    renderAt(SEARCH, [therapist("a", "Hove BN3")]);
+    await within(results()).findByRole("link", { name: "Therapist a" });
+    pick(/^Shortlist/);
+    const pin = await screen.findByRole("button", { name: `Pin ${key(HOVE)}` });
+    const scrollTo = vi.fn();
+    Object.defineProperty(list(), "scrollTo", { value: scrollTo });
+    const box = (top: number, bottom: number) => ({ top, bottom }) as DOMRect;
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+      if (this === list()) return box(100, 500);
+      return this.closest("[hidden]") ? box(120, 300) : box(700, 900);
+    });
+    fireEvent.click(pin);
+    expect(scrollTo).toHaveBeenLastCalledWith({ top: 700 - 100 - 8, behavior: "smooth" });
+  });
+
+  it("rings the pin of a hovered shortlisted card", async () => {
+    screenIs(true);
+    shortlist.add(therapist("c"));
+    renderAt(SEARCH);
+    await loaded();
+    pick(/^Shortlist/);
+    const card = within(screen.getByRole("tabpanel", { name: /^Shortlist/ })).getByRole("link", { name: "Therapist c" });
+    fireEvent.pointerEnter(card.closest("[data-slot=card]") as HTMLElement);
+    expect(map().dataset.highlighted).toBe("c");
+  });
+
+  it("counts the shortlisted therapists the map can't place while it shows them", async () => {
+    screenIs(true);
+    placeByDistrict();
+    shortlist.add(therapist("c", "Hove BN3"));
+    shortlist.add(therapist("d", " BN"));
+    renderAt(SEARCH);
+    await loaded();
+    pick(/^Shortlist/);
+    expect(await screen.findByText("2 therapists, kept in this browser only · 1 not on the map.")).toBeTruthy();
   });
 
   it("raises a lowered sheet to show the tab picked, or the one already open", async () => {
@@ -634,13 +810,17 @@ describe("SearchPage", () => {
 
   it("lists a shortlist beside the prompt before a search, as there are no results yet", async () => {
     screenIs(true);
-    shortlist.add(therapist("a"));
+    placeByDistrict();
+    shortlist.add(therapist("a", "BRIGHTON BN1"));
     renderAt("/");
     await mapLoads();
     expect(screen.getByText(/^Search a town, city or postcode/)).toBeTruthy();
     expect(screen.queryByTestId("map")).toBeNull();
     expect(screen.getByRole("tab", { name: "Results" }).hasAttribute("disabled")).toBe(true);
     expect(within(screen.getByRole("tabpanel", { name: /^Shortlist/ })).getByRole("link", { name: "Therapist a" })).toBeTruthy();
+    // With no map, there is nothing to look their place up for or count them missing from.
+    expect(screen.getByText("1 therapist, kept in this browser only.")).toBeTruthy();
+    expect(api.place).not.toHaveBeenCalled();
     expect(screen.getAllByRole("heading", { level: 1, name: "Find a UKCP therapist" })).toHaveLength(1);
     expect(api.search).not.toHaveBeenCalled();
   });
