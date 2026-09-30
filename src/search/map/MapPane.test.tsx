@@ -74,7 +74,7 @@ vi.mock("./MovedMapButtons", async () => {
   const { createElement, Fragment, useState } = await import("react");
   let mounts = 0;
   type Props = {
-    centred: boolean;
+    centre?: { lat: number; lng: number };
     settled: boolean;
     coveredBelow?: (height: number) => number;
     onSearch: (postcode: string) => boolean;
@@ -82,7 +82,7 @@ vi.mock("./MovedMapButtons", async () => {
   };
   return {
     // Numbered as it mounts, and clicked to stand for a postcode found near the middle of the map, or a recentre.
-    MovedMapButtons: ({ centred, settled, coveredBelow, onSearch, onRecentre }: Props) => {
+    MovedMapButtons: ({ centre, settled, coveredBelow, onSearch, onRecentre }: Props) => {
       const [mount] = useState(() => ++mounts);
       return createElement(
         Fragment,
@@ -91,7 +91,7 @@ vi.mock("./MovedMapButtons", async () => {
           type: "button",
           "data-testid": "search-area",
           "data-mount": mount,
-          "data-centred": String(centred),
+          "data-centre": centre ? `${centre.lat},${centre.lng}` : "",
           "data-settled": String(settled),
           "data-covered": coveredBelow?.(800) ?? "",
           onClick: () => onSearch("BN3 1FG"),
@@ -164,12 +164,12 @@ describe("MapPane", () => {
     const onSearchArea = vi.fn(() => true);
     renderPane({ fitKey: "Location=Brighton", centre: BRIGHTON, onSearchArea });
     const offer = screen.getByTestId("search-area");
-    expect([offer.dataset.centred, offer.dataset.settled]).toEqual(["true", "true"]);
+    expect([offer.dataset.centre, offer.dataset.settled]).toEqual(["50.82,-0.14", "true"]);
     fireEvent.click(offer);
     expect(onSearchArea).toHaveBeenCalledWith("BN3 1FG");
     cleanup();
     renderPane({ fitKey: "Languages=French" });
-    expect(screen.getByTestId("search-area").dataset.centred).toBe("false");
+    expect(screen.getByTestId("search-area").dataset.centre).toBe("");
     cleanup();
     renderPane({ fitKey: "Location=Brighton", centre: BRIGHTON, placing: true });
     expect(screen.getByTestId("search-area").dataset.settled).toBe("false");

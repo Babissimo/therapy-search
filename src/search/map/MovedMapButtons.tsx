@@ -18,8 +18,8 @@ export const ALREADY_SEARCHED = "This is the area already searched.";
 const LEAST_MOVE_PX = 2;
 
 type Props = {
-  /** Whether the search has a place of its own, which zooming in on is no move to somewhere else. */
-  centred: boolean;
+  /** The search's own place, if it has one, which zooming in on is no move to somewhere else. */
+  centre?: Point;
   /** False while a search is on its way, whose results will frame the map afresh. */
   settled: boolean;
   /** How much of the map's bottom, in pixels, lies under something laid over it, given the map's height. */
@@ -38,7 +38,7 @@ type Framing = { view: View; centre: LatLng; zoom: number };
  * is somewhere a search could mean, a search at the postcode nearest the middle of the map in view. It measures the
  * move from the view it mounts on, so its owner mounts it afresh as each search is framed.
  */
-export function MovedMapButtons({ centred, settled, coveredBelow, onSearch, onRecentre }: Props) {
+export function MovedMapButtons({ centre, settled, coveredBelow, onSearch, onRecentre }: Props) {
   const near = usePostcodeNear((postcode) => (onSearch(postcode) ? undefined : ALREADY_SEARCHED), {
     none: NO_POSTCODE_HERE,
     failed: () => AREA_UNKNOWN,
@@ -67,7 +67,8 @@ export function MovedMapButtons({ centred, settled, coveredBelow, onSearch, onRe
     [map],
   );
   if (!settled || recentred) return null;
-  const elsewhere = movedElsewhere(seen.view, framed.view, centred);
+  // Read as the map lies now, since raising the sheet re-aims the part in view without a move.
+  const elsewhere = movedElsewhere(seen.view, framed.view, middleInView(map, coveredBelow), centre);
   const back = onRecentre !== undefined && seen.strayed;
   if (!elsewhere && !back) return null;
   return (
