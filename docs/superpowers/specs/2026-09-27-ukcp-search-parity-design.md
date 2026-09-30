@@ -21,8 +21,8 @@ Out of scope for v1:
 
 - **Free to run.** Cloudflare Workers free plan: 100,000 Worker requests a day and 10 ms of CPU per request. With Workers Caching on (§4.2), cached answers and static files count as requests too.
 - **Respectful of UKCP.**
-  - Cache identical searches (15 minutes) and profiles (1 hour), and collapse concurrent identical requests, so repeated traffic never reaches UKCP.
-  - Send upstream only what a visitor's action on UKCP would send, except that a search asks for 480 results at once where UKCP's page asks for 12 (map spec §4.4): one search POST per uncached batch of results, one profile GET per opened profile, one contact POST per click. Never prefetch or crawl.
+  - Cache identical searches (15 minutes, or 6 hours without a location, §4.2) and profiles (1 hour), and collapse concurrent identical requests, so repeated traffic never reaches UKCP.
+  - Send upstream only what a visitor's action on UKCP would send, except that a search asks for 480 results at once where UKCP's page asks for 12, or for every result when it has no location (map spec §4.4): one search POST per uncached batch of results, one profile GET per opened profile, one contact POST per click. Never prefetch or crawl.
   - Identify ourselves in the `User-Agent` with a link to the site, so UKCP can see and contact us.
   - Cap uncached upstream requests per visitor IP (§4.3).
 - **Clearly unofficial.** The site's name opens the about text, which says the site is not affiliated with UKCP, and every profile has a "View on UKCP" link.
@@ -60,7 +60,7 @@ Search and contact requests need an ASP.NET anti-forgery pair:
 | `Colleges` | 11 UKCP colleges | |
 | `OnlyProfilesWithPhotos`, `OnlyWheelchairAccessible` | `true` / `false` | |
 | `Pager.CurrentPage` | 1-based | |
-| `Pager.PageSize` | UKCP's UI sends none, for a default of 12 | The server accepts any size, a whole London search of 3,579 included, and falls back to 12 below 1. We send 480 (map spec §4.4). |
+| `Pager.PageSize` | UKCP's UI sends none, for a default of 12 | The server accepts any size, a whole London search of 3,579 included, and falls back to 12 below 1. We send 480, or 10,000, more than the whole register of 8,461, for a search without a location (map spec §4.4). |
 | `OrderSeed` | Signed 32-bit integer | UKCP's UI sends a per-visitor seed kept in the `TOrderSeed` cookie. It doesn't hold the order steady (see Ordering), so we don't send it. |
 | `InPerson`, `Remote` | `true` / `false` | Client-side only: they adjust the location box. The server ignores them. |
 
@@ -145,11 +145,13 @@ A switch beside the site's name picks a light, dark or system theme, the last fo
 
 | Route | Upstream | Cache |
 |---|---|---|
-| `GET /api/search?<UKCP params>` | Search POST (§3.2) | 15 minutes |
+| `GET /api/search?<UKCP params>` | Search POST (§3.2) | 15 minutes; 6 hours without a location |
 | `GET /api/therapist/:slug` | Profile GET (§3.4) | 1 hour |
 | `POST /api/contact/:id` | ContactDetails POST | None |
 
-Search is a GET on our side so the response can be cached by URL. The Worker **validates** every parameter against the option lists (including each `HelpWith` term) and the numeric ranges in §3.2, rejecting anything else with `400`, so nothing arbitrary is forwarded. It then **canonicalises** the query (fixed key order, sorted values and `HelpWith` terms, defaults and keys it doesn't forward dropped) and redirects to the canonical URL when it differs, so equivalent searches share one cache entry. It **forwards** the query as a form POST for a batch of 480 results, with `page` counting batches (map spec §4.4), and returns UKCP's HTML unchanged, as `text/plain` with `X-Content-Type-Options: nosniff` so it can never render as a page on our origin. The front end parses it (§5).
+Search is a GET on our side so the response can be cached by URL. The Worker **validates** every parameter against the option lists (including each `HelpWith` term) and the numeric ranges in §3.2, rejecting anything else with `400`, so nothing arbitrary is forwarded. It then **canonicalises** the query (fixed key order, sorted values and `HelpWith` terms, defaults and keys it doesn't forward dropped) and redirects to the canonical URL when it differs, so equivalent searches share one cache entry. It **forwards** the query as a form POST for a batch of 480 results, or for every result when there is no location, with `page` counting batches (map spec §4.4). It returns UKCP's HTML byte for byte, never decoded, since decoding the 8.5 MB of the largest search would take most of a request's 10 ms of CPU, as `text/plain` with `X-Content-Type-Options: nosniff` so it can never render as a page on our origin. The front end parses it (§5).
+
+A search without a location is kept for 6 hours. Asking UKCP for all of it is the heaviest request the site makes, and the order a visitor sees comes from the browser (§4.1), so the entry's age decides only how soon a therapist who joins UKCP appears.
 
 The contact route answers only requests from the site's own pages (a matching `Origin`), so other sites cannot make their visitors' browsers request contact details from UKCP.
 
@@ -213,8 +215,8 @@ Profile sections stay generic because their set varies between profiles; only of
 | Condition | Worker | UI |
 |---|---|---|
 | `400` from UKCP | Refresh session, retry once; then `502` | "UKCP's search isn't responding. Try again, or search on UKCP directly." with a link built from the same parameters |
-| UKCP 5xx or no answer within 10 s | `502` | Same as above |
-| A page without the element its parser starts from (`.results-no` or a notice; `.therapist-header`) | `502`, found by a string search so it costs no parsing, and never cached | Same as above |
+| UKCP 5xx or no answer within 10 s (25 s for every result of a search without a location) | `502` | Same as above |
+| A page without the element its parser starts from (`.results-no` or a notice; `.therapist-header`) | `502`, found by a string search (of a results page's first 8 KB, where UKCP puts either) so it costs no parsing, and never cached | Same as above |
 | Markup that has it but no longer parses (for example, cards without a slug) | Passes it on | "UKCP's pages have changed, so this site can't read them yet. Search on UKCP directly." |
 | Invalid parameter | `400` naming the parameter | Cannot happen through the UI; the form offers only valid values |
 | Rate limit | `429` | §4.3 message |

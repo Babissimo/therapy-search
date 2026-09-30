@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { emptyParams } from "../../shared/query";
 import { UkcpClient, UpstreamError, searchForm, type Fetch, type SessionStore } from "./client";
 
@@ -29,6 +29,10 @@ function memoryStore(entries: Record<string, string> = {}) {
 
 const shared = (token: string, fetchedAt: number) => JSON.stringify({ cookie: "ARRAffinity=shared", token, fetchedAt });
 
+const text = async (body: Promise<Uint8Array>) => new TextDecoder().decode(await body);
+
+afterEach(() => vi.restoreAllMocks());
+
 /** A stub upstream that answers, or fails, in order and records every call. */
 function upstream(...responses: (Response | Error)[]) {
   const calls: { url: string; init: RequestInit }[] = [];
@@ -47,7 +51,7 @@ describe("UkcpClient.search", () => {
     const { fetch, calls } = upstream(pageResponse(), new Response("<div>results</div>"));
     const client = new UkcpClient(fetch, "test-agent");
 
-    const html = await client.search({ ...emptyParams(), text: { HelpWith: "", Location: "Leeds", KeywordFilter: "" } });
+    const html = await text(client.search({ ...emptyParams(), text: { HelpWith: "", Location: "Leeds", KeywordFilter: "" } }));
 
     expect(html).toBe("<div>results</div>");
     expect(calls.map((c) => c.url)).toEqual([
@@ -82,13 +86,26 @@ describe("UkcpClient.search", () => {
     const { fetch, calls } = upstream(pageResponse(), new Response("", { status: 400 }), pageResponse("TOKEN-2"), new Response("ok"));
     const client = new UkcpClient(fetch, "ua");
 
-    await expect(client.search(emptyParams())).resolves.toBe("ok");
+    await expect(text(client.search(emptyParams()))).resolves.toBe("ok");
     expect((calls[3]!.init.body as URLSearchParams).get("__RequestVerificationToken")).toBe("TOKEN-2");
   });
 
   it("gives up after one retry", async () => {
     const { fetch } = upstream(pageResponse(), new Response("", { status: 400 }), pageResponse(), new Response("", { status: 400 }));
     await expect(new UkcpClient(fetch, "ua").search(emptyParams())).rejects.toEqual(new UpstreamError(400, "UKCP answered 400"));
+  });
+
+  it("allows 10 seconds for a batch, and 25 for every result of a search without a location", async () => {
+    const timeout = vi.spyOn(AbortSignal, "timeout");
+    const { fetch, calls } = upstream(pageResponse(), new Response("batch"), new Response("whole"));
+    const client = new UkcpClient(fetch, "ua");
+
+    await client.search({ ...emptyParams(), text: { HelpWith: "", Location: "Leeds", KeywordFilter: "" } });
+    expect((calls[1]!.init.body as URLSearchParams).get("Pager.PageSize")).toBe("480");
+    expect(timeout).toHaveBeenLastCalledWith(10_000);
+    await client.search(emptyParams());
+    expect((calls[2]!.init.body as URLSearchParams).get("Pager.PageSize")).toBe("10000");
+    expect(timeout).toHaveBeenLastCalledWith(25_000);
   });
 
   it("does not retry other failures", async () => {
@@ -145,7 +162,7 @@ describe("UkcpClient's shared session", () => {
   it("replaces a stored session UKCP rejects", async () => {
     const { fetch, calls } = upstream(new Response("", { status: 400 }), pageResponse("TOKEN-2"), new Response("ok"));
     const { store, puts } = memoryStore({ session: shared("REJECTED", 0) });
-    await expect(new UkcpClient(fetch, "ua", { store, now: () => 0 }).search(emptyParams())).resolves.toBe("ok");
+    await expect(text(new UkcpClient(fetch, "ua", { store, now: () => 0 }).search(emptyParams()))).resolves.toBe("ok");
 
     expect((calls[2]!.init.body as URLSearchParams).get("__RequestVerificationToken")).toBe("TOKEN-2");
     expect(JSON.parse(puts[0]!.value)).toMatchObject({ token: "TOKEN-2" });
@@ -179,7 +196,7 @@ describe("UkcpClient's shared session", () => {
     const client = new UkcpClient(fetch, "ua", { store, now: () => 2 * 60 * 1000 });
 
     await expect(client.search(emptyParams())).rejects.toBeInstanceOf(UpstreamError);
-    await expect(client.search(emptyParams())).resolves.toBe("results");
+    await expect(text(client.search(emptyParams()))).resolves.toBe("results");
 
     expect((calls[2]!.init.body as URLSearchParams).get("__RequestVerificationToken")).toBe("TOKEN-2");
     expect(JSON.parse(puts[0]!.value)).toMatchObject({ token: "TOKEN-2" });
@@ -201,7 +218,7 @@ describe("UkcpClient's shared session", () => {
     const client = new UkcpClient(fetch, "ua", { store: memoryStore().store, now: () => 30 * 1000 });
 
     await expect(client.search(emptyParams())).rejects.toBeInstanceOf(UpstreamError);
-    await expect(client.search(emptyParams())).resolves.toBe("results");
+    await expect(text(client.search(emptyParams()))).resolves.toBe("results");
 
     expect(calls.filter((c) => c.url.endsWith("/find-a-therapist/"))).toHaveLength(1);
   });
@@ -214,7 +231,7 @@ describe("UkcpClient's shared session", () => {
   it("searches with a session of its own when the store fails", async () => {
     const { fetch } = upstream(pageResponse(), new Response("results"));
     const store: SessionStore = { get: () => Promise.reject(new Error("KV down")), put: () => Promise.reject(new Error("429")) };
-    await expect(new UkcpClient(fetch, "ua", { store }).search(emptyParams())).resolves.toBe("results");
+    await expect(text(new UkcpClient(fetch, "ua", { store }).search(emptyParams()))).resolves.toBe("results");
   });
 
   it("ignores a stored value it can't read", async () => {
@@ -252,6 +269,7 @@ describe("UkcpClient.contact", () => {
 describe("searchForm", () => {
   it("sends the fields UKCP's form sends bar its shuffle seed, with repeated keys for multiple values", () => {
     const params = emptyParams();
+    params.text.Location = "Leeds";
     params.multi.Languages = ["French", "Spanish"];
     params.flags.OnlyWheelchairAccessible = true;
     params.page = 3;
@@ -265,6 +283,10 @@ describe("searchForm", () => {
     expect(form.get("Pager.CurrentPage")).toBe("3");
     expect(form.get("Pager.PageSize")).toBe("480");
     expect(form.has("OrderSeed")).toBe(false);
+  });
+
+  it("asks for every result at once without a location, which the browser orders as a whole", () => {
+    expect(searchForm(emptyParams()).get("Pager.PageSize")).toBe("10000");
   });
 
   it("asks for a smaller page when told to", () => {

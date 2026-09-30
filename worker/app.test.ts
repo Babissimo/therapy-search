@@ -6,6 +6,7 @@ import { UpstreamError, type UkcpClient } from "./ukcp/client";
 
 const RESULTS = `<span class="results-no">1-1 of 1 results</span>
 <div class="profile-listing"><a href="therapist/Jo-Bloggs-ABCDEFGH"><h2>Jo Bloggs</h2></a></div>`;
+const bytes = (text: string) => new TextEncoder().encode(text);
 const v = `v=${LOOKUP_VERSION}`;
 const FOUND: PlaceLookup = { found: true, kind: "outcode", candidates: [{ lat: 50.835, lng: -0.178 }] };
 
@@ -24,7 +25,7 @@ function setup({
   const store = { get: async () => null, put: async () => {} };
   const assets = { fetch: vi.fn(async (_url: string) => asset()) };
   const env: Env = { ASSETS: assets, UPSTREAM_LIMIT: { limit }, PLACE_LIMIT: { limit: placeLimit }, UKCP_SESSION: store, SITE_URL: "https://example.test" };
-  const stub = { search: vi.fn(async () => RESULTS), profile: vi.fn(), contact: vi.fn(), ...client } as unknown as UkcpClient;
+  const stub = { search: vi.fn(async () => bytes(RESULTS)), profile: vi.fn(), contact: vi.fn(), ...client } as unknown as UkcpClient;
   const finder: PlaceFinder = { lookup: vi.fn(async () => FOUND), nearest: vi.fn(async () => ({ found: true, postcode: "BN3 1FG" }) as const), ...places };
   const app = createApp(
     () => stub,
@@ -45,6 +46,26 @@ describe("GET /api/search", () => {
     expect(await res.text()).toBe(RESULTS);
     expect(stub.search).toHaveBeenCalledOnce();
     expect(limit).toHaveBeenCalledWith({ key: "203.0.113.9" });
+  });
+
+  it("keeps a search without a location, which is asked for whole, for 6 hours", async () => {
+    const { request } = setup();
+    const res = await request("/api/search?TypesOfSession=Online+Therapy");
+    expect([res.status, res.headers.get("Cache-Control")]).toEqual([200, "public, max-age=21600"]);
+  });
+
+  it("passes UKCP's page on byte for byte", async () => {
+    const page = bytes(`${RESULTS}<p>Zoë O’Brien</p>${"x".repeat(20_000)}`);
+    const { request } = setup({ client: { search: vi.fn(async () => page) } });
+    const res = await request("/api/search?Location=Leeds");
+    expect(new Uint8Array(await res.arrayBuffer())).toEqual(page);
+  });
+
+  it("looks for the results' count or UKCP's notice only in a page's opening", async () => {
+    const late = bytes(`<p>Down for maintenance</p>${" ".repeat(8 * 1024)}${RESULTS}`);
+    const { request } = setup({ client: { search: vi.fn(async () => late) } });
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    expect((await request("/api/search?Location=Leeds")).status).toBe(502);
   });
 
   it("redirects an equivalent query to its canonical form without calling UKCP", async () => {
@@ -78,7 +99,7 @@ describe("GET /api/search", () => {
   });
 
   it("answers 502, uncached, when UKCP sends a page that isn't search results", async () => {
-    const { request } = setup({ client: { search: vi.fn(async () => "<p>Down for maintenance</p>") } });
+    const { request } = setup({ client: { search: vi.fn(async () => bytes("<p>Down for maintenance</p>")) } });
     vi.spyOn(console, "error").mockImplementation(() => {});
     const res = await request("/api/search?Location=Leeds");
     expect([res.status, res.headers.get("Cache-Control")]).toEqual([502, "no-store"]);

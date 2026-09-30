@@ -1,7 +1,7 @@
 import { Hono, type Context } from "hono";
 import { LOCATION_MAX_LENGTH, canonicalLocation, nearestQuery, placeQuery, type NearestLookup, type PlaceLookup, type PlaceOptions } from "../shared/location";
 import { ALLOWED } from "../shared/options";
-import { InvalidParam, readParams, toQuery } from "../shared/query";
+import { InvalidParam, asksWhole, readParams, toQuery } from "../shared/query";
 import { UpstreamError, type SessionStore, type UkcpClient } from "./ukcp/client";
 
 export type RateLimit = { limit(options: { key: string }): Promise<{ success: boolean }> };
@@ -14,6 +14,11 @@ export type PlaceFinder = {
 type Ctx = Context<{ Bindings: Env }>;
 
 const SEARCH_MAX_AGE = 15 * 60;
+// A search without a location is asked for whole, UKCP's heaviest answer, and the browser orders it, so the entry's age
+// decides only how soon someone joining or leaving UKCP shows.
+const WHOLE_SEARCH_MAX_AGE = 6 * 60 * 60;
+// UKCP opens a results page with its count or a notice; the rest can run to megabytes.
+const OPENING_BYTES = 8 * 1024;
 const PROFILE_MAX_AGE = 60 * 60;
 // Places don't move; a miss is kept shorter in case the geocoders learn it.
 const PLACE_FOUND_MAX_AGE = 30 * 24 * 60 * 60;
@@ -45,8 +50,8 @@ export function createApp(clientFor: (env: Env) => UkcpClient, placesFor: (env: 
       return c.redirect(`/api/search${canonical ? `?${canonical}` : ""}`, 301);
     }
     if (!(await allow(c, c.env.UPSTREAM_LIMIT))) return c.json({ error: TOO_MANY }, 429);
-    const html = expectPage(await clientFor(c.env).search(params), "results-no", "fat-search-alert");
-    return upstreamHtml(c, html, `public, max-age=${SEARCH_MAX_AGE}`);
+    const body = expectOpening(await clientFor(c.env).search(params), "results-no", "fat-search-alert");
+    return upstreamHtml(c, body, `public, max-age=${asksWhole(params) ? WHOLE_SEARCH_MAX_AGE : SEARCH_MAX_AGE}`);
   });
 
   app.get("/api/therapist/:slug", async (c) => {
@@ -146,8 +151,14 @@ function expectPage(html: string, ...markers: string[]): string {
   return html;
 }
 
+/** `expectPage` for a results page, searching only its opening. */
+function expectOpening(body: Uint8Array<ArrayBuffer>, ...markers: string[]): Uint8Array<ArrayBuffer> {
+  expectPage(new TextDecoder().decode(body.subarray(0, OPENING_BYTES)), ...markers);
+  return body;
+}
+
 /** UKCP's HTML for the browser to read, as plain text so it can't run as a page on this site. */
-function upstreamHtml(c: Ctx, html: string, cacheControl: string): Response {
+function upstreamHtml(c: Ctx, html: string | Uint8Array<ArrayBuffer>, cacheControl: string): Response {
   return c.body(html, 200, { "Content-Type": "text/plain; charset=utf-8", "X-Content-Type-Options": "nosniff", "Cache-Control": cacheControl });
 }
 

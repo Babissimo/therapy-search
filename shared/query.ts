@@ -14,6 +14,8 @@ export const SEARCH_MILES = 30;
 export const PAGE_SIZE = 12;
 /** Results asked of UKCP at once, since pages asked for a minute apart come from different shuffles. */
 export const BATCH_SIZE = 40 * PAGE_SIZE;
+/** More than UKCP's whole register (8,461 on 2026-09-29), so one request brings every result. */
+export const WHOLE_SET_SIZE = 10_000;
 export const TEXT_MAX_LENGTH = 200;
 
 export type SearchParams = {
@@ -81,6 +83,19 @@ function readInt(query: URLSearchParams, name: string, fallback: number, min: nu
   const value = Number(raw);
   if (!Number.isInteger(value) || value < min || value > max) throw new InvalidParam(name, `${name} must be a whole number from ${min} to ${max}`);
   return value;
+}
+
+/**
+ * Whether a search is asked of UKCP whole rather than in batches. Without a location UKCP shuffles every result, so
+ * the browser can keep its own order only by having them all; with one, each batch holds the nearest remaining.
+ */
+export function asksWhole(params: SearchParams): boolean {
+  return params.text.Location === "";
+}
+
+/** Results asked of UKCP at once for a search, with `page` counting these batches. */
+export function batchSize(params: SearchParams): number {
+  return asksWhole(params) ? WHOLE_SET_SIZE : BATCH_SIZE;
 }
 
 /** The one query string for a search: fixed key order, sorted values, defaults left out. */

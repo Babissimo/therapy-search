@@ -28,7 +28,7 @@ await pause();
 const params = emptyParams();
 params.text.Location = "London";
 // The site's own batch, so a cap on UKCP's page size shows here before it shortens anyone's list.
-const results = parseResults(await client.search(params));
+const results = parseResults(new TextDecoder().decode(await client.search(params)));
 expect(results.total > BATCH_SIZE && results.therapists.length === BATCH_SIZE, `expected a full batch of London results, got ${results.therapists.length} of ${results.total}`);
 expect(results.locationSearched !== undefined, "the London search reported no resolved location");
 await pause();

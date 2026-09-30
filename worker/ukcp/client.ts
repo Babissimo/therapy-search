@@ -1,9 +1,11 @@
-import { BATCH_SIZE, FLAG_PARAMS, MULTI_PARAMS, SEARCH_MILES, UKCP_ORIGIN, type SearchParams } from "../../shared/query";
+import { BATCH_SIZE, FLAG_PARAMS, MULTI_PARAMS, SEARCH_MILES, UKCP_ORIGIN, batchSize, type SearchParams } from "../../shared/query";
 const SESSION_TTL_MS = 20 * 60 * 1000;
 // A failure this soon after a session's fetch more likely lies with the request than its server.
 const DROP_AFTER_MS = 60 * 1000;
 const SESSION_KEY = "session";
 const TIMEOUT_MS = 10_000;
+// For more than a batch: UKCP takes about 1.4 ms a result, so its whole register of some 8,500 takes about 12 s.
+const LONG_TIMEOUT_MS = 25_000;
 const TOKEN = /<input[^>]*name="__RequestVerificationToken"[^>]*value="([^"]+)"/;
 
 export type Fetch = (url: string, init?: RequestInit) => Promise<Response>;
@@ -50,13 +52,14 @@ export class UkcpClient {
     return bodyOf(await this.#fetch("/find-a-therapist/"));
   }
 
-  /** A batch of results; `params.page` counts batches of `pageSize`. */
-  search(params: SearchParams, pageSize = BATCH_SIZE): Promise<string> {
-    return this.#postWithSession("/umbraco/surface/searchsurface/Search", searchForm(params, pageSize));
+  /** A batch of results as UKCP sent them, every one for a search without a location; `params.page` counts batches. */
+  search(params: SearchParams, pageSize = batchSize(params)): Promise<Uint8Array<ArrayBuffer>> {
+    const timeoutMs = pageSize > BATCH_SIZE ? LONG_TIMEOUT_MS : TIMEOUT_MS;
+    return this.#postWithSession("/umbraco/surface/searchsurface/Search", searchForm(params, pageSize), bytesOf, timeoutMs);
   }
 
   contact(id: string): Promise<string> {
-    return this.#postWithSession("/Umbraco/Surface/ProfileSurface/ContactDetails", new URLSearchParams({ id }));
+    return this.#postWithSession("/Umbraco/Surface/ProfileSurface/ContactDetails", new URLSearchParams({ id }), bodyOf);
   }
 
   /** Resolves to null when UKCP has no such profile; it redirects unknown slugs to its home page. */
@@ -66,23 +69,23 @@ export class UkcpClient {
     return bodyOf(res);
   }
 
-  async #postWithSession(path: string, form: URLSearchParams): Promise<string> {
+  async #postWithSession<T>(path: string, form: URLSearchParams, read: (res: Response) => Promise<T>, timeoutMs = TIMEOUT_MS): Promise<T> {
     let session: Session | undefined;
     try {
       session = await this.#getSession();
-      return await this.#post(path, form, session);
+      return await this.#post(path, form, session, read, timeoutMs);
     } catch (error) {
-      if (error instanceof UpstreamError && error.status === 400) return this.#post(path, form, await this.#getSession({ renew: true }));
+      if (error instanceof UpstreamError && error.status === 400) return this.#post(path, form, await this.#getSession({ renew: true }), read, timeoutMs);
       // Its ARRAffinity cookie ties a session to one of UKCP's servers, so a failing server's session is not used again.
       if (session && serverFailed(error) && this.#now() - session.fetchedAt >= DROP_AFTER_MS) this.#dropped = session.token;
       throw error;
     }
   }
 
-  async #post(path: string, form: URLSearchParams, session: Session): Promise<string> {
+  async #post<T>(path: string, form: URLSearchParams, session: Session, read: (res: Response) => Promise<T>, timeoutMs: number): Promise<T> {
     const body = new URLSearchParams(form);
     body.set("__RequestVerificationToken", session.token);
-    const res = await this.#fetch(path, {
+    const init = {
       method: "POST",
       body,
       headers: {
@@ -90,8 +93,8 @@ export class UkcpClient {
         "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
         "X-Requested-With": "XMLHttpRequest",
       },
-    });
-    return bodyOf(res);
+    };
+    return read(await this.#fetch(path, init, timeoutMs));
   }
 
   async #getSession({ renew = false } = {}): Promise<Session> {
@@ -129,10 +132,11 @@ export class UkcpClient {
     } catch {}
   }
 
-  #fetch(path: string, init: RequestInit = {}): Promise<Response> {
+  /** Bounded by `timeoutMs` from asking to the body's last byte. */
+  #fetch(path: string, init: RequestInit = {}, timeoutMs = TIMEOUT_MS): Promise<Response> {
     const headers = new Headers(init.headers);
     headers.set("User-Agent", this.userAgent);
-    return this.fetchImpl(UKCP_ORIGIN + path, { ...init, headers, signal: AbortSignal.timeout(TIMEOUT_MS) });
+    return this.fetchImpl(UKCP_ORIGIN + path, { ...init, headers, signal: AbortSignal.timeout(timeoutMs) });
   }
 }
 
@@ -146,8 +150,14 @@ async function bodyOf(res: Response): Promise<string> {
   return res.text();
 }
 
+/** The body undecoded, since decoding a whole register's results would take most of a request's 10 ms of CPU. */
+async function bytesOf(res: Response): Promise<Uint8Array<ArrayBuffer>> {
+  if (!res.ok) throw new UpstreamError(res.status, `UKCP answered ${res.status}`);
+  return new Uint8Array(await res.arrayBuffer());
+}
+
 /** UKCP's own form fields for a search, as its page would post them, with a page size its page leaves to the default of 12. */
-export function searchForm(params: SearchParams, pageSize = BATCH_SIZE): URLSearchParams {
+export function searchForm(params: SearchParams, pageSize = batchSize(params)): URLSearchParams {
   const form = new URLSearchParams({
     HelpWith: params.text.HelpWith,
     Location: params.text.Location,
