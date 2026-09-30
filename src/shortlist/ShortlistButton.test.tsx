@@ -33,9 +33,11 @@ describe("ShortlistButton", () => {
 
   it("puts a therapist it removed back in the place and with the card they had", () => {
     const store = renderButton((seeded) => {
-      seeded.add({ ...JO, summary: "Summary text." }, 42);
-      seeded.add({ slug: "Al-ABCDEFGH", name: "Al Bloggs", initials: "AB", tags: [] }, 43);
+      seeded.add({ ...JO, summary: "Summary text." }, { addedAt: 42 });
+      seeded.add({ slug: "Al-ABCDEFGH", name: "Al Bloggs", initials: "AB", tags: [] }, { addedAt: 43 });
+      seeded.move(JO.slug, { below: seeded.get()[0] });
     });
+    expect(store.get().map((e) => e.card.name)).toEqual(["Jo Bloggs", "Al Bloggs"]);
     const before = store.get();
     fireEvent.click(screen.getByRole("button", { name: "Remove Jo Bloggs from your shortlist" }));
     fireEvent.click(screen.getByRole("button", { name: "Add Jo Bloggs to your shortlist" }));

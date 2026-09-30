@@ -23,7 +23,7 @@ export function ShortlistButton({ therapist, className }: Props) {
       variant="ghost"
       size="icon-sm"
       className={className}
-      onClick={() => (entry ? store.remove(therapist.slug) : store.add(kept?.card ?? therapist, kept?.addedAt))}
+      onClick={() => (entry ? store.remove(therapist.slug) : store.add(kept?.card ?? therapist, kept))}
     >
       <Bookmark aria-hidden className={cn(entry && "fill-current")} />
     </IconButton>
