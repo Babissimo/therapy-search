@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, renderHook, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, type Location } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { emptyParams } from "@shared/query";
+import { emptyParams, readParams } from "@shared/query";
 import type { Profile, TherapistCard } from "@shared/types";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { api, ApiError } from "@/lib/api";
@@ -233,6 +233,25 @@ describe("ProfilePage's content", () => {
     expect(link.getAttribute("href")).toBe("https://maps.example/?q=Brighton");
     screen.getByText("London Office");
     expect(screen.queryByRole("link", { name: /London Office/ })).toBeNull();
+  });
+
+  it("puts first the office the visitor's search measured to, marked with the distance its card gave", async () => {
+    vi.spyOn(api, "place").mockResolvedValue({ found: false, reason: "not-found" });
+    const card: TherapistCard = { slug: "Test-ABCDEFGH", name: "Test Therapist", initials: "TT", location: "Brighton BN1", distance: "0.1 miles from Brighton", tags: [] };
+    vi.spyOn(api, "search").mockResolvedValue(listed({ total: 1, from: 1, to: 1, notices: [], therapists: [card] }));
+    const client = newClient();
+    const params = readParams(new URLSearchParams("Location=Brighton"));
+    const search = renderHook(() => useResults(params), { wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider> });
+    await waitFor(() => expect(search.result.current.therapists).toHaveLength(1));
+    const london = { ...office("London Office", "£90"), isMain: true, address: ["10 Harley Street", "London W1G 9PF"] };
+    const brighton = { ...office("Brighton Office", "£70"), address: ["28 New Road", "Brighton BN1 1UG"] };
+    renderAt(["/", overSearch("?Location=Brighton")], { ...PROFILE, offices: [london, brighton] }, { client });
+    const first = await screen.findByText("Brighton Office");
+    expect(first.compareDocumentPosition(screen.getByText("London Office")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const [mark, ...others] = screen.getAllByText(", the office nearest your search");
+    expect(others).toEqual([]);
+    expect(mark?.parentElement?.textContent).toBe("0.1 miles from Brighton, the office nearest your search");
+    expect(mark?.closest("[data-slot=card]")?.textContent).toContain("Brighton Office");
   });
 
   it("looks an office up once at home, and abroad until one of its texts is found in its country", async () => {

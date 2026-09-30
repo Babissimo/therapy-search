@@ -19,9 +19,10 @@ import { ShortlistButton } from "@/shortlist/ShortlistButton";
 import type { ShortlistCard } from "@/shortlist/store";
 import { ContactList, ContactListSkeleton } from "./ContactList";
 import { isInterestOf, type ShownSection } from "./interests";
+import { nearestOffice } from "./nearestOffice";
 import { useOfficePlace } from "./place";
 import { sectionsBySize } from "./sectionsBySize";
-import { matchingTags, useSearchMatch } from "./searchedTerms";
+import { matchingTags, useOpeningCard, useSearchMatch } from "./searchedTerms";
 
 const ProfileMap = lazy(() => import("./ProfileMap"));
 
@@ -65,6 +66,7 @@ type Exits = { back?: ReactNode; close?: ReactNode };
 export function ProfileBody({ slug, back, close }: { slug: string } & Exits) {
   const { data: profile, error, isPending } = useQuery({ queryKey: ["profile", slug], queryFn: () => api.profile(slug) });
   const isMatch = useSearchMatch();
+  const card = useOpeningCard(slug);
 
   if (isPending) return <ProfileSkeleton back={back} close={close} />;
   if (error) {
@@ -82,6 +84,8 @@ export function ProfileBody({ slug, back, close }: { slug: string } & Exits) {
   const { long, short } = sectionsBySize(profile);
   const hasMatches = matches.length > 0;
   const besideLong = long.length > 0;
+  const nearest = nearestOffice(profile.offices, card);
+  const offices = nearest === undefined ? profile.offices : [profile.offices[nearest]!, ...profile.offices.toSpliced(nearest, 1)];
   return (
     <article className={BODY}>
       <StickyHeader back={back} close={close} bookmark={<ProfileBookmark profile={profile} />}>
@@ -135,10 +139,10 @@ export function ProfileBody({ slug, back, close }: { slug: string } & Exits) {
                   <SectionView key={i} section={section} isMatch={isMatch} />
                 ))}
               </ShortSections>
-              {profile.offices.length > 0 && (
+              {offices.length > 0 && (
                 <div className={cn("grid gap-8 @xl:grid-cols-2", besideLong && "@4xl:grid-cols-1")}>
-                  {profile.offices.map((office, i) => (
-                    <OfficeCard key={i} office={office} profile={profile} />
+                  {offices.map((office, i) => (
+                    <OfficeCard key={i} office={office} profile={profile} distance={nearest !== undefined && i === 0 ? card?.distance : undefined} />
                   ))}
                 </div>
               )}
@@ -458,11 +462,12 @@ function Tag({ tag, isMatch, isInterest, announce = true }: TagProps & { tag: st
   );
 }
 
-function OfficeCard({ office, profile }: { office: Office; profile: Profile }) {
+/** An office's card; the one nearest the visitor's search is marked as a matching tag is, with the distance its search card gave. */
+function OfficeCard({ office, profile, distance }: { office: Office; profile: Profile; distance?: string }) {
   return (
-    <Card>
+    <Card className={cn(distance && "ring-primary")}>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
+        <CardTitle className="flex flex-wrap items-center gap-2">
           {office.mapUrl ? (
             <a className="inline-flex items-center gap-1.5 underline-offset-4 hover:underline" href={office.mapUrl} target="_blank" rel="noreferrer">
               {office.name}
@@ -473,6 +478,13 @@ function OfficeCard({ office, profile }: { office: Office; profile: Profile }) {
             office.name
           )}
           {office.isMain && <Badge variant="outline">Main address</Badge>}
+          {distance && (
+            <Badge>
+              <Check data-icon="inline-start" aria-hidden />
+              {distance}
+              <span className="sr-only">, the office nearest your search</span>
+            </Badge>
+          )}
         </CardTitle>
       </CardHeader>
       <CardContent className="flex flex-1 flex-col gap-3 text-sm">

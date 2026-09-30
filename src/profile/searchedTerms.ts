@@ -1,8 +1,10 @@
 import { useMemo } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "react-router";
 import { InvalidParam, readParams, type SearchParams } from "@shared/query";
-import type { Profile } from "@shared/types";
+import type { Profile, TherapistCard } from "@shared/types";
 import { soughtTerms } from "@/search/activeFilters";
+import { shownCard } from "@/search/useResults";
 import { backgroundOf } from "./profileLink";
 
 function readSearch(search: string): SearchParams | undefined {
@@ -27,6 +29,13 @@ export function useSearchMatch(): (tag: string) => boolean {
     const sought = params ? soughtTerms(params) : new Set<string>();
     return (tag) => sought.has(tag.toLowerCase());
   }, [params]);
+}
+
+/** The card the search a profile was opened from showed for the therapist, while that search's results are kept. */
+export function useOpeningCard(slug: string): TherapistCard | undefined {
+  const params = useOpeningSearch();
+  const client = useQueryClient();
+  return params && shownCard(client, params, slug);
 }
 
 /** Every tag on the profile that matches, once each, in the order the profile lists them. */
