@@ -1,15 +1,15 @@
 // @vitest-environment jsdom
 import { fireEvent, render, screen } from "@testing-library/react";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { describe, expect, it } from "vitest";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ResultsPanel } from "./ResultsPanel";
 
-function Harness() {
+function Harness({ masthead }: { masthead?: ReactNode }) {
   const [open, setOpen] = useState(true);
   return (
     <TooltipProvider>
-      <ResultsPanel open={open} onOpenChange={setOpen} tabs={<p>The tabs</p>} footer={<button type="button">Load more</button>}>
+      <ResultsPanel open={open} onOpenChange={setOpen} tabs={<p>The tabs</p>} masthead={masthead} footer={<button type="button">Load more</button>}>
         <p>The list</p>
       </ResultsPanel>
     </TooltipProvider>
@@ -19,16 +19,28 @@ function Harness() {
 const panel = () => screen.queryByRole("region", { name: "Results and shortlist" });
 
 describe("ResultsPanel", () => {
-  it("collapses to a button that brings it back", () => {
+  it("collapses to its toggle, which keeps focus to bring it back", () => {
     render(<Harness />);
     expect(panel()?.textContent).toContain("The tabs");
-    fireEvent.click(screen.getByRole("button", { name: "Hide list" }));
+    const toggle = screen.getByRole("button", { name: "Hide list" });
+    toggle.focus();
+    fireEvent.click(toggle);
     expect(panel()).toBeNull();
-    const show = screen.getByRole("button", { name: "Show list" });
-    expect(show.getAttribute("aria-expanded")).toBe("false");
-    fireEvent.click(show);
+    expect(screen.getByRole("button", { name: "Show list" })).toBe(toggle);
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    expect(document.activeElement).toBe(toggle);
+    fireEvent.click(toggle);
     expect(panel()?.textContent).toContain("The list");
-    expect(screen.getByRole("button", { name: "Hide list" }).getAttribute("aria-expanded")).toBe("true");
+    expect(screen.getByRole("button", { name: "Hide list" })).toBe(toggle);
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+  });
+
+  it("heads the panel with the masthead, outside its region and hidden with it", () => {
+    render(<Harness masthead={<p>The masthead</p>} />);
+    const masthead = screen.getByText("The masthead");
+    expect(panel()?.contains(masthead)).toBe(false);
+    fireEvent.click(screen.getByRole("button", { name: "Hide list" }));
+    expect(masthead.closest("[hidden]")).not.toBeNull();
   });
 
   it("keeps its tabs and footer outside the scrolling list", () => {
