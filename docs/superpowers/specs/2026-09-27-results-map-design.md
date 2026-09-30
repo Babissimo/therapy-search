@@ -147,16 +147,17 @@ When the visitor typed a location but UKCP searched "United Kingdom" (parity §3
 
 ### 5.1 Route
 
-| Route | Upstream | Cache |
-|---|---|---|
-| `GET /api/place?q=<text>[&centre=true][&outsideUK=true][&country=<code>]&v=<version>` | postcodes.io or Nominatim | 30 days when found; 1 day when not found or too general |
-| `GET /api/nearest?lat=<degrees>&lng=<degrees>&v=<version>` | postcodes.io | 30 days when found; 1 day when not found |
+| Route | Body | Cached as | Upstream | Cache |
+|---|---|---|---|---|
+| `POST /api/place` | `q`, `centre`, `outsideUK`, `country` | `/api/place?q=<text>[&centre=true][&outsideUK=true][&country=<code>]&v=<version>` | postcodes.io or Nominatim | 30 days when found; 1 day when not found or too general |
+| `POST /api/nearest` | `lat`, `lng` | `/api/nearest?lat=<degrees>&lng=<degrees>&v=<version>` | postcodes.io | 30 days when found; 1 day when not found |
 
-- One string per request, so Workers Caching (parity §4.2) keys each string on its own and shares it across visitors, where a batch URL would rarely repeat. A page needs at most 13 lookups (12 cards and the centre), fewer once repeated strings are merged, sent in parallel over one HTTP/2 connection.
-- `q` must be 1–100 characters after trimming. The route canonicalises it with `shared/location.ts` and redirects to the canonical URL when it differs, as `/api/search` does (parity §4.2), so equal strings share one entry. The browser requests the canonical form in the first place.
-- `v` is `LOOKUP_VERSION` from `shared/location.ts`, part of both routes' canonical forms. Cached answers outlive a deploy (parity §4.2), so a change to what either route answers sets it to that day's date, never a value used before, and every lookup moves to new URLs rather than waiting up to 30 days for the old answers to expire. A tab still running older code is answered from the old version's entries while the edge holds them, and otherwise redirected to the current version.
+- The text or point travels in the body and is cached by canonical URL, as a search is (parity §4.2).
+- One string per request, so Workers Caching keys each string on its own and shares it across visitors, where a batch would rarely repeat. A page needs at most 13 lookups (12 cards and the centre), fewer once repeated strings are merged, sent in parallel over one HTTP/2 connection.
+- `q` must be 1–100 characters after trimming. The Worker canonicalises it with `shared/location.ts`, so equal strings share one entry.
+- `v` is `LOOKUP_VERSION` from `shared/location.ts`, part of both routes' canonical forms, set by the Worker whatever the browser sends. Cached answers outlive a deploy (parity §4.2), so a change to what either route answers sets it to that day's date, never a value used before, and every lookup moves to new entries rather than waiting up to 30 days for the old answers to expire.
 - `country`, a two-letter code, keeps a lookup to that country: the text goes whole to Nominatim there, since the UK's postcode rules mean nothing abroad.
-- `/api/nearest` answers the postcode nearest the visitor, for a search from where they are. Its canonical form rounds the point to three decimal places, about 100 metres, so neither the Worker nor any cache sees a finer position; a finer one is redirected before any lookup.
+- `/api/nearest` answers the postcode nearest the visitor, for a search from where they are. The browser rounds the point to three decimal places, about 100 metres, before sending it, and the Worker rounds anything finer before it reaches the cache, so no cache sees a finer position.
 - Upstream requests, each with a 5-second timeout:
 
 | Kind | Request |
@@ -205,7 +206,7 @@ type NearestLookup = { found: true; postcode: string } | { found: false };
 ## 8. Testing
 
 - **Location text:** unit tests of classification and canonicalisation covering every row of §3.1, including the live strings in §2.
-- **Worker route:** Vitest calling the Hono app with a stub `fetch` for postcodes.io and Nominatim and a fake rate limiter. Cases: each kind, the fallback chain, the canonical redirect, `Cache-Control` for found and not found, `502` on upstream failure, `429`, and `countrycodes` dropped outside the UK.
+- **Worker route:** Vitest calling the Hono app with a stub `fetch` for postcodes.io and Nominatim and a fake rate limiter. Cases: each kind, the fallback chain, the canonical form, `Cache-Control` for found and not found, `502` on upstream failure, `429`, and `countrycodes` dropped outside the UK.
 - **Pin logic:** unit tests of candidate choice with and without a centre, the plausibility cut, grouping pins that share a point, remote-only detection, the reach line and the unplaced reasons.
 - **Components:** the prompt asks UKCP for nothing and shows no map; "Load more" appends a page, stays outside the scrolling list, and the URL gains no `page`; a new search starts again at the first page; the panel collapses and reopens; the sheet's buttons move it between positions; therapists sharing a pin are listed together under their place, which the pin's selection marks and scrolls into view; hovering a card reaches the map as a highlighted pin; the centre is marked and the frame grows with "Load more" to take in further pins; a profile opens in a drawer over the search and closing it returns to the search unchanged; Back restores the list's scroll; the tiles follow the `dark` class; the unrecognised-location alert. Leaflet is mocked under jsdom.
 - **Manual:** a pass in the browser against the dev server for what jsdom can't show: pins, cluster zoom versus selection, the centre pin and the fit, the refit on "Load more", the pin rings and halo in both themes, the panel resizing the map, the sheet's positions and drag on a narrow viewport, the drawer, and dark tiles.
