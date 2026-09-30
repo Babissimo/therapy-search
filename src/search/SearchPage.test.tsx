@@ -545,9 +545,11 @@ describe("SearchPage", () => {
     expect(list().scrollTop).toBe(400);
   });
 
-  it("heads an invalid search link with the site's name", () => {
+  it("heads an invalid search link with the site's name, marked as an error", () => {
     renderAt("/?OnlyProfilesWithPhotos=yes");
-    expect(screen.getByRole("alert").textContent).toContain("This search link isn't valid");
+    const alert = screen.getByRole("alert");
+    expect(alert.textContent).toContain("This search link isn't valid");
+    expect(alert.querySelector("svg")?.classList.contains("lucide-circle-alert")).toBe(true);
     expect(screen.getByRole("heading", { level: 1, name: "Find a UKCP therapist" })).toBeTruthy();
   });
 
