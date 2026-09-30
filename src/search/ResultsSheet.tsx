@@ -14,8 +14,6 @@ type Props = {
   onPositionChange: (position: SheetPosition) => void;
   /** The tabs between the results and the shortlist, in the header, so they show however low the sheet is. */
   tabs: ReactNode;
-  /** What the button that lowers the sheet says, naming what lowering it shows. */
-  lowerLabel?: string;
   scrollRef?: Ref<HTMLDivElement>;
   onScroll?: (scrollTop: number) => void;
   /** Beneath the list rather than at its end, so it stays in view however far the list scrolls. */
@@ -27,7 +25,7 @@ type Props = {
  * The results and shortlist over the bottom of the map on narrow screens: a plain region rather than a dialog, so the
  * map above stays usable. Only the header drags; the list inside scrolls as normal, so the two gestures never compete.
  */
-export function ResultsSheet({ position, onPositionChange, tabs, lowerLabel = "Show map", scrollRef, onScroll, footer, children }: Props) {
+export function ResultsSheet({ position, onPositionChange, tabs, scrollRef, onScroll, footer, children }: Props) {
   const sheet = useRef<HTMLElement>(null);
   const drag = useRef<{ startY: number; startHeight: number } | null>(null);
   // The state draws the sheet; the ref is what a pointerup reads, as the last move may not have rendered yet.
@@ -86,7 +84,7 @@ export function ResultsSheet({ position, onPositionChange, tabs, lowerLabel = "S
         <span aria-hidden className="absolute top-1.5 left-1/2 h-1 w-10 -translate-x-1/2 rounded-full bg-muted-foreground/40" />
         {tabs}
         <Button type="button" variant="outline" size="sm" onClick={() => onPositionChange(position === "full" ? "peek" : "full")}>
-          {position === "full" ? lowerLabel : "Show list"}
+          {position === "full" ? "Show map" : "Show list"}
         </Button>
       </div>
       {/* Positioned so that visually hidden text is placed inside the list rather than stretching the page. */}

@@ -1,19 +1,16 @@
-import type { ReactNode } from "react";
+import type { ReactNode, Ref } from "react";
 import { Badge } from "@/components/ui/badge";
 import { TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { therapistCount, useShortlist } from "@/shortlist/useShortlist";
 
 export type ListTab = "results" | "shortlist";
 
-/** The side bar's two lists. The shortlist's count is read here, so a bookmark redraws the tabs rather than the page. */
-export function ListTabs({ searching }: { searching: boolean }) {
+/** Between the results and the shortlist. The shortlist's count is read here, so a bookmark redraws the tabs rather than the page. */
+export function ListTabs({ ref }: { ref?: Ref<HTMLDivElement> }) {
   const count = useShortlist().length;
   return (
-    <TabsList>
-      {/* Before a search there are no results to show. */}
-      <TabsTrigger value="results" disabled={!searching}>
-        Results
-      </TabsTrigger>
+    <TabsList ref={ref}>
+      <TabsTrigger value="results">Results</TabsTrigger>
       <TabsTrigger value="shortlist">
         Shortlist
         {count > 0 && (

@@ -1,15 +1,15 @@
 // @vitest-environment jsdom
 import { fireEvent, render, screen } from "@testing-library/react";
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import { describe, expect, it } from "vitest";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ResultsPanel } from "./ResultsPanel";
 
-function Harness({ masthead }: { masthead?: ReactNode }) {
+function Harness() {
   const [open, setOpen] = useState(true);
   return (
     <TooltipProvider>
-      <ResultsPanel open={open} onOpenChange={setOpen} tabs={<p>The tabs</p>} masthead={masthead} footer={<button type="button">Load more</button>}>
+      <ResultsPanel open={open} onOpenChange={setOpen} tabs={<p>The tabs</p>} masthead={<p>The masthead</p>} footer={<button type="button">Load more</button>}>
         <p>The list</p>
       </ResultsPanel>
     </TooltipProvider>
@@ -37,7 +37,7 @@ describe("ResultsPanel", () => {
   });
 
   it("heads the panel with the masthead, outside its region and hidden with it", () => {
-    render(<Harness masthead={<p>The masthead</p>} />);
+    render(<Harness />);
     const masthead = screen.getByText("The masthead");
     expect(panel().contains(masthead)).toBe(false);
     fireEvent.click(screen.getByRole("button", { name: "Hide list" }));
