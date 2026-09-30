@@ -92,7 +92,7 @@ export default function MapPane({
         {/* Mounted afresh on each frame, which it measures the visitor's moves from, and waiting as the frame does. */}
         <MovedMapButtons
           key={framings}
-          centred={centre !== undefined}
+          centre={centre}
           settled={!framing}
           coveredBelow={coveredBelow}
           onSearch={onSearchArea}

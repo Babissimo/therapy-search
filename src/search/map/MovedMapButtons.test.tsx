@@ -67,7 +67,7 @@ function renderAt(
   } = {},
 ) {
   leaflet.start(framed);
-  render(<MovedMapButtons centred settled={settled} onSearch={onSearch} onRecentre={onRecentre} coveredBelow={coveredBelow} />, { wrapper: TooltipProvider });
+  render(<MovedMapButtons centre={BRIGHTON} settled={settled} onSearch={onSearch} onRecentre={onRecentre} coveredBelow={coveredBelow} />, { wrapper: TooltipProvider });
   act(() => leaflet.show(view));
   return onSearch;
 }
@@ -94,11 +94,38 @@ describe("MovedMapButtons", () => {
     expect(button()).not.toBeNull();
   });
 
+  it("offers no search zoomed in on the search's own place, however far from it the frame's middle lies", () => {
+    // Stretched north by a pin far out, as a search's frame takes in every pin.
+    const framed = viewAround({ lat: BRIGHTON.lat + 20 / 69.05, lng: BRIGHTON.lng }, 50);
+    renderAt(viewAround(BRIGHTON, 5), { framed, onRecentre: vi.fn() });
+    expect(button()).toBeNull();
+    expect(recentreButton()).not.toBeNull();
+  });
+
+  it("takes the search's own place to be where the part of the map left uncovered is aimed", () => {
+    const framed = viewAround({ lat: BRIGHTON.lat + 20 / 69.05, lng: BRIGHTON.lng }, 50);
+    // An eighth of the way down, halfway down the quarter left in view, is Brighton: the whole map's middle is 1.9
+    // miles south of it.
+    renderAt(viewAround({ lat: BRIGHTON.lat - 1.875 / 69.05, lng: BRIGHTON.lng }, 5), { framed, coveredBelow: (height) => (height * 3) / 4 });
+    expect(button()).toBeNull();
+  });
+
+  it("offers a search once raising what covers the map aims the part in view away from the search's place", () => {
+    const framed = viewAround({ lat: BRIGHTON.lat + 20 / 69.05, lng: BRIGHTON.lng }, 50);
+    leaflet.start(framed);
+    const { rerender } = render(<MovedMapButtons centre={BRIGHTON} settled onSearch={vi.fn(() => true)} />);
+    act(() => leaflet.show(viewAround(BRIGHTON, 5)));
+    expect(button()).toBeNull();
+    // An eighth of the way down, 1.9 miles north of Brighton.
+    rerender(<MovedMapButtons centre={BRIGHTON} settled coveredBelow={(height) => (height * 3) / 4} onSearch={vi.fn(() => true)} />);
+    expect(button()).not.toBeNull();
+  });
+
   it("counts moves of the whole map, so raising what covers it and nudging the map offers no search", () => {
     const framed = viewAround(BRIGHTON, 5);
     leaflet.start(framed);
-    const { rerender } = render(<MovedMapButtons centred settled coveredBelow={() => 0} onSearch={vi.fn(() => true)} />);
-    rerender(<MovedMapButtons centred settled coveredBelow={(height) => (height * 3) / 4} onSearch={vi.fn(() => true)} />);
+    const { rerender } = render(<MovedMapButtons centre={BRIGHTON} settled coveredBelow={() => 0} onSearch={vi.fn(() => true)} />);
+    rerender(<MovedMapButtons centre={BRIGHTON} settled coveredBelow={(height) => (height * 3) / 4} onSearch={vi.fn(() => true)} />);
     act(() => leaflet.show({ ...framed, north: framed.north + 0.001, south: framed.south + 0.001 }));
     expect(button()).toBeNull();
   });
@@ -108,13 +135,13 @@ describe("MovedMapButtons", () => {
     const { rerender } = render(
       <>
         <Framer />
-        <MovedMapButtons centred settled={false} onSearch={vi.fn(() => true)} />
+        <MovedMapButtons centre={BRIGHTON} settled={false} onSearch={vi.fn(() => true)} />
       </>,
     );
     rerender(
       <>
         <Framer view={viewAround(HOVE, 5)} />
-        <MovedMapButtons centred settled onSearch={vi.fn(() => true)} />
+        <MovedMapButtons centre={BRIGHTON} settled onSearch={vi.fn(() => true)} />
       </>,
     );
     expect(button()).not.toBeNull();
@@ -122,12 +149,12 @@ describe("MovedMapButtons", () => {
 
   it("hands focus to the map when its search starts and it goes, rather than dropping it, and keeps it until then", () => {
     leaflet.start(viewAround(BRIGHTON, 5));
-    const { rerender } = render(<MovedMapButtons centred settled onSearch={vi.fn(() => true)} />);
+    const { rerender } = render(<MovedMapButtons centre={BRIGHTON} settled onSearch={vi.fn(() => true)} />);
     act(() => leaflet.show(viewAround(HOVE, 5)));
     button()!.focus();
-    rerender(<MovedMapButtons centred settled onSearch={vi.fn(() => true)} />);
+    rerender(<MovedMapButtons centre={BRIGHTON} settled onSearch={vi.fn(() => true)} />);
     expect(document.activeElement).toBe(button());
-    rerender(<MovedMapButtons centred settled={false} onSearch={vi.fn(() => true)} />);
+    rerender(<MovedMapButtons centre={BRIGHTON} settled={false} onSearch={vi.fn(() => true)} />);
     expect(document.activeElement).toBe(leaflet.container);
   });
 
@@ -147,7 +174,7 @@ describe("MovedMapButtons", () => {
     const framed = viewAround(BRIGHTON, 5);
     const half = (framed.east - framed.west) / 2;
     leaflet.start(framed);
-    render(<MovedMapButtons centred settled onSearch={vi.fn(() => true)} onRecentre={vi.fn()} />, { wrapper: TooltipProvider });
+    render(<MovedMapButtons centre={BRIGHTON} settled onSearch={vi.fn(() => true)} onRecentre={vi.fn()} />, { wrapper: TooltipProvider });
     // Twice as wide at the same scale, as when a panel beside it closes.
     act(() => leaflet.show({ ...framed, east: framed.east + half, west: framed.west - half }, { x: 800, y: 800 }));
     expect(recentreButton()).toBeNull();

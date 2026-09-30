@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { choosePoint, milesBetween, movedElsewhere } from "./geo";
+import { choosePoint, milesBetween, movedElsewhere, type Point, type View } from "./geo";
 import { viewAround } from "./geo.testing";
 
 const BRIGHTON = { lat: 50.8225, lng: -0.1372 };
@@ -7,34 +7,50 @@ const HOVE = { lat: 50.835, lng: -0.178 };
 
 describe("movedElsewhere", () => {
   const FRAMED = viewAround(BRIGHTON, 5);
+  const middle = (view: View) => ({ lat: (view.north + view.south) / 2, lng: (view.east + view.west) / 2 });
+  /** Aimed at the middle of `view`, as when nothing covers the map. */
+  const moved = (view: View, framed: View, centre?: Point) => movedElsewhere(view, framed, middle(view), centre);
 
   it("counts a view moved well away from where the search framed it", () => {
-    expect(movedElsewhere(viewAround(HOVE, 5), FRAMED, true)).toBe(true);
+    expect(moved(viewAround(HOVE, 5), FRAMED, BRIGHTON)).toBe(true);
   });
 
   it("counts no move while the middle is within a quarter of the view of where it was framed", () => {
-    expect(movedElsewhere(viewAround(HOVE, 10), FRAMED, true)).toBe(false);
+    expect(moved(viewAround(HOVE, 10), FRAMED, BRIGHTON)).toBe(false);
   });
 
   it("counts no move of half a mile or less, however far in the map is zoomed", () => {
     const nearBrighton = { lat: BRIGHTON.lat + 0.4 / 69.05, lng: BRIGHTON.lng };
-    expect(movedElsewhere(viewAround(nearBrighton, 1), FRAMED, true)).toBe(false);
+    expect(moved(viewAround(nearBrighton, 1), FRAMED, BRIGHTON)).toBe(false);
   });
 
   it("counts no move to a view wider than a search reaches across", () => {
     const farFromBrighton = { lat: 52.5, lng: -1.9 };
-    expect(movedElsewhere(viewAround(farFromBrighton, 61), FRAMED, true)).toBe(false);
-    expect(movedElsewhere(viewAround(farFromBrighton, 59), FRAMED, true)).toBe(true);
+    expect(moved(viewAround(farFromBrighton, 61), FRAMED, BRIGHTON)).toBe(false);
+    expect(moved(viewAround(farFromBrighton, 59), FRAMED, BRIGHTON)).toBe(true);
   });
 
-  it("counts any view narrow enough, even zoomed straight in, when a search with no centre was framed too wide to mean a place", () => {
+  it("counts any view narrow enough, even zoomed straight in, when a search was framed too wide to mean a place", () => {
     const midlands = { lat: 52.5, lng: -1.9 };
-    expect(movedElsewhere(viewAround(midlands, 5), viewAround(midlands, 400), false)).toBe(true);
+    expect(moved(viewAround(midlands, 5), viewAround(midlands, 400))).toBe(true);
+    // As when a pin far out stretches the frame of a search at Brighton up to the Midlands.
+    expect(moved(viewAround(midlands, 20), viewAround(midlands, 180), BRIGHTON)).toBe(true);
   });
 
-  it("counts no move zoomed straight in on a search's own centre, however wide it was framed", () => {
+  it("counts no move zoomed in on a search's own centre, however far from it the frame's middle lies", () => {
     const sherborne = { lat: 50.95, lng: -2.52 };
-    expect(movedElsewhere(viewAround(sherborne, 40), viewAround(sherborne, 80), true)).toBe(false);
+    // A frame stretched north by a pin far out, as a search's frame takes in every pin.
+    const framed = viewAround({ lat: sherborne.lat + 20 / 69.05, lng: sherborne.lng }, 80);
+    expect(moved(viewAround(sherborne, 20), framed, sherborne)).toBe(false);
+    expect(moved(viewAround(sherborne, 20), framed)).toBe(true);
+  });
+
+  it("measures from the search's centre where the view is aimed, rather than the middle of the whole map", () => {
+    const framed = viewAround({ lat: BRIGHTON.lat + 20 / 69.05, lng: BRIGHTON.lng }, 50);
+    // The part left uncovered, at the top of the map, is centred on Brighton; the whole map's middle is south of it.
+    const view = viewAround({ lat: BRIGHTON.lat - 2 / 69.05, lng: BRIGHTON.lng }, 5);
+    expect(movedElsewhere(view, framed, BRIGHTON, BRIGHTON)).toBe(false);
+    expect(movedElsewhere(view, framed, middle(view), BRIGHTON)).toBe(true);
   });
 });
 const CORNWALL_HAMLET = { lat: 50.352, lng: -4.947, type: "hamlet" };
