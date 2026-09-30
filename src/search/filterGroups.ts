@@ -4,7 +4,7 @@ import { REMOTE_SESSIONS } from "./online";
 
 const ADDITIONAL = "Additional Filters";
 const OUTSIDE_UK: FilterField = { name: "LocationSearchOutsideUK", value: "true", label: "Search locations outside the UK" };
-const OUTSIDE_UK_HELP = "Searching locations outside the UK reads the location as a place anywhere in the world.";
+const OUTSIDE_UK_HELP = 'Tick "Search locations outside the UK" to look for the place you type anywhere in the world, not just in the UK.';
 const ONLINE_ADDITIONAL_HELP = "Use this filter to narrow down your results to only therapists who have added a picture to their profile.";
 
 /**

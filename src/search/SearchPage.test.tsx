@@ -210,7 +210,7 @@ describe("SearchPage", () => {
     screenIs(true);
     renderAt("/");
     await mapLoads();
-    expect(within(results()).getByText(/^Search a town, city or postcode/)).toBeTruthy();
+    expect(within(results()).getByText(/^Type a town, city or postcode/)).toBeTruthy();
     expect(screen.getByRole("tab", { name: "Results" }).getAttribute("aria-selected")).toBe("true");
     expect(screen.getByRole("heading", { level: 1, name: "Find a UKCP therapist" })).toBeTruthy();
     expect(screen.queryByTestId("map")).toBeNull();
@@ -219,7 +219,7 @@ describe("SearchPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "Search" }));
     await loaded();
     expect(await screen.findByTestId("map")).toBeTruthy();
-    expect(screen.queryByText(/^Search a town, city or postcode/)).toBeNull();
+    expect(screen.queryByText(/^Type a town, city or postcode/)).toBeNull();
   });
 
   it("lets the map leave the UK only for a search outside it", async () => {
@@ -237,7 +237,7 @@ describe("SearchPage", () => {
     screenIs(true);
     renderAt("/?Languages=French&KeywordFilter=grief&LocationSearchOutsideUK=true");
     await mapLoads();
-    expect(screen.getByText(/^Search a town, city or postcode/)).toBeTruthy();
+    expect(screen.getByText(/^Type a town, city or postcode/)).toBeTruthy();
     expect(screen.queryByTestId("map")).toBeNull();
     expect(screen.getByRole("button", { name: "Remove French" })).toBeTruthy();
     expect(api.search).not.toHaveBeenCalled();
@@ -257,7 +257,7 @@ describe("SearchPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "Filters" }));
     fireEvent.click(await screen.findByRole("button", { name: "Clear all filters" }));
     fireEvent.click(screen.getByRole("button", { name: "Close" }));
-    expect(within(results()).getByText(/^Search a town, city or postcode/)).toBeTruthy();
+    expect(within(results()).getByText(/^Type a town, city or postcode/)).toBeTruthy();
     expect(screen.queryByTestId("map")).toBeNull();
     fireEvent.change(screen.getByRole("textbox", { name: "Location" }), { target: { value: "York" } });
     fireEvent.click(screen.getByRole("button", { name: "Search" }));
@@ -348,7 +348,7 @@ describe("SearchPage", () => {
     fireEvent.change(keyword, { target: { value: "grief" } });
     fireEvent.submit(keyword.closest("form")!);
     expect(url().get("KeywordFilter")).toBe("grief");
-    expect(screen.getByText(/^Search a town, city or postcode/)).toBeTruthy();
+    expect(screen.getByText(/^Type a town, city or postcode/)).toBeTruthy();
     expect(filters()).toBeTruthy();
     const box = screen.getByRole("textbox", { name: "Location" });
     box.focus();
@@ -395,7 +395,7 @@ describe("SearchPage", () => {
     shortlist.add(therapist("a"));
     renderAt("/");
     await mapLoads();
-    expect(within(results()).getByText(/^Search a town, city or postcode/)).toBeTruthy();
+    expect(within(results()).getByText(/^Type a town, city or postcode/)).toBeTruthy();
     expect(screen.queryByTestId("map")).toBeNull();
     const box = screen.getByRole("textbox", { name: "Location" });
     expect(box.compareDocumentPosition(screen.getByRole("tablist")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -975,7 +975,7 @@ describe("SearchPage online", () => {
   /** The online view narrowed by a filter, so it has something to search for. */
   const GREEK = `${ONLINE}?Languages=Greek`;
   const GREEK_ONLINE = "TypesOfSession=Online+Therapy&TypesOfSession=Telephone+Therapy&Languages=Greek";
-  const prompt = () => screen.queryByText(/^Choose a filter to see/);
+  const prompt = () => screen.queryByText("Start with what matters to you.");
 
   it("lists everyone working online or by phone who matches its filters, with no place to search and no map", async () => {
     screenIs(true);
@@ -1238,7 +1238,7 @@ describe("SearchPage's view transitions", () => {
     fireEvent.change(screen.getByRole("textbox", { name: "Location" }), { target: { value: "" } });
     fireEvent.click(screen.getByRole("button", { name: /^Filters/ }));
     fireEvent.click(await screen.findByRole("button", { name: "Clear all filters" }));
-    expect(screen.getByText(/^Search a town, city or postcode/)).toBeTruthy();
+    expect(screen.getByText(/^Type a town, city or postcode/)).toBeTruthy();
     expect(started).toEqual([["morph"], ["morph"]]);
   });
 });

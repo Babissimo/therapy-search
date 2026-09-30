@@ -13,7 +13,7 @@ describe("filterGroups", () => {
     const groups = filterGroups({ helpWith: [], groups: [languages, { label: "Additional Filters", help: "Photos and access.", fields: [photos] }] });
     expect(groups[0]).toBe(languages);
     expect(groups[1]?.fields.map((f) => f.name)).toEqual(["OnlyProfilesWithPhotos", "LocationSearchOutsideUK"]);
-    expect(groups[1]?.help).toMatch(/^Photos and access\. Searching locations outside the UK/);
+    expect(groups[1]?.help).toMatch(/^Photos and access\. Tick "Search locations outside the UK"/);
   });
 
   it("keeps the tick in a group of its own if UKCP's options lose the additional filters", () => {
