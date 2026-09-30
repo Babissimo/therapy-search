@@ -68,6 +68,17 @@ describe("AppRoutes", () => {
     await waitFor(() => expect(document.activeElement).toBe(card));
   });
 
+  it("opens a profile from the online list in a drawer over it, and closing it goes back to the list", async () => {
+    renderAt("/online");
+    expect(screen.getByRole("link", { name: "Online" }).getAttribute("aria-current")).toBe("page");
+    fireEvent.click(await screen.findByRole("link", { name: "Jo Bloggs" }));
+    const drawer = await screen.findByRole("dialog", { name: "Therapist profile" });
+    fireEvent.click(within(drawer).getByRole("button", { name: "Close" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(screen.getByTestId("url").textContent).toBe("/online");
+    expect(api.search).toHaveBeenCalledOnce();
+  });
+
   it("shows a profile reached directly as a page of its own", async () => {
     renderAt("/therapist/Jo-ABCDEFGH");
     expect(await screen.findByRole("heading", { name: "Jo Bloggs" })).toBeTruthy();

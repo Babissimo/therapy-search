@@ -1,5 +1,6 @@
 import { OPTIONS } from "@shared/options";
 import type { FilterField, FilterGroup, Options } from "@shared/types";
+import { REMOTE_SESSIONS } from "./online";
 
 const ADDITIONAL = "Additional Filters";
 const OUTSIDE_UK: FilterField = { name: "LocationSearchOutsideUK", value: "true", label: "Search locations outside the UK" };
@@ -16,4 +17,13 @@ export function filterGroups(options: Options): FilterGroup[] {
   return options.groups.map((g) => (g === additional ? { ...g, help, fields: [...g.fields, OUTSIDE_UK] } : g));
 }
 
+/** UKCP's groups as the online view lists them: with no place to read, and only the session types that can be had remotely. */
+export function onlineFilterGroups(options: Options): FilterGroup[] {
+  return options.groups.map((g) => {
+    const remote = g.fields.filter((f) => f.name !== "TypesOfSession" || REMOTE_SESSIONS.includes(f.value));
+    return remote.length === g.fields.length ? g : { ...g, fields: remote };
+  });
+}
+
 export const FILTER_GROUPS = filterGroups(OPTIONS);
+export const ONLINE_FILTER_GROUPS = onlineFilterGroups(OPTIONS);

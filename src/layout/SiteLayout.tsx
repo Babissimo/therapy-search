@@ -1,13 +1,15 @@
 import type { ReactNode } from "react";
 import { matchPath, useLocation } from "react-router";
 import { backgroundOf } from "@/profile/profileLink";
+import { ONLINE_PATH } from "@/search/online";
 import { Masthead } from "./Masthead";
 
 export function SiteLayout({ children }: { children: ReactNode }) {
-  // The search page is a map filling the window, with the site's name atop its results; other pages read as documents
-  // with it in a header. A profile's drawer leaves the page beneath it as it was.
+  // The search page, near a place or online, fills the window, with the site's name atop its results; other pages read
+  // as documents with it in a header. A profile's drawer leaves the page beneath it as it was.
   const location = useLocation();
-  const fill = matchPath("/", (backgroundOf(location) ?? location).pathname) !== null;
+  const { pathname } = backgroundOf(location) ?? location;
+  const fill = matchPath("/", pathname) !== null || matchPath(ONLINE_PATH, pathname) !== null;
   if (fill) return <main className="flex h-svh flex-col">{children}</main>;
   return (
     <>

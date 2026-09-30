@@ -1,5 +1,6 @@
+import type { ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
-import { TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { therapistCount, useShortlist } from "@/shortlist/useShortlist";
 
 export type ListTab = "results" | "shortlist";
@@ -24,5 +25,27 @@ export function ListTabs({ searching }: { searching: boolean }) {
         )}
       </TabsTrigger>
     </TabsList>
+  );
+}
+
+// The page's text size rather than the tabs' own, which is set for short text. A panel is a Tab stop of its own, so it
+// shows a ring when it has focus.
+const PANEL = "rounded-md text-base focus-visible:ring-3 focus-visible:ring-ring/50";
+
+/**
+ * The tabs' two lists, mounted throughout and hidden here rather than shown by Radix a render after their tab, so a
+ * panel's entries are there for the list's scroll to be restored or a pin's entry found. The shortlist's cards come and
+ * go with their tab, which lets go of those removed while it was open.
+ */
+export function ListPanels({ tab, results, shortlist }: { tab: ListTab; results: ReactNode; shortlist: ReactNode }) {
+  return (
+    <>
+      <TabsContent value="results" forceMount hidden={tab !== "results"} className={PANEL}>
+        {results}
+      </TabsContent>
+      <TabsContent value="shortlist" forceMount hidden={tab !== "shortlist"} className={PANEL}>
+        {tab === "shortlist" && shortlist}
+      </TabsContent>
+    </>
   );
 }

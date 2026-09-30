@@ -6,7 +6,7 @@ export type SheetPosition = "peek" | "half" | "full";
 
 // In rem: peek shows the header alone; full leaves the search box and a strip of map above the sheet.
 const PEEK_REM = 3.5;
-const FULL_GAP_REM = 8;
+const FULL_GAP_REM = 10.5;
 const HEIGHT: Record<SheetPosition, string> = { peek: `${PEEK_REM}rem`, half: "50%", full: `calc(100% - ${FULL_GAP_REM}rem)` };
 
 type Props = {
