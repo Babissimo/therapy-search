@@ -114,7 +114,8 @@ function TherapistPin({ pin, markers, onSelect }: { pin: Pin; markers: Map<strin
   return (
     // No title: the icon names the marker, and a title would add the browser's own tooltip to this one.
     <MapMarker position={position} icon={icon} data={pin} ref={register} eventHandlers={{ click: activate }}>
-      <MapTooltip>{only ? [only.name, only.location].filter(Boolean).join(" · ") : `${pin.therapists.length} therapists here`}</MapTooltip>
+      {/* Lifted clear of the pin, which grows under the pointer (index.css). */}
+      <MapTooltip offset={[0, -10]}>{only ? [only.name, only.location].filter(Boolean).join(" · ") : `${pin.therapists.length} therapists here`}</MapTooltip>
     </MapMarker>
   );
 }

@@ -166,6 +166,20 @@
   .pin-selected .pin-avatar::before {
     @apply ring-1 ring-sky-500/40 motion-safe:animate-[pin-pulse_1.2s_ease-out_3];
   }
+  /* The pin or cluster under the pointer shows as a highlighted one does, above the rest. Only where the pointer can
+     hover: a tap would leave it so. */
+  @media (hover: hover) {
+    .leaflet-marker-icon.leaflet-interactive:hover {
+      /* Beats the z-index Leaflet sets inline, the marker's y position on the map plus any offset. */
+      z-index: 100000 !important;
+      & > * {
+        @apply scale-125 transition-[scale];
+      }
+      & .pin-avatar::before {
+        @apply block;
+      }
+    }
+  }
 }
 
 @keyframes pin-pulse {

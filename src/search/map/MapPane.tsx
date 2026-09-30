@@ -69,8 +69,8 @@ export default function MapPane({
         {tiles && <MapTileLayer bounds={bounds} />}
         <MapBounds bounds={bounds} />
         <MapZoomControl className="top-auto right-2 bottom-8 left-auto max-lg:hidden" />
-        {/* Above the therapists' pins, which often share its point, but beneath one hovered (Leaflet raises it 250) or
-            marked (PinsLayer raises it 1000); it lets clicks through to them. */}
+        {/* Above the therapists' pins, which often share its point, but beneath one hovered (index.css raises it above
+            every marker) or marked (PinsLayer raises it 1000); it lets clicks through to them. */}
         {centre && <MapMarker position={[centre.lat, centre.lng]} icon={centrePin} interactive={false} keyboard={false} zIndexOffset={200} />}
         <PinsLayer pins={pins} highlight={highlight} selected={selected} onSelect={onSelect} />
         <FitView

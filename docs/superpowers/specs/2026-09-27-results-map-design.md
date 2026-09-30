@@ -107,7 +107,7 @@ For outside-UK searches (`LocationSearchOutsideUK`), which postcodes.io cannot a
 
 ### 4.6 Pins and clusters
 
-- A pin is the therapist's `Avatar` (photo or initials) in a Leaflet `divIcon`. It is keyboard-focusable with the therapist's name as its title, and hovering shows the name and listed location.
+- A pin is the therapist's `Avatar` (photo or initials) in a Leaflet `divIcon`. It is keyboard-focusable with the therapist's name as its title, and hovering shows the name and listed location. Where the pointer can hover (`(hover: hover)`), hovering a pin or cluster also raises, enlarges and rings it as hovering a card does; touch goes without, since a tap would leave it enlarged.
 - A therapist whose session types include Remote but not In-person gets a small lucide `Video` badge on the pin, since their location says nothing about travel.
 - Therapists who share one point form a single stacked pin: up to three avatars and the count.
 - Nearby pins merge into clusters with `leaflet.markercluster`, drawn the same way. Clicking a cluster zooms to its bounds, and clustering stops at zoom 16, so every cluster splits before the map runs out of zoom. Leaflet's spiderfy (fanning the markers out) is off.
