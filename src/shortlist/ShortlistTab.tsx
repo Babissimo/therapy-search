@@ -20,7 +20,7 @@ import { pinsBySlug, type Pin } from "@/search/map/pins";
 import { TherapistCard } from "@/search/TherapistCard";
 import { ShortlistButton } from "./ShortlistButton";
 import { byRank, type Shortlist, type ShortlistCard } from "./store";
-import { therapistCount, useShortlist, useShortlistStore } from "./useShortlist";
+import { useShortlist, useShortlistStore } from "./useShortlist";
 
 type Props = {
   /** The search's terms, which pick out tags as they do in the results. */
@@ -70,11 +70,7 @@ export function ShortlistTab({ sought, pins = [], unplaced = 0, selected, onHigh
 
   return (
     <div className="space-y-4">
-      {shortlist.length > 0 && (
-        <p className="text-sm text-muted-foreground">
-          {therapistCount(shortlist.length)}, kept in this browser only{unplaced > 0 && ` · ${unplaced} not on the map`}.
-        </p>
-      )}
+      <p className="text-sm text-muted-foreground">Kept in this browser only{unplaced > 0 && ` · ${unplaced} not on the map`}.</p>
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}
