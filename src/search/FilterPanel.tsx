@@ -1,10 +1,9 @@
-import { CircleHelp } from "lucide-react";
 import { TEXT_MAX_LENGTH, type SearchParams } from "@shared/query";
 import type { FilterGroup } from "@shared/types";
+import { HelpTip } from "@/components/HelpTip";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { CheckboxGroup } from "./CheckboxGroup";
 import { FILTER_GROUPS } from "./filterGroups";
 import { isChecked, tickedIn, withField } from "./state";
@@ -54,16 +53,7 @@ export function FilterPanel({ params, drafts, groups = FILTER_GROUPS, onSearch }
                   <TickedCount count={tickedIn(params, group)} />
                 </span>
               </AccordionTrigger>
-              {group.help && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button type="button" variant="ghost" size="icon-sm" aria-label={`About ${group.label}`}>
-                      <CircleHelp aria-hidden />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent className="max-w-xs">{group.help}</TooltipContent>
-                </Tooltip>
-              )}
+              {group.help && <HelpTip label={`About ${group.label}`}>{group.help}</HelpTip>}
             </div>
             {/* Headings open and searches narrow inside an open group, so its height follows the content. */}
             <AccordionContent className="h-auto">

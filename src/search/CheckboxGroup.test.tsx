@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
+import type { ReactElement } from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { CheckboxGroup } from "./CheckboxGroup";
 
 const group = {
@@ -50,51 +52,55 @@ describe("CheckboxGroup", () => {
       label: "Type of Therapy",
       fields: ["Child Counsellor", "Gestalt Psychotherapist", "Person Centred Psychotherapist"].map((v) => ({ name: "TypesOfTherapy", value: v, label: v })),
     };
+    // Headings carry question marks, whose tooltips need a provider.
+    const renderWithTips = (ui: ReactElement) => render(ui, { wrapper: TooltipProvider });
 
     it("keeps each heading shut until it is opened", () => {
-      render(<CheckboxGroup group={types} searchable={false} isChecked={() => false} onToggle={() => {}} />);
+      renderWithTips(<CheckboxGroup group={types} searchable={false} isChecked={() => false} onToggle={() => {}} />);
       expect(screen.queryAllByRole("checkbox")).toHaveLength(0);
       fireEvent.click(screen.getByRole("button", { name: "Humanistic and integrative" }));
       expect(screen.getAllByRole("checkbox")).toHaveLength(2);
       screen.getByRole("checkbox", { name: "Person Centred Psychotherapist" });
     });
 
-    it("says what a heading's titles have in common once it is opened", () => {
-      render(<CheckboxGroup group={types} searchable={false} isChecked={() => false} onToggle={() => {}} />);
+    it("says what a heading's titles have in common behind a question mark beside it", () => {
+      renderWithTips(<CheckboxGroup group={types} searchable={false} isChecked={() => false} onToggle={() => {}} />);
       expect(screen.queryByText(/expert on your own life/)).toBeNull();
-      fireEvent.click(screen.getByRole("button", { name: "Humanistic and integrative" }));
-      screen.getByText(/expert on your own life/);
+      fireEvent.click(screen.getByRole("button", { name: "About Humanistic and integrative" }));
+      expect(screen.getByRole("tooltip").textContent).toMatch(/expert on your own life/);
+      expect(screen.queryAllByRole("checkbox")).toHaveLength(0);
     });
 
     it("scrolls its headings in a box of their own, beneath the search box", () => {
-      render(<CheckboxGroup group={types} searchable isChecked={() => false} onToggle={() => {}} />);
+      renderWithTips(<CheckboxGroup group={types} searchable isChecked={() => false} onToggle={() => {}} />);
       const box = screen.getByRole("button", { name: "Children and young people" }).closest(".overflow-y-auto");
       expect(box?.contains(screen.getByRole("button", { name: "Humanistic and integrative" }))).toBe(true);
       expect(box?.contains(screen.getByRole("searchbox"))).toBe(false);
     });
 
     it("opens a heading that holds a tick, and counts the ticks", () => {
-      render(<CheckboxGroup group={types} searchable={false} isChecked={(f) => f.value === "Child Counsellor"} onToggle={() => {}} />);
+      renderWithTips(<CheckboxGroup group={types} searchable={false} isChecked={(f) => f.value === "Child Counsellor"} onToggle={() => {}} />);
       expect(screen.getByRole("button", { name: "Children and young people, 1 ticked" }).getAttribute("aria-expanded")).toBe("true");
       screen.getByRole("checkbox", { name: "Child Counsellor" });
     });
 
     it("lists ticked boxes first under their heading", () => {
-      render(<CheckboxGroup group={types} searchable={false} isChecked={(f) => f.value === "Person Centred Psychotherapist"} onToggle={() => {}} />);
+      renderWithTips(<CheckboxGroup group={types} searchable={false} isChecked={(f) => f.value === "Person Centred Psychotherapist"} onToggle={() => {}} />);
       const boxes = screen.getAllByRole("checkbox").map((c) => c.parentElement?.textContent);
       expect(boxes).toEqual(["Person Centred Psychotherapist", "Gestalt Psychotherapist"]);
     });
 
     it("shows every match under its heading while searching", () => {
-      render(<CheckboxGroup group={types} searchable isChecked={() => false} onToggle={() => {}} />);
+      renderWithTips(<CheckboxGroup group={types} searchable isChecked={() => false} onToggle={() => {}} />);
       fireEvent.change(screen.getByRole("searchbox", { name: "Search Type of Therapy" }), { target: { value: "psycho" } });
-      expect(screen.queryAllByRole("button")).toHaveLength(0);
+      expect(screen.queryByRole("button", { name: "Humanistic and integrative" })).toBeNull();
       screen.getByText("Humanistic and integrative");
+      screen.getByRole("button", { name: "About Humanistic and integrative" });
       expect(screen.getAllByRole("checkbox")).toHaveLength(2);
     });
 
     it("leaves a box ticked during a search in view once the search is cleared", () => {
-      render(<CheckboxGroup group={types} searchable isChecked={() => false} onToggle={() => {}} />);
+      renderWithTips(<CheckboxGroup group={types} searchable isChecked={() => false} onToggle={() => {}} />);
       const search = screen.getByRole("searchbox", { name: "Search Type of Therapy" });
       fireEvent.change(search, { target: { value: "gestalt" } });
       fireEvent.click(screen.getByRole("checkbox", { name: "Gestalt Psychotherapist" }));

@@ -2,6 +2,7 @@ import { useId, useMemo, useState } from "react";
 import { ChevronRight, Info } from "lucide-react";
 import { sectionsOf } from "@shared/sections";
 import type { FilterField, FilterGroup } from "@shared/types";
+import { HelpTip } from "@/components/HelpTip";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
@@ -83,17 +84,19 @@ export function CheckboxGroup({ group, searchable, isChecked, onToggle }: Props)
             return (
               <Collapsible key={section.heading} asChild open={expanded} onOpenChange={(on) => openSection(section.heading, on)}>
                 <li>
-                  {needle ? (
-                    <p className="py-1 text-sm text-muted-foreground">{section.heading}</p>
-                  ) : (
-                    <CollapsibleTrigger className="flex w-full items-center gap-1.5 rounded-md py-1 text-left text-sm outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50">
-                      <ChevronRight className={cn("size-4 shrink-0 text-muted-foreground motion-safe:transition-transform", expanded && "rotate-90")} aria-hidden />
-                      <span className="flex-1">{section.heading}</span>
-                      <TickedCount count={section.fields.filter(isChecked).length} />
-                    </CollapsibleTrigger>
-                  )}
+                  <div className="flex items-center gap-1">
+                    {needle ? (
+                      <span className="py-1 text-sm text-muted-foreground">{section.heading}</span>
+                    ) : (
+                      <CollapsibleTrigger className="flex items-center gap-1.5 rounded-md py-1 text-left text-sm outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50">
+                        <ChevronRight className={cn("size-4 shrink-0 text-muted-foreground motion-safe:transition-transform", expanded && "rotate-90")} aria-hidden />
+                        <span>{section.heading}</span>
+                        <TickedCount count={section.fields.filter(isChecked).length} />
+                      </CollapsibleTrigger>
+                    )}
+                    {section.about && <HelpTip label={`About ${section.heading}`}>{section.about}</HelpTip>}
+                  </div>
                   <CollapsibleContent>
-                    {section.about && <p className="pt-1 pb-1.5 pl-5.5 text-sm text-muted-foreground">{section.about}</p>}
                     <ul className="space-y-2 py-1 pl-5.5">{fields.map(item)}</ul>
                   </CollapsibleContent>
                 </li>
