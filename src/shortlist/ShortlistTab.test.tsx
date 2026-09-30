@@ -5,6 +5,7 @@ import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import type { Pin } from "@/search/map/pins";
+import { ClosedGroupsContext, createClosedGroups, type ClosedGroups } from "./groups";
 import { ShortlistTab } from "./ShortlistTab";
 import { createShortlistStore, type ShortlistCard } from "./store";
 import { ShortlistContext } from "./useShortlist";
@@ -18,19 +19,21 @@ const card = (slug: string, name: string): ShortlistCard => ({
   tags: ["Anxiety", "Grief"],
 });
 
-type Props = Omit<ComponentProps<typeof ShortlistTab>, "sought"> & { sought?: string[] };
+type Props = Omit<ComponentProps<typeof ShortlistTab>, "sought"> & { sought?: string[]; groups?: ClosedGroups };
 
-function renderTab({ sought = [], ...props }: Props, ...cards: ShortlistCard[]) {
+function renderTab({ sought = [], groups = createClosedGroups(), ...props }: Props, ...cards: ShortlistCard[]) {
   let t = 1000;
   const store = createShortlistStore(null, () => t++);
   for (const c of cards) store.add(c);
   render(
     <ShortlistContext.Provider value={store}>
-      <TooltipProvider>
-        <MemoryRouter>
-          <ShortlistTab sought={new Set(sought)} {...props} />
-        </MemoryRouter>
-      </TooltipProvider>
+      <ClosedGroupsContext.Provider value={groups}>
+        <TooltipProvider>
+          <MemoryRouter>
+            <ShortlistTab sought={new Set(sought)} {...props} />
+          </MemoryRouter>
+        </TooltipProvider>
+      </ClosedGroupsContext.Provider>
     </ShortlistContext.Provider>,
   );
   return store;
@@ -39,7 +42,9 @@ function renderTab({ sought = [], ...props }: Props, ...cards: ShortlistCard[]) 
 const pin = (key: string, ...cards: ShortlistCard[]): Pin => ({ key, point: { lat: 51, lng: 0 }, therapists: cards, kind: "outcode" });
 const entry = (name: string) => screen.getByRole("heading", { name }).closest("li");
 
-const names = () => screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
+const names = () => screen.getAllByRole("heading", { level: 3 }).map((h) => h.textContent);
+/** The groups shown, by the status each heading's button opens and closes. */
+const groupsShown = () => screen.getAllByRole("heading", { level: 2 }).map((h) => h.querySelector("button")?.dataset.groupToggle);
 
 afterEach(() => {
   vi.useRealTimers();
@@ -47,15 +52,16 @@ afterEach(() => {
 });
 
 /**
- * jsdom lays nothing out, so each entry is given a place of its own down the list for dnd-kit to measure. Timers are
- * faked so a move runs synchronously, as an async test that timed out would leave its `act` open over the next one.
+ * jsdom lays nothing out, so each entry is given a place of its own down the tab, across its groups, for dnd-kit to
+ * measure. Timers are faked so a move runs synchronously, as an async test that timed out would leave its `act` open
+ * over the next one.
  */
 function layOutEntries() {
   vi.useFakeTimers();
   vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
     const li = this.closest("li");
-    if (!li?.parentElement) return new DOMRect();
-    return new DOMRect(0, [...li.parentElement.children].indexOf(li) * 200, 300, 180);
+    if (!li) return new DOMRect();
+    return new DOMRect(0, [...document.querySelectorAll("li")].indexOf(li) * 200, 300, 180);
   });
 }
 
@@ -70,6 +76,13 @@ function moveByKeys(name: string, ...codes: string[]) {
 }
 
 const announced = () => screen.getByRole("status").textContent;
+
+/** Opens a therapist's status menu as a keyboard does, since jsdom's pointer events lack the button Radix checks for. */
+function openMenu(name: string) {
+  fireEvent.keyDown(screen.getByRole("button", { name: new RegExp(`^Status of ${name}:`) }), { key: "Enter" });
+}
+
+const choose = (label: string) => fireEvent.click(screen.getByRole("menuitemradio", { name: label }));
 
 describe("ShortlistTab", () => {
   it("says how to shortlist someone when the list is empty", () => {
@@ -168,5 +181,116 @@ describe("ShortlistTab", () => {
     expect(onHighlight).toHaveBeenLastCalledWith("Ann-AAAAAAAA");
     fireEvent.pointerLeave(ann);
     expect(onHighlight).toHaveBeenLastCalledWith(undefined);
+  });
+
+  it("groups therapists by where the visitor stands with them, leaving out empty groups", () => {
+    const store = renderTab({}, card("Ann-AAAAAAAA", "Ann"), card("Bo-BBBBBBBB", "Bo"), card("Cy-CCCCCCCC", "Cy"), card("Di-DDDDDDDD", "Di"));
+    act(() => {
+      store.setStatus("Ann-AAAAAAAA", "seeing");
+      store.setStatus("Cy-CCCCCCCC", "contacted");
+      store.setStatus("Di-DDDDDDDD", "contacted");
+    });
+    expect(groupsShown()).toEqual(["toContact", "contacted", "seeing"]);
+    screen.getByRole("button", { name: "Contacted, 2 therapists", expanded: true });
+    expect(names()).toEqual(["Bo", "Di", "Cy", "Ann"]);
+  });
+
+  it("moves a therapist to the group of the status chosen for them, keeping their place, and focus and the reader with them", () => {
+    const store = renderTab({}, card("Ann-AAAAAAAA", "Ann"), card("Bo-BBBBBBBB", "Bo"), card("Cy-CCCCCCCC", "Cy"));
+    openMenu("Cy");
+    choose("Contacted");
+    openMenu("Ann");
+    choose("Contacted");
+    expect(groupsShown()).toEqual(["toContact", "contacted"]);
+    expect(names()).toEqual(["Bo", "Cy", "Ann"]);
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Status of Ann: contacted" }));
+    screen.getByText("Ann moved to Contacted.");
+    expect(store.get().map((e) => e.card.name)).toEqual(["Cy", "Bo", "Ann"]);
+  });
+
+  it("closes Set aside to start with, and opens or closes any group", () => {
+    const store = renderTab({}, card("Ann-AAAAAAAA", "Ann"), card("Bo-BBBBBBBB", "Bo"));
+    act(() => store.setStatus("Ann-AAAAAAAA", "setAside"));
+    expect(names()).toEqual(["Bo"]);
+    fireEvent.click(screen.getByRole("button", { name: "Set aside, 1 therapist", expanded: false }));
+    expect(names()).toEqual(["Bo", "Ann"]);
+    fireEvent.click(screen.getByRole("button", { name: "To contact, 1 therapist", expanded: true }));
+    expect(names()).toEqual(["Ann"]);
+  });
+
+  it("gives focus to a closed group's heading when a therapist is sent there", () => {
+    renderTab({}, card("Ann-AAAAAAAA", "Ann"), card("Bo-BBBBBBBB", "Bo"));
+    openMenu("Ann");
+    choose("Set aside");
+    expect(names()).toEqual(["Bo"]);
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Set aside, 1 therapist" }));
+    screen.getByText("Ann moved to Set aside.");
+  });
+
+  it("clears the map's highlight when a therapist is sent to a closed group", () => {
+    const onHighlight = vi.fn();
+    renderTab({ onHighlight }, card("Ann-AAAAAAAA", "Ann"), card("Bo-BBBBBBBB", "Bo"));
+    act(() => screen.getByRole("button", { name: /^Status of Ann:/ }).focus());
+    expect(onHighlight).toHaveBeenLastCalledWith("Ann-AAAAAAAA");
+    openMenu("Ann");
+    choose("Set aside");
+    expect(onHighlight).toHaveBeenLastCalledWith(undefined);
+  });
+
+  it("clears the map's highlight when a therapist's card goes from under the pointer or focus, as another tab can send it", () => {
+    const onHighlight = vi.fn();
+    const store = renderTab({ onHighlight }, card("Ann-AAAAAAAA", "Ann"), card("Bo-BBBBBBBB", "Bo"));
+    act(() => screen.getByRole("button", { name: /^Status of Ann:/ }).focus());
+    expect(onHighlight).toHaveBeenLastCalledWith("Ann-AAAAAAAA");
+    act(() => store.setStatus("Ann-AAAAAAAA", "setAside"));
+    expect(names()).toEqual(["Bo"]);
+    expect(onHighlight).toHaveBeenLastCalledWith(undefined);
+  });
+
+  it("leaves the map's highlight on a therapist whose card moves to an open group, as focus goes with them", () => {
+    const onHighlight = vi.fn();
+    renderTab({ onHighlight }, card("Ann-AAAAAAAA", "Ann"), card("Bo-BBBBBBBB", "Bo"));
+    act(() => screen.getByRole("button", { name: /^Status of Ann:/ }).focus());
+    openMenu("Ann");
+    choose("Contacted");
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Status of Ann: contacted" }));
+    expect(onHighlight).toHaveBeenLastCalledWith("Ann-AAAAAAAA");
+  });
+
+  it("gives focus to the bookmark that can put back a therapist the menu removed", () => {
+    const store = renderTab({}, card("Ann-AAAAAAAA", "Ann"));
+    openMenu("Ann");
+    fireEvent.click(screen.getByRole("menuitem", { name: "Remove from shortlist" }));
+    expect(store.has("Ann-AAAAAAAA")).toBe(false);
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Add Ann to your shortlist" }));
+  });
+
+  it("keeps a drag among the therapist's own group", () => {
+    layOutEntries();
+    const store = renderTab({}, card("Ann-AAAAAAAA", "Ann"), card("Bo-BBBBBBBB", "Bo"), card("Cy-CCCCCCCC", "Cy"), card("Di-DDDDDDDD", "Di"));
+    act(() => {
+      store.setStatus("Ann-AAAAAAAA", "contacted");
+      store.setStatus("Bo-BBBBBBBB", "contacted");
+    });
+    expect(names()).toEqual(["Di", "Cy", "Bo", "Ann"]);
+    moveByKeys("Cy", "ArrowDown", "Space");
+    expect(names()).toEqual(["Di", "Cy", "Bo", "Ann"]);
+    expect(announced()).toBe("Cy put down at number 2 of 2.");
+    moveByKeys("Di", "ArrowDown", "Space");
+    expect(names()).toEqual(["Cy", "Di", "Bo", "Ann"]);
+    expect(store.get().map((e) => e.card.name)).toEqual(["Cy", "Di", "Bo", "Ann"]);
+  });
+
+  it("puts a therapist dropped at the top of their group after whoever precedes it among everyone", () => {
+    layOutEntries();
+    const store = renderTab({}, card("Ann-AAAAAAAA", "Ann"), card("Bo-BBBBBBBB", "Bo"), card("Cy-CCCCCCCC", "Cy"), card("Di-DDDDDDDD", "Di"));
+    act(() => {
+      store.setStatus("Ann-AAAAAAAA", "contacted");
+      store.setStatus("Bo-BBBBBBBB", "contacted");
+    });
+    expect(names()).toEqual(["Di", "Cy", "Bo", "Ann"]);
+    moveByKeys("Ann", "ArrowUp", "Space");
+    expect(names()).toEqual(["Di", "Cy", "Ann", "Bo"]);
+    expect(store.get().map((e) => e.card.name)).toEqual(["Di", "Cy", "Ann", "Bo"]);
   });
 });
