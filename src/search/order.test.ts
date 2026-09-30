@@ -12,7 +12,8 @@ function memory(initial?: string) {
 }
 
 const slugs = (listings: { slug: string }[]) => listings.map((l) => l.slug);
-const people = Array.from({ length: 40 }, (_, i) => ({ slug: `Therapist-${i}-ID${1000 + i}` }));
+const bare = { hasPhoto: false, hasSummary: false };
+const people = Array.from({ length: 40 }, (_, i) => ({ slug: `Therapist-${i}-ID${1000 + i}`, ...bare }));
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -82,16 +83,33 @@ describe("inOrder", () => {
   });
 
   it("keeps a location search nearest first, reordering only people at the same distance", () => {
-    const at = (miles: string) => people.slice(0, 10).map((p) => ({ slug: `${p.slug}-${miles}`, distance: `${miles} miles from Leeds` }));
+    const at = (miles: string) => people.slice(0, 10).map((p) => ({ ...p, slug: `${p.slug}-${miles}`, distance: `${miles} miles from Leeds` }));
     const ordered = inOrder([...at("1.2"), ...at("0.3"), ...at("0"), ...at("1")].reverse(), 7);
     expect(ordered.map((l) => l.distance)).toEqual(["0", "0.3", "1", "1.2"].flatMap((miles) => Array(10).fill(`${miles} miles from Leeds`)));
     expect(slugs(ordered.slice(0, 10))).toEqual(slugs(inOrder(at("0"), 7)));
   });
 
   it("counts a card without a distance as 0 miles, among the nearest, as UKCP does", () => {
-    const online = people.slice(0, 10).map((p) => ({ slug: `${p.slug}-online` }));
-    const near = people.slice(10, 20).map((p) => ({ slug: p.slug, distance: "0 miles from Leeds" }));
-    const ordered = inOrder([{ slug: "Far-ID1", distance: "0.1 miles from Leeds" }, ...near, ...online], 7);
+    const online = people.slice(0, 10).map((p) => ({ ...p, slug: `${p.slug}-online` }));
+    const near = people.slice(10, 20).map((p) => ({ ...p, distance: "0 miles from Leeds" }));
+    const ordered = inOrder([{ slug: "Far-ID1", distance: "0.1 miles from Leeds", ...bare }, ...near, ...online], 7);
     expect(slugs(ordered)).toEqual([...slugs(inOrder([...online, ...near], 7)), "Far-ID1"]);
+  });
+
+  it.each([
+    ["at the same distance", "0.4 miles from Leeds"],
+    ["in a search without a location", undefined],
+  ])("puts people %s who show more first: a photo and a summary, then either, then neither", (_, distance) => {
+    const showing = (hasPhoto: boolean, hasSummary: boolean) =>
+      people.slice(0, 10).map((p) => ({ slug: `${p.slug}-${hasPhoto}-${hasSummary}`, distance, hasPhoto, hasSummary }));
+    const [both, photo, summary, neither] = [showing(true, true), showing(true, false), showing(false, true), showing(false, false)];
+    const ordered = slugs(inOrder([...neither, ...summary, ...photo, ...both], 7));
+    expect(ordered).toEqual(slugs([...inOrder(both, 7), ...inOrder([...photo, ...summary], 7), ...inOrder(neither, 7)]));
+  });
+
+  it("keeps the nearest first however little they show", () => {
+    const near = { slug: "Near-ID1", distance: "0.2 miles from Leeds", ...bare };
+    const far = { slug: "Far-ID2", distance: "0.3 miles from Leeds", hasPhoto: true, hasSummary: true };
+    expect(slugs(inOrder([far, near], 7))).toEqual(["Near-ID1", "Far-ID2"]);
   });
 });

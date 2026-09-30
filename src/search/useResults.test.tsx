@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { emptyParams } from "@shared/query";
 import type { TherapistCard } from "@shared/types";
 import { api } from "@/lib/api";
+import { listed } from "@/lib/listed.testing";
 import { inOrder, orderSeed } from "./order";
 import { cachedCard, useResults } from "./useResults";
 
@@ -15,23 +16,29 @@ function withClient(client = newClient()) {
   return ({ children }: { children: ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>;
 }
 
-const cards = Array.from({ length: 30 }, (_, i): TherapistCard => ({ slug: `Therapist-${i}-ID${i}`, name: `Therapist ${i}`, initials: "T", tags: [] }));
+const cards = Array.from({ length: 30 }, (_, i): TherapistCard => ({
+  slug: `Therapist-${i}-ID${i}`,
+  name: `Therapist ${i}`,
+  initials: "T",
+  photoUrl: i % 3 === 0 ? "https://example.invalid/photo.jpg" : undefined,
+  summary: i % 2 === 0 ? "Summary." : undefined,
+  tags: [],
+}));
+const listingsOf = (answer: TherapistCard[]) => listed({ total: answer.length, from: 1, to: answer.length, notices: [], therapists: answer });
 
 /** UKCP answering with every card at once, shuffled afresh each time as it does among people at the same distance. */
 function answerShuffled(answer = cards) {
   const read = vi.fn((card: TherapistCard) => card);
-  vi.spyOn(api, "search").mockImplementation(async () => ({
-    total: answer.length,
-    from: 1,
-    to: answer.length,
-    notices: [],
-    listings: [...answer].sort(() => Math.random() - 0.5).map((card) => ({ slug: card.slug, distance: card.distance, read: () => read(card) })),
-  }));
+  vi.spyOn(api, "search").mockImplementation(async () => {
+    const found = listingsOf(answer);
+    return { ...found, listings: found.listings.sort(() => Math.random() - 0.5).map((listing) => ({ ...listing, read: () => read(listing.read()) })) };
+  });
   return read;
 }
 
 const shown = (therapists: TherapistCard[]) => therapists.map((t) => t.slug);
-const expected = inOrder(cards, orderSeed()).map((t) => t.slug);
+const expectedOf = (answer: TherapistCard[]) => inOrder(listingsOf(answer).listings, orderSeed()).map((l) => l.slug);
+const expected = expectedOf(cards);
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -59,7 +66,7 @@ describe("useResults", () => {
     answerShuffled(located);
     const { result } = renderHook(() => useResults(emptyParams()), { wrapper: withClient() });
     await waitFor(() => expect(result.current.therapists).toHaveLength(12));
-    expect(shown(result.current.therapists)).toEqual(shown(inOrder(located.slice(6), orderSeed()).slice(0, 12)));
+    expect(shown(result.current.therapists)).toEqual(expectedOf(located.slice(6)).slice(0, 12));
   });
 
   it("finds the card a search showed for a therapist, but not one of those it has yet to show", async () => {

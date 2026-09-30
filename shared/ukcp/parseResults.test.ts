@@ -73,12 +73,24 @@ describe("parseResults card details", () => {
 });
 
 describe("parseListings", () => {
-  it("finds each card's slug and distance, reading the rest only when asked", () => {
+  it("finds each card's slug, distance and whether it shows a photo and a summary, reading the rest only when asked", () => {
     const { listings, ...found } = parseListings(fixture("results-location.html"));
     const { therapists, ...read } = parseResults(fixture("results-location.html"));
     expect(found).toEqual(read);
-    expect(listings.map((l) => [l.slug, l.distance])).toEqual(therapists.map((t) => [t.slug, t.distance]));
+    expect(listings.map((l) => [l.slug, l.distance, l.hasPhoto, l.hasSummary])).toEqual(
+      therapists.map((t) => [t.slug, t.distance, t.photoUrl !== undefined, t.summary !== undefined]),
+    );
     expect(listings.map((l) => l.read())).toEqual(therapists);
+  });
+
+  it("counts a photo or summary only where the card shows one", () => {
+    const listingOf = (inner: string) =>
+      parseListings(`<span class="results-no">1-1 of 1 results</span><div class="profile-listing"><a href="therapist/Jo-Bloggs-ABCDEFGH">${inner}</a></div>`).listings[0];
+    const shown = { hasPhoto: true, hasSummary: true };
+    const none = { hasPhoto: false, hasSummary: false };
+    expect(listingOf(`<img class="profile-photo" src="https://example.invalid/jo.jpg"><h2>Jo Bloggs</h2><p>Summary.</p>`)).toMatchObject(shown);
+    expect(listingOf(`<img class="profile-photo" src="javascript:alert(1)"><h2>Jo Bloggs</h2><p>&nbsp;</p>`)).toMatchObject(none);
+    expect(listingOf(`<div class="profile-photo profile-photo-placeholder"><span>JB</span></div><h2>Jo Bloggs</h2>`)).toMatchObject(none);
   });
 
   it("leaves a card it can't read to fail when it is read", () => {

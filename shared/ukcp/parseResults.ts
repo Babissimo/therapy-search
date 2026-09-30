@@ -4,7 +4,7 @@ import { ParseError, initialsOf, oneLine, optional, readHtml, safeUrl } from "./
 const RANGE = /(\d+)\s*-\s*(\d+)\s+of\s+(\d+)\s+results?/i;
 
 /** A card found on a results page: enough to order it by, with the rest read only when it is shown. */
-export type Listing = { slug: string; distance?: string; read: () => TherapistCard };
+export type Listing = { slug: string; distance?: string; hasPhoto: boolean; hasSummary: boolean; read: () => TherapistCard };
 /** A results page with its cards not yet read. */
 export type Listings = Omit<SearchResult, "therapists"> & { listings: Listing[] };
 
@@ -13,7 +13,7 @@ export function parseResults(html: string): SearchResult {
   return { ...found, therapists: listings.map((listing) => listing.read()) };
 }
 
-/** Reads a results page but not its cards' details, which cost the most to read and are needed only for the cards shown. */
+/** Reads a results page and what its cards are ordered by, leaving the rest, which costs the most to read, for the cards shown. */
 export function parseListings(html: string): Listings {
   const doc = readHtml(html);
   const notices = [...doc.querySelectorAll(".fat-search-alert h6")].map((n) => oneLine(n.textContent)).filter(Boolean);
@@ -37,11 +37,19 @@ function listingOf(a: Element): Listing {
   const slug = /therapist\/([^/?#]+)/.exec(href)?.[1];
   if (!slug) throw new ParseError("results: a card has no profile link");
   const distance = distanceOf(a);
-  return { slug, distance, read: () => readCard(a, slug, distance) };
+  return { slug, distance, hasPhoto: photoOf(a) !== undefined, hasSummary: summaryOf(a) !== undefined, read: () => readCard(a, slug, distance) };
 }
 
 function distanceOf(a: Element): string | undefined {
   return /\(([^)]*\bfrom\b[^)]*)\)/.exec(oneLine(a.querySelector(".profile-listing-locations")?.textContent))?.[1];
+}
+
+function photoOf(a: Element): string | undefined {
+  return safeUrl(a.querySelector("img.profile-photo")?.getAttribute("src"));
+}
+
+function summaryOf(a: Element): string | undefined {
+  return optional(oneLine(a.querySelector("p")?.textContent));
 }
 
 function readCard(a: Element, slug: string, distance: string | undefined): TherapistCard {
@@ -60,11 +68,11 @@ function readCard(a: Element, slug: string, distance: string | undefined): Thera
     slug,
     name,
     initials: oneLine(a.querySelector(".profile-photo-placeholder span")?.textContent) || initialsOf(name),
-    photoUrl: safeUrl(a.querySelector("img.profile-photo")?.getAttribute("src")),
+    photoUrl: photoOf(a),
     location: optional(oneLine(locations?.querySelector("strong")?.textContent)),
     distance,
     sessionTypes: optional(oneLine(sessionText).replace(/^\|\s*/, "")),
-    summary: optional(oneLine(a.querySelector("p")?.textContent)),
+    summary: summaryOf(a),
     tags: [...a.querySelectorAll(".tag-list li")].map((li) => oneLine(li.textContent)).filter(Boolean),
   };
 }
