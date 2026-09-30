@@ -111,6 +111,13 @@ describe("ProfilePage's content", () => {
     }
   });
 
+  it("lets a tag too long for its column wrap onto another line", async () => {
+    const college = "College of Family Couple and Systemic Psychotherapy (CFCSP)";
+    renderAt(["/therapist/Test-ABCDEFGH"], { ...PROFILE, practical: [section("UKCP College", [college])] });
+    // jsdom lays nothing out, so this checks the tag gives up the badge's single line rather than measuring it.
+    expect((await screen.findByText(college)).className).toContain("whitespace-normal");
+  });
+
   it("links each office's name to its map", async () => {
     const mapped = { ...office("Brighton Office", "£70"), mapUrl: "https://maps.example/?q=Brighton" };
     renderAt(["/therapist/Test-ABCDEFGH"], { ...PROFILE, offices: [mapped, office("London Office", "£70")] });
