@@ -833,7 +833,7 @@ describe("SearchPage", () => {
     renderAt(SEARCH);
     await loaded();
     pick(/^Shortlist/);
-    expect(await screen.findByText("2 therapists, kept in this browser only · 1 not on the map.")).toBeTruthy();
+    expect(await screen.findByText("Kept in this browser only · 1 not on the map.")).toBeTruthy();
   });
 
   it("raises a lowered sheet to show the tab picked, or the one already open", async () => {
@@ -860,7 +860,7 @@ describe("SearchPage", () => {
     expect(screen.getByRole("tab", { name: "Results" }).hasAttribute("disabled")).toBe(true);
     expect(within(screen.getByRole("tabpanel", { name: /^Shortlist/ })).getByRole("link", { name: "Therapist a" })).toBeTruthy();
     // With no map, there is nothing to look their place up for or count them missing from.
-    expect(screen.getByText("1 therapist, kept in this browser only.")).toBeTruthy();
+    expect(screen.getByText("Kept in this browser only.")).toBeTruthy();
     expect(api.place).not.toHaveBeenCalled();
     expect(screen.getAllByRole("heading", { level: 1, name: "Find a UKCP therapist" })).toHaveLength(1);
     expect(api.search).not.toHaveBeenCalled();

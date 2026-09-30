@@ -81,7 +81,7 @@ describe("ShortlistTab", () => {
     renderTab({}, card("Ann-AAAAAAAA", "Ann"), card("Bo-BBBBBBBB", "Bo"));
     expect(names()).toEqual(["Bo", "Ann"]);
     expect(screen.getByRole("link", { name: "Ann" }).getAttribute("href")).toBe("/therapist/Ann-AAAAAAAA");
-    screen.getByText("2 therapists, kept in this browser only.");
+    screen.getByText("Kept in this browser only.");
     screen.getByText("About Ann.");
   });
 
@@ -97,10 +97,17 @@ describe("ShortlistTab", () => {
     expect(store.has("Bo-BBBBBBBB")).toBe(false);
     expect(names()).toEqual(["Cy", "Bo", "Ann"]);
     expect(entry("Bo")?.className).toMatch(/opacity-60/);
-    screen.getByText("2 therapists, kept in this browser only.");
+    screen.getByText("Kept in this browser only.");
     fireEvent.click(screen.getByRole("button", { name: "Add Bo to your shortlist" }));
     expect(store.get().map((e) => e.card.name)).toEqual(["Cy", "Bo", "Ann"]);
     expect(entry("Bo")?.className).not.toMatch(/opacity-60/);
+  });
+
+  it("still says where the shortlist is kept once everyone on it is removed", () => {
+    renderTab({}, card("Ann-AAAAAAAA", "Ann"));
+    fireEvent.click(screen.getByRole("button", { name: "Remove Ann from your shortlist" }));
+    expect(names()).toEqual(["Ann"]);
+    screen.getByText("Kept in this browser only.");
   });
 
   it("moves a therapist by their handle, saying where they are as they go", () => {
@@ -150,7 +157,7 @@ describe("ShortlistTab", () => {
 
   it("counts those the map can't place while it shows the shortlist", () => {
     renderTab({ pins: [], unplaced: 1 }, card("Ann-AAAAAAAA", "Ann"), card("Bo-BBBBBBBB", "Bo"));
-    screen.getByText("2 therapists, kept in this browser only · 1 not on the map.");
+    screen.getByText("Kept in this browser only · 1 not on the map.");
   });
 
   it("tells the map whose card the pointer is on, for it to ring their pin", () => {
