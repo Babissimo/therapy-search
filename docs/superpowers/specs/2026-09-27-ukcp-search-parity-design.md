@@ -21,7 +21,7 @@ Out of scope for v1:
 
 - **Free to run.** Cloudflare Workers free plan: 100,000 Worker requests a day and 10 ms of CPU per request. With Workers Caching on (§4.2), cached answers and static files count as requests too.
 - **Respectful of UKCP.**
-  - Cache identical searches (15 minutes, or 6 hours without a location, §4.2) and profiles (1 hour), and collapse concurrent identical requests, so repeated traffic never reaches UKCP.
+  - Cache identical searches (15 minutes, or 6 hours without a location, §4.2), and profiles and their contact details (1 hour), and collapse concurrent identical requests, so repeated traffic never reaches UKCP.
   - Send upstream only what a visitor's action on UKCP would send, except that a search asks for 480 results at once where UKCP's page asks for 12, or for every result when it has no location (map spec §4.4): one search POST per uncached batch of results, one profile GET per opened profile, one contact POST per click. Never prefetch or crawl.
   - Identify ourselves in the `User-Agent` with a link to the site, so UKCP can see and contact us.
   - Cap uncached upstream requests per visitor IP (§4.3).
@@ -103,7 +103,7 @@ A zero-result response has no `.results-no` and a "No therapists can be found" n
 | `.therapist-contacts a[href^="mailto:"]` | "Email Therapist" address, shown inline |
 | `.therapist-contacts-details` | `data-id` (numeric Umbraco id) and `data-nodata` |
 
-Unless `data-nodata="true"`, UKCP's JS adds a "Show Contact Details" button. It sends `POST /Umbraco/Surface/ProfileSurface/ContactDetails` with `__RequestVerificationToken` and `id=<data-id>`, and gets back a fragment with `.therapist-contacts-details-tel`, `-email` and `-web` blocks, each holding one link. We reproduce this with one upstream call per click, uncached, so UKCP's view of contact requests stays accurate.
+Unless `data-nodata="true"`, UKCP's JS adds a "Show Contact Details" button. It sends `POST /Umbraco/Surface/ProfileSurface/ContactDetails` with `__RequestVerificationToken` and `id=<data-id>`, and gets back a fragment with `.therapist-contacts-details-tel`, `-email` and `-web` blocks, each holding one link. We reproduce this through the Worker, which caches each answer as it does profiles (§4.2), so UKCP sees roughly one contact request per therapist an hour from this site, not one per reveal. An unknown id gets an empty page, which is never cached.
 
 ## 4. Architecture
 
@@ -147,13 +147,13 @@ A switch beside the site's name picks a light, dark or system theme, the last fo
 |---|---|---|
 | `GET /api/search?<UKCP params>` | Search POST (§3.2) | 15 minutes; 6 hours without a location |
 | `GET /api/therapist/:slug` | Profile GET (§3.4) | 1 hour |
-| `POST /api/contact/:id` | ContactDetails POST | None |
+| `GET /api/contact/:id` | ContactDetails POST (§3.4) | 1 hour |
 
-Search is a GET on our side so the response can be cached by URL. The Worker **validates** every parameter against the option lists (including each `HelpWith` term) and the numeric ranges in §3.2, rejecting anything else with `400`, so nothing arbitrary is forwarded. It then **canonicalises** the query (fixed key order, sorted values and `HelpWith` terms, defaults and keys it doesn't forward dropped) and redirects to the canonical URL when it differs, so equivalent searches share one cache entry. It **forwards** the query as a form POST for a batch of 480 results, or for every result when there is no location, with `page` counting batches (map spec §4.4). It returns UKCP's HTML byte for byte, never decoded, since decoding the 8.5 MB of the largest search would take most of a request's 10 ms of CPU, as `text/plain` with `X-Content-Type-Options: nosniff` so it can never render as a page on our origin. The front end parses it (§5).
+Search and contact details are GETs on our side so the responses can be cached by URL. The Worker **validates** every parameter against the option lists (including each `HelpWith` term) and the numeric ranges in §3.2, rejecting anything else with `400`, so nothing arbitrary is forwarded. It then **canonicalises** the query (fixed key order, sorted values and `HelpWith` terms, defaults and keys it doesn't forward dropped) and redirects to the canonical URL when it differs, so equivalent searches share one cache entry. It **forwards** the query as a form POST for a batch of 480 results, or for every result when there is no location, with `page` counting batches (map spec §4.4). It returns UKCP's HTML byte for byte, never decoded, since decoding the 8.5 MB of the largest search would take most of a request's 10 ms of CPU, as `text/plain` with `X-Content-Type-Options: nosniff` so it can never render as a page on our origin. The front end parses it (§5).
 
 A search without a location is kept for 6 hours. Asking UKCP for all of it is the heaviest request the site makes, and the order a visitor sees comes from the browser (§4.1), so the entry's age decides only how soon a therapist who joins UKCP appears.
 
-The contact route answers only requests from the site's own pages (a matching `Origin`), so other sites cannot make their visitors' browsers request contact details from UKCP.
+The contact route refuses requests that the browser marks as coming from another site (`Sec-Fetch-Site`), so other sites cannot make their visitors' browsers request contact details from UKCP.
 
 Caching uses Workers Caching (`cache.enabled` in the Wrangler config, `Cache-Control: public, max-age=…` on responses). It keys by path and query and collapses concurrent misses, and it works on `workers.dev`. Entries outlive a deploy (`cache.cross_version_cache`), since the Worker's answers rarely change between deploys: a change that alters them reaches a cached URL only as its entry expires, within an hour for searches and profiles. A route whose answers are kept longer carries a version in its query instead, raised when they change.
 
