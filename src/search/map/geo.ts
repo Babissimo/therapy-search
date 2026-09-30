@@ -9,6 +9,14 @@ type Found = Extract<PlaceLookup, { found: true }>;
 export const METRES_PER_MILE = 1609.344;
 /** The whole UK, where the map starts until a search is framed. */
 export const UK_VIEW = { centre: [54.5, -3] as [number, number], zoom: 5 };
+/**
+ * Scilly and Jersey to Shetland, Fermanagh to Lowestoft. The margin lets a place at the edge sit clear of the map's,
+ * and in the north clear of the search box over the top of it.
+ */
+export const UK_BOUNDS: [[number, number], [number, number]] = [
+  [49, -9],
+  [61.5, 2.5],
+];
 const EARTH_RADIUS_MILES = 3958.8;
 /** A smaller move, however far in the map is zoomed, would search much the same place. */
 const LEAST_MOVE_MILES = 0.5;

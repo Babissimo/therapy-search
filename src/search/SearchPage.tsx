@@ -226,6 +226,7 @@ function SearchView({ params, onChange, wide }: ViewProps) {
                     setFiltersOpen(false);
                     return true;
                   }}
+                  outsideUK={params.flags.LocationSearchOutsideUK}
                 />
               </Suspense>
             ) : (

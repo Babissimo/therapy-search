@@ -1,11 +1,21 @@
 // @vitest-environment jsdom
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import type L from "leaflet";
+import L from "leaflet";
 import { createRef } from "react";
+import { useMapEvents } from "react-leaflet";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { Map, MapMarker, MapMarkerClusterGroup, MapZoomControl, elementIcon, markerData, tileSource } from "./map";
+import { Map, MapBounds, MapMarker, MapMarkerClusterGroup, MapTileLayer, MapZoomControl, elementIcon, markerData, tileSource } from "./map";
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
+
+/** jsdom lays nothing out, so every element reports the size given, which a test can change. */
+function sizeElements(size: { width: number; height: number }) {
+  vi.spyOn(Element.prototype, "clientWidth", "get").mockImplementation(() => size.width);
+  vi.spyOn(Element.prototype, "clientHeight", "get").mockImplementation(() => size.height);
+}
 
 describe("tileSource", () => {
   it("uses CARTO's light tiles when there is a key, and its dark tiles in the dark theme", () => {
@@ -20,6 +30,36 @@ describe("tileSource", () => {
     expect(tileSource(undefined).url).toBe("https://tile.openstreetmap.org/{z}/{x}/{y}.png");
     expect(tileSource("", true).url).toBe("https://tile.openstreetmap.org/{z}/{x}/{y}.png");
     expect(tileSource("").attribution).not.toContain("CARTO");
+  });
+});
+
+describe("MapTileLayer", () => {
+  /** The columns of tiles fetched, read from each tile's address, which ends `{x}/{y}.png`. */
+  const columns = (container: HTMLElement) =>
+    [...new Set([...container.querySelectorAll<HTMLImageElement>(".leaflet-tile")].map((tile) => Number(tile.src.split("/").at(-2))))].sort(
+      (a, b) => a - b,
+    );
+
+  it("fetches no tiles beyond its bounds, and all around once they are lifted", () => {
+    // At zoom 4 each column spans 22.5 degrees, so a view 1,000 pixels wide takes in columns 6 to 9.
+    sizeElements({ width: 1000, height: 600 });
+    const { container, rerender } = render(
+      <Map center={[0, 0]} zoom={4}>
+        <MapTileLayer
+          bounds={[
+            [-10, -10],
+            [10, 10],
+          ]}
+        />
+      </Map>,
+    );
+    expect(columns(container)).toEqual([7, 8]);
+    rerender(
+      <Map center={[0, 0]} zoom={4}>
+        <MapTileLayer />
+      </Map>,
+    );
+    expect(columns(container)).toEqual([6, 7, 8, 9]);
   });
 });
 
@@ -78,5 +118,109 @@ describe("Map", () => {
     const invalidate = vi.spyOn(map.current!, "invalidateSize");
     resized();
     expect(invalidate).toHaveBeenCalled();
+  });
+});
+
+describe("MapBounds", () => {
+  // Twenty degrees each way, which span 228 pixels at zoom 4 and 114 at zoom 3.
+  const AROUND: L.LatLngBoundsLiteral = [
+    [-10, -10],
+    [10, 10],
+  ];
+  // Leaflet holds the view within bounds to the nearest pixel; a fifth of a degree either side allows for it.
+  const toThePixel = (bounds: L.LatLngBoundsLiteral) => L.latLngBounds(bounds).pad(0.01);
+
+  it("keeps the view within its bounds", () => {
+    sizeElements({ width: 400, height: 200 });
+    const map = createRef<L.Map>();
+    render(
+      <Map ref={map} center={[0, 0]} zoom={6}>
+        <MapBounds bounds={AROUND} />
+      </Map>,
+    );
+    map.current!.setView([40, 40], 6, { animate: false });
+    expect(toThePixel(AROUND).contains(map.current!.getBounds())).toBe(true);
+  });
+
+  it("settles within its bounds at once, so nothing that listens afterwards hears the map move", async () => {
+    sizeElements({ width: 400, height: 200 });
+    const moved = vi.fn();
+    function Listener() {
+      useMapEvents({ moveend: moved });
+      return null;
+    }
+    const map = createRef<L.Map>();
+    render(
+      <Map ref={map} center={[12, 12]} zoom={5}>
+        <MapBounds bounds={AROUND} />
+        <Listener />
+      </Map>,
+    );
+    expect(toThePixel(AROUND).contains(map.current!.getBounds())).toBe(true);
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    expect(moved).not.toHaveBeenCalled();
+  });
+
+  it("zooms out no further than shows its bounds whole, zooming in when its container grows", () => {
+    const size = { width: 400, height: 400 };
+    sizeElements(size);
+    const map = createRef<L.Map>();
+    render(
+      <Map ref={map} center={[0, 0]} zoom={6}>
+        <MapBounds bounds={AROUND} />
+      </Map>,
+    );
+    expect(map.current!.getMinZoom()).toBe(4);
+    size.height = 200;
+    map.current!.invalidateSize();
+    expect(map.current!.getMinZoom()).toBe(3);
+    map.current!.setZoom(3, { animate: false });
+    size.height = 400;
+    map.current!.invalidateSize();
+    expect(map.current!.getMinZoom()).toBe(4);
+    expect(map.current!.getZoom()).toBe(4);
+  });
+
+  it("disables zooming out at the furthest, though the furthest was set before the control listened", () => {
+    sizeElements({ width: 400, height: 200 });
+    render(
+      <Map center={[0, 0]} zoom={3}>
+        <MapBounds bounds={AROUND} />
+        <MapZoomControl />
+      </Map>,
+    );
+    expect(screen.getByRole<HTMLButtonElement>("button", { name: "Zoom out" }).disabled).toBe(true);
+    expect(screen.getByRole<HTMLButtonElement>("button", { name: "Zoom in" }).disabled).toBe(false);
+  });
+
+  it("zooms out no further than the map's own minimum, when that is higher", () => {
+    sizeElements({ width: 400, height: 200 });
+    const map = createRef<L.Map>();
+    render(
+      <Map ref={map} center={[0, 0]} zoom={6} minZoom={4}>
+        <MapBounds bounds={AROUND} />
+      </Map>,
+    );
+    expect(map.current!.getMinZoom()).toBe(4);
+  });
+
+  it("lets the map roam as it did once its bounds are lifted", () => {
+    sizeElements({ width: 400, height: 200 });
+    const map = createRef<L.Map>();
+    const { rerender } = render(
+      <Map ref={map} center={[0, 0]} zoom={6} minZoom={1}>
+        <MapBounds bounds={AROUND} />
+      </Map>,
+    );
+    rerender(
+      <Map ref={map} center={[0, 0]} zoom={6} minZoom={1}>
+        <MapBounds />
+      </Map>,
+    );
+    expect(map.current!.getMinZoom()).toBe(1);
+    expect(map.current!.options.maxBoundsViscosity).toBe(0);
+    map.current!.setView([40, 40], 6, { animate: false });
+    expect(map.current!.getCenter().lat).toBeCloseTo(40);
+    expect(map.current!.getCenter().lng).toBeCloseTo(40);
   });
 });
