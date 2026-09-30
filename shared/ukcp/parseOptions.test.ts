@@ -20,6 +20,11 @@ describe("parseOptions", () => {
     expect(options.groups.every((g) => g.label !== "" && g.help !== undefined)).toBe(true);
   });
 
+  it("drops the sentence leading into a help note's link, which a tooltip can't carry", () => {
+    const colleges = options.groups.find((g) => g.label === "UKCP Colleges");
+    expect(colleges?.help).toMatch(/you can filter results by College\.$/);
+  });
+
   it("pairs each checkbox's value with its visible label", () => {
     const session = options.groups.find((g) => g.fields[0]?.name === "TypesOfSession");
     expect(session?.fields).toContainEqual({ name: "TypesOfSession", value: "Online Therapy", label: "Online Therapy" });
