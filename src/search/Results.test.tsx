@@ -322,10 +322,12 @@ describe("Results", () => {
     expect(document.activeElement).toBe(screen.getByRole("link", { name: "Therapist 2-0" }));
   });
 
-  it("offers UKCP's own search when the first page fails", async () => {
+  it("offers UKCP's own search in a new tab when the first page fails", async () => {
     answerBatches({ fail: 1 });
     renderResults(leeds);
-    expect((await screen.findByRole("link", { name: "Search on UKCP" })).getAttribute("href")).toContain("Location=Leeds");
+    const link = await screen.findByRole("link", { name: "Search on UKCP" });
+    expect(link.getAttribute("href")).toContain("Location=Leeds");
+    expect(link.getAttribute("target")).toBe("_blank");
   });
 
   it("starts again from the nearest page when the search changes", async () => {

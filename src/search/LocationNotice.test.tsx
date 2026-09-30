@@ -16,11 +16,11 @@ describe("locationFellBack", () => {
 });
 
 describe("LocationNotice", () => {
-  it("warns when UKCP didn't recognise the place", () => {
+  it("warns when UKCP didn't recognise the place, marked as a notice", () => {
     render(<LocationNotice typed=" Brightn " searched="United Kingdom" />);
-    expect(screen.getByRole("alert").textContent).toBe(
-      `UKCP didn't recognise "Brightn", so these results are from across the UK. Try a town or a postcode.`,
-    );
+    const alert = screen.getByRole("alert");
+    expect(alert.textContent).toBe(`UKCP didn't recognise "Brightn", so these results are from across the UK. Try a town or a postcode.`);
+    expect(alert.querySelector("svg")?.classList.contains("lucide-info")).toBe(true);
   });
 
   it("names the place UKCP searched otherwise", () => {
