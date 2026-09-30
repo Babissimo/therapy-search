@@ -1043,11 +1043,12 @@ describe("SearchPage online", () => {
     expect(within(screen.getByRole("tabpanel", { name: /^Shortlist/ })).getByText("Online Therapy").outerHTML).toBe(inResults);
   });
 
-  it("keeps its filters open beside the list on wide screens, offering only video and phone among the session types and no wheelchair access", async () => {
+  it("keeps its filters open to the right of the list on wide screens, offering only video and phone among the session types and no wheelchair access", async () => {
     screenIs(true);
     renderAt(GREEK);
     await loaded();
     expect(screen.queryByRole("button", { name: "Filters" })).toBeNull();
+    expect(results().compareDocumentPosition(filters()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     fireEvent.click(within(filters()).getByRole("button", { name: /^Type of Session/ }));
     expect(within(filters()).queryByRole("checkbox", { name: "Face to Face - Long Term" })).toBeNull();
     fireEvent.click(within(filters()).getByRole("button", { name: /^Additional Filters/ }));
