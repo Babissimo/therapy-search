@@ -51,6 +51,12 @@
     --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+@theme {
+    /* The measure for long reading: about 70 letters of the profile's 17px text. In rems, since a ch is Atkinson's broad
+       zero and 65ch would run to 94. */
+    --container-reading: 35rem;
+}
+
 :root {
     color-scheme: light;
     /* Slate teal on faintly warm whites, with greys drawn a little towards the slate; amber marks the one thing picked
