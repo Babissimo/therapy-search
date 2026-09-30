@@ -59,6 +59,13 @@ describe("CheckboxGroup", () => {
       screen.getByRole("checkbox", { name: "Person Centred Psychotherapist" });
     });
 
+    it("says what a heading's titles have in common once it is opened", () => {
+      render(<CheckboxGroup group={types} searchable={false} isChecked={() => false} onToggle={() => {}} />);
+      expect(screen.queryByText(/expert on your own life/)).toBeNull();
+      fireEvent.click(screen.getByRole("button", { name: "Humanistic and integrative" }));
+      screen.getByText(/expert on your own life/);
+    });
+
     it("scrolls its headings in a box of their own, beneath the search box", () => {
       render(<CheckboxGroup group={types} searchable isChecked={() => false} onToggle={() => {}} />);
       const box = screen.getByRole("button", { name: "Children and young people" }).closest(".overflow-y-auto");
