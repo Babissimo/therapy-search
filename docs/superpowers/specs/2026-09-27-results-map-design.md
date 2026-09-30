@@ -10,7 +10,7 @@ In scope:
 
 - A map-centred search page: the results in a collapsible panel on wide screens and a bottom sheet on narrow ones, with the search and filters over the map (§4.1–4.5)
 - One list of results that grows with "Load more" and that the map mirrors (§4.4)
-- Therapist pins, clusters, the circle the list reaches and zoom (§4.6–4.7)
+- Therapist pins, clusters, the search's centre and zoom (§4.6–4.7)
 - A notice when UKCP doesn't recognise the typed location (§4.9)
 - A prompt in place of a search of everyone (§4.10), and profiles in a drawer over the search (§4.11)
 - A place-lookup route on the Worker (§5)
@@ -55,11 +55,11 @@ A postcode or outcode has one answer. A place name can match several places ("Br
 
 Choosing in the browser keeps each string's cached answer independent of the search it appeared in.
 
-A place-name pin further from the centre than twice the 30 miles searched (§4.5) plus 5 miles is treated as unplaced (§4.8) rather than shown where the therapist probably isn't. Postcodes and outcodes are unambiguous, so they are shown wherever they fall, outside the circle included.
+A place-name pin further from the centre than twice the 30 miles searched (§4.5) plus 5 miles is treated as unplaced (§4.8) rather than shown where the therapist probably isn't. Postcodes and outcodes are unambiguous, so they are shown wherever they fall.
 
 ### 3.3 The search centre
 
-The circle is centred on UKCP's "Location searched" (parity §3.3) rather than the typed text, since that is the point UKCP measured distances from. A place name there goes to Nominatim, whose ranking by prominence puts Brighton the city first; a postcode or outcode goes to postcodes.io as in §3.1. There is no centre when the search has no location or UKCP fell back to "United Kingdom" (§4.9).
+The centre is UKCP's "Location searched" (parity §3.3) rather than the typed text, since that is the point UKCP measured distances from. A place name there goes to Nominatim, whose ranking by prominence puts Brighton the city first; a postcode or outcode goes to postcodes.io as in §3.1. There is no centre when the search has no location or UKCP fell back to "United Kingdom" (§4.9).
 
 For outside-UK searches (`LocationSearchOutsideUK`), which postcodes.io cannot answer, every place name goes to Nominatim without its UK restriction, card locations included, though not the shortlist's (§4.6).
 
@@ -103,7 +103,7 @@ For outside-UK searches (`LocationSearchOutsideUK`), which postcodes.io cannot a
 - Inside the location box's right end, where the browser offers geolocation, sits a "Use my location" icon button. It asks the browser for a position up to five minutes old, looks up the nearest postcode (§5.1) and searches that with the typed keyword, putting the postcode in the box. A refusal, a failure or no UK postcode within 2 km shows a one-line reason beneath the box until the next attempt or keystroke. On narrow screens the chips form one row that scrolls sideways.
 - On wide screens "Filters" opens the filter panel beneath the search box, floating over the map and scrolling within itself, with its "Refine your search" heading and close button on one line. It is open on arrival at the prompt (§4.10), which has no map for it to cover, unless the shortlist is beside the prompt, which would leave the prompt too little room; it is closed on arrival at a search. A search for a place, typed in the location box or located, puts it away to show where the results are; ticks and the keyword leave it open for more. On narrow screens it opens the existing "Refine your search" sheet, which is always closed on arrival.
 - The filter panel keeps everything but the location box: "Clear all filters" (§4.10), keyword and the option groups. "Search locations outside the UK", which UKCP sets beside its location box, is the last box in Additional Filters, whose help gains a line on it, and counts among that group's ticks. It changes how the location is read rather than narrowing the results, so, as with "Clear all filters" keeping it (§4.10), it makes no chip and the Filters button's count leaves it out. The location and keyword share one draft, so any change submits whatever is typed in either, as the filter panel does today.
-- Every location search reaches 30 miles, the furthest UKCP's form offers, and links to UKCP's own page ask for the same. There is no distance setting, and a `Distance` in an old link is ignored: results come nearest first, so the reach only lengthens the list, and the circle shows how far it goes (§4.7).
+- Every location search reaches 30 miles, the furthest UKCP's form offers, and links to UKCP's own page ask for the same. There is no distance setting, and a `Distance` in an old link is ignored: results come nearest first, so the reach only lengthens the list, and the list's opening line says how far it goes (§4.4).
 
 ### 4.6 Pins and clusters
 
@@ -116,10 +116,11 @@ For outside-UK searches (`LocationSearchOutsideUK`), which postcodes.io cannot a
 - While the Shortlist tab is open beside a search, the map shows the shortlist in place of the results: a pin for each shortlisted therapist it can place, drawn and stacked as above. A shortlist gathers therapists from any search, so their places are chosen as though there were no centre (§3.2), and none is set aside as too far from it. They are read as UK places whatever the search, since an overseas reading with no centre to choose by could put a UK therapist abroad. Their places are looked up only once the map shows them. A therapist taken off the shortlist loses their pin, though their card stays to put them back (parity §4.4). Hovering a shortlisted card highlights its pin, and selecting a pin marks the card of everyone at it in the shortlist, which stays open. The shortlist's opening line adds how many the map can't place, as the results' does (§4.4).
 - The open list is the complete accessible alternative; the map has the label "Map of results", or "Map of your shortlist" while it shows the shortlist.
 
-### 4.7 Circle, zoom and fit
+### 4.7 Centre, zoom and fit
 
-- The circle is centred on the search centre and reaches the furthest of UKCP's distances among the loaded cards, the figure the list's opening line gives (§4.4). UKCP measures to each therapist's address and lists them nearest first, so the circle grows with every "Load more" that reaches further. A pin marks only the district or town a card lists, so it can sit a mile or two either side of the edge. A card showing an office other than the one UKCP measured to carries no distance, and its pin can fall well outside. The circle is drawn once a loaded card is further than 0 miles, in blue, which shows on light and dark tiles alike. It measures the results alone, so the shortlist's map (§4.6) has none.
-- The map frames that circle and every placed pin once a search's first page is placed, or the whole 30 miles searched when nothing lies beyond the centre (no card has a distance, or every card is 0 miles away and none is placed), and frames them again whenever "Load more" places pins beyond those already framed or the circle reaches further. Without a centre it frames the placed pins. The frame is padded clear of the search box and zooms no closer than level 14. A view restored on Back (§4.4) is kept until pins or a circle arrive beyond those it took in. Opening the Shortlist tab frames the shortlist's placed pins alone, and opening the Results tab again frames the results afresh.
+- A blue pin, which shows on light and dark tiles alike, marks the search centre (§3.3) on the results' map. It stands above the therapists' pins, which often share its point, but beneath a hovered or selected one, and takes no clicks.
+- No circle shows how far the list reaches; its opening line says so (§4.4). UKCP measures to each therapist's full address, but most cards give only a postcode district, whose pin sits at the district's middle, so pins would sit outside a circle drawn to UKCP's miles until the list reached past a district's width: in Brighton, 446 of the first 480 cards give only a district, and their pins lie 1.5 to 1.9 miles out while the first 150 cards reach 1.5 miles.
+- The map frames the centre and every placed pin once a search's first page is placed, or the whole 30 miles searched when no pin is placed, and frames them again whenever "Load more" places further pins. Without a centre it frames the placed pins. The frame is padded clear of the search box and zooms no closer than level 14. A view restored on Back (§4.4) is kept until pins arrive beyond those it took in. Opening the Shortlist tab frames the shortlist's placed pins alone, and opening the Results tab again frames the results afresh.
 - A search opened from a link or a reload draws no tiles until its first frame, or until it turns out to have nothing to frame, and jumps to that frame rather than animating, so a search that frames its results never fetches the UK overview's tiles first (§6). A view restored on Back loads its tiles at once.
 - shadcn-map's zoom control sits bottom right on wide screens. Narrow screens rely on pinch zoom, since the sheet covers the bottom of the map.
 
@@ -186,7 +187,7 @@ type NearestLookup = { found: true; postcode: string } | { found: false };
 
 ## 6. Map component
 
-- `src/components/ui/map.tsx` is vendored from shadcn-map (`https://shadcn-map.vercel.app/r/map.json`), keeping only `Map`, `MapTileLayer`, `MapMarker`, `MapTooltip`, `MapMarkerClusterGroup`, `MapCircle` and `MapZoomControl`. Its drawing, fullscreen, layers, search and locate controls go, with the dependencies only they need (`leaflet-draw`, `leaflet.fullscreen`, the place-autocomplete registry item), as does `next-themes`, since the app has its own theme switch, and the lazy-loading wrappers it has for server rendering, since the map pane is already its own chunk (§4.1). Pin and cluster icons are plain DOM elements rather than rendered React, because Leaflet creates and discards them itself as clusters change.
+- `src/components/ui/map.tsx` is vendored from shadcn-map (`https://shadcn-map.vercel.app/r/map.json`), keeping only `Map`, `MapTileLayer`, `MapMarker`, `MapTooltip`, `MapMarkerClusterGroup` and `MapZoomControl`. Its drawing, fullscreen, layers, search and locate controls go, with the dependencies only they need (`leaflet-draw`, `leaflet.fullscreen`, the place-autocomplete registry item), as does `next-themes`, since the app has its own theme switch, and the lazy-loading wrappers it has for server rendering, since the map pane is already its own chunk (§4.1). Pin and cluster icons are plain DOM elements rather than rendered React, because Leaflet creates and discards them itself as clusters change.
 - Dependencies: `leaflet` 1.9, `react-leaflet` 5 and `leaflet.markercluster` 1.5. For the cluster wrapper we use `react-leaflet-cluster` 4, which is stable on React 19, rather than shadcn-map's `react-leaflet-markercluster`, whose React 19 version is still a release candidate.
 - Tiles are CARTO's `light_all`, or `dark_all` while `<html>` has the theme switch's `dark` class, swapping live when the theme changes. The key is read at build time from `VITE_CARTO_KEY`, which the deploy job sets from a `CARTO_KEY` Actions variable; it ships in the page, so it is a variable rather than a secret. Without a key, as in local development and CI's check job, the map uses OpenStreetMap's standard tiles in both themes.
 
@@ -194,9 +195,9 @@ type NearestLookup = { found: true; postcode: string } | { found: false };
 
 | Condition | UI |
 |---|---|
-| The first page fails | The list's message (parity §6) in the panel or sheet; the map shows neither pins nor circle, since the centre comes from that page |
+| The first page fails | The list's message (parity §6) in the panel or sheet; the map shows no pins and no centre, which comes from that page |
 | "Load more" fails | The same message above the button beneath the list, which now reads "Try again"; loaded results stay |
-| The centre lookup fails | No circle; the map fits the pins, and place names are chosen as if there were no centre (§3.2) |
+| The centre lookup fails | No centre pin; the map fits the pins, and place names are chosen as if there were no centre (§3.2) |
 | A pin's lookup fails | Unplaced, with the "just now" reason (§4.8) |
 | Tiles fail to load | Leaflet's blank background; pins and clusters still work |
 
@@ -205,8 +206,8 @@ type NearestLookup = { found: true; postcode: string } | { found: false };
 - **Location text:** unit tests of classification and canonicalisation covering every row of §3.1, including the live strings in §2.
 - **Worker route:** Vitest calling the Hono app with a stub `fetch` for postcodes.io and Nominatim and a fake rate limiter. Cases: each kind, the fallback chain, the canonical redirect, `Cache-Control` for found and not found, `502` on upstream failure, `429`, and `countrycodes` dropped outside the UK.
 - **Pin logic:** unit tests of candidate choice with and without a centre, the plausibility cut, grouping pins that share a point, remote-only detection, the reach line and the unplaced reasons.
-- **Components:** the prompt asks UKCP for nothing and shows no map; "Load more" appends a page, stays outside the scrolling list, and the URL gains no `page`; a new search starts again at the first page; the panel collapses and reopens; the sheet's buttons move it between positions; therapists sharing a pin are listed together under their place, which the pin's selection marks and scrolls into view; hovering a card reaches the map as a highlighted pin; the circle reaches the furthest of UKCP's distances and the frame grows with "Load more" to take in pins beyond it; a profile opens in a drawer over the search and closing it returns to the search unchanged; Back restores the list's scroll; the tiles follow the `dark` class; the unrecognised-location alert. Leaflet is mocked under jsdom.
-- **Manual:** a pass in the browser against the dev server for what jsdom can't show: pins, cluster zoom versus selection, the circle and the fit, the refit on "Load more", the pin rings and halo in both themes, the panel resizing the map, the sheet's positions and drag on a narrow viewport, the drawer, and dark tiles.
+- **Components:** the prompt asks UKCP for nothing and shows no map; "Load more" appends a page, stays outside the scrolling list, and the URL gains no `page`; a new search starts again at the first page; the panel collapses and reopens; the sheet's buttons move it between positions; therapists sharing a pin are listed together under their place, which the pin's selection marks and scrolls into view; hovering a card reaches the map as a highlighted pin; the centre is marked and the frame grows with "Load more" to take in further pins; a profile opens in a drawer over the search and closing it returns to the search unchanged; Back restores the list's scroll; the tiles follow the `dark` class; the unrecognised-location alert. Leaflet is mocked under jsdom.
+- **Manual:** a pass in the browser against the dev server for what jsdom can't show: pins, cluster zoom versus selection, the centre pin and the fit, the refit on "Load more", the pin rings and halo in both themes, the panel resizing the map, the sheet's positions and drag on a narrow viewport, the drawer, and dark tiles.
 
 ## 9. Delivery
 
@@ -217,8 +218,8 @@ One pull request, whose commits build it in this order:
 3. The results list with "Load more" in place of page numbers (§4.4), before any map.
 4. The map components: the vendored `map.tsx` and its dependencies.
 5. The fixed 30-mile search (§4.5).
-6. The map-centred page: its layout, the results panel and sheet, the search and filters over the map, and the map pane with its circle, fit, themed tiles and attribution.
-7. The pins: pins, stacked pins, clusters, selection, card highlighting, the circle they reach, the unplaced lines and the about text's data sources.
+6. The map-centred page: its layout, the results panel and sheet, the search and filters over the map, and the map pane with its fit, themed tiles and attribution.
+7. The pins: pins, stacked pins, clusters, selection, card highlighting, the unplaced lines and the about text's data sources.
 8. The prompt (§4.10).
 9. The profile drawer (§4.11).
 

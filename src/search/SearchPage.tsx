@@ -22,7 +22,6 @@ import { LoadMore } from "./LoadMore";
 import { ModeSwitch } from "./ModeSwitch";
 import { ONLINE_PATH, onlineParams } from "./online";
 import { OnlineView } from "./OnlineView";
-import { reachMiles } from "./reach";
 import { Results } from "./Results";
 import { ResultsPanel } from "./ResultsPanel";
 import { coverOf, ResultsSheet, type SheetPosition } from "./ResultsSheet";
@@ -45,7 +44,7 @@ const NO_CENTRE = { settled: true };
 const REVEAL_GAP_PX = 8;
 
 /** What the map shows of the list that is open. */
-type MapView = Pick<MapPaneProps, "label" | "fitKey" | "centre" | "reachMiles" | "centreSettled" | "pins" | "placing">;
+type MapView = Pick<MapPaneProps, "label" | "fitKey" | "centre" | "centreSettled" | "pins" | "placing">;
 
 export function SearchPage() {
   const { params, error, update } = useSearchState();
@@ -91,8 +90,7 @@ function SearchView({ params, onChange, wide }: ViewProps) {
   // Kept by key, so a new search shows its results whichever tab was open.
   const [tabChoice, setTabChoice] = useState<{ fitKey: string; tab: ListTab }>();
   const tab = tabChoice?.fitKey === fitKey ? tabChoice.tab : searching ? "results" : "shortlist";
-  // Beside a search, the map shows whichever list is open, framing each afresh as its tab opens. The circle measures the
-  // results alone.
+  // Beside a search, the map shows whichever list is open, framing each afresh as its tab opens.
   const mapsShortlist = searching && tab === "shortlist";
   const shortlisted = useShortlistIf(mapsShortlist).map((entry) => entry.card);
   // A shortlist gathers therapists from any search, so their places are read with no centre to choose by or be too far
@@ -100,7 +98,7 @@ function SearchView({ params, onChange, wide }: ViewProps) {
   const shortlistPins = usePins(shortlisted, NO_CENTRE, false);
   const mapView: MapView = mapsShortlist
     ? { label: "Map of your shortlist", fitKey: `${fitKey} shortlist`, centreSettled: true, pins: shortlistPins.pins, placing: shortlistPins.placing }
-    : { label: "Map of results", fitKey, centre: centre.point, reachMiles: reachMiles(results.therapists), centreSettled, pins, placing };
+    : { label: "Map of results", fitKey, centre: centre.point, centreSettled, pins, placing };
   // Kept by key, so the selection follows its pin as Load more adds to it; a new search clears it.
   const [selection, setSelection] = useState<{ fitKey: string; pinKey: string }>();
   const selected = selection?.fitKey === fitKey ? mapView.pins.find((pin) => pin.key === selection.pinKey) : undefined;

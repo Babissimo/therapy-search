@@ -29,7 +29,6 @@ vi.mock("./map/MapPane", async () => {
   type Props = {
     label: string;
     fitKey: string;
-    reachMiles?: number;
     centreSettled: boolean;
     pins: Pin[];
     highlight: Highlight;
@@ -40,7 +39,7 @@ vi.mock("./map/MapPane", async () => {
     coveredBelow?: (height: number) => number;
   };
   return {
-    default: ({ label, fitKey, reachMiles, centreSettled, pins, highlight, selected, onSelect, onSearchArea, outsideUK, coveredBelow }: Props) => {
+    default: ({ label, fitKey, centreSettled, pins, highlight, selected, onSelect, onSearchArea, outsideUK, coveredBelow }: Props) => {
       const slug = useSyncExternalStore(highlight.subscribe, highlight.get);
       return createElement(
         "div",
@@ -49,7 +48,6 @@ vi.mock("./map/MapPane", async () => {
           "aria-label": label,
           "data-testid": "map",
           "data-fit-key": fitKey,
-          "data-reach": reachMiles ?? "",
           "data-settled": String(centreSettled),
           "data-highlighted": slug ?? "",
           "data-selected": selected?.key ?? "",
@@ -664,19 +662,17 @@ describe("SearchPage", () => {
     await loaded();
   });
 
-  it("maps the shortlist alone while its tab is open, framed apart from the results and with no circle", async () => {
+  it("maps the shortlist alone while its tab is open, framed apart from the results", async () => {
     screenIs(true);
     placeByDistrict();
     shortlist.add(therapist("c", "Hove BN3"));
-    renderAt(SEARCH, [therapist("a", "BRIGHTON BN1"), { ...therapist("b", "Hove BN3"), distance: "2 miles from Leeds" }]);
+    renderAt(SEARCH, [therapist("a", "BRIGHTON BN1"), therapist("b", "Hove BN3")]);
     await waitFor(() => expect(mapPins()).toEqual([`Pin ${key(BRIGHTON)}: a`, `Pin ${key(HOVE)}: b`]));
     const framed = map().dataset.fitKey;
-    expect(map().dataset.reach).toBe("2");
     expect(screen.getByRole("region", { name: "Map of results" })).toBe(map());
     pick(/^Shortlist/);
     await waitFor(() => expect(mapPins()).toEqual([`Pin ${key(HOVE)}: c`]));
     expect(map().dataset.fitKey).not.toBe(framed);
-    expect(map().dataset.reach).toBe("");
     expect(screen.getByRole("region", { name: "Map of your shortlist" })).toBe(map());
     pick("Results");
     expect(mapPins()).toEqual([`Pin ${key(BRIGHTON)}: a`, `Pin ${key(HOVE)}: b`]);

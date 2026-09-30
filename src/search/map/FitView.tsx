@@ -4,12 +4,11 @@ import { useMap } from "react-leaflet";
 import { SEARCH_MILES } from "@shared/query";
 import { METRES_PER_MILE, type Point } from "./geo";
 
-/** A search's view, with how many pins and how far a circle it took in. */
-export type Framed = { fitKey: string; pins: number; reach?: number };
+/** A search's view, with how many pins it took in. */
+export type Framed = { fitKey: string; pins: number };
 type Props = {
   fitKey: string;
   centre?: Point;
-  reachMiles?: number;
   points: Point[];
   waiting: boolean;
   restored?: Framed;
@@ -29,22 +28,20 @@ const LEAST_ROOM = 128;
 const MAX_ZOOM = 14;
 
 /**
- * Frames each search as its first page is placed, and again whenever Load more places further pins or the circle
- * reaches further: around the circle and every pin, or the whole area searched when nothing lies beyond the centre.
- * With no centre it frames the pins alone. A view restored on Back is left as it was until pins or a circle arrive
- * beyond those it had.
+ * Frames each search as its first page is placed, and again whenever Load more places further pins: around the centre
+ * and every pin, or the whole area searched when no pin is placed. With no centre it frames the pins alone. A view
+ * restored on Back is left as it was until pins arrive beyond those it had.
  * `onFramed` hears when the view is where the search puts it, or that there is nothing to frame.
  */
-export function FitView({ fitKey, centre, reachMiles, points, waiting, restored, instant, coveredBelow, onFramed }: Props) {
+export function FitView({ fitKey, centre, points, waiting, restored, instant, coveredBelow, onFramed }: Props) {
   const map = useMap();
   const framed = useRef(restored);
   useEffect(() => {
     const last = framed.current;
-    const taken = last?.fitKey === fitKey && points.length <= last.pins && (reachMiles ?? 0) <= (last.reach ?? 0);
+    const taken = last?.fitKey === fitKey && points.length <= last.pins;
     if (waiting || taken) return;
     const bounds = L.latLngBounds(points.map((p) => [p.lat, p.lng]));
-    const miles = reachMiles !== undefined && (reachMiles > 0 || points.length > 0) ? reachMiles : SEARCH_MILES;
-    if (centre) bounds.extend(L.latLng(centre).toBounds(2 * miles * METRES_PER_MILE));
+    if (centre) bounds.extend(points.length > 0 ? L.latLng(centre) : L.latLng(centre).toBounds(2 * SEARCH_MILES * METRES_PER_MILE));
     const height = map.getSize().y;
     const covered = Math.max(0, Math.min(coveredBelow?.(height) ?? 0, height - TOP_LEFT[1] - MARGIN - LEAST_ROOM));
     const options: L.FitBoundsOptions = { paddingTopLeft: TOP_LEFT, paddingBottomRight: [MARGIN, MARGIN + covered], maxZoom: MAX_ZOOM };
@@ -57,7 +54,7 @@ export function FitView({ fitKey, centre, reachMiles, points, waiting, restored,
     // Leaflet ends every fit with a moveend, at once or when an animation comes to rest, even when the view stays put.
     if (onFramed) map.once("moveend", onFramed);
     map.fitBounds(bounds, options);
-    framed.current = { fitKey, pins: points.length, reach: reachMiles };
-  }, [map, fitKey, centre, reachMiles, points, waiting, instant, coveredBelow, onFramed]);
+    framed.current = { fitKey, pins: points.length };
+  }, [map, fitKey, centre, points, waiting, instant, coveredBelow, onFramed]);
   return null;
 }

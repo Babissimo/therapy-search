@@ -16,7 +16,7 @@ const CENTRE: [number, number] = [27, 33];
 const CENTRE_SVG =
   '<svg xmlns="http://www.w3.org/2000/svg" viewBox="3 1 18 22" class="size-full drop-shadow-sm"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0" class="fill-sky-500 stroke-background" stroke-width="1.5"/><circle cx="12" cy="10" r="3" class="fill-background"/></svg>';
 
-/** Where the search is centred: blue like the circle around it, and a pin rather than an avatar, so it reads as no therapist. */
+/** Where the search is centred: blue, which shows on light and dark tiles alike, and a pin rather than an avatar, so it reads as no therapist. */
 export function centreIcon(): DivIcon {
   const pin = element("span", "block size-full");
   pin.setAttribute("aria-hidden", "true");

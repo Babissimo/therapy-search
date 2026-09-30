@@ -18,7 +18,6 @@ vi.mock("@/components/ui/map", async () => {
     MapTileLayer: ({ bounds }: { bounds?: unknown }) => createElement("div", { "data-testid": "tiles", "data-bounds": JSON.stringify(bounds ?? null) }),
     MapBounds: ({ bounds }: { bounds?: unknown }) => createElement("div", { "data-testid": "bounds", "data-bounds": JSON.stringify(bounds ?? null) }),
     MapZoomControl: () => null,
-    MapCircle: ({ radius }: { radius: number }) => createElement("div", { "data-testid": "circle", "data-radius": radius }),
     MapMarkerClusterGroup: ({ children }: { children?: unknown }) => createElement(Fragment, null, children as never),
     MapMarker: ({
       position,
@@ -53,7 +52,7 @@ vi.mock("./FitView", async () => {
       coveredBelow,
       onFramed,
     }: {
-      restored?: { fitKey: string; pins: number; reach?: number };
+      restored?: { fitKey: string; pins: number };
       instant?: boolean;
       coveredBelow?: (height: number) => number;
       onFramed?: () => void;
@@ -63,7 +62,7 @@ vi.mock("./FitView", async () => {
         "data-testid": "fit",
         "data-instant": String(Boolean(instant)),
         "data-covered": coveredBelow?.(800) ?? "",
-        "data-restored": restored ? `${restored.fitKey} with ${restored.pins} pins${restored.reach === undefined ? "" : ` to ${restored.reach} miles`}` : "",
+        "data-restored": restored ? `${restored.fitKey} with ${restored.pins} pins` : "",
         onClick: onFramed,
       }),
   };
@@ -138,15 +137,9 @@ function pointerCanHover(hover: boolean) {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("MapPane", () => {
-  it("draws a circle around the centre out to the furthest of UKCP's distances, wherever the pins fall", () => {
-    const lewes = { ...pin("c"), point: { lat: 50.87, lng: 0.01 } };
-    renderPane({ fitKey: "Location=Brighton", centre: BRIGHTON, reachMiles: 0.4, pins: [pin("a", "b"), lewes] });
-    expect(Number(screen.getByTestId("circle").dataset.radius)).toBeCloseTo(0.4 * 1609.344);
+  it("marks the centre with a pin that takes no clicks", () => {
+    renderPane({ fitKey: "Location=Brighton", centre: BRIGHTON, pins: [pin("a")] });
     expect(screen.getByRole("region", { name: "Map of results" })).toBeTruthy();
-  });
-
-  it("marks the centre with a pin that takes no clicks, even before the circle is drawn", () => {
-    renderPane({ fitKey: "Location=Brighton", centre: BRIGHTON, reachMiles: 0, pins: [pin("a")] });
     expect(screen.getByTestId("static-marker").dataset.position).toBe("50.82,-0.14");
     cleanup();
     renderPane({ pins: [pin("a")] });
@@ -184,25 +177,14 @@ describe("MapPane", () => {
     expect(screen.getByTestId("search-area").dataset.covered).toBe("400");
   });
 
-  it("draws no circle without a centre, or before any card is further than 0 miles", () => {
-    renderPane({ reachMiles: 2, pins: [pin("a")] });
-    expect(screen.queryByTestId("circle")).toBeNull();
-    cleanup();
-    renderPane({ fitKey: "Location=Brighton", centre: BRIGHTON, pins: [pin("a")] });
-    expect(screen.queryByTestId("circle")).toBeNull();
-    cleanup();
-    renderPane({ fitKey: "Location=Brighton", centre: BRIGHTON, reachMiles: 0, pins: [pin("a")] });
-    expect(screen.queryByTestId("circle")).toBeNull();
-  });
-
-  it("remembers its view, pins and circle for the history entry, and opens there again for the same search", () => {
-    const { unmount } = renderPane({ fitKey: "Location=Leeds", entry: "remembered", reachMiles: 2, pins: [pin("a"), pin("b", "c")] });
+  it("remembers its view and pins for the history entry, and opens there again for the same search", () => {
+    const { unmount } = renderPane({ fitKey: "Location=Leeds", entry: "remembered", pins: [pin("a"), pin("b", "c")] });
     expect(screen.getByTestId("map").dataset.view).toBe("54.5,-3@5");
     moveend.current();
     unmount();
     renderPane({ fitKey: "Location=Leeds", entry: "remembered" });
     expect(screen.getByTestId("map").dataset.view).toBe("51.5,-0.12@11");
-    expect(screen.getByTestId("fit").dataset.restored).toBe("Location=Leeds with 2 pins to 2 miles");
+    expect(screen.getByTestId("fit").dataset.restored).toBe("Location=Leeds with 2 pins");
   });
 
   it("frames a different search afresh", () => {
