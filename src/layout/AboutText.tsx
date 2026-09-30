@@ -17,8 +17,15 @@ export function AboutText() {
         servers, and each visitor's requests are rate-limited.
       </p>
       <p>
-        No searches are logged. Your browser keeps your shortlist, your choice of light or dark theme if you pick one, and one random number
-        that holds results in the same order when you come back to a search. None of these is sent to this site or to UKCP.
+        Cloudflare, which hosts this site, records the address of each request along with your IP address, so your search is never put in
+        one: it travels inside the request, and sits after the # in the page's address, which your browser doesn't send. When this site has no
+        stored answer and asks OpenStreetMap about a place, or UKCP for a profile, Cloudflare records that request too, with the place or
+        profile in its address and your internet provider and country, but not your IP address. Therapists' photos load straight from UKCP,
+        so UKCP sees your IP address and whose photos are shown.
+      </p>
+      <p>
+        Your browser keeps your shortlist, your choice of light or dark theme if you pick one, and one random number that holds results in
+        the same order when you come back to a search. None of these is sent to this site or to UKCP.
       </p>
       <p>
         The map's tiles come from CARTO, with map data from OpenStreetMap contributors. Your browser fetches them directly, so CARTO sees the

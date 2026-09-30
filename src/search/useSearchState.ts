@@ -3,7 +3,7 @@ import { useSearchParams } from "react-router";
 import { ALLOWED } from "@shared/options";
 import { InvalidParam, readParams, toQuery, type SearchParams } from "@shared/query";
 
-/** The search lives in the page's query string, in UKCP's own parameter names. */
+/** The search lives in the query string after the page's `#`, in UKCP's own parameter names. */
 export function useSearchState() {
   const [query, setQuery] = useSearchParams();
   const key = query.toString();

@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
-import { BrowserRouter, Link, Route, Routes, useLocation, useParams } from "react-router";
+import { HashRouter, Link, Route, Routes, useLocation, useParams } from "react-router";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SiteLayout } from "@/layout/SiteLayout";
 import { ProfileDrawer } from "@/profile/ProfileDrawer";
@@ -18,9 +18,10 @@ export function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <BrowserRouter>
+        {/* Pages and searches live after the #, so a reload or a shared link never sends them (see fragmentAddress). */}
+        <HashRouter>
           <AppRoutes />
-        </BrowserRouter>
+        </HashRouter>
       </TooltipProvider>
     </QueryClientProvider>
   );

@@ -9,7 +9,7 @@ import { api } from "@/lib/api";
 import { listed } from "@/lib/listed.testing";
 import { createShortlistStore } from "@/shortlist/store";
 import { ShortlistContext } from "@/shortlist/useShortlist";
-import { AppRoutes } from "./App";
+import { App, AppRoutes } from "./App";
 
 // Leaflet draws nothing under jsdom; the map is tested on its own.
 vi.mock("@/search/map/MapPane", () => ({ default: () => null }));
@@ -47,6 +47,15 @@ beforeEach(() => {
 afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+});
+
+describe("App", () => {
+  it("reads the page from after the #, which the browser never sends to the server", () => {
+    window.history.replaceState(null, "", "/#/nowhere");
+    render(<App />);
+    expect(screen.getByText(/There's no page here/)).toBeTruthy();
+    window.history.replaceState(null, "", "/");
+  });
 });
 
 describe("AppRoutes", () => {
