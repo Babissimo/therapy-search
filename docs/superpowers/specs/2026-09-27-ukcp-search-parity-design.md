@@ -130,6 +130,8 @@ A profile's header stays at the top of the page or drawer as the visitor reads, 
 
 Beneath the header come the fees, named by office only where offices charge differently, and, for a profile opened from a search, the tags that search asked for, judged as the result cards judge them (map spec §4.4). Those tags are also marked with a tick wherever the profile lists them, languages included.
 
+Then come the sections read at length (My Approach, About Me, Special Interests and What I can help with) and the short rest, languages and the office cards among them. They are told apart by heading rather than length, so each sits in the same place on every profile. On a wide page the long sections take a wide column, under the matching tags, beside a narrow one of the short sections under the fees. Where there is less room, as in the drawer, the long sections run full width with the short ones and the office cards two to a line below them, and on a phone everything is one column. A profile without long sections gives the short ones the whole width.
+
 Each office card holds a still map centred on that office, the therapist's photo pinned as on the results map. It centres on the office's postcode; failing that, for the main office, on the place UKCP lists the therapist under, as the results map does; otherwise on the last line of its address, usually the town. An office that can't be placed has no map. The office's name links to UKCP's map link for it. The map is looked up through the place route (map spec §5) under the results map's own cache key, and Leaflet loads only once there is somewhere to show.
 
 | UKCP element | shadcn/ui |

@@ -12,8 +12,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api";
+import { cn } from "@/lib/utils";
 import { ContactList } from "./ContactList";
 import { useOfficePlace } from "./place";
+import { sectionsBySize } from "./sectionsBySize";
 import { matchingTags, useSearchMatch } from "./searchedTerms";
 
 const ProfileMap = lazy(() => import("./ProfileMap"));
@@ -80,8 +82,13 @@ export function ProfileBody({ slug, back, close }: { slug: string } & Exits) {
 
   const matches = matchingTags(profile, isMatch);
   const priced = profile.offices.filter((office) => office.cost);
-  const languages: ProfileSection = { heading: "Languages", paragraphs: [], items: profile.languages, details: [] };
-  const aside = profile.languages.length > 0 ? [languages, ...profile.practical] : profile.practical;
+  const { long, short } = sectionsBySize(profile);
+  const hasMatches = matches.length > 0;
+  const hasFees = priced.length > 0;
+  // A wide page puts the long sections, under the matches, in a wide column beside the short ones, under the fees; a
+  // column without its head starts at the top. With no long sections the short ones keep the whole width.
+  const besideLong = long.length > 0;
+  const below = (headed: boolean) => (headed ? "@4xl:row-2" : "@4xl:row-[1/span_2]");
   return (
     <article className="@container space-y-8">
       <StickyHeader back={back} close={close}>
@@ -100,31 +107,37 @@ export function ProfileBody({ slug, back, close }: { slug: string } & Exits) {
         </div>
       </StickyHeader>
 
-      {(matches.length > 0 || priced.length > 0) && (
-        <>
-          <div className="grid gap-8 @2xl:grid-cols-2">
-            {matches.length > 0 && (
-              <SectionView section={{ heading: "Matches your search", paragraphs: [], items: matches, details: [] }} isMatch={isMatch} announce={false} />
-            )}
-            {matches.length > 0 && priced.length > 0 && <Separator className="@2xl:hidden" />}
-            {priced.length > 0 && <Fees offices={priced} />}
+      <div className={cn("grid gap-8 @xl:grid-cols-2", besideLong && "@4xl:grid-cols-[minmax(0,1fr)_20rem] @4xl:grid-rows-[auto_1fr]")}>
+        {hasMatches && (
+          <SectionView
+            section={{ heading: "Matches your search", paragraphs: [], items: matches, details: [] }}
+            isMatch={isMatch}
+            announce={false}
+            className={cn(besideLong && "@4xl:col-1 @4xl:row-1")}
+          />
+        )}
+        {hasMatches && hasFees && <Separator className="@xl:hidden" />}
+        {hasFees && <Fees offices={priced} className={cn(besideLong && "@4xl:col-2 @4xl:row-1")} />}
+        {(hasMatches || hasFees) && <Separator className={cn("@xl:col-span-2", besideLong && "@4xl:hidden")} />}
+        {besideLong && (
+          <div className={cn("space-y-8 @xl:col-span-2 @4xl:col-1", below(hasMatches))}>
+            {/* In its own column the rule under the matches spans only that column. */}
+            {hasMatches && <Separator className="hidden @4xl:block" />}
+            <Sections sections={long} isMatch={isMatch} />
           </div>
-          <Separator />
-        </>
-      )}
-
-      <div className="grid gap-8 @4xl:grid-cols-[minmax(0,1fr)_20rem]">
-        <div className="space-y-8">
-          <Sections sections={profile.about} isMatch={isMatch} />
-        </div>
-        <aside className="space-y-8">
-          {/* In one column the aside follows the about sections, so it opens with a rule of its own. */}
-          {profile.about.length > 0 && aside.length > 0 && <Separator className="@4xl:hidden" />}
-          <Sections sections={aside} isMatch={isMatch} />
-          {profile.offices.map((office, i) => (
-            <OfficeCard key={i} office={office} profile={profile} />
-          ))}
-        </aside>
+        )}
+        {(short.length > 0 || profile.offices.length > 0) && (
+          <aside className={cn("space-y-8 @xl:col-span-2", besideLong && ["@4xl:col-2", below(hasFees)])}>
+            <ShortSections sections={short} isMatch={isMatch} besideLong={besideLong} underFees={hasFees} />
+            {profile.offices.length > 0 && (
+              <div className={cn("grid gap-8 @xl:grid-cols-2", besideLong && "@4xl:grid-cols-1")}>
+                {profile.offices.map((office, i) => (
+                  <OfficeCard key={i} office={office} profile={profile} />
+                ))}
+              </div>
+            )}
+          </aside>
+        )}
       </div>
     </article>
   );
@@ -161,9 +174,31 @@ function Sections({ sections, isMatch }: { sections: ProfileSection[]; isMatch: 
   ));
 }
 
-function SectionView({ section, isMatch, announce = true }: SectionProps) {
+type ShortProps = { sections: ProfileSection[]; isMatch: SectionProps["isMatch"]; besideLong: boolean; underFees: boolean };
+
+/**
+ * Short sections, two to a line once there is room, each under a rule of its own. The first line has none where only a
+ * rule or the header is above it: with no long sections, or at the top of a wide page's short column without fees.
+ */
+function ShortSections({ sections, isMatch, besideLong, underFees }: ShortProps) {
+  if (sections.length === 0) return null;
+  const first = !besideLong
+    ? "first:border-t-0 first:pt-0 @xl:nth-2:border-t-0 @xl:nth-2:pt-0"
+    : underFees
+      ? ""
+      : "@4xl:first:border-t-0 @4xl:first:pt-0";
   return (
-    <section className="space-y-3">
+    <div className={cn("grid gap-8 @xl:grid-cols-2", besideLong && "@4xl:grid-cols-1")}>
+      {sections.map((section, i) => (
+        <SectionView key={i} section={section} isMatch={isMatch} className={cn("border-t pt-8", first)} />
+      ))}
+    </div>
+  );
+}
+
+function SectionView({ section, isMatch, announce = true, className }: SectionProps & { className?: string }) {
+  return (
+    <section className={cn("space-y-3", className)}>
       <h2 className="text-lg font-semibold">{section.heading}</h2>
       {section.paragraphs.map((text, i) => (
         <p key={i} className="whitespace-pre-line">
@@ -208,10 +243,10 @@ function SectionView({ section, isMatch, announce = true }: SectionProps) {
 }
 
 /** The fees of the offices that give them, named by office only where they differ. */
-function Fees({ offices }: { offices: Office[] }) {
+function Fees({ offices, className }: { offices: Office[]; className?: string }) {
   const alike = new Set(offices.map((office) => office.cost)).size === 1;
   return (
-    <section className="space-y-3">
+    <section className={cn("space-y-3", className)}>
       <h2 className="text-lg font-semibold">Fees</h2>
       {alike ? (
         <p className="whitespace-pre-line">{offices[0]?.cost}</p>
