@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, renderHook, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, renderHook, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, type Location } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { emptyParams } from "@shared/query";
@@ -41,7 +41,10 @@ function renderAt(entries: (string | Partial<Location>)[], result: Profile | Api
   );
 }
 
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
 
 describe("ProfilePage's way back", () => {
   it("goes back to the visitor's search", async () => {
@@ -81,6 +84,26 @@ describe("ProfilePage's header", () => {
     renderAt(["/therapist/Test-ABCDEFGH"], { ...PROFILE, email: "test@example.com" });
     const email = await screen.findByRole("link", { name: "Email: test@example.com" });
     expect(email.closest("header")).not.toBeNull();
+  });
+
+  it("marks itself stuck once its scroller clips it at the top, for its photo to shrink", async () => {
+    const reports: IntersectionObserverCallback[] = [];
+    vi.stubGlobal(
+      "IntersectionObserver",
+      class {
+        constructor(callback: IntersectionObserverCallback) {
+          reports.push(callback);
+        }
+        observe() {}
+        disconnect() {}
+      },
+    );
+    renderAt(["/therapist/Test-ABCDEFGH"]);
+    const header = (await screen.findByRole("heading", { name: "Test Therapist" })).closest("header");
+    expect(header?.dataset.stuck).toBeUndefined();
+    const clipped = { boundingClientRect: { top: -1 }, intersectionRect: { top: 0 } } as IntersectionObserverEntry;
+    act(() => reports.at(-1)!([clipped], {} as IntersectionObserver));
+    expect(header?.dataset.stuck).toBe("true");
   });
 });
 

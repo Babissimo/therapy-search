@@ -8,6 +8,20 @@ globalThis.ResizeObserver ??= class {
   disconnect() {}
 };
 
+// A profile's header watches for sticking with IntersectionObserver, which jsdom lacks too; unobserved, it never sticks.
+globalThis.IntersectionObserver ??= class {
+  readonly root = null;
+  readonly rootMargin = "";
+  readonly scrollMargin = "";
+  readonly thresholds = [];
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+  takeRecords() {
+    return [];
+  }
+};
+
 afterEach(() => cleanup());
 
 if (typeof window !== "undefined") {
