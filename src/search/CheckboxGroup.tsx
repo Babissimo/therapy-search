@@ -3,6 +3,7 @@ import { ChevronRight, Info } from "lucide-react";
 import { sectionsOf } from "@shared/sections";
 import type { FilterField, FilterGroup } from "@shared/types";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { isMulti } from "./state";
@@ -35,10 +36,11 @@ export function CheckboxGroup({ group, searchable, isChecked, onToggle }: Props)
   // UKCP ANDs a list's values, where a list of boxes reads as "any of these", except the session types, which it ORs.
   const narrows = group.fields.every((f) => isMulti(f.name) && f.name !== "TypesOfSession") && group.fields.some(isChecked);
 
-  const toggleSection = (heading: string) =>
+  const openSection = (heading: string, on: boolean) =>
     setOpen((before) => {
       const after = new Set(before);
-      if (!after.delete(heading)) after.add(heading);
+      if (on) after.add(heading);
+      else after.delete(heading);
       return after;
     });
   const tick = (field: FilterField, on: boolean) => {
@@ -73,33 +75,28 @@ export function CheckboxGroup({ group, searchable, isChecked, onToggle }: Props)
       )}
       {sections ? (
         <ul className={cn("space-y-1", SCROLL_BOX)}>
-          {sections.map((section, i) => {
+          {sections.map((section) => {
             const fields = inView(section.fields);
             if (fields.length === 0) return null;
-            const listId = `${baseId}s${i}`;
             // A search shows every match, so its headings are labels rather than toggles.
             const expanded = needle !== "" || open.has(section.heading);
             return (
-              <li key={section.heading}>
-                {needle ? (
-                  <p className="py-1 text-sm text-muted-foreground">{section.heading}</p>
-                ) : (
-                  <button
-                    type="button"
-                    aria-expanded={expanded}
-                    aria-controls={listId}
-                    onClick={() => toggleSection(section.heading)}
-                    className="flex w-full items-center gap-1.5 rounded-md py-1 text-left text-sm outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
-                  >
-                    <ChevronRight className={cn("size-4 shrink-0 text-muted-foreground transition-transform", expanded && "rotate-90")} aria-hidden />
-                    <span className="flex-1">{section.heading}</span>
-                    <TickedCount count={section.fields.filter(isChecked).length} />
-                  </button>
-                )}
-                <ul id={listId} hidden={!expanded} className="space-y-2 py-1 pl-5.5">
-                  {fields.map(item)}
-                </ul>
-              </li>
+              <Collapsible key={section.heading} asChild open={expanded} onOpenChange={(on) => openSection(section.heading, on)}>
+                <li>
+                  {needle ? (
+                    <p className="py-1 text-sm text-muted-foreground">{section.heading}</p>
+                  ) : (
+                    <CollapsibleTrigger className="flex w-full items-center gap-1.5 rounded-md py-1 text-left text-sm outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50">
+                      <ChevronRight className={cn("size-4 shrink-0 text-muted-foreground transition-transform", expanded && "rotate-90")} aria-hidden />
+                      <span className="flex-1">{section.heading}</span>
+                      <TickedCount count={section.fields.filter(isChecked).length} />
+                    </CollapsibleTrigger>
+                  )}
+                  <CollapsibleContent>
+                    <ul className="space-y-2 py-1 pl-5.5">{fields.map(item)}</ul>
+                  </CollapsibleContent>
+                </li>
+              </Collapsible>
             );
           })}
           {nothing}
