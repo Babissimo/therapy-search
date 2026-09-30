@@ -11,25 +11,26 @@ In scope:
 - A map-centred search page: the results in a collapsible panel on wide screens and a bottom sheet on narrow ones, with the search and filters over the map (§4.1–4.5)
 - One list of results that grows with "Load more" and that the map mirrors (§4.4)
 - Therapist pins, clusters, the search's centre and zoom (§4.6–4.7)
+- Pins at the postcode of the office a card shows, read from the therapist's profile (§3.4)
 - A notice when UKCP doesn't recognise the typed location (§4.9)
 - A prompt in place of a search of everyone (§4.10), and profiles in a drawer over the search (§4.11)
-- A place-lookup route on the Worker (§5)
+- Place- and office-lookup routes on the Worker (§5)
 
 Out of scope:
 
 - Mapping every result at once. The results grow a page at a time (§4.4)
 - Searching the area in view, since UKCP searches from a typed location
 - The visitor's own position (a "locate me" control) and travel times
-- Profile office addresses on the results map. Each office on a profile has its own small map (parity §4.1)
+- A therapist's other offices on the results map. Each office on a profile has its own small map (parity §4.1)
 
 ## 2. Constraints
 
 The parity constraints still hold (parity §2). In addition:
 
-- **Pins use only what the result card shows.** UKCP publishes no coordinates. A card has one free-text location, seen live as ` BN31FG`, `BRIGHTON BN3`, `Brighton ` or `Brighton BN`, and profile map links are Google text searches. The map geocodes that text at the precision the therapist gave, full postcodes included.
+- **Pins use what the result card shows, sharpened from the profile.** UKCP publishes no coordinates. A card has one free-text location, seen live as ` BN31FG`, `BRIGHTON BN3`, `Brighton ` or `Brighton BN`, and profile map links are Google text searches. The map geocodes that text at the precision the therapist gave, full postcodes included, and moves a pin to the office's postcode where the profile gives one (§3.4).
 - **Respectful of the geocoders.** postcodes.io and Nominatim are free services. Each distinct string is looked up once and cached for every visitor (§5.1), requests carry the Worker's existing `User-Agent`, and uncached lookups are capped per visitor (§5.3). Nominatim's policy (at most one request a second, results cached, data attributed) is met by using it only for search centres, outside-UK searches (§3.3) and profile offices abroad (parity §4.1).
 - **Third parties never see search terms.** The browser's only third-party requests are map tiles, which reveal the area in view. The default referrer policy sends the tile server our origin alone, never the page URL with its filters, and must stay that way. Place lookups go through the Worker, so the geocoders never see a visitor's IP.
-- **Free to run.** CARTO's raster tiles need a key, free for non-commercial use up to 5 million tile requests a month. Each page of results adds at most 13 Worker requests (§5.1), well inside the free plan's daily allowance at this site's scale.
+- **Free to run.** CARTO's raster tiles need a key, free for non-commercial use up to 5 million tile requests a month. Each page of results adds at most 37 Worker requests (§5.1), well inside the free plan's daily allowance at this site's scale.
 
 ## 3. Where a pin comes from
 
@@ -63,6 +64,17 @@ The centre is UKCP's "Location searched" (parity §3.3) rather than the typed te
 
 For outside-UK searches (`LocationSearchOutsideUK`), which postcodes.io cannot answer, every place name goes to Nominatim without its UK restriction, card locations included, though not the shortlist's (§4.6).
 
+### 3.4 The office's postcode
+
+A card's location is the therapist's office nearest the search, and most cards give only its district, whose pin sits at the district's middle, a mile or two from the office. The profile lists each office's address, and most give the postcode: of 32 sampled on 2026-09-30, the nearest 16 to Brighton and to Leeds, 20 gave the full postcode of the office their card shows, 6 only its district, and 6 cards gave only a town or nothing.
+
+So for a card whose location ends in a district, the browser asks the Worker for the postcode of the therapist's office in that district (§5.1) and moves the pin there once it is placed. Until then the card's own lookup places the pin, and it stays there when the profile gives no postcode in that district or any of these lookups fails. The card keeps UKCP's words; only the pin moves.
+
+- Only cards the map shows ask: those in the pages loaded, and the shortlist's while its map is open (§4.6). A card that already gives a full postcode, or only a town, does not ask, nor does one in an outside-UK search, whose districts could be anywhere.
+- At most four of these requests are in flight from a page at once, so UKCP never sees a page's twelve at once, and one whose card is no longer shown by its turn, after a new search say, is never sent.
+- The answer is kept for 30 days, or a week when the profile gives no postcode in the district, in case the therapist adds one. The card, kept for 15 minutes, still decides who is listed and in which district, so an old answer can't bring back a therapist UKCP has dropped, and a therapist who moves district asks afresh. The profile itself is kept for an hour (parity §4.2), since UKCP drops therapists on suspension.
+- A therapist with two offices in the district is placed at the first the profile lists.
+
 ## 4. Front end
 
 ### 4.1 Page layout
@@ -91,7 +103,7 @@ For outside-UK searches (`LocationSearchOutsideUK`), which postcodes.io cannot a
 
 - The results are one list, in the order the browser keeps (parity §4.1), that grows a page at a time with "Load more"; the map shows every therapist in it that it can place. The button sits beneath the list, outside its scrolling area, so it stays in view however far the list scrolls. UKCP orders location searches by distance band (parity §3.3), so each page reaches further out.
 - A card shows the photo, 96 pixels across, beside the name, place and session types, with the summary and tags beneath at the card's full width. The place is the postcode or district alone followed by the distance, as in "E8 (0.2 miles away)": the town mostly repeats the searched place. A card with no distance, as in a search with no place, or with no postcode in its location keeps the location whole, since there it is all that says where someone is. A card in a pin's box (below) leaves the place to the box's heading and gives only the distance, as in "0.2 miles away". Tags are shown only when the search asks for them by name, as a help-with term, a ticked box or the keyword. Phone numbers are left to the profile's contact details (parity §3.4).
-- Therapists who share a stacked pin (§4.6) are listed together where the first of them comes, in a box headed by the location they all list with their number, or by the postcodes, districts or places that placed them when they write it differently. Their names sit beneath that heading as `h3`s. Cards join the box as their locations are placed and as "Load more" brings others to the pin; a keyboard handed on from "Load more" waits for the new cards to be placed, since joining a box redraws a card.
+- Therapists who share a stacked pin (§4.6) are listed together where the first of them comes, in a box headed by the location they all list with their number, or by the postcodes, districts or places that placed them when they write it differently; an office's postcode (§3.4) stands in for the card's location of whoever it placed. Their names sit beneath that heading as `h3`s. Cards join the box as their locations are placed and as "Load more" brings others to the pin; a keyboard handed on from "Load more" waits for the new cards to be placed, their offices' postcodes included, since joining or leaving a box redraws a card.
 - Results come from `/api/search` in batches of 480, each one upstream request within the parity §4.3 limit, and "Load more" shows them twelve at a time, asking for the next batch only once the last is used up. UKCP reshuffles equally distant results about once a minute (parity §3.2), so pages asked for one at a time would repeat some therapists and skip others; each batch is put in the browser's order as it arrives, and a therapist repeated where two batches meet is shown once. UKCP takes any page size: 480 answers most towns in one request (Leeds has 231 results) in about a second and about 65 KB compressed, where a whole city (London has 3,579) would outrun the Worker's 10-second upstream timeout. A search without a location asks for every result at once instead (parity §4.2), since UKCP shuffles the whole set and the browser can keep its order only by having all of it; its one batch then holds everything, and "Load more" never asks again. Online Therapy alone, 5,152 results, is 8.5 MB (0.8 MB compressed) and takes UKCP about 7 seconds, and the whole register of 8,461 would take about 12; with a filter or two most run to 2,000–3,000 results and 3–5 seconds. Should UKCP answer fewer than asked, the first batch's length sets the step. Changing the search starts again from the first page. The page URL never carries `page`; a link that has one opens at the first page.
 - The list is headed by its count: "257 results", or "257 results within your area" when a place was searched. A search that finds no one says so there alone. Beneath, a line reads, for a location search, "Nearest 24 of 257, up to 0.6 miles away", using the furthest of UKCP's distances among the loaded cards; any other search reads "24 of 257". When any loaded therapist has no pin it adds "3 not on the map" (§4.8). Beneath sit "Pins show the postcode or area each therapist lists.", then the "Location searched" line or the alert that replaces it (§4.9), and UKCP's notices.
 - "Load more" shows a spinner while a page loads and disappears once every result is loaded; the map then takes in any new pins (§4.7). While the first page loads, the list shows skeleton cards. A search without a location that has not answered after 2 seconds adds "Getting every result. The first time can take a few seconds." above them, or above the dimmed list it replaces.
@@ -113,14 +125,14 @@ For outside-UK searches (`LocationSearchOutsideUK`), which postcodes.io cannot a
 - Nearby pins merge into clusters with `leaflet.markercluster`, drawn the same way. Clicking a cluster zooms to its bounds, and clustering stops at zoom 16, so every cluster splits before the map runs out of zoom. Leaflet's spiderfy (fanning the markers out) is off.
 - Activating a single pin on a device that can hover (`(hover: hover)`) opens the therapist's profile (§4.11), since hovering has already shown who it is. Otherwise, and for a stacked pin on any device, it selects: the pin's entry in the list (its box, or the one card) is outlined in blue, marked `aria-current`, and scrolled into view unless already wholly in view. The panel opens if collapsed and the sheet rises to half if lower, opening at the entry; a list already showing glides there unless reduced motion is preferred. Activating the selected pin again clears the selection. The selected pin, or the cluster holding it, keeps a blue halo that pulses briefly unless reduced motion is preferred. A new search, or a change of tab, clears the selection.
 - Hovering or focusing a card raises its pin, enlarges it and rings it in blue, or does the same to the cluster holding it. A ring is a disc behind each avatar, inside the icon so it scales with it, so a stack's ring traces its circles; it is blue because the theme's greys vanish against the tiles.
-- While the Shortlist tab is open beside a search, the map shows the shortlist in place of the results: a pin for each shortlisted therapist it can place, drawn and stacked as above. A shortlist gathers therapists from any search, so their places are chosen as though there were no centre (§3.2), and none is set aside as too far from it. They are read as UK places whatever the search, since an overseas reading with no centre to choose by could put a UK therapist abroad. Their places are looked up only once the map shows them. A therapist taken off the shortlist loses their pin, though their card stays to put them back (parity §4.4). Hovering a shortlisted card highlights its pin, and selecting a pin marks the card of everyone at it in the shortlist, which stays open. The shortlist's opening line adds how many the map can't place, as the results' does (§4.4).
+- While the Shortlist tab is open beside a search, the map shows the shortlist in place of the results: a pin for each shortlisted therapist it can place, drawn and stacked as above. A shortlist gathers therapists from any search, so their places are chosen as though there were no centre (§3.2), and none is set aside as too far from it. They are read as UK places whatever the search, since an overseas reading with no centre to choose by could put a UK therapist abroad. Their places, office postcodes included (§3.4), are looked up only once the map shows them. A therapist taken off the shortlist loses their pin, though their card stays to put them back (parity §4.4). Hovering a shortlisted card highlights its pin, and selecting a pin marks the card of everyone at it in the shortlist, which stays open. The shortlist's opening line adds how many the map can't place, as the results' does (§4.4).
 - The open list is the complete accessible alternative; the map has the label "Map of results", or "Map of your shortlist" while it shows the shortlist.
 
 ### 4.7 Centre, zoom and fit
 
 - A blue pin, which shows on light and dark tiles alike, marks the search centre (§3.3) on the results' map. It stands above the therapists' pins, which often share its point, but beneath a hovered or selected one, and takes no clicks.
-- No circle shows how far the list reaches; its opening line says so (§4.4). UKCP measures to each therapist's full address, but most cards give only a postcode district, whose pin sits at the district's middle, so pins would sit outside a circle drawn to UKCP's miles until the list reached past a district's width: in Brighton, 446 of the first 480 cards give only a district, and their pins lie 1.5 to 1.9 miles out while the first 150 cards reach 1.5 miles.
-- The map frames the centre and every placed pin once a search's first page is placed, or the whole 30 miles searched when no pin is placed, and frames them again whenever "Load more" places further pins. Without a centre it frames the placed pins. The frame is padded clear of the search box and zooms no closer than level 14. A view restored on Back (§4.4) is kept until pins arrive beyond those it took in. Opening the Shortlist tab frames the shortlist's placed pins alone, and opening the Results tab again frames the results afresh.
+- No circle shows how far the list reaches; its opening line says so (§4.4). UKCP measures to each therapist's full address, but a card giving only a district is pinned at the district's middle until its office's postcode is known, and for good when the profile gives none (§3.4), so a circle drawn to UKCP's miles would leave pins outside it: in Brighton, 446 of the first 480 cards give only a district, and such pins lie 1.5 to 1.9 miles out while the first 150 cards reach 1.5 miles.
+- The map frames the centre and every placed pin once a search's first page is placed, or the whole 30 miles searched when no pin is placed, and frames them again whenever "Load more" places further pins. Without a centre it frames the placed pins. An office's postcode (§3.4) holds back no frame, and a pin moving to one frames nothing again: the map frames afresh when more therapists are placed, not when a stack splits. The frame is padded clear of the search box and zooms no closer than level 14. A view restored on Back (§4.4) is kept until therapists are placed beyond those it took in. Opening the Shortlist tab frames the shortlist's placed pins alone, and opening the Results tab again frames the results afresh.
 - A search opened from a link or a reload draws no tiles until its first frame, or until it turns out to have nothing to frame, and jumps to that frame rather than animating, so a search that frames its results never fetches the UK overview's tiles first (§6). A view restored on Back loads its tiles at once.
 - shadcn-map's zoom control sits bottom right on wide screens. Narrow screens rely on pinch zoom, since the sheet covers the bottom of the map.
 
@@ -143,7 +155,7 @@ When the visitor typed a location but UKCP searched "United Kingdom" (parity §3
 - A profile opened from a card or a pin shows in a drawer from the right, over the search, which stays rendered beneath it. The URL becomes `/#/therapist/:slug`, carrying the search's location as React Router's background location, so closing the drawer or Back returns to the search exactly as it was, and `SiteLayout` keeps the search's layout beneath.
 - A profile reached any other way, such as a shared link, is a page of its own, as before; a reload keeps whichever it was, since the browser keeps the history entry's state. The profile lays itself out by the width it is given, so it reads the same in the drawer as on a narrow page.
 
-## 5. Worker: place lookup
+## 5. Worker: place and office lookups
 
 ### 5.1 Route
 
@@ -151,14 +163,16 @@ When the visitor typed a location but UKCP searched "United Kingdom" (parity §3
 |---|---|---|---|---|
 | `POST /api/place` | `q`, `centre`, `outsideUK`, `country` | `/api/place?q=<text>[&centre=true][&outsideUK=true][&country=<code>]&v=<version>` | postcodes.io or Nominatim | 30 days when found; 1 day when not found or too general |
 | `POST /api/nearest` | `lat`, `lng` | `/api/nearest?lat=<degrees>&lng=<degrees>&v=<version>` | postcodes.io | 30 days when found; 1 day when not found |
+| `POST /api/office` | `slug`, `outcode` | `/api/office/:slug?outcode=<district>&v=<version>` | Profile GET (parity §3.4) | 30 days when found; a week when not; not kept when UKCP has no such profile |
 
 - The text or point travels in the body and is cached by canonical URL, as a search is (parity §4.2).
-- One string per request, so Workers Caching keys each string on its own and shares it across visitors, where a batch would rarely repeat. A page needs at most 13 lookups (12 cards and the centre), fewer once repeated strings are merged, sent in parallel over one HTTP/2 connection.
+- One string per request, so Workers Caching keys each string on its own and shares it across visitors, where a batch would rarely repeat. A page needs at most 13 lookups (12 cards and the centre), and as many again for office postcodes (§3.4), fewer once repeated strings are merged, sent in parallel over one HTTP/2 connection.
 - `q` must be 1–100 characters after trimming. The Worker canonicalises it with `shared/location.ts`, so equal strings share one entry.
 - `v` is `LOOKUP_VERSION` from `shared/location.ts`, part of both routes' canonical forms, set by the Worker whatever the browser sends. Cached answers outlive a deploy (parity §4.2), so a change to what either route answers sets it to that day's date, never a value used before, and every lookup moves to new entries rather than waiting up to 30 days for the old answers to expire.
 - `country`, a two-letter code, keeps a lookup to that country: the text goes whole to Nominatim there, since the UK's postcode rules mean nothing abroad.
 - `/api/nearest` answers the postcode nearest the visitor, for a search from where they are. The browser rounds the point to three decimal places, about 100 metres, before sending it, and the Worker rounds anything finer before it reaches the cache, so no cache sees a finer position.
-- Upstream requests, each with a 5-second timeout:
+- `/api/office` answers the postcode of the first office on the therapist's profile in the district. The Worker has no HTML parser, so it finds the postcodes by pattern, reading only the profile's office addresses, since the page's footer holds UKCP's own. Its `v` is `OFFICE_VERSION` in `worker/app.ts`, which changes as `LOOKUP_VERSION` does.
+- Upstream requests to the geocoders, each with a 5-second timeout:
 
 | Kind | Request |
 |---|---|
@@ -176,6 +190,8 @@ type PlaceLookup =
   | { found: false; reason: "too-general" | "not-found" };
 
 type NearestLookup = { found: true; postcode: string } | { found: false };
+
+type OfficePostcode = { found: true; postcode: string } | { found: false };
 ```
 
 `type` is a place candidate's settlement type, mapped from postcodes.io's `local_type` or Nominatim's `addresstype` onto the order in §3.2; types outside it rank last.
@@ -185,6 +201,7 @@ type NearestLookup = { found: true; postcode: string } | { found: false };
 - Uncached lookups count against a new rate-limit binding, `PLACE_LIMIT`, of 60 a minute per IP, keyed as in parity §4.3. It is separate from UKCP's limit, so geocoding never uses up a visitor's searches. Past it, the route returns `429`.
 - An upstream failure or timeout returns `502` and is never cached. The browser shows that therapist as unplaced with the "just now" reason (§4.8) and asks again on the next visit to the search.
 - Nearest-postcode lookups share `PLACE_LIMIT`, and fail the same way.
+- Uncached office lookups count against their own binding, `OFFICE_LIMIT`, of 60 a minute per IP, since a page's twelve and a "Load more" would use up the 20 that UKCP searches have (parity §4.3). Past it the route returns `429`, a profile UKCP doesn't have `404`, and a UKCP failure `502`, none of them cached; the pin stays where the card put it (§3.4).
 - The routes log only a status, never the text or point looked up (parity §2).
 
 ## 6. Map component
@@ -201,14 +218,15 @@ type NearestLookup = { found: true; postcode: string } | { found: false };
 | "Load more" fails | The same message above the button beneath the list, which now reads "Try again"; loaded results stay |
 | The centre lookup fails | No centre pin; the map fits the pins, and place names are chosen as if there were no centre (§3.2) |
 | A pin's lookup fails | Unplaced, with the "just now" reason (§4.8) |
+| An office lookup fails | The pin stays where the card's location put it (§3.4) |
 | Tiles fail to load | Leaflet's blank background; pins and clusters still work |
 
 ## 8. Testing
 
 - **Location text:** unit tests of classification and canonicalisation covering every row of §3.1, including the live strings in §2.
-- **Worker route:** Vitest calling the Hono app with a stub `fetch` for postcodes.io and Nominatim and a fake rate limiter. Cases: each kind, the fallback chain, the canonical form, `Cache-Control` for found and not found, `502` on upstream failure, `429`, and `countrycodes` dropped outside the UK.
-- **Pin logic:** unit tests of candidate choice with and without a centre, the plausibility cut, grouping pins that share a point, remote-only detection, the reach line and the unplaced reasons.
-- **Components:** the prompt asks UKCP for nothing and shows no map; "Load more" appends a page, stays outside the scrolling list, and the URL gains no `page`; a new search starts again at the first page; the panel collapses and reopens; the sheet's buttons move it between positions; therapists sharing a pin are listed together under their place, which the pin's selection marks and scrolls into view; hovering a card reaches the map as a highlighted pin; the centre is marked and the frame grows with "Load more" to take in further pins; a profile opens in a drawer over the search and closing it returns to the search unchanged; Back restores the list's scroll; the tiles follow the `dark` class; the unrecognised-location alert. Leaflet is mocked under jsdom.
+- **Worker route:** Vitest calling the Hono app with a stub `fetch` for postcodes.io and Nominatim and a fake rate limiter. Cases: each kind, the fallback chain, the canonical form, `Cache-Control` for found and not found, `502` on upstream failure, `429`, and `countrycodes` dropped outside the UK. For offices, with a stub UKCP client: the postcode in the district, spaced or not; none there; an address outside the office sections ignored; `404` for a missing profile; `OFFICE_LIMIT`.
+- **Pin logic:** unit tests of candidate choice with and without a centre, the plausibility cut, grouping pins that share a point, remote-only detection, the reach line and the unplaced reasons. Which cards ask for an office postcode; a pin moving to it once placed and staying put when there is none or a lookup fails; no more than four office requests in flight.
+- **Components:** the prompt asks UKCP for nothing and shows no map; "Load more" appends a page, stays outside the scrolling list, and the URL gains no `page`; a new search starts again at the first page; the panel collapses and reopens; the sheet's buttons move it between positions; therapists sharing a pin are listed together under their place, which the pin's selection marks and scrolls into view; hovering a card reaches the map as a highlighted pin; the centre is marked and the frame grows with "Load more" to take in further pins, but not as a stack splits; a profile opens in a drawer over the search and closing it returns to the search unchanged; Back restores the list's scroll; the tiles follow the `dark` class; the unrecognised-location alert. Leaflet is mocked under jsdom.
 - **Manual:** a pass in the browser against the dev server for what jsdom can't show: pins, cluster zoom versus selection, the centre pin and the fit, the refit on "Load more", the pin rings and halo in both themes, the panel resizing the map, the sheet's positions and drag on a narrow viewport, the drawer, and dark tiles.
 
 ## 9. Delivery

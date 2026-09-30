@@ -1,6 +1,19 @@
 import { describe, expect, it, vi } from "vitest";
 import { LOOKUP_VERSION, type PlaceLookup } from "../shared/location";
-import { createCache, createGateway, NEAREST_DOWN, PLACE_DOWN, RATE_KEY, rateKey, STALE_PAGE, TOO_MANY, UPSTREAM_DOWN, type Env, type PlaceFinder } from "./app";
+import {
+  createCache,
+  createGateway,
+  NEAREST_DOWN,
+  OFFICE_VERSION,
+  PLACE_DOWN,
+  RATE_KEY,
+  rateKey,
+  STALE_PAGE,
+  TOO_MANY,
+  UPSTREAM_DOWN,
+  type Env,
+  type PlaceFinder,
+} from "./app";
 import { GeocodeError } from "./places/geocoder";
 import { UpstreamError, type UkcpClient } from "./ukcp/client";
 
@@ -15,16 +28,25 @@ const SCRIPT = () => new Response("export {};", { headers: { "Content-Type": "te
 function setup({
   allow = true,
   allowPlaces = true,
+  allowOffices = true,
   client = {} as Partial<UkcpClient>,
   places = {} as Partial<PlaceFinder>,
   asset = SCRIPT as () => Response,
 } = {}) {
   const limit = vi.fn(async () => ({ success: allow }));
   const placeLimit = vi.fn(async () => ({ success: allowPlaces }));
+  const officeLimit = vi.fn(async () => ({ success: allowOffices }));
   // The routes are given a client, so the session store is never reached.
   const store = { get: async () => null, put: async () => {} };
   const assets = { fetch: vi.fn(async (_url: string) => asset()) };
-  const env: Env = { ASSETS: assets, UPSTREAM_LIMIT: { limit }, PLACE_LIMIT: { limit: placeLimit }, UKCP_SESSION: store, SITE_URL: "https://example.test" };
+  const env: Env = {
+    ASSETS: assets,
+    UPSTREAM_LIMIT: { limit },
+    PLACE_LIMIT: { limit: placeLimit },
+    OFFICE_LIMIT: { limit: officeLimit },
+    UKCP_SESSION: store,
+    SITE_URL: "https://example.test",
+  };
   const stub = { search: vi.fn(async () => bytes(RESULTS)), profile: vi.fn(), contact: vi.fn(), ...client } as unknown as UkcpClient;
   const finder: PlaceFinder = { lookup: vi.fn(async () => FOUND), nearest: vi.fn(async () => ({ found: true, postcode: "BN3 1FG" }) as const), ...places };
   const cache = createCache(
@@ -40,7 +62,7 @@ function setup({
   const post = (path: string, body: string, headers?: Record<string, string>) => request(path, { method: "POST", body, headers: { "Content-Type": "application/x-www-form-urlencoded", ...headers } });
   /** The cached entrypoint answering the gateway directly, to read what the edge may keep. */
   const cached = (path: string) => cache.request(path, { headers: { [RATE_KEY]: "203.0.113.9" } }, env);
-  return { request, post, cached, asked, forwarded, stub, limit, placeLimit, finder, assets };
+  return { request, post, cached, asked, forwarded, stub, limit, placeLimit, officeLimit, finder, assets };
 }
 
 describe("the gateway", () => {
@@ -201,6 +223,56 @@ describe("POST /api/contact", () => {
     expect([refused.status, refused.headers.get("Cache-Control")]).toEqual([403, "no-store"]);
     expect((await from("same-site")).status).toBe(403);
     expect(forwarded).toHaveBeenCalledOnce();
+  });
+});
+
+describe("POST /api/office", () => {
+  const PROFILE = `<div class="therapist-header"><h1>Jo Bloggs</h1></div>
+<div class="profile-locations"><section><h3>Hove</h3><address>2 Church Road<br>Hove BN3 2FL</address></section></div>`;
+  const office = `/api/office/Jo-Bloggs-ABCDEFGH?outcode=BN3&v=${OFFICE_VERSION}`;
+
+  it("asks the cache by slug, district and version, and answers the office's postcode, which the edge may keep for 30 days", async () => {
+    const { post, cached, asked, stub } = setup({ client: { profile: vi.fn(async () => PROFILE) } });
+    const res = await post("/api/office", "slug=Jo-Bloggs-ABCDEFGH&outcode=bn3");
+    expect([res.status, await res.json()]).toEqual([200, { found: true, postcode: "BN3 2FL" }]);
+    expect(asked()).toEqual([office]);
+    expect(stub.profile).toHaveBeenCalledWith("Jo-Bloggs-ABCDEFGH");
+    expect((await cached(office)).headers.get("Cache-Control")).toBe("public, max-age=2592000");
+  });
+
+  it("answers no postcode, kept for a week, when the profile gives none in the district", async () => {
+    const { cached } = setup({ client: { profile: vi.fn(async () => PROFILE) } });
+    const res = await cached(`/api/office/Jo-Bloggs-ABCDEFGH?outcode=BN1&v=${OFFICE_VERSION}`);
+    expect([res.status, await res.json(), res.headers.get("Cache-Control")]).toEqual([200, { found: false }, "public, max-age=604800"]);
+  });
+
+  it("rejects a slug or district it can't use without asking the cache", async () => {
+    const { post, forwarded } = setup();
+    for (const body of ["slug=../../admin&outcode=BN3", "slug=Jo-Bloggs-ABCDEFGH&outcode=BN3 2FL", "slug=Jo-Bloggs-ABCDEFGH&outcode=BRIGHTON", "slug=Jo-Bloggs-ABCDEFGH"]) {
+      expect((await post("/api/office", body)).status).toBe(400);
+    }
+    expect(forwarded).not.toHaveBeenCalled();
+  });
+
+  it("counts a miss against the office allowance alone, and refuses one past it", async () => {
+    const { post, limit, officeLimit } = setup({ allowOffices: false, client: { profile: vi.fn(async () => PROFILE) } });
+    const res = await post("/api/office", "slug=Jo-Bloggs-ABCDEFGH&outcode=BN3");
+    expect([res.status, await res.json()]).toEqual([429, { error: TOO_MANY }]);
+    expect(officeLimit).toHaveBeenCalledWith({ key: "203.0.113.9" });
+    expect(limit).not.toHaveBeenCalled();
+  });
+
+  it("returns 404, which the edge never keeps, when UKCP has no such profile", async () => {
+    const { cached } = setup({ client: { profile: vi.fn(async () => null) } });
+    const res = await cached(`/api/office/Nobody-ZZZZZZZZ?outcode=BN3&v=${OFFICE_VERSION}`);
+    expect([res.status, res.headers.get("Cache-Control")]).toEqual([404, "no-store"]);
+  });
+
+  it("keeps nothing when UKCP answers with something other than a profile", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const { cached } = setup({ client: { profile: vi.fn(async () => "<p>Down for maintenance</p>") } });
+    const res = await cached(office);
+    expect([res.status, res.headers.get("Cache-Control")]).toEqual([502, "no-store"]);
   });
 });
 
