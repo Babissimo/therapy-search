@@ -128,6 +128,8 @@ A switch beside the site's name picks a light, dark or system theme, the last fo
 
 A profile's header stays at the top of the page or drawer as the visitor reads, with the way out (back to the search, or the drawer's close button), the photo and name, and every way to reach the therapist: telephone, email, website, social media links and the UKCP profile, each marked by an icon. Where the header is narrow they form one row that scrolls sideways, so the header stays short.
 
+Beneath the header come the fees, named by office only where offices charge differently, and, for a profile opened from a search, the tags that search asked for, judged as the result cards judge them (map spec §4.4). Those tags are also marked with a tick wherever the profile lists them, languages included.
+
 | UKCP element | shadcn/ui |
 |---|---|
 | "I want help with" typeahead, multiple terms | `Popover` + `Command` combobox, choices shown as `Badge`s |
