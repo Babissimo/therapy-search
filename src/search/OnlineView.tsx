@@ -24,7 +24,7 @@ import { useRememberedScroll } from "./viewMemory";
 
 type Props = { params: SearchParams; onChange: (next: SearchParams) => void; wide: boolean };
 
-/** Therapists working online or by phone, wherever they are. With no place to map, the list takes the page, its filters beside it. */
+/** Therapists working online or by phone, wherever they are. With no place to map, the list takes the page, its filters to its right. */
 export function OnlineView({ params, onChange, wide }: Props) {
   const { key: entry } = useLocation();
   const drafts = useSearchDrafts(params, onChange);
@@ -78,13 +78,6 @@ export function OnlineView({ params, onChange, wide }: Props) {
     <>
       {wide && <Masthead className="border-b px-4 py-3" />}
       <div className="flex min-h-0 flex-1">
-        {wide && (
-          <div className="flex w-96 shrink-0 flex-col gap-2 border-r p-3">
-            {toolbar}
-            {chips}
-            <FiltersSection id={filtersId} params={params} drafts={drafts} groups={ONLINE_FILTER_GROUPS} />
-          </div>
-        )}
         {/* The list is positioned so that visually hidden text is placed inside it rather than stretching the page. */}
         <Tabs.Root value={tab} onValueChange={(value) => setTabChoice({ query, tab: value as ListTab })} asChild>
           <section aria-label="Results and shortlist" className="group/tabs relative flex min-w-0 flex-1 flex-col">
@@ -113,17 +106,25 @@ export function OnlineView({ params, onChange, wide }: Props) {
             )}
           </section>
         </Tabs.Root>
+        {/* Right of the list, as Near me sets its toolbar and filters right of its results. */}
+        {wide && (
+          <div className="flex w-96 shrink-0 flex-col gap-2 border-l p-3">
+            {toolbar}
+            {chips}
+            <FiltersSection id={filtersId} params={params} drafts={drafts} groups={ONLINE_FILTER_GROUPS} />
+          </div>
+        )}
       </div>
     </>
   );
 }
 
-/** In place of the results until a filter narrows the search. The filters sit beside it on wide screens, behind their button otherwise. */
+/** In place of the results until a filter narrows the search. The filters sit to its right on wide screens, behind their button otherwise. */
 function OnlinePrompt({ wide }: { wide: boolean }) {
   return (
     <Prompt ask="Choose a filter to see the UKCP therapists who work online or by phone." className="py-10 sm:py-16">
       {wide ? (
-        "The filters"
+        "The filters to the right"
       ) : (
         <>
           Filters <FiltersIcon />
