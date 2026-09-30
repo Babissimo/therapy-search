@@ -35,8 +35,12 @@ export function ThemeSwitch() {
                 value={value}
                 checked={choice === value}
                 onChange={() => {
-                  setChoice(value);
                   storeTheme(value);
+                  // Applied here rather than left to the effect, which would change the page before the fade captures it.
+                  crossFade(() => {
+                    applyTheme(value, window.matchMedia("(prefers-color-scheme: dark)").matches);
+                    setChoice(value);
+                  });
                 }}
                 className="sr-only"
               />
@@ -49,4 +53,11 @@ export function ThemeSwitch() {
       ))}
     </fieldset>
   );
+}
+
+/** Cross-fades the whole page from how it looks to how `change` leaves it, where the browser can and motion is welcome. */
+function crossFade(change: () => void) {
+  if (!("startViewTransition" in document) || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return change();
+  // Skipped in a hidden tab or by the next pick, when it still makes the change but rejects `ready`.
+  document.startViewTransition(change).ready.catch(() => {});
 }
