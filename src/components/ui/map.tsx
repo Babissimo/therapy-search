@@ -84,7 +84,7 @@ function MapTileLayer(props: Omit<TileLayerProps, "url" | "attribution">) {
 /** `data` rides along in the Leaflet marker's options, so a cluster can tell what its markers stand for. */
 function MapMarker({ data, ...props }: MarkerProps & { data?: unknown; ref?: Ref<Marker> }) {
   const options = { ...props, data };
-  return <LeafletMarker riseOnHover {...options} />;
+  return <LeafletMarker {...options} />;
 }
 
 function markerData<T>(marker: Marker): T | undefined {
