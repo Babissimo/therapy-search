@@ -67,7 +67,7 @@ For outside-UK searches (`LocationSearchOutsideUK`), which postcodes.io cannot a
 
 ### 4.1 Page layout
 
-- The search page fills the viewport, with the map filling the space the results leave. There is no site header once there is a search. On this page `SiteLayout` drops its width cap, padding and footer, and the site's name and the theme switch head the results instead (§4.2, §4.3), or the page while it shows the prompt (§4.10). Other pages keep their layout, with those two in the footer.
+- The search page fills the viewport, with the map filling the space the results leave. There is no site header once there is a search. On this page `SiteLayout` drops its width cap, padding and header, and the site's name and the theme switch head the results instead (§4.2, §4.3), or the page while it shows the prompt (§4.10). Other pages keep their layout, with those two in a header above the page.
 - The site's name is not a link. Resting the mouse on it shows the about text in a card; a click, tap or Enter pins the card open and moves focus into it, so touch and the keyboard reach its links.
 - From the `lg` breakpoint (1024px) the results sit in a panel beside the map (§4.2); below it, in a sheet over the map (§4.3). Both hold the same results component.
 - The map pane loads as its own chunk, so the results render without waiting for Leaflet, and only once there is a search (§4.10); until it arrives the pane is a plain muted background.
