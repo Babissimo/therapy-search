@@ -79,22 +79,27 @@ function ResultsList({ params, results, listRef, pins = [], unplaced = [], selec
   const sought = soughtTerms(params);
 
   return (
-    <section aria-busy={query.isPlaceholderData} className={cn("space-y-4", query.isPlaceholderData && "opacity-60")}>
-      {/* With no one found, the heading has said so. */}
-      <Summary
-        title={title}
-        reach={therapists.length > 0 && (unplaced.length > 0 ? `${reach} · ${unplaced.length} not on the map` : reach)}
-        note={
-          therapists.length > 0 &&
-          (online ? "Only therapists who say they work online or by phone." : "Pins show the postcode or area each therapist lists.")
-        }
-      />
-      <LocationNotice typed={params.text.Location} searched={first?.locationSearched} />
-      {first?.notices.map((notice) => (
-        <Alert key={notice}>
-          <AlertDescription>{notice}</AlertDescription>
-        </Alert>
-      ))}
+    // Dims while the next search's results are on their way.
+    <section aria-busy={query.isPlaceholderData} className={cn("space-y-4 motion-safe:transition-opacity", query.isPlaceholderData && "opacity-60")}>
+      {/* The heading and each entry fade in as they replace their skeleton or arrive, and again as their tab is shown,
+          which starts their animations afresh. Side by side rather than one within another, so no fade dims another. */}
+      <div className="space-y-4 fade-in-0 motion-safe:animate-in">
+        {/* With no one found, the heading has said so. */}
+        <Summary
+          title={title}
+          reach={therapists.length > 0 && (unplaced.length > 0 ? `${reach} · ${unplaced.length} not on the map` : reach)}
+          note={
+            therapists.length > 0 &&
+            (online ? "Only therapists who say they work online or by phone." : "Pins show the postcode or area each therapist lists.")
+          }
+        />
+        <LocationNotice typed={params.text.Location} searched={first?.locationSearched} />
+        {first?.notices.map((notice) => (
+          <Alert key={notice}>
+            <AlertDescription>{notice}</AlertDescription>
+          </Alert>
+        ))}
+      </div>
       <ul ref={listRef} className="space-y-4">
         {listEntries(therapists, pins).map((entry) => {
           const { key, pin, therapist: t } = entry;
@@ -105,7 +110,7 @@ function ResultsList({ params, results, listRef, pins = [], unplaced = [], selec
               key={key}
               data-pin={pin?.key}
               aria-current={marked || undefined}
-              className={cn("rounded-xl", marked && t && "ring-2 ring-highlight")}
+              className={cn("rounded-xl fade-in-0 motion-safe:animate-in", marked && t && "ring-2 ring-highlight")}
             >
               {t ? (
                 <TherapistCard therapist={t} sought={sought} online={online} action={<ShortlistButton therapist={t} />} onHighlight={highlight(t.slug)} />
