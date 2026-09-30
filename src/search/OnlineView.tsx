@@ -60,10 +60,19 @@ export function OnlineView({ params, onChange, wide }: Props) {
     <ListPanels
       tab={tab}
       shortlist={<ShortlistTab sought={soughtTerms(search)} online />}
-      results={searching ? <Results params={search} results={results} listRef={listRef} online /> : <OnlinePrompt wide={wide} />}
+      results={
+        searching ? (
+          <>
+            <Results params={search} results={results} listRef={listRef} online />
+            {/* The list is the page here, so the button comes at its end rather than holding a strip beneath it. */}
+            <LoadMore results={results} listRef={listRef} atEnd />
+          </>
+        ) : (
+          <OnlinePrompt wide={wide} />
+        )
+      }
     />
   );
-  const footer = tab === "results" ? <LoadMore results={results} listRef={listRef} /> : undefined;
 
   return (
     <>
@@ -87,7 +96,6 @@ export function OnlineView({ params, onChange, wide }: Props) {
                 <div ref={scroll.ref} onScroll={(e) => scroll.save(e.currentTarget.scrollTop)} className="relative min-h-0 flex-1 overflow-y-auto p-4">
                   <div className="mx-auto max-w-2xl">{lists}</div>
                 </div>
-                <div className="mx-auto w-full max-w-2xl">{footer}</div>
               </>
             ) : (
               <>
@@ -101,7 +109,6 @@ export function OnlineView({ params, onChange, wide }: Props) {
                   <div className="sticky top-0 z-10 border-b bg-background px-4 py-2">{tabs}</div>
                   <div className="p-4">{lists}</div>
                 </div>
-                {footer}
               </>
             )}
           </section>
