@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { queryOptions, useQuery } from "@tanstack/react-query";
 import { LOCATION_MAX_LENGTH, canonicalLocation, classifyLocation, type PlaceLookup, type PlaceOptions } from "@shared/location";
 import type { Office } from "@shared/types";
 import { api } from "@/lib/api";
@@ -59,7 +59,7 @@ export type OfficeLookup = { texts: string[]; country?: string };
  * under, as the results map does; else its last line, usually the town.
  */
 export function officeLookup(office: Office, listed: string | undefined): OfficeLookup | undefined {
-  const lines = office.address.map((line) => line.replace(NATION, "").trim()).filter(Boolean);
+  const lines = addressLines(office);
   const location = classifyLocation(lines.join(" "));
   // Trusted over a country beside it, as in a Belfast address closing "Ireland".
   if (location.kind === "postcode") return { texts: [location.postcode] };
@@ -77,6 +77,23 @@ export function officeLookup(office: Office, listed: string | undefined): Office
   return text ? { texts: [text] } : undefined;
 }
 
+/**
+ * Where an office is, as a results card would say: the place UKCP lists the therapist under for the main office; else
+ * the part of the address holding the postcode, or else the last line, that `officeLookup` places it by.
+ */
+export function officeLocation(office: Office, listed: string | undefined): string | undefined {
+  if (office.isMain && listed && lookupText(listed)) return listed.trim();
+  const lines = addressLines(office);
+  const location = classifyLocation(lines.join(" "));
+  if (location.kind !== "postcode") return lines.at(-1);
+  const parts = lines.flatMap((line) => line.split(",")).map((part) => part.trim());
+  return parts.find((part) => classifyLocation(part).kind === "postcode") ?? location.postcode;
+}
+
+function addressLines(office: Office): string[] {
+  return office.address.map((line) => line.replace(NATION, "").trim()).filter(Boolean);
+}
+
 /** The answer for the first of the texts that is found, else the last one's. */
 async function firstFound(texts: string[], options: PlaceOptions): Promise<PlaceLookup> {
   let answer: PlaceLookup = { found: false, reason: "not-found" };
@@ -87,19 +104,23 @@ async function firstFound(texts: string[], options: PlaceOptions): Promise<Place
   return answer;
 }
 
-/** Where an office is, and how far in to show it. Places don't move, so answers last the session. */
-export function useOfficePlace(office: Office, listed: string | undefined): { point: Point; zoom: number } | undefined {
-  const lookup = officeLookup(office, listed);
+/** How an office is placed, wherever it is placed from. Places don't move, so answers last the session. */
+export function officePlaceQuery(lookup: OfficeLookup | undefined) {
   // Abroad, each text takes Nominatim's single best answer in the country, as a search centre does. At home, the one
   // text is keyed as the search keys a card's, so a place it already placed is not asked for again.
   const options: PlaceOptions = lookup?.country ? { centre: true, country: lookup.country } : { outsideUK: false };
-  const query = useQuery({
+  return queryOptions({
     queryKey: ["place", lookup?.country ? { texts: lookup.texts, ...options } : { text: lookup?.texts[0], ...options }],
     queryFn: () => firstFound(lookup?.texts ?? [], options),
     enabled: lookup !== undefined,
     staleTime: Infinity,
     gcTime: Infinity,
   });
+}
+
+/** Where an office is, and how far in to show it. */
+export function useOfficePlace(office: Office, listed: string | undefined): { point: Point; zoom: number } | undefined {
+  const query = useQuery(officePlaceQuery(officeLookup(office, listed)));
   const answer = query.data;
   const point = answer?.found ? choosePoint(answer) : undefined;
   return answer?.found && point ? { point, zoom: ZOOM[answer.kind] } : undefined;

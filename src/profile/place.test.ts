@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Office } from "@shared/types";
-import { officeLookup } from "./place";
+import { officeLocation, officeLookup } from "./place";
 
 const office = (address: string[], isMain = false): Office => ({ name: "Office", isMain, address });
 const home = (text: string) => ({ texts: [text] });
@@ -48,5 +48,32 @@ describe("officeLookup", () => {
     expect(officeLookup(office([]), undefined)).toBeUndefined();
     expect(officeLookup(office(["England"]), undefined)).toBeUndefined();
     expect(officeLookup(office(["Germany"]), undefined)).toBeUndefined();
+  });
+});
+
+describe("officeLocation", () => {
+  it("gives the main office as UKCP lists the therapist", () => {
+    expect(officeLocation(office(["49 Church Road", "Hove BN3 2BE", "UK"], true), "Hove BN3")).toBe("Hove BN3");
+    expect(officeLocation(office(["The Clinic", "12 High Street"], true), "Lewes")).toBe("Lewes");
+  });
+
+  it("otherwise gives the part of the address holding its postcode, wherever it sits", () => {
+    expect(officeLocation(office(["Studio 22", "Lewes BN7 1YJ"]), "Hove BN3")).toBe("Lewes BN7 1YJ");
+    expect(officeLocation(office(["Studio 22, 1 Castle Ditch Lane, Lewes BN7 1YJ"]), undefined)).toBe("Lewes BN7 1YJ");
+    expect(officeLocation(office(["Lewes BN7 1YJ", "East Sussex"]), undefined)).toBe("Lewes BN7 1YJ");
+    expect(officeLocation(office(["Vernon Terrace", "Brighton BN1 3JG, United Kingdom"]), undefined)).toBe("Brighton BN1 3JG");
+    expect(officeLocation(office(["Lewes BN7", "1YJ"]), undefined)).toBe("BN7 1YJ");
+    expect(officeLocation(office(["16 Church Street", "Warnham RH12 3QW"], true), undefined)).toBe("Warnham RH12 3QW");
+  });
+
+  it("otherwise gives the last line, leaving out the nation", () => {
+    expect(officeLocation(office(["Malling Street", "Lewes", "England"]), undefined)).toBe("Lewes");
+    expect(officeLocation(office(["Hove"], true), " ")).toBe("Hove");
+    expect(officeLocation(office(["Hove"], true), " BN")).toBe("Hove");
+  });
+
+  it("has nothing to give for an office with no address", () => {
+    expect(officeLocation(office([]), undefined)).toBeUndefined();
+    expect(officeLocation(office(["England"]), undefined)).toBeUndefined();
   });
 });

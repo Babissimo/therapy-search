@@ -11,13 +11,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { cachedCard } from "@/search/useResults";
 import { ShortlistButton } from "@/shortlist/ShortlistButton";
 import type { ShortlistCard } from "@/shortlist/store";
 import { ContactList } from "./ContactList";
 import { useOfficePlace } from "./place";
+import { profileQuery } from "./profileQuery";
 import { sectionsBySize } from "./sectionsBySize";
 import { matchingTags, useSearchMatch } from "./searchedTerms";
 
@@ -61,7 +61,7 @@ type Exits = { back?: ReactNode; close?: ReactNode };
 
 /** A therapist's profile, laid out by the width it is given, whether a page's or a drawer's. */
 export function ProfileBody({ slug, back, close }: { slug: string } & Exits) {
-  const { data: profile, error, isPending } = useQuery({ queryKey: ["profile", slug], queryFn: () => api.profile(slug) });
+  const { data: profile, error, isPending } = useQuery(profileQuery(slug));
   const isMatch = useSearchMatch();
 
   if (isPending) {

@@ -17,6 +17,7 @@ import { ListPanels, ListTabs, type ListTab } from "./ListTabs";
 import { createHighlight } from "./map/highlight";
 import type { MapPaneProps } from "./map/MapPane";
 import type { Pin } from "./map/pins";
+import { useNearerOffices } from "./map/nearerOffices";
 import { useCentre, usePins } from "./map/usePlaces";
 import { LoadMore } from "./LoadMore";
 import { ModeSwitch } from "./ModeSwitch";
@@ -81,12 +82,13 @@ function SearchView({ params, onChange, wide }: ViewProps) {
   // The search, which the tab chosen and a selection belong to.
   const fitKey = searching ? toQuery(params) : "";
   const results = useResults(params, searching);
-  useShortlistRefresh(results.therapists);
   const centre = useCentre(results.searchedPlace, params.flags.LocationSearchOutsideUK);
   // The place searched comes with the results, so there is none until a first search's results arrive; while the next
   // search loads, the results, and so the place, are still the last search's.
   const centreSettled = centre.settled && !results.query.isPending && !results.query.isPlaceholderData;
-  const { pins, unplaced, placing } = usePins(results.therapists, centre, params.flags.LocationSearchOutsideUK);
+  const nearer = useNearerOffices(results.therapists, centre, params.flags.LocationSearchOutsideUK);
+  useShortlistRefresh(nearer.ready);
+  const { pins, unplaced, placing } = usePins(nearer.ready, centre, params.flags.LocationSearchOutsideUK);
   // Kept by key, so a new search shows its results whichever tab was open.
   const [tabChoice, setTabChoice] = useState<{ fitKey: string; tab: ListTab }>();
   const tab = tabChoice?.fitKey === fitKey ? tabChoice.tab : searching ? "results" : "shortlist";
@@ -161,7 +163,7 @@ function SearchView({ params, onChange, wide }: ViewProps) {
   const list = (
     <Results
       params={params}
-      results={results}
+      results={{ ...results, therapists: nearer.therapists }}
       listRef={listRef}
       pins={pins}
       unplaced={unplaced}

@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation, useNavigate } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { SearchResult, TherapistCard } from "@shared/types";
+import type { Profile, SearchResult, TherapistCard } from "@shared/types";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { api } from "@/lib/api";
 import { listed } from "@/lib/listed.testing";
@@ -32,6 +32,7 @@ vi.mock("./map/MapPane", async () => {
     fitKey: string;
     centreSettled: boolean;
     pins: Pin[];
+    placing: boolean;
     highlight: Highlight;
     selected?: Pin;
     onSelect: (pin: Pin) => void;
@@ -40,7 +41,7 @@ vi.mock("./map/MapPane", async () => {
     coveredBelow?: (height: number) => number;
   };
   return {
-    default: ({ label, fitKey, centreSettled, pins, highlight, selected, onSelect, onSearchArea, outsideUK, coveredBelow }: Props) => {
+    default: ({ label, fitKey, centreSettled, pins, placing, highlight, selected, onSelect, onSearchArea, outsideUK, coveredBelow }: Props) => {
       const slug = useSyncExternalStore(highlight.subscribe, highlight.get);
       return createElement(
         "div",
@@ -50,6 +51,7 @@ vi.mock("./map/MapPane", async () => {
           "data-testid": "map",
           "data-fit-key": fitKey,
           "data-settled": String(centreSettled),
+          "data-placing": String(placing),
           "data-highlighted": slug ?? "",
           "data-selected": selected?.key ?? "",
           "data-outside-uk": String(Boolean(outsideUK)),
@@ -535,6 +537,42 @@ describe("SearchPage", () => {
       ["H3", "Therapist c"],
     ]);
     expect(names()).toEqual(["Therapist a", "Therapist c", "Therapist b"]);
+  });
+
+  it("shows and pins a therapist UKCP gave no distance at their profile's office nearest the search, framing without them", async () => {
+    screenIs(true);
+    const LEWES = { lat: 50.873, lng: 0.008 };
+    vi.spyOn(api, "place").mockImplementation(async (text, options) => ({
+      found: true,
+      kind: "outcode",
+      candidates: [options?.centre ? BRIGHTON : /\bBN3\b/.test(text) ? HOVE : /\bBN7\b/.test(text) ? LEWES : BRIGHTON],
+    }));
+    let answerProfile: (profile: Profile) => void = () => {};
+    const read = vi.spyOn(api, "profile").mockReturnValue(new Promise((resolve) => (answerProfile = resolve)));
+    const near = { ...therapist("a", "Brighton BN1"), distance: "0.2 miles from Brighton" };
+    vi.spyOn(api, "search").mockResolvedValue(
+      listed({ total: 2, from: 1, to: 2, notices: [], locationSearched: "Brighton", therapists: [near, therapist("sam", "Lewes BN7")] }),
+    );
+    // Shortlisted as another search showed them, which stands until this one knows where they are.
+    shortlist.add({ ...therapist("sam"), location: "Hove BN3" });
+    renderPage("/?Location=Brighton");
+    expect(await within(results()).findByText("Lewes BN7")).toBeTruthy();
+    expect(shortlist.get().map((entry) => entry.card.location)).toEqual(["Hove BN3"]);
+    await waitFor(() => expect(read).toHaveBeenCalledOnce());
+    expect(read).toHaveBeenCalledWith("sam");
+    await waitFor(() => expect(map().dataset.placing).toBe("false"));
+    expect(mapPins()).toEqual([`Pin ${key(BRIGHTON)}: a`]);
+    expect(within(results()).queryByText(/not on the map/)).toBeNull();
+
+    const hove = { name: "Hove Office", isMain: true, address: ["49 Church Road", "Hove BN3 2BE", "UK"] };
+    const lewes = { name: "Lewes Office", isMain: false, address: ["Studio 22", "Lewes BN7 1YJ"] };
+    answerProfile({ ...therapist("sam"), location: "Hove BN3", languages: [], emailInContact: false, social: [], about: [], practical: [], offices: [hove, lewes] });
+    expect(await within(results()).findByText("Hove BN3")).toBeTruthy();
+    await waitFor(() => expect(mapPins()).toEqual([`Pin ${key(BRIGHTON)}: a`, `Pin ${key(HOVE)}: sam`]));
+    // The shortlist keeps the card as the list shows it.
+    fireEvent.click(within(results()).getByRole("button", { name: "Remove Therapist sam from your shortlist" }));
+    fireEvent.click(within(results()).getByRole("button", { name: "Add Therapist sam to your shortlist" }));
+    expect(shortlist.get().map((entry) => entry.card.location)).toEqual(["Hove BN3"]);
   });
 
   it("tells the map how much of it the sheet covers on narrow screens, counting the list as lowered to show the map", async () => {
