@@ -2,7 +2,6 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { useEffect } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { TooltipProvider } from "@/components/ui/tooltip";
 import { ApiError, api } from "@/lib/api";
 import type { View } from "./geo";
 import { viewAround } from "./geo.testing";
@@ -67,7 +66,7 @@ function renderAt(
   } = {},
 ) {
   leaflet.start(framed);
-  render(<MovedMapButtons centre={BRIGHTON} settled={settled} onSearch={onSearch} onRecentre={onRecentre} coveredBelow={coveredBelow} />, { wrapper: TooltipProvider });
+  render(<MovedMapButtons centre={BRIGHTON} settled={settled} onSearch={onSearch} onRecentre={onRecentre} coveredBelow={coveredBelow} />);
   act(() => leaflet.show(view));
   return onSearch;
 }
@@ -82,7 +81,7 @@ function Framer({ view }: { view?: View }) {
 
 const button = () => screen.queryByRole("button", { name: "Search this area" });
 const press = () => fireEvent.click(button()!);
-const recentreButton = () => screen.queryByRole("button", { name: "Recentre on the search" });
+const recentreButton = () => screen.queryByRole("button", { name: "Recentre" });
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -174,7 +173,7 @@ describe("MovedMapButtons", () => {
     const framed = viewAround(BRIGHTON, 5);
     const half = (framed.east - framed.west) / 2;
     leaflet.start(framed);
-    render(<MovedMapButtons centre={BRIGHTON} settled onSearch={vi.fn(() => true)} onRecentre={vi.fn()} />, { wrapper: TooltipProvider });
+    render(<MovedMapButtons centre={BRIGHTON} settled onSearch={vi.fn(() => true)} onRecentre={vi.fn()} />);
     // Twice as wide at the same scale, as when a panel beside it closes.
     act(() => leaflet.show({ ...framed, east: framed.east + half, west: framed.west - half }, { x: 800, y: 800 }));
     expect(recentreButton()).toBeNull();
@@ -183,7 +182,7 @@ describe("MovedMapButtons", () => {
   it("offers to recentre beside the search, going at once when pressed and handing focus to the map", () => {
     const onRecentre = vi.fn();
     renderAt(viewAround(HOVE, 5), { onRecentre });
-    expect(within(screen.getByRole("group")).getAllByRole("button").map((b) => b.textContent)).toEqual(["Search this area", "Recentre on the search"]);
+    expect(within(screen.getByRole("group")).getAllByRole("button").map((b) => b.textContent)).toEqual(["Search this area", "Recentre"]);
     recentreButton()!.focus();
     fireEvent.click(recentreButton()!);
     expect(onRecentre).toHaveBeenCalledOnce();
@@ -199,6 +198,16 @@ describe("MovedMapButtons", () => {
     await waitFor(() => expect(recentreButton()!.getAttribute("aria-disabled")).toBe("true"));
     fireEvent.click(recentreButton()!);
     expect(onRecentre).not.toHaveBeenCalled();
+  });
+
+  it("sits at the bottom of the map, above whatever covers it", () => {
+    leaflet.start(viewAround(BRIGHTON, 5));
+    const { rerender } = render(<MovedMapButtons centre={BRIGHTON} settled onSearch={vi.fn(() => true)} />);
+    act(() => leaflet.show(viewAround(HOVE, 5)));
+    const holder = () => screen.getByRole("group").closest<HTMLElement>("[style]")!;
+    expect(holder().style.bottom).toBe("calc(0px + 2rem)");
+    rerender(<MovedMapButtons centre={BRIGHTON} settled coveredBelow={(height) => height / 2} onSearch={vi.fn(() => true)} />);
+    expect(holder().style.bottom).toBe("calc(400px + 2rem)");
   });
 
   it("offers nothing while a search is settling", () => {

@@ -2,14 +2,13 @@ import type { LatLng, Map as LeafletMap } from "leaflet";
 import { Focus, Loader2, Search } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useMap } from "react-leaflet";
-import { IconButton } from "@/components/IconButton";
 import { Button } from "@/components/ui/button";
 import { ButtonGroup } from "@/components/ui/button-group";
 import { MapControlContainer } from "@/components/ui/map";
 import { usePostcodeNear } from "../usePostcodeNear";
 import { movedElsewhere, type Point, type View } from "./geo";
 
-// Each fits one line beneath the button on a phone.
+// Each fits one line above the buttons on a phone.
 export const NO_POSTCODE_HERE = "No postcode near here. Move the map nearer a town.";
 export const AREA_UNKNOWN = "Couldn't look up this area just now. Try again.";
 export const ALREADY_SEARCHED = "This is the area already searched.";
@@ -67,15 +66,24 @@ export function MovedMapButtons({ centre, settled, coveredBelow, onSearch, onRec
     [map],
   );
   if (!settled || recentred) return null;
+  const covered = coveredBelow?.(map.getSize().y) ?? 0;
   // Read as the map lies now, since raising the sheet re-aims the part in view without a move.
-  const elsewhere = movedElsewhere(seen.view, framed.view, middleInView(map, coveredBelow), centre);
+  const elsewhere = movedElsewhere(seen.view, framed.view, middleInView(map, covered), centre);
   const back = onRecentre !== undefined && seen.strayed;
   if (!elsewhere && !back) return null;
   return (
-    // Clear of SearchPage's toolbar, whose inset, width and row of filter chips these offsets follow: beneath it on a
-    // phone, where it spans the map, and beside it on a wide screen.
-    <div className="pointer-events-none absolute inset-x-3 top-40 z-1000 flex justify-center lg:top-5 lg:left-102">
+    // Level with the zoom buttons on a wide screen; on a phone, above the sheet, gliding as it does. A resize, which
+    // moves the sheet's top, ends with a moveend, which renders this again.
+    <div
+      className="pointer-events-none absolute inset-x-3 z-1000 flex justify-center transition-[bottom] duration-200"
+      style={{ bottom: `calc(${covered}px + 2rem)` }}
+    >
       <MapControlContainer className="pointer-events-auto relative flex flex-col items-center gap-1.5">
+        {near.problem && (
+          <p role="alert" className="rounded-md bg-background px-2 py-1 text-xs text-destructive shadow-md">
+            {near.problem}
+          </p>
+        )}
         {/* A pill however many buttons it holds, overriding the group's own rounding of its last one. */}
         <ButtonGroup className="rounded-full shadow-md [&>[data-slot]:not(:has(~[data-slot]))]:rounded-r-full!">
           {elsewhere && (
@@ -86,18 +94,18 @@ export function MovedMapButtons({ centre, settled, coveredBelow, onSearch, onRec
               className="rounded-full px-3 dark:bg-background"
               // Not disabled while looking, which would drop focus; a second press is ignored.
               aria-disabled={near.looking}
-              onClick={() => near.lookNear(() => Promise.resolve(middleInView(map, coveredBelow)))}
+              onClick={() => near.lookNear(() => Promise.resolve(middleInView(map, covered)))}
             >
               {near.looking ? <Loader2 aria-hidden className="animate-spin" /> : <Search aria-hidden />}
               Search this area
             </Button>
           )}
           {back && (
-            <IconButton
+            <Button
               ref={handFocus}
-              label="Recentre on the search"
+              type="button"
               variant="outline"
-              className="rounded-full dark:bg-background"
+              className="rounded-full px-3 dark:bg-background"
               // The search under way would move the map again as it arrives, so this waits for it.
               aria-disabled={near.looking}
               onClick={() => {
@@ -107,17 +115,13 @@ export function MovedMapButtons({ centre, settled, coveredBelow, onSearch, onRec
               }}
             >
               <Focus aria-hidden />
-            </IconButton>
+              Recentre
+            </Button>
           )}
         </ButtonGroup>
         <p aria-live="polite" className="sr-only">
           {near.looking ? "Finding the nearest postcode" : ""}
         </p>
-        {near.problem && (
-          <p role="alert" className="rounded-md bg-background px-2 py-1 text-xs text-destructive shadow-md">
-            {near.problem}
-          </p>
-        )}
       </MapControlContainer>
     </div>
   );
@@ -141,8 +145,9 @@ function strayedFrom(map: LeafletMap, framing: Framing): boolean {
   return Math.hypot(x - size.x / 2, y - size.y / 2) > LEAST_MOVE_PX;
 }
 
-function middleInView(map: LeafletMap, coveredBelow?: (height: number) => number): Point {
+/** The middle of the part of the map in view, above the `covered` pixels at its bottom. */
+function middleInView(map: LeafletMap, covered: number): Point {
   const { x, y } = map.getSize();
-  const { lat, lng } = map.containerPointToLatLng([x / 2, (y - (coveredBelow?.(y) ?? 0)) / 2]);
+  const { lat, lng } = map.containerPointToLatLng([x / 2, (y - covered) / 2]);
   return { lat, lng };
 }
