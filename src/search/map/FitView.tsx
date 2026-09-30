@@ -15,11 +15,16 @@ type Props = {
   restored?: Framed;
   /** Frames without animating. */
   instant?: boolean;
+  /** How much of the map's bottom, in pixels, lies under something laid over it, given the map's height. */
+  coveredBelow?: (height: number) => number;
   onFramed?: () => void;
 };
 
-// Clear of the search box and filters over the top left of the map.
-const PADDING = { paddingTopLeft: [48, 136], paddingBottomRight: [48, 48] } satisfies L.FitBoundsOptions;
+// Clear of the search box and filters over the top left of the map, with a margin on its other sides.
+const TOP_LEFT: L.PointTuple = [48, 136];
+const MARGIN = 48;
+// Left to frame into however much covers the map: Leaflet zooms far out to fit less, or to street level if none.
+const LEAST_ROOM = 128;
 // Close enough to tell streets apart, even when every pin is at the centre.
 const MAX_ZOOM = 14;
 
@@ -30,7 +35,7 @@ const MAX_ZOOM = 14;
  * beyond those it had.
  * `onFramed` hears when the view is where the search puts it, or that there is nothing to frame.
  */
-export function FitView({ fitKey, centre, reachMiles, points, waiting, restored, instant, onFramed }: Props) {
+export function FitView({ fitKey, centre, reachMiles, points, waiting, restored, instant, coveredBelow, onFramed }: Props) {
   const map = useMap();
   const framed = useRef(restored);
   useEffect(() => {
@@ -40,7 +45,9 @@ export function FitView({ fitKey, centre, reachMiles, points, waiting, restored,
     const bounds = L.latLngBounds(points.map((p) => [p.lat, p.lng]));
     const miles = reachMiles !== undefined && (reachMiles > 0 || points.length > 0) ? reachMiles : SEARCH_MILES;
     if (centre) bounds.extend(L.latLng(centre).toBounds(2 * miles * METRES_PER_MILE));
-    const options: L.FitBoundsOptions = { ...PADDING, maxZoom: MAX_ZOOM };
+    const height = map.getSize().y;
+    const covered = Math.max(0, Math.min(coveredBelow?.(height) ?? 0, height - TOP_LEFT[1] - MARGIN - LEAST_ROOM));
+    const options: L.FitBoundsOptions = { paddingTopLeft: TOP_LEFT, paddingBottomRight: [MARGIN, MARGIN + covered], maxZoom: MAX_ZOOM };
     // Only ever false: an explicit true would animate even a pan across the country.
     if (instant) options.animate = false;
     if (!bounds.isValid()) {
@@ -51,6 +58,6 @@ export function FitView({ fitKey, centre, reachMiles, points, waiting, restored,
     if (onFramed) map.once("moveend", onFramed);
     map.fitBounds(bounds, options);
     framed.current = { fitKey, pins: points.length, reach: reachMiles };
-  }, [map, fitKey, centre, reachMiles, points, waiting, instant, onFramed]);
+  }, [map, fitKey, centre, reachMiles, points, waiting, instant, coveredBelow, onFramed]);
   return null;
 }

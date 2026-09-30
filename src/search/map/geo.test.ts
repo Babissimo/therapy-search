@@ -1,42 +1,40 @@
 import { describe, expect, it } from "vitest";
-import { areaToSearch, choosePoint, milesBetween } from "./geo";
+import { choosePoint, milesBetween, movedElsewhere } from "./geo";
 import { viewAround } from "./geo.testing";
 
 const BRIGHTON = { lat: 50.8225, lng: -0.1372 };
 const HOVE = { lat: 50.835, lng: -0.178 };
 
-describe("areaToSearch", () => {
+describe("movedElsewhere", () => {
   const FRAMED = viewAround(BRIGHTON, 5);
 
-  it("offers the middle of a view moved well away from where the search framed it", () => {
-    const area = areaToSearch(viewAround(HOVE, 5), FRAMED, true);
-    expect(area?.lat).toBeCloseTo(HOVE.lat, 6);
-    expect(area?.lng).toBeCloseTo(HOVE.lng, 6);
+  it("counts a view moved well away from where the search framed it", () => {
+    expect(movedElsewhere(viewAround(HOVE, 5), FRAMED, true)).toBe(true);
   });
 
-  it("offers nothing while the middle is within a quarter of the view of where it was framed", () => {
-    expect(areaToSearch(viewAround(HOVE, 10), FRAMED, true)).toBeUndefined();
+  it("counts no move while the middle is within a quarter of the view of where it was framed", () => {
+    expect(movedElsewhere(viewAround(HOVE, 10), FRAMED, true)).toBe(false);
   });
 
-  it("offers nothing for a move of half a mile or less, however far in the map is zoomed", () => {
+  it("counts no move of half a mile or less, however far in the map is zoomed", () => {
     const nearBrighton = { lat: BRIGHTON.lat + 0.4 / 69.05, lng: BRIGHTON.lng };
-    expect(areaToSearch(viewAround(nearBrighton, 1), FRAMED, true)).toBeUndefined();
+    expect(movedElsewhere(viewAround(nearBrighton, 1), FRAMED, true)).toBe(false);
   });
 
-  it("offers nothing while the view is wider than a search reaches across", () => {
+  it("counts no move to a view wider than a search reaches across", () => {
     const farFromBrighton = { lat: 52.5, lng: -1.9 };
-    expect(areaToSearch(viewAround(farFromBrighton, 61), FRAMED, true)).toBeUndefined();
-    expect(areaToSearch(viewAround(farFromBrighton, 59), FRAMED, true)).toBeDefined();
+    expect(movedElsewhere(viewAround(farFromBrighton, 61), FRAMED, true)).toBe(false);
+    expect(movedElsewhere(viewAround(farFromBrighton, 59), FRAMED, true)).toBe(true);
   });
 
-  it("offers any view narrow enough, even zoomed straight in, when a search with no centre was framed too wide to mean a place", () => {
+  it("counts any view narrow enough, even zoomed straight in, when a search with no centre was framed too wide to mean a place", () => {
     const midlands = { lat: 52.5, lng: -1.9 };
-    expect(areaToSearch(viewAround(midlands, 5), viewAround(midlands, 400), false)).toBeDefined();
+    expect(movedElsewhere(viewAround(midlands, 5), viewAround(midlands, 400), false)).toBe(true);
   });
 
-  it("offers nothing zoomed straight in on a search's own centre, however wide it was framed", () => {
+  it("counts no move zoomed straight in on a search's own centre, however wide it was framed", () => {
     const sherborne = { lat: 50.95, lng: -2.52 };
-    expect(areaToSearch(viewAround(sherborne, 40), viewAround(sherborne, 80), true)).toBeUndefined();
+    expect(movedElsewhere(viewAround(sherborne, 40), viewAround(sherborne, 80), true)).toBe(false);
   });
 });
 const CORNWALL_HAMLET = { lat: 50.352, lng: -4.947, type: "hamlet" };

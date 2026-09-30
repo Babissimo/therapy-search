@@ -44,7 +44,7 @@ export function ResultsSheet({ position, onPositionChange, tabs, lowerLabel = "S
   function move(event: PointerEvent<HTMLDivElement>) {
     const container = sheet.current?.parentElement;
     if (!drag.current || !container) return;
-    const { peek, full } = heights(container);
+    const { peek, full } = heights(container.clientHeight);
     liveHeight.current = Math.min(full, Math.max(peek, drag.current.startHeight - (event.clientY - drag.current.startY)));
     setDragHeight(liveHeight.current);
   }
@@ -57,7 +57,7 @@ export function ResultsSheet({ position, onPositionChange, tabs, lowerLabel = "S
   function end() {
     const container = sheet.current?.parentElement;
     const height = liveHeight.current;
-    if (drag.current && height !== null && container) onPositionChange(nearest(height, heights(container)));
+    if (drag.current && height !== null && container) onPositionChange(nearest(height, heights(container.clientHeight)));
     drag.current = null;
     liveHeight.current = null;
     setDragHeight(null);
@@ -105,12 +105,20 @@ export function ResultsSheet({ position, onPositionChange, tabs, lowerLabel = "S
   );
 }
 
+/**
+ * How much of the bottom of the map, `height` pixels tall, the sheet covers for a visitor looking at the map. At full
+ * the map is out of sight until they lower the sheet, which Show map lowers to peek.
+ */
+export function coverOf(position: SheetPosition, height: number): number {
+  const { peek, half } = heights(height);
+  return position === "half" ? half : peek;
+}
+
 type Heights = Record<SheetPosition, number>;
 
-/** Each position's height in pixels, within the map area the sheet sits in. */
-function heights(container: HTMLElement): Heights {
+/** Each position's height in pixels, within the map area, `total` pixels tall, that the sheet sits in. */
+function heights(total: number): Heights {
   const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
-  const total = container.clientHeight;
   return { peek: PEEK_REM * rem, half: total / 2, full: total - FULL_GAP_REM * rem };
 }
 
