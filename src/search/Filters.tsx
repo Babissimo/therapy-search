@@ -40,7 +40,7 @@ export function MobileFilters({ ticked, ...panel }: PanelProps & { ticked: numbe
       <SheetTrigger asChild>
         <FiltersButton ticked={ticked} />
       </SheetTrigger>
-      <SheetContent side="left" className="gap-0">
+      <SheetContent side="right" className="gap-0">
         <SheetHeader className="border-b">
           <SheetTitle>Refine your search</SheetTitle>
         </SheetHeader>
