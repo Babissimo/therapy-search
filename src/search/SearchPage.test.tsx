@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation, useNavigate } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SearchResult, TherapistCard } from "@shared/types";
@@ -110,7 +110,12 @@ function Profile() {
 }
 
 function Url() {
-  return <output data-testid="url">{useLocation().search}</output>;
+  const { pathname, search } = useLocation();
+  return (
+    <output data-testid="url" data-path={pathname}>
+      {search}
+    </output>
+  );
 }
 
 /** The page's shortlist, empty at each test's start. Each addition is newer than the last, as a visitor's clicks are. */
@@ -126,21 +131,20 @@ function renderAt(url: string, ...pages: TherapistCard[][]) {
 }
 
 function renderPage(url: string) {
+  const page = (
+    <>
+      <SearchPage />
+      <Url />
+    </>
+  );
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
       <ShortlistContext.Provider value={shortlist}>
         <TooltipProvider>
           <MemoryRouter initialEntries={[url]}>
             <Routes>
-              <Route
-                path="/"
-                element={
-                  <>
-                    <SearchPage />
-                    <Url />
-                  </>
-                }
-              />
+              <Route path="/" element={page} />
+              <Route path="/online" element={page} />
               <Route path="/therapist/:slug" element={<Profile />} />
             </Routes>
           </MemoryRouter>
@@ -153,6 +157,7 @@ function renderPage(url: string) {
 /** A search whose answer, with no "Location searched", has no centre to look up. */
 const SEARCH = "/?Location=Leeds";
 const url = () => new URLSearchParams(screen.getByTestId("url").textContent ?? "");
+const path = () => screen.getByTestId("url").dataset.path;
 const results = () => screen.getByRole("region", { name: "Results and shortlist" });
 const loaded = () => within(results()).findByText(/^\d+ of 30/);
 /** The side bar's scrolling list, which holds everything but its tabs and footer. */
@@ -887,5 +892,138 @@ describe("SearchPage", () => {
     expect(screen.getByRole("tab", { name: "Results" }).getAttribute("aria-selected")).toBe("true");
     expect(results().dataset.position).toBe("full");
     await loaded();
+  });
+});
+
+describe("SearchPage online", () => {
+  const ONLINE = "/online";
+  /** The search the page last asked UKCP for. */
+  const asked = () => vi.mocked(api.search).mock.lastCall?.[0];
+  const filters = () => screen.getByRole("region", { name: "Refine your search" });
+  const EVERYONE_ONLINE = "TypesOfSession=Online+Therapy&TypesOfSession=Telephone+Therapy";
+
+  it("lists everyone working online or by phone, with no place to search and no map", async () => {
+    screenIs(true);
+    renderAt(ONLINE);
+    await loaded();
+    await mapLoads();
+    expect(screen.queryByTestId("map")).toBeNull();
+    expect(screen.queryByRole("textbox", { name: "Location" })).toBeNull();
+    expect(asked()).toBe(EVERYONE_ONLINE);
+    expect(within(results()).getByText("Only therapists who say they work online or by phone.")).toBeTruthy();
+    expect(within(results()).queryByText(/^Pins show/)).toBeNull();
+  });
+
+  it("asks for no place, nor a session type needing one, that a link carries", async () => {
+    screenIs(true);
+    renderAt(`${ONLINE}?Location=Leeds&TypesOfSession=Face+to+Face+-+Long+Term`);
+    await loaded();
+    expect(asked()).toBe(EVERYONE_ONLINE);
+  });
+
+  it("goes online from a search near a place, taking its filters, and comes back to the place", async () => {
+    screenIs(true);
+    renderAt("/?Location=Leeds&Languages=Greek&TypesOfSession=Face+to+Face+-+Long+Term");
+    await loaded();
+    expect(screen.getByRole("link", { name: "Near me" }).getAttribute("aria-current")).toBe("page");
+    fireEvent.click(screen.getByRole("link", { name: "Online" }));
+    expect([path(), url().toString()]).toEqual([ONLINE, "Languages=Greek"]);
+    expect(screen.getByRole("link", { name: "Online" }).getAttribute("aria-current")).toBe("page");
+    await loaded();
+    fireEvent.click(screen.getByRole("link", { name: "Near me" }));
+    expect([path(), url().toString()]).toEqual(["/", "Location=Leeds&Languages=Greek"]);
+    await loaded();
+  });
+
+  it("keeps the keyboard on the switch as it changes the page", async () => {
+    screenIs(true);
+    renderAt(SEARCH);
+    await loaded();
+    fireEvent.click(screen.getByRole("link", { name: "Online" }));
+    expect(document.activeElement).toBe(screen.getByRole("link", { name: "Online" }));
+    await loaded();
+  });
+
+  it("takes Near me back to the place last seen, however online was reached", async () => {
+    screenIs(true);
+    renderAt("/?Location=York");
+    await loaded();
+    cleanup();
+    renderAt(ONLINE);
+    await loaded();
+    expect(screen.getByRole("link", { name: "Near me" }).getAttribute("href")).toBe("/?Location=York");
+  });
+
+  it("picks out the same sought terms on the shortlist as in the results", async () => {
+    screenIs(true);
+    shortlist.add({ ...therapist("a"), tags: ["Online Therapy"] });
+    renderAt(ONLINE, [{ ...therapist("a"), tags: ["Online Therapy"] }]);
+    await within(results()).findByText(/^1 of 1/);
+    const inResults = within(screen.getByRole("tabpanel", { name: "Results" })).getByText("Online Therapy").outerHTML;
+    const tab = screen.getByRole("tab", { name: /^Shortlist/ });
+    fireEvent.mouseDown(tab);
+    fireEvent.click(tab);
+    expect(within(screen.getByRole("tabpanel", { name: /^Shortlist/ })).getByText("Online Therapy").outerHTML).toBe(inResults);
+  });
+
+  it("keeps its filters open beside the list on wide screens, offering only video and phone among the session types", async () => {
+    screenIs(true);
+    renderAt(ONLINE);
+    await loaded();
+    expect(screen.queryByRole("button", { name: "Filters" })).toBeNull();
+    fireEvent.click(within(filters()).getByRole("button", { name: /^Type of Session/ }));
+    expect(within(filters()).queryByRole("checkbox", { name: "Face to Face - Long Term" })).toBeNull();
+    fireEvent.click(within(filters()).getByRole("checkbox", { name: "Telephone Therapy" }));
+    expect(url().toString()).toBe("TypesOfSession=Telephone+Therapy");
+    await waitFor(() => expect(asked()).toBe("TypesOfSession=Telephone+Therapy"));
+    await loaded();
+  });
+
+  it("keeps the filters' heading still as they scroll on wide screens", async () => {
+    screenIs(true);
+    renderAt(ONLINE);
+    await loaded();
+    const body = screen.getByRole("searchbox", { name: "Keyword search" }).closest(".overflow-y-auto");
+    expect(body?.contains(within(filters()).getByRole("heading", { name: "Refine your search" }))).toBe(false);
+  });
+
+  it("opens its filters in a sheet on narrow screens", async () => {
+    screenIs(false);
+    renderAt(ONLINE);
+    await loaded();
+    fireEvent.click(screen.getByRole("button", { name: "Filters" }));
+    expect(await screen.findByRole("dialog", { name: "Refine your search" })).toBeTruthy();
+  });
+
+  it("keeps Load more beneath the list rather than at its end", async () => {
+    screenIs(false);
+    renderAt(ONLINE);
+    await loaded();
+    const more = screen.getByRole("button", { name: "Load more" });
+    expect(results().contains(more)).toBe(true);
+    expect(list().contains(more)).toBe(false);
+  });
+
+  it("returns to the same place in the list after Back from a profile", async () => {
+    screenIs(true);
+    renderAt(ONLINE);
+    await loaded();
+    list().scrollTop = 400;
+    fireEvent.scroll(list());
+    fireEvent.click(screen.getByRole("link", { name: "Therapist p1-3" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Back" }));
+    await loaded();
+    expect(list().scrollTop).toBe(400);
+  });
+
+  it("keeps the shortlist in a tab beside the list", async () => {
+    screenIs(true);
+    shortlist.add(therapist("a"));
+    renderAt(ONLINE);
+    await loaded();
+    const tab = screen.getByRole("tab", { name: /^Shortlist/ });
+    fireEvent.mouseDown(tab);
+    fireEvent.click(tab);
+    expect(within(screen.getByRole("tabpanel", { name: /^Shortlist/ })).getByRole("link", { name: "Therapist a" })).toBeTruthy();
   });
 });

@@ -1,15 +1,10 @@
-import { SlidersHorizontal, X } from "lucide-react";
+import { SlidersHorizontal } from "lucide-react";
 import { Tabs } from "radix-ui";
-import { lazy, Suspense, useEffect, useId, useRef, useState, type ComponentProps } from "react";
-import { Link, useLocation } from "react-router";
+import { lazy, Suspense, useEffect, useId, useRef, useState } from "react";
+import { Link, useLocation, useMatch } from "react-router";
 import { canonicalLocation } from "@shared/location";
-import { OPTIONS } from "@shared/options";
 import { toQuery, type SearchParams } from "@shared/query";
-import { IconButton } from "@/components/IconButton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { TabsContent } from "@/components/ui/tabs";
 import { Masthead } from "@/layout/Masthead";
 import { useMediaQuery } from "@/lib/useMediaQuery";
 import { cn } from "@/lib/utils";
@@ -17,20 +12,22 @@ import { ShortlistTab } from "@/shortlist/ShortlistTab";
 import { useHasShortlist, useShortlistIf, useShortlistRefresh } from "@/shortlist/useShortlist";
 import { soughtTerms } from "./activeFilters";
 import { FilterChips } from "./FilterChips";
-import { FilterPanel } from "./FilterPanel";
-import { ListTabs, type ListTab } from "./ListTabs";
+import { FiltersButton, FiltersSection, MobileFilters } from "./Filters";
+import { ListPanels, ListTabs, type ListTab } from "./ListTabs";
 import { createHighlight } from "./map/highlight";
 import type { MapPaneProps } from "./map/MapPane";
 import type { Pin } from "./map/pins";
 import { useCentre, usePins } from "./map/usePlaces";
 import { LoadMore } from "./LoadMore";
+import { ModeSwitch } from "./ModeSwitch";
+import { ONLINE_PATH, onlineParams } from "./online";
+import { OnlineView } from "./OnlineView";
 import { reachMiles } from "./reach";
 import { Results } from "./Results";
 import { ResultsPanel } from "./ResultsPanel";
 import { ResultsSheet, type SheetPosition } from "./ResultsSheet";
 import { SearchBox } from "./SearchBox";
-import { tickedIn, withFlag } from "./state";
-import { TickedCount } from "./TickedCount";
+import { tickedFilters, withFlag } from "./state";
 import { useResults } from "./useResults";
 import { useSearchDrafts, type SearchDrafts } from "./useSearchDrafts";
 import { useSearchState } from "./useSearchState";
@@ -52,6 +49,8 @@ type MapView = Pick<MapPaneProps, "label" | "fitKey" | "centre" | "reachMiles" |
 
 export function SearchPage() {
   const { params, error, update } = useSearchState();
+  const online = useMatch(ONLINE_PATH) !== null;
+  const wide = useMediaQuery(WIDE);
   if (!params) {
     return (
       <div className="m-4 space-y-4">
@@ -67,13 +66,14 @@ export function SearchPage() {
       </div>
     );
   }
-  return <SearchView params={params} onChange={update} />;
+  if (online) return <OnlineView params={onlineParams(params)} onChange={update} wide={wide} />;
+  return <SearchView params={params} onChange={update} wide={wide} />;
 }
 
-type ViewProps = { params: SearchParams; onChange: (next: SearchParams) => void };
+type ViewProps = { params: SearchParams; onChange: (next: SearchParams) => void; wide: boolean };
 
-function SearchView({ params, onChange }: ViewProps) {
-  const wide = useMediaQuery(WIDE);
+/** Therapists near a place, on a map of where they are. */
+function SearchView({ params, onChange, wide }: ViewProps) {
   const { key: entry } = useLocation();
   const drafts = useSearchDrafts(params, onChange);
   // With nothing to search for, UKCP would list everyone in a random order, which answers no one's question. The
@@ -171,30 +171,21 @@ function SearchView({ params, onChange }: ViewProps) {
       onHighlight={highlight.set}
     />
   );
-  // The page's text size rather than the tabs' own, which is set for short text. A panel is a Tab stop of its own, so it
-  // shows a ring when it has focus.
-  const panel = "rounded-md text-base focus-visible:ring-3 focus-visible:ring-ring/50";
-  // Mounted throughout and hidden here, rather than shown by Radix a render after their tab, so a panel's entries are
-  // there for the list's scroll to be restored or a pin's entry found. The shortlist's cards come and go with their tab,
-  // which lets go of those removed while it was open.
   const lists = (
-    <>
-      <TabsContent value="results" forceMount hidden={tab !== "results"} className={panel}>
-        {/* Until a search there is nothing to list, and nothing loading whose wait could be timed. */}
-        {searching && list}
-      </TabsContent>
-      <TabsContent value="shortlist" forceMount hidden={tab !== "shortlist"} className={panel}>
-        {tab === "shortlist" && (
-          <ShortlistTab
-            sought={soughtTerms(params)}
-            pins={shortlistPins.pins}
-            unplaced={shortlistPins.unplaced.length}
-            selected={selected}
-            onHighlight={highlight.set}
-          />
-        )}
-      </TabsContent>
-    </>
+    <ListPanels
+      tab={tab}
+      // Until a search there is nothing to list, and nothing loading whose wait could be timed.
+      results={searching && list}
+      shortlist={
+        <ShortlistTab
+          sought={soughtTerms(params)}
+          pins={shortlistPins.pins}
+          unplaced={shortlistPins.unplaced.length}
+          selected={selected}
+          onHighlight={highlight.set}
+        />
+      }
+    />
   );
   const footer = tab === "results" ? <LoadMore results={results} listRef={listRef} placing={placing} /> : undefined;
   const tabs = <ListTabs searching={searching} />;
@@ -278,8 +269,9 @@ function reveal(list: HTMLElement, entry: HTMLElement, glide: boolean) {
 }
 
 /**
- * The search box, filters and active-filter chips, floating over the top of the map or the prompt. The map's "Search
- * this area" button is placed to keep clear of it, so a change to its inset, width or height moves that too.
+ * The switch to online, search box, filters and active-filter chips, floating over the top of the map or the prompt.
+ * The map's "Search this area" button is placed to keep clear of it, so a change to its inset, width or height moves
+ * that too.
  */
 function MapToolbar({
   params,
@@ -288,26 +280,28 @@ function MapToolbar({
   wide,
   filtersOpen,
   onFiltersOpenChange,
-}: ViewProps & { drafts: SearchDrafts; wide: boolean; filtersOpen: boolean; onFiltersOpenChange: (open: boolean) => void }) {
+}: ViewProps & { drafts: SearchDrafts; filtersOpen: boolean; onFiltersOpenChange: (open: boolean) => void }) {
   const filtersId = useId();
-  // UKCP's groups rather than the panel's, so the outside-UK tick, which makes no chip and survives Clear all, goes uncounted.
-  const ticked = OPTIONS.groups.reduce((sum, group) => sum + tickedIn(params, group), 0);
+  const ticked = tickedFilters(params);
   return (
     // Only the toolbar's own controls take the pointer; the map shows through the rest of it.
     <div className="pointer-events-none absolute inset-3 z-10 flex flex-col items-start gap-2 lg:right-auto lg:w-96">
-      <div className="pointer-events-auto flex w-full items-start gap-2 rounded-xl border bg-background p-2 shadow-md">
-        {/* A search for a place puts the filters away to show where it is; ticks and the keyword leave them open for more. */}
-        <SearchBox params={params} drafts={drafts} onPlaceSearch={() => onFiltersOpenChange(false)} className="min-w-0 flex-1" />
-        {wide ? (
-          <FiltersButton
-            ticked={ticked}
-            aria-expanded={filtersOpen}
-            aria-controls={filtersOpen ? filtersId : undefined}
-            onClick={() => onFiltersOpenChange(!filtersOpen)}
-          />
-        ) : (
-          <MobileFilters params={params} drafts={drafts} ticked={ticked} />
-        )}
+      <div className="pointer-events-auto flex w-full flex-col gap-2 rounded-xl border bg-background p-2 shadow-md">
+        <ModeSwitch online={false} params={params} />
+        <div className="flex items-start gap-2">
+          {/* A search for a place puts the filters away to show where it is; ticks and the keyword leave them open for more. */}
+          <SearchBox params={params} drafts={drafts} onPlaceSearch={() => onFiltersOpenChange(false)} className="min-w-0 flex-1" />
+          {wide ? (
+            <FiltersButton
+              ticked={ticked}
+              aria-expanded={filtersOpen}
+              aria-controls={filtersOpen ? filtersId : undefined}
+              onClick={() => onFiltersOpenChange(!filtersOpen)}
+            />
+          ) : (
+            <MobileFilters params={params} drafts={drafts} ticked={ticked} />
+          )}
+        </div>
       </div>
       <FilterChips
         params={params}
@@ -316,23 +310,13 @@ function MapToolbar({
         className={cn("pointer-events-auto", !wide && "max-w-full flex-nowrap overflow-x-auto [&>li]:shrink-0")}
       />
       {wide && filtersOpen && (
-        <section
+        <FiltersSection
           id={filtersId}
-          aria-labelledby={`${filtersId}-heading`}
-          className="pointer-events-auto flex min-h-0 w-full flex-col overflow-hidden rounded-xl border bg-background shadow-lg"
-        >
-          <div className="flex items-center justify-between gap-2 border-b p-3 pl-4">
-            <h2 id={`${filtersId}-heading`} className="font-semibold">
-              Refine your search
-            </h2>
-            <Button type="button" variant="ghost" size="icon-sm" aria-label="Close filters" onClick={() => onFiltersOpenChange(false)}>
-              <X aria-hidden />
-            </Button>
-          </div>
-          <div className="min-h-0 overflow-y-auto p-4">
-            <FilterPanel params={params} drafts={drafts} />
-          </div>
-        </section>
+          params={params}
+          drafts={drafts}
+          onClose={() => onFiltersOpenChange(false)}
+          className="pointer-events-auto w-full shadow-lg"
+        />
       )}
     </div>
   );
@@ -342,7 +326,7 @@ function MapToolbar({
 function SearchPrompt({ besideFilters }: { besideFilters: boolean }) {
   return (
     // Clear of the toolbar over its top, or beside the filters open beneath it.
-    <div className={cn("flex size-full overflow-y-auto", besideFilters ? "py-6 pr-6 pl-105" : "px-6 py-24")}>
+    <div className={cn("flex size-full overflow-y-auto", besideFilters ? "py-6 pr-6 pl-105" : "px-6 py-28")}>
       {/* Centred by its margins, so text taller than the space scrolls from its top rather than being cut off there. */}
       <div className="m-auto max-w-2xl space-y-4 text-center text-balance sm:space-y-6">
         <p className="text-2xl font-semibold tracking-tight sm:text-4xl">
@@ -354,35 +338,5 @@ function SearchPrompt({ besideFilters }: { besideFilters: boolean }) {
         </p>
       </div>
     </div>
-  );
-}
-
-function MobileFilters({ params, drafts, ticked }: { params: SearchParams; drafts: SearchDrafts; ticked: number }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <Sheet open={open} onOpenChange={setOpen}>
-      <SheetTrigger asChild>
-        <FiltersButton ticked={ticked} />
-      </SheetTrigger>
-      <SheetContent side="left" className="gap-0">
-        <SheetHeader className="border-b">
-          <SheetTitle>Refine your search</SheetTitle>
-        </SheetHeader>
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 pt-4 pb-6">
-          {/* Searching closes the sheet to show its results; ticks leave it open for more. */}
-          <FilterPanel params={params} drafts={drafts} onSearch={() => setOpen(false)} />
-        </div>
-      </SheetContent>
-    </Sheet>
-  );
-}
-
-/** With the number of ticked filters on its corner. */
-function FiltersButton({ ticked, className, ...props }: Omit<ComponentProps<typeof IconButton>, "label"> & { ticked: number }) {
-  return (
-    <IconButton label="Filters" variant="outline" className={cn("relative", className)} {...props}>
-      <SlidersHorizontal aria-hidden />
-      <TickedCount count={ticked} className="absolute -top-1.5 -right-1.5 h-4 min-w-4 px-1 text-[0.625rem]" />
-    </IconButton>
   );
 }

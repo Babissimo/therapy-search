@@ -56,7 +56,7 @@ export function SearchAreaButton({ centred, settled, onSearch }: Props) {
   return (
     // Clear of SearchPage's toolbar, whose inset, width and row of filter chips these offsets follow: beneath it on a
     // phone, where it spans the map, and beside it on a wide screen.
-    <div className="pointer-events-none absolute inset-x-3 top-30 z-1000 flex justify-center lg:top-5 lg:left-102">
+    <div className="pointer-events-none absolute inset-x-3 top-40 z-1000 flex justify-center lg:top-5 lg:left-102">
       <MapControlContainer className="pointer-events-auto relative flex flex-col items-center gap-1.5">
         <Button
           ref={handFocus}

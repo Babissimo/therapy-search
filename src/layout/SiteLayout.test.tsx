@@ -36,4 +36,11 @@ describe("SiteLayout", () => {
     at({ pathname: "/therapist/Jo-ABCDEFGH", state: { background: { pathname: "/", search: "?Location=Leeds" } } });
     expect(screen.queryByRole("banner")).toBeNull();
   });
+
+  it("lays the online search out as the search page, beneath a profile opened over it too", () => {
+    at("/online");
+    expect(screen.queryByRole("banner")).toBeNull();
+    at({ pathname: "/therapist/Jo-ABCDEFGH", state: { background: { pathname: "/online", search: "" } } });
+    expect(screen.queryByRole("banner")).toBeNull();
+  });
 });

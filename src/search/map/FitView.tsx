@@ -19,7 +19,7 @@ type Props = {
 };
 
 // Clear of the search box and filters over the top left of the map.
-const PADDING = { paddingTopLeft: [48, 96], paddingBottomRight: [48, 48] } satisfies L.FitBoundsOptions;
+const PADDING = { paddingTopLeft: [48, 136], paddingBottomRight: [48, 48] } satisfies L.FitBoundsOptions;
 // Close enough to tell streets apart, even when every pin is at the centre.
 const MAX_ZOOM = 14;
 

@@ -25,6 +25,8 @@ type Props = {
   selected?: Pin;
   /** The therapist whose card the pointer or focus is on, for the map to ring their pin. */
   onHighlight?: (slug: string | undefined) => void;
+  /** Beneath the count, on what the list shows. */
+  note?: string;
 };
 
 // How long a search runs before the list says why.
@@ -41,7 +43,7 @@ export function Results(props: Props) {
   );
 }
 
-function ResultsList({ params, results, listRef, pins = [], unplaced = [], selected, onHighlight }: Props) {
+function ResultsList({ params, results, listRef, pins = [], unplaced = [], selected, onHighlight, note = "Pins show the postcode or area each therapist lists." }: Props) {
   const { query, first, therapists, searchedPlace } = results;
   if (query.isPending) {
     return (
@@ -68,7 +70,7 @@ function ResultsList({ params, results, listRef, pins = [], unplaced = [], selec
         {therapists.length > 0 && (
           <>
             <p className="text-sm text-muted-foreground">{unplaced.length > 0 ? `${reach} · ${unplaced.length} not on the map` : reach}</p>
-            <p className="text-xs text-muted-foreground">Pins show the postcode or area each therapist lists.</p>
+            <p className="text-xs text-muted-foreground">{note}</p>
           </>
         )}
       </div>

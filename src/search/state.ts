@@ -1,3 +1,4 @@
+import { OPTIONS } from "@shared/options";
 import { FLAG_PARAMS, MULTI_PARAMS, type FlagParam, type MultiParam, type SearchParams, type TextParam } from "@shared/query";
 import type { FilterField, FilterGroup } from "@shared/types";
 
@@ -31,6 +32,11 @@ export function isChecked(params: SearchParams, field: FilterField): boolean {
   if (isMulti(field.name)) return params.multi[field.name].includes(field.value);
   if (isFlag(field.name)) return params.flags[field.name];
   return false;
+}
+
+/** Ticks narrowing the search. UKCP's groups rather than the panel's, so the outside-UK tick, which makes no chip and survives Clear all, goes uncounted. */
+export function tickedFilters(params: SearchParams): number {
+  return OPTIONS.groups.reduce((sum, group) => sum + tickedIn(params, group), 0);
 }
 
 export function tickedIn(params: SearchParams, group: FilterGroup): number {

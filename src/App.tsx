@@ -5,6 +5,7 @@ import { SiteLayout } from "@/layout/SiteLayout";
 import { ProfileDrawer } from "@/profile/ProfileDrawer";
 import { ProfilePage } from "@/profile/ProfilePage";
 import { backgroundOf } from "@/profile/profileLink";
+import { ONLINE_PATH } from "@/search/online";
 import { SearchPage } from "@/search/SearchPage";
 
 // Retrying would repeat requests to UKCP that already failed or were rate-limited.
@@ -32,6 +33,7 @@ export function AppRoutes() {
     <SiteLayout>
       <Routes location={background ?? location}>
         <Route path="/" element={<SearchPage />} />
+        <Route path={ONLINE_PATH} element={<SearchPage />} />
         <Route path="/therapist/:slug" element={<ProfileRoute />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
