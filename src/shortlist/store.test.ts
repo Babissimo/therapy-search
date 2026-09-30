@@ -46,14 +46,61 @@ describe("createShortlistStore", () => {
     expect(store.has("a")).toBe(true);
   });
 
-  it("puts a therapist back where they were when given the time they were first added", () => {
+  it("moves a therapist between two others, to either end, and keeps the order for the next visit", () => {
+    const storage = memory();
+    const store = createShortlistStore(storage, clock());
+    for (const slug of ["a", "b", "c"]) store.add(card(slug));
+    const slugs = () => store.get().map((e) => e.card.slug);
+    const at = (slug: string) => store.get().find((e) => e.card.slug === slug);
+    store.move("a", { above: at("c"), below: at("b") });
+    expect(slugs()).toEqual(["c", "a", "b"]);
+    store.move("b", { below: at("c") });
+    expect(slugs()).toEqual(["b", "c", "a"]);
+    store.move("b", { above: at("a") });
+    expect(slugs()).toEqual(["c", "a", "b"]);
+    expect(createShortlistStore(storage).get().map((e) => e.card.slug)).toEqual(["c", "a", "b"]);
+  });
+
+  it("still moves a therapist into place after the same gap has been halved past what a number can hold", () => {
+    const store = createShortlistStore(memory(), clock());
+    for (const slug of ["a", "b", "c", "d", "e"]) store.add(card(slug));
+    for (let i = 0; i < 60; i++) {
+      const [top, second] = store.get();
+      const last = store.get().at(-1)!;
+      store.move(last.card.slug, { above: top, below: second });
+      expect(store.get()[1]?.card.slug).toBe(last.card.slug);
+    }
+  });
+
+  it("leaves everyone else's rank alone while there is room between the neighbours", () => {
+    const store = createShortlistStore(memory(), clock());
+    for (const slug of ["a", "b", "c"]) store.add(card(slug));
+    store.move("a", { above: store.get()[0], below: store.get()[1] });
+    const others = store.get().slice(0, 2);
+    store.move("b", { below: store.get()[0] });
+    expect(store.get().slice(1)).toEqual(others);
+  });
+
+  it("lists a therapist added after a move above everyone", () => {
     const store = createShortlistStore(memory(), clock());
     store.add(card("a"));
     store.add(card("b"));
-    store.remove("a");
-    expect(store.has("a")).toBe(false);
-    store.add(card("a"), 1000);
-    expect(store.get().map((e) => e.card.slug)).toEqual(["b", "a"]);
+    store.move("a", { below: store.get()[0] });
+    store.add(card("c"));
+    expect(store.get().map((e) => e.card.slug)).toEqual(["c", "a", "b"]);
+  });
+
+  it("puts a therapist back where they were, moved or not, when given the entry they had", () => {
+    const store = createShortlistStore(memory(), clock());
+    for (const slug of ["a", "b", "c"]) store.add(card(slug));
+    store.move("c", { above: store.get()[2] });
+    const before = store.get();
+    for (const entry of before) {
+      store.remove(entry.card.slug);
+      expect(store.has(entry.card.slug)).toBe(false);
+      store.add(entry.card, entry);
+    }
+    expect(store.get().map((e) => e.card.slug)).toEqual(["b", "a", "c"]);
   });
 
   it("keeps the list for the next visit", () => {
@@ -62,11 +109,11 @@ describe("createShortlistStore", () => {
     expect(createShortlistStore(storage).get().map((e) => e.card.slug)).toEqual(["a"]);
   });
 
-  it("drops stored entries it can't read, and photo links that aren't http(s)", () => {
+  it("drops stored entries it can't read, and photo links and ranks that it can't use", () => {
     const stored = {
       v: 1,
       entries: {
-        good: { addedAt: 1, card: { slug: "good", name: "Good", initials: "G", photoUrl: "javascript:alert(1)", tags: ["Anxiety"] } },
+        good: { addedAt: 1, rank: "top", card: { slug: "good", name: "Good", initials: "G", photoUrl: "javascript:alert(1)", tags: ["Anxiety"] } },
         noName: { addedAt: 2, card: { slug: "noName", initials: "N", tags: [] } },
         noTime: { card: { slug: "noTime", name: "No time", initials: "N", tags: [] } },
         badTags: { addedAt: 3, card: { slug: "badTags", name: "Bad tags", initials: "B", tags: "Anxiety" } },
@@ -124,6 +171,15 @@ describe("createShortlistStore", () => {
     store.refresh([card("a", { name: "New name", photoUrl: "https://example.invalid/new.jpg" }), card("z")]);
     expect(store.get()).toEqual([{ addedAt: 1000, card: { ...card("a", { name: "New name", photoUrl: "https://example.invalid/new.jpg" }), distance: undefined } }]);
     expect(createShortlistStore(storage).get()[0]?.card.name).toBe("New name");
+  });
+
+  it("keeps a moved therapist's place when fresh results update their card", () => {
+    const store = createShortlistStore(memory(), clock());
+    store.add(card("a"));
+    store.add(card("b"));
+    store.move("b", { above: store.get()[1] });
+    store.refresh([card("b", { name: "New name" })]);
+    expect(store.get().map((e) => e.card.name)).toEqual(["Name of a", "New name"]);
   });
 
   it("changes nothing when fresh results match what it has", () => {

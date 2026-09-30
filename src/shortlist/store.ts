@@ -5,10 +5,14 @@ export const SHORTLIST_KEY = "shortlist";
 
 /** A card as a search showed it, less its distance, which only meant something from that search's place. */
 export type ShortlistCard = Omit<TherapistCard, "distance">;
-export type ShortlistEntry = { addedAt: number; card: ShortlistCard };
+/** `rank` is set once the visitor moves them; until then they are ranked by when they were added. */
+export type ShortlistEntry = { addedAt: number; rank?: number; card: ShortlistCard };
 
-/** Newest first, as UKCP lists its own. */
+/** Highest rank first: newest first, as UKCP lists its own, until the visitor rearranges it. */
 export type Shortlist = readonly ShortlistEntry[];
+
+/** The neighbours a therapist is moved between, as listed; either is missing at an end of the list. */
+type Between = { above?: ShortlistEntry; below?: ShortlistEntry };
 
 type Entries = ReadonlyMap<string, ShortlistEntry>;
 type Stored = { v: 1; entries: Record<string, ShortlistEntry> };
@@ -18,9 +22,10 @@ type Events = Pick<EventTarget, "addEventListener" | "removeEventListener">;
 export type ShortlistStore = {
   get: () => Shortlist;
   has: (slug: string) => boolean;
-  /** `addedAt` puts back a therapist just removed in the place they had. */
-  add: (card: ShortlistCard, addedAt?: number) => void;
+  /** `place`, the entry a therapist just removed had, puts them back where they were. */
+  add: (card: ShortlistCard, place?: Pick<ShortlistEntry, "addedAt" | "rank">) => void;
   remove: (slug: string) => void;
+  move: (slug: string, between: Between) => void;
   /** Brings shortlisted therapists' cards up to date from results the site has fetched anyway. */
   refresh: (cards: readonly TherapistCard[]) => void;
   subscribe: (onChange: () => void) => () => void;
@@ -60,8 +65,20 @@ export function createShortlistStore(storage: KeyValue | null, now: () => number
   return {
     get: () => list,
     has: (slug) => entries.has(slug),
-    add: (card, addedAt = now()) => update((next) => void next.set(card.slug, { addedAt, card: cardOf(card) })),
+    add: (card, place) => update((next) => void next.set(card.slug, { addedAt: place?.addedAt ?? now(), rank: place?.rank, card: cardOf(card) })),
     remove: (slug) => update((next) => void next.delete(slug)),
+    move: (slug, between) =>
+      update((next) => {
+        const entry = next.get(slug);
+        if (!entry) return;
+        let rank = rankBetween(between, next, now);
+        // Halving one gap again and again wears it below what a number can split; spread out, there is room again.
+        if (!fitsBetween(rank, between, next)) {
+          spread(next);
+          rank = rankBetween(between, next, now);
+        }
+        next.set(slug, { ...entry, rank });
+      }),
     refresh: (cards) => {
       // Runs whenever results render, so only shortlisted therapists' cards are copied and compared.
       const changed = cards.filter((fresh) => {
@@ -88,7 +105,42 @@ export function createShortlistStore(storage: KeyValue | null, now: () => number
 }
 
 function ordered(entries: Entries): Shortlist {
-  return [...entries.values()].sort((a, b) => b.addedAt - a.addedAt);
+  return [...entries.values()].sort(byRank);
+}
+
+export function byRank(a: ShortlistEntry, b: ShortlistEntry): number {
+  return rankOf(b) - rankOf(a);
+}
+
+function rankOf(entry: ShortlistEntry): number {
+  return entry.rank ?? entry.addedAt;
+}
+
+/** Midway between the neighbours; at the top, the time of the move, so anyone added later still goes above. */
+function rankBetween({ above, below }: Between, entries: Entries, now: () => number): number {
+  const rank = (neighbour: ShortlistEntry) => rankOf(current(neighbour, entries));
+  if (above && below) return (rank(above) + rank(below)) / 2;
+  if (below) return Math.max(now(), rank(below) + 1);
+  return above ? rank(above) - 1 : now();
+}
+
+function fitsBetween(rank: number, { above, below }: Between, entries: Entries): boolean {
+  return (!above || rank < rankOf(current(above, entries))) && (!below || rank > rankOf(current(below, entries)));
+}
+
+/** A neighbour as the store now holds them, where still listed, as spreading may have lowered them. */
+function current(neighbour: ShortlistEntry, entries: Entries): ShortlistEntry {
+  return entries.get(neighbour.card.slug) ?? neighbour;
+}
+
+/** Lowers ranks where needed so each is at least a millisecond below the one above, keeping their order. */
+function spread(entries: Map<string, ShortlistEntry>) {
+  let floor = Infinity;
+  for (const entry of ordered(entries)) {
+    const rank = Math.min(rankOf(entry), floor - 1);
+    if (rank !== rankOf(entry)) entries.set(entry.card.slug, { ...entry, rank });
+    floor = rank;
+  }
 }
 
 /** The card's own fields in a fixed order, so two copies of the same card compare equal as JSON. */
@@ -148,6 +200,7 @@ function entryFrom(value: unknown): ShortlistEntry | undefined {
   if (!Array.isArray(c.tags) || !c.tags.every((tag) => typeof tag === "string")) return undefined;
   return {
     addedAt: value.addedAt,
+    rank: typeof value.rank === "number" ? value.rank : undefined,
     card: cardOf({
       slug: c.slug,
       name: c.name,

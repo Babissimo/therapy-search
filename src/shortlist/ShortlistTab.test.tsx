@@ -2,7 +2,7 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import type { ComponentProps } from "react";
 import { MemoryRouter } from "react-router";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import type { Pin } from "@/search/map/pins";
 import { ShortlistTab } from "./ShortlistTab";
@@ -41,6 +41,36 @@ const entry = (name: string) => screen.getByRole("heading", { name }).closest("l
 
 const names = () => screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
 
+afterEach(() => {
+  vi.useRealTimers();
+  vi.restoreAllMocks();
+});
+
+/**
+ * jsdom lays nothing out, so each entry is given a place of its own down the list for dnd-kit to measure. Timers are
+ * faked so a move runs synchronously, as an async test that timed out would leave its `act` open over the next one.
+ */
+function layOutEntries() {
+  vi.useFakeTimers();
+  vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+    const li = this.closest("li");
+    if (!li?.parentElement) return new DOMRect();
+    return new DOMRect(0, [...li.parentElement.children].indexOf(li) * 200, 300, 180);
+  });
+}
+
+/** Picks a therapist up by their handle, as a keyboard does, then presses each key in turn. */
+function moveByKeys(name: string, ...codes: string[]) {
+  const handle = screen.getByRole("button", { name: `Move ${name}` });
+  handle.focus();
+  fireEvent.keyDown(handle, { code: "Space" });
+  // dnd-kit listens for the next key only once the one that picked them up has passed.
+  act(() => vi.runOnlyPendingTimers());
+  for (const code of codes) fireEvent.keyDown(handle, { code });
+}
+
+const announced = () => screen.getByRole("status").textContent;
+
 describe("ShortlistTab", () => {
   it("says how to shortlist someone when the list is empty", () => {
     renderTab({});
@@ -71,6 +101,33 @@ describe("ShortlistTab", () => {
     fireEvent.click(screen.getByRole("button", { name: "Add Bo to your shortlist" }));
     expect(store.get().map((e) => e.card.name)).toEqual(["Cy", "Bo", "Ann"]);
     expect(entry("Bo")?.className).not.toMatch(/opacity-60/);
+  });
+
+  it("moves a therapist by their handle, saying where they are as they go", () => {
+    layOutEntries();
+    const store = renderTab({}, card("Ann-AAAAAAAA", "Ann"), card("Bo-BBBBBBBB", "Bo"), card("Cy-CCCCCCCC", "Cy"));
+    moveByKeys("Cy");
+    expect(announced()).toBe("Picked up Cy, number 1 of 3.");
+    fireEvent.keyDown(screen.getByRole("button", { name: "Move Cy" }), { code: "ArrowDown" });
+    expect(announced()).toBe("Cy moved to number 2 of 3.");
+    fireEvent.keyDown(screen.getByRole("button", { name: "Move Cy" }), { code: "Escape" });
+    expect(names()).toEqual(["Cy", "Bo", "Ann"]);
+    expect(announced()).toBe("Cy put back at number 1 of 3.");
+    moveByKeys("Cy", "ArrowDown", "ArrowDown", "Space");
+    expect(names()).toEqual(["Bo", "Ann", "Cy"]);
+    expect(store.get().map((e) => e.card.name)).toEqual(["Bo", "Ann", "Cy"]);
+    expect(announced()).toBe("Cy put down at number 3 of 3.");
+  });
+
+  it("keeps a removed therapist's place as others move past, but can't move them", () => {
+    layOutEntries();
+    const store = renderTab({}, card("Ann-AAAAAAAA", "Ann"), card("Bo-BBBBBBBB", "Bo"), card("Cy-CCCCCCCC", "Cy"));
+    fireEvent.click(screen.getByRole("button", { name: "Remove Bo from your shortlist" }));
+    expect(screen.getByRole<HTMLButtonElement>("button", { name: "Move Bo" }).disabled).toBe(true);
+    moveByKeys("Cy", "ArrowDown", "Space");
+    expect(names()).toEqual(["Bo", "Cy", "Ann"]);
+    fireEvent.click(screen.getByRole("button", { name: "Add Bo to your shortlist" }));
+    expect(store.get().map((e) => e.card.name)).toEqual(["Bo", "Cy", "Ann"]);
   });
 
   it("shows therapists shortlisted in another tab while it is open", () => {
