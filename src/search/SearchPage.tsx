@@ -9,7 +9,9 @@ import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
 import { Masthead } from "@/layout/Masthead";
 import { useMediaQuery } from "@/lib/useMediaQuery";
 import { cn } from "@/lib/utils";
+import { useClosedGroups } from "@/shortlist/groups";
 import { ShortlistTab } from "@/shortlist/ShortlistTab";
+import { statusOf } from "@/shortlist/store";
 import { useShortlistIf, useShortlistRefresh } from "@/shortlist/useShortlist";
 import { soughtTerms } from "./activeFilters";
 import { FilterChips } from "./FilterChips";
@@ -102,7 +104,11 @@ function SearchView({ params, onChange, wide }: ViewProps) {
   const tab = tabChoice?.fitKey === fitKey ? tabChoice.tab : "results";
   // Beside a search, the map shows whichever list is open, framing each afresh as its tab opens.
   const mapsShortlist = searching && tab === "shortlist";
-  const shortlisted = useShortlistIf(mapsShortlist).map((entry) => entry.card);
+  const [closedGroups] = useClosedGroups();
+  // As the tab lists them, the map shows the therapists in the shortlist's open groups.
+  const shortlisted = useShortlistIf(mapsShortlist)
+    .filter((entry) => !closedGroups.has(statusOf(entry)))
+    .map((entry) => entry.card);
   // A shortlist gathers therapists from any search, so their places are read with no centre to choose by or be too far
   // from, and as UK places, since an overseas reading with no centre could put a UK therapist abroad.
   const shortlistPins = usePins(shortlisted, NO_CENTRE, false);

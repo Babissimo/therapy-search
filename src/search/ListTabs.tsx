@@ -3,13 +3,17 @@ import type { ReactNode, Ref } from "react";
 import { Morph } from "@/components/Morph";
 import { TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CountBadge } from "@/shortlist/CountBadge";
+import { statusOf } from "@/shortlist/store";
 import { useShortlist } from "@/shortlist/useShortlist";
 
 export type ListTab = "results" | "shortlist";
 
-/** Between the results and the shortlist. The shortlist's count is read here, so a bookmark redraws the tabs rather than the page. */
+/**
+ * Between the results and the shortlist. The shortlist's count is read here, so a bookmark redraws the tabs rather than
+ * the page. Those set aside aren't counted, the visitor having finished with them.
+ */
 export function ListTabs({ ref }: { ref?: Ref<HTMLDivElement> }) {
-  const count = useShortlist().length;
+  const count = useShortlist().filter((entry) => statusOf(entry) !== "setAside").length;
   return (
     <Morph name="list-tabs">
       <TabsList ref={ref}>
