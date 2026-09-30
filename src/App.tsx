@@ -1,4 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { useState } from "react";
 import { BrowserRouter, Link, Route, Routes, useLocation, useParams } from "react-router";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SiteLayout } from "@/layout/SiteLayout";
@@ -29,6 +30,9 @@ export function App() {
 export function AppRoutes() {
   const location = useLocation();
   const background = backgroundOf(location);
+  // The drawer's profile outlasts leaving it, so the drawer slides away still showing it.
+  const [drawn, setDrawn] = useState(background && location);
+  if (background && location !== drawn) setDrawn(location);
   return (
     <SiteLayout>
       <Routes location={background ?? location}>
@@ -37,18 +41,26 @@ export function AppRoutes() {
         <Route path="/therapist/:slug" element={<ProfileRoute />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
-      {background && (
-        <Routes>
-          <Route path="/therapist/:slug" element={<ProfileRoute drawer />} />
+      {drawn && (
+        // At the location it opened at, so as it slides away the profile still reads the search it was opened from.
+        <Routes location={drawn}>
+          <Route path="/therapist/:slug" element={<DrawerRoute open={background !== undefined} />} />
         </Routes>
       )}
     </SiteLayout>
   );
 }
 
-function ProfileRoute({ drawer = false }: { drawer?: boolean }) {
+function ProfileRoute() {
   const { slug = "" } = useParams();
-  return drawer ? <ProfileDrawer key={slug} slug={slug} /> : <ProfilePage key={slug} slug={slug} />;
+  return <ProfilePage key={slug} slug={slug} />;
+}
+
+function DrawerRoute({ open }: { open: boolean }) {
+  const { slug = "" } = useParams();
+  // By history entry rather than profile, so each opening, even of a profile opened before, knows what opened it.
+  const { key } = useLocation();
+  return <ProfileDrawer key={key} slug={slug} open={open} />;
 }
 
 function NotFound() {
