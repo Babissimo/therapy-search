@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from "vitest";
 import type { TherapistCard } from "@shared/types";
-import { createShortlistStore, SHORTLIST_KEY } from "./store";
+import { createShortlistStore, SHORTLIST_KEY, statusOf } from "./store";
 
 function memory(initial?: unknown) {
   const store = new Map<string, string>(initial === undefined ? [] : [[SHORTLIST_KEY, typeof initial === "string" ? initial : JSON.stringify(initial)]]);
@@ -228,5 +228,84 @@ describe("createShortlistStore", () => {
     events.dispatchEvent(new StorageEvent("storage", { key: SHORTLIST_KEY }));
     expect(onChange).toHaveBeenCalledOnce();
     expect(store.has("elsewhere")).toBe(true);
+  });
+
+  it("records where the visitor stands with a therapist, and keeps it for the next visit", () => {
+    const storage = memory();
+    const store = createShortlistStore(storage, clock());
+    store.add(card("a"));
+    expect(statusOf(store.get()[0]!)).toBe("toContact");
+    store.setStatus("a", "contacted");
+    expect(statusOf(store.get()[0]!)).toBe("contacted");
+    expect(statusOf(createShortlistStore(storage).get()[0]!)).toBe("contacted");
+  });
+
+  it("stores To contact as no status at all", () => {
+    const storage = memory();
+    const store = createShortlistStore(storage, clock());
+    store.add(card("a"));
+    store.setStatus("a", "waiting");
+    store.setStatus("a", "toContact");
+    expect(store.get()[0]?.status).toBeUndefined();
+    expect(JSON.parse(storage.store.get(SHORTLIST_KEY)!).entries.a).not.toHaveProperty("status");
+  });
+
+  it("keeps a therapist's place as their status changes, and their status as they move", () => {
+    const store = createShortlistStore(memory(), clock());
+    for (const slug of ["a", "b", "c"]) store.add(card(slug));
+    store.setStatus("b", "setAside");
+    expect(store.get().map((e) => e.card.slug)).toEqual(["c", "b", "a"]);
+    store.move("b", { above: store.get()[2] });
+    expect(store.get().map((e) => [e.card.slug, statusOf(e)])).toEqual([
+      ["c", "toContact"],
+      ["a", "toContact"],
+      ["b", "setAside"],
+    ]);
+  });
+
+  it("keeps a therapist's status when fresh results update their card", () => {
+    const store = createShortlistStore(memory(), clock());
+    store.add(card("a"));
+    store.setStatus("a", "seeing");
+    store.refresh([card("a", { name: "New name" })]);
+    expect(statusOf(store.get()[0]!)).toBe("seeing");
+  });
+
+  it("puts a therapist back with the status they had, or adds them with the one given", () => {
+    const store = createShortlistStore(memory(), clock());
+    store.add(card("a"));
+    store.setStatus("a", "consultation");
+    const [before] = store.get();
+    store.remove("a");
+    store.add(before!.card, before);
+    expect(store.get()).toEqual([before]);
+    store.add(card("b"), { status: "contacted" });
+    expect(store.get()[0]).toEqual({ addedAt: 1001, status: "contacted", card: { ...card("b"), distance: undefined } });
+  });
+
+  it("changes nothing for a therapist who isn't shortlisted", () => {
+    const store = createShortlistStore(memory(), clock());
+    store.setStatus("a", "contacted");
+    expect(store.get()).toEqual([]);
+  });
+
+  it("reads a status it doesn't know as To contact", () => {
+    const entry = (status: unknown) => ({ addedAt: 1, status, card: { slug: "x", name: "X", initials: "X", tags: [] } });
+    const read = (status: unknown) => createShortlistStore(memory({ v: 1, entries: { x: entry(status) } })).get()[0]?.status;
+    expect(read("waiting")).toBe("waiting");
+    expect(read("toContact")).toBeUndefined();
+    expect(read("ghosted")).toBeUndefined();
+    expect(read(3)).toBeUndefined();
+  });
+
+  it("follows a status changed in another tab", () => {
+    const storage = memory();
+    const events = new EventTarget();
+    const store = createShortlistStore(storage, clock(), events);
+    store.add(card("a"));
+    store.subscribe(() => {});
+    createShortlistStore(storage).setStatus("a", "waiting");
+    events.dispatchEvent(new StorageEvent("storage", { key: SHORTLIST_KEY }));
+    expect(statusOf(store.get()[0]!)).toBe("waiting");
   });
 });

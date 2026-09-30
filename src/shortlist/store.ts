@@ -3,10 +3,16 @@ import { safeUrl } from "@shared/ukcp/text";
 
 export const SHORTLIST_KEY = "shortlist";
 
+/** Where the visitor stands with a shortlisted therapist, in the order a search usually runs through them. */
+export const STATUSES = ["toContact", "contacted", "waiting", "consultation", "seeing", "setAside"] as const;
+export type Status = (typeof STATUSES)[number];
+/** "To contact" is where a bookmark puts a therapist, so it is stored as no status at all. */
+type StoredStatus = Exclude<Status, "toContact">;
+
 /** A card as a search showed it, less its distance, which only meant something from that search's place. */
 export type ShortlistCard = Omit<TherapistCard, "distance">;
 /** `rank` is set once the visitor moves them; until then they are ranked by when they were added. */
-export type ShortlistEntry = { addedAt: number; rank?: number; card: ShortlistCard };
+export type ShortlistEntry = { addedAt: number; rank?: number; status?: StoredStatus; card: ShortlistCard };
 
 /** Highest rank first: newest first, as UKCP lists its own, until the visitor rearranges it. */
 export type Shortlist = readonly ShortlistEntry[];
@@ -22,10 +28,12 @@ type Events = Pick<EventTarget, "addEventListener" | "removeEventListener">;
 export type ShortlistStore = {
   get: () => Shortlist;
   has: (slug: string) => boolean;
-  /** `place`, the entry a therapist just removed had, puts them back where they were. */
-  add: (card: ShortlistCard, place?: Pick<ShortlistEntry, "addedAt" | "rank">) => void;
+  /** `place`, the entry a therapist just removed had, puts them back where and as they were; a status alone adds them with it. */
+  add: (card: ShortlistCard, place?: Partial<Omit<ShortlistEntry, "card">>) => void;
   remove: (slug: string) => void;
   move: (slug: string, between: Between) => void;
+  /** Leaves their place in the order alone, so the visitor's preference carries from one status to the next. */
+  setStatus: (slug: string, status: Status) => void;
   /** Brings shortlisted therapists' cards up to date from results the site has fetched anyway. */
   refresh: (cards: readonly TherapistCard[]) => void;
   subscribe: (onChange: () => void) => () => void;
@@ -65,7 +73,8 @@ export function createShortlistStore(storage: KeyValue | null, now: () => number
   return {
     get: () => list,
     has: (slug) => entries.has(slug),
-    add: (card, place) => update((next) => void next.set(card.slug, { addedAt: place?.addedAt ?? now(), rank: place?.rank, card: cardOf(card) })),
+    add: (card, place) =>
+      update((next) => void next.set(card.slug, { addedAt: place?.addedAt ?? now(), rank: place?.rank, status: place?.status, card: cardOf(card) })),
     remove: (slug) => update((next) => void next.delete(slug)),
     move: (slug, between) =>
       update((next) => {
@@ -78,6 +87,11 @@ export function createShortlistStore(storage: KeyValue | null, now: () => number
           rank = rankBetween(between, next, now);
         }
         next.set(slug, { ...entry, rank });
+      }),
+    setStatus: (slug, status) =>
+      update((next) => {
+        const entry = next.get(slug);
+        if (entry) next.set(slug, { ...entry, status: status === "toContact" ? undefined : status });
       }),
     refresh: (cards) => {
       // Runs whenever results render, so only shortlisted therapists' cards are copied and compared.
@@ -110,6 +124,10 @@ function ordered(entries: Entries): Shortlist {
 
 export function byRank(a: ShortlistEntry, b: ShortlistEntry): number {
   return rankOf(b) - rankOf(a);
+}
+
+export function statusOf(entry: ShortlistEntry): Status {
+  return entry.status ?? "toContact";
 }
 
 function rankOf(entry: ShortlistEntry): number {
@@ -201,6 +219,7 @@ function entryFrom(value: unknown): ShortlistEntry | undefined {
   return {
     addedAt: value.addedAt,
     rank: typeof value.rank === "number" ? value.rank : undefined,
+    status: storedStatus(value.status),
     card: cardOf({
       slug: c.slug,
       name: c.name,
@@ -212,6 +231,11 @@ function entryFrom(value: unknown): ShortlistEntry | undefined {
       tags: c.tags,
     }),
   };
+}
+
+/** A status this site stores, or nothing, which reads as "To contact". */
+function storedStatus(value: unknown): StoredStatus | undefined {
+  return STATUSES.some((status) => status !== "toContact" && status === value) ? (value as StoredStatus) : undefined;
 }
 
 function text(value: unknown): string | undefined {
