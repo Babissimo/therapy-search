@@ -32,8 +32,8 @@ export function CheckboxGroup({ group, searchable, isChecked, onToggle }: Props)
   const matches = (f: FilterField) => f.label.toLowerCase().includes(needle);
   const inView = (fields: FilterField[]) => fields.filter(matches).sort((a, b) => Number(first.has(b)) - Number(first.has(a)));
   const shown = inView(group.fields);
-  // UKCP ANDs a list's values, where a list of boxes reads as "any of these".
-  const narrows = group.fields.every((f) => isMulti(f.name)) && group.fields.some(isChecked);
+  // UKCP ANDs a list's values, where a list of boxes reads as "any of these", except the session types, which it ORs.
+  const narrows = group.fields.every((f) => isMulti(f.name) && f.name !== "TypesOfSession") && group.fields.some(isChecked);
 
   const toggleSection = (heading: string) =>
     setOpen((before) => {

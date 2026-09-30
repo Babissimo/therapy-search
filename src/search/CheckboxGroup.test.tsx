@@ -31,6 +31,12 @@ describe("CheckboxGroup", () => {
     screen.getByText(hint);
   });
 
+  it("leaves the hint off the session types, as UKCP lists anyone offering any of those ticked", () => {
+    const sessions = { label: "Type of Session", fields: ["Online Therapy", "Telephone Therapy"].map((v) => ({ name: "TypesOfSession", value: v, label: v })) };
+    render(<CheckboxGroup group={sessions} searchable={false} isChecked={() => true} onToggle={() => {}} />);
+    expect(screen.queryByText(/each extra tick narrows/)).toBeNull();
+  });
+
   it("lists boxes ticked when it opens first, and leaves later ticks where they are", () => {
     const names = () => screen.getAllByRole("checkbox").map((c) => c.parentElement?.textContent);
     const { rerender } = render(<CheckboxGroup group={group} searchable={false} isChecked={(f) => f.value === "Spanish"} onToggle={() => {}} />);
