@@ -2,7 +2,7 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ResultsSheet, type SheetPosition } from "./ResultsSheet";
+import { coverOf, ResultsSheet, type SheetPosition } from "./ResultsSheet";
 
 function Harness({ start }: { start: SheetPosition }) {
   const [position, setPosition] = useState(start);
@@ -106,5 +106,13 @@ describe("ResultsSheet", () => {
     const list = screen.getByText("Jo").parentElement!;
     expect(list.className).toContain("overflow-y-auto");
     expect(list.contains(screen.getByText("Load more"))).toBe(false);
+  });
+});
+
+describe("coverOf", () => {
+  it("covers as much of the map as the sheet is tall, and at full as much as Show map lowers it to", () => {
+    expect(coverOf("peek", 800)).toBe(56);
+    expect(coverOf("half", 800)).toBe(400);
+    expect(coverOf("full", 800)).toBe(56);
   });
 });

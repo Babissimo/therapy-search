@@ -5,7 +5,7 @@ import { useMap } from "react-leaflet";
 import { Button } from "@/components/ui/button";
 import { MapControlContainer } from "@/components/ui/map";
 import { usePostcodeNear } from "../usePostcodeNear";
-import { areaToSearch, type View } from "./geo";
+import { movedElsewhere, type Point, type View } from "./geo";
 
 // Each fits one line beneath the button on a phone.
 export const NO_POSTCODE_HERE = "No postcode near here. Move the map nearer a town.";
@@ -17,15 +17,18 @@ type Props = {
   centred: boolean;
   /** False while a search is on its way, whose results will frame the map afresh. */
   settled: boolean;
+  /** How much of the map's bottom, in pixels, lies under something laid over it, given the map's height. */
+  coveredBelow?: (height: number) => number;
   /** Searches at the postcode, answering false when it is the one already searched. */
   onSearch: (postcode: string) => boolean;
 };
 
 /**
- * Offers a search at the postcode nearest the middle of the map, once the visitor moves the map somewhere a search
- * could mean. It measures the move from the view it mounts on, so its owner mounts it afresh as each search is framed.
+ * Offers a search at the postcode nearest the middle of the map in view, once the visitor moves the map somewhere a
+ * search could mean. It measures the move from the view it mounts on, so its owner mounts it afresh as each search is
+ * framed.
  */
-export function SearchAreaButton({ centred, settled, onSearch }: Props) {
+export function SearchAreaButton({ centred, settled, coveredBelow, onSearch }: Props) {
   const near = usePostcodeNear((postcode) => (onSearch(postcode) ? undefined : ALREADY_SEARCHED), {
     none: NO_POSTCODE_HERE,
     failed: () => AREA_UNKNOWN,
@@ -51,8 +54,7 @@ export function SearchAreaButton({ centred, settled, onSearch }: Props) {
     },
     [map],
   );
-  const area = settled ? areaToSearch(view, framed, centred) : undefined;
-  if (!area) return null;
+  if (!settled || !movedElsewhere(view, framed, centred)) return null;
   return (
     // Clear of SearchPage's toolbar, whose inset, width and row of filter chips these offsets follow: beneath it on a
     // phone, where it spans the map, and beside it on a wide screen.
@@ -65,7 +67,7 @@ export function SearchAreaButton({ centred, settled, onSearch }: Props) {
           className="rounded-full px-3 shadow-md dark:bg-background"
           // Not disabled while looking, which would drop focus; a second press is ignored.
           aria-disabled={near.looking}
-          onClick={() => near.lookNear(() => Promise.resolve(area))}
+          onClick={() => near.lookNear(() => Promise.resolve(middleInView(map, coveredBelow)))}
         >
           {near.looking ? <Loader2 aria-hidden className="animate-spin" /> : <Search aria-hidden />}
           Search this area
@@ -83,7 +85,14 @@ export function SearchAreaButton({ centred, settled, onSearch }: Props) {
   );
 }
 
+// The whole map, rather than the part in view, so that raising or lowering what covers it is no move.
 function viewOf(map: LeafletMap): View {
   const bounds = map.getBounds();
   return { north: bounds.getNorth(), south: bounds.getSouth(), east: bounds.getEast(), west: bounds.getWest() };
+}
+
+function middleInView(map: LeafletMap, coveredBelow?: (height: number) => number): Point {
+  const { x, y } = map.getSize();
+  const { lat, lng } = map.containerPointToLatLng([x / 2, (y - (coveredBelow?.(y) ?? 0)) / 2]);
+  return { lat, lng };
 }

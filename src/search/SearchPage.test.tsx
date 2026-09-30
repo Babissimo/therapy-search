@@ -37,9 +37,10 @@ vi.mock("./map/MapPane", async () => {
     onSelect: (pin: Pin) => void;
     onSearchArea: (postcode: string) => boolean;
     outsideUK?: boolean;
+    coveredBelow?: (height: number) => number;
   };
   return {
-    default: ({ label, fitKey, reachMiles, centreSettled, pins, highlight, selected, onSelect, onSearchArea, outsideUK }: Props) => {
+    default: ({ label, fitKey, reachMiles, centreSettled, pins, highlight, selected, onSelect, onSearchArea, outsideUK, coveredBelow }: Props) => {
       const slug = useSyncExternalStore(highlight.subscribe, highlight.get);
       return createElement(
         "div",
@@ -53,6 +54,8 @@ vi.mock("./map/MapPane", async () => {
           "data-highlighted": slug ?? "",
           "data-selected": selected?.key ?? "",
           "data-outside-uk": String(Boolean(outsideUK)),
+          // As much of an 800px map as the sheet covers.
+          "data-covered": coveredBelow?.(800) ?? "",
         },
         pins.map((pin) =>
           createElement(
@@ -499,6 +502,26 @@ describe("SearchPage", () => {
       ["H3", "Therapist c"],
     ]);
     expect(names()).toEqual(["Therapist a", "Therapist c", "Therapist b"]);
+  });
+
+  it("tells the map how much of it the sheet covers on narrow screens, counting the list as lowered to show the map", async () => {
+    screenIs(false);
+    placeByDistrict();
+    renderAt(SEARCH, [therapist("a", "Hove BN3")]);
+    const pin = await screen.findByRole("button", { name: `Pin ${key(HOVE)}` });
+    expect(results().dataset.position).toBe("full");
+    expect(screen.getByTestId("map").dataset.covered).toBe("56");
+    fireEvent.click(screen.getByRole("button", { name: "Show map" }));
+    fireEvent.click(pin);
+    expect(results().dataset.position).toBe("half");
+    expect(screen.getByTestId("map").dataset.covered).toBe("400");
+  });
+
+  it("leaves the map wholly uncovered on wide screens", async () => {
+    screenIs(true);
+    renderAt(SEARCH);
+    await loaded();
+    expect(screen.getByTestId("map").dataset.covered).toBe("");
   });
 
   it("marks a selected pin's place in the list until the pin is activated again, raising the sheet halfway", async () => {

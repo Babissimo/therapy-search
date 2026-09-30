@@ -47,11 +47,22 @@ vi.mock("./FitView", async () => {
   const { createElement } = await import("react");
   return {
     // Clicked to stand for the view being framed.
-    FitView: ({ restored, instant, onFramed }: { restored?: { fitKey: string; pins: number; reach?: number }; instant?: boolean; onFramed?: () => void }) =>
+    FitView: ({
+      restored,
+      instant,
+      coveredBelow,
+      onFramed,
+    }: {
+      restored?: { fitKey: string; pins: number; reach?: number };
+      instant?: boolean;
+      coveredBelow?: (height: number) => number;
+      onFramed?: () => void;
+    }) =>
       createElement("button", {
         type: "button",
         "data-testid": "fit",
         "data-instant": String(Boolean(instant)),
+        "data-covered": coveredBelow?.(800) ?? "",
         "data-restored": restored ? `${restored.fitKey} with ${restored.pins} pins${restored.reach === undefined ? "" : ` to ${restored.reach} miles`}` : "",
         onClick: onFramed,
       }),
@@ -60,10 +71,10 @@ vi.mock("./FitView", async () => {
 vi.mock("./SearchAreaButton", async () => {
   const { createElement, useState } = await import("react");
   let mounts = 0;
-  type Props = { centred: boolean; settled: boolean; onSearch: (postcode: string) => boolean };
+  type Props = { centred: boolean; settled: boolean; coveredBelow?: (height: number) => number; onSearch: (postcode: string) => boolean };
   return {
     // Numbered as it mounts, and clicked to stand for a postcode found near the middle of the map.
-    SearchAreaButton: ({ centred, settled, onSearch }: Props) => {
+    SearchAreaButton: ({ centred, settled, coveredBelow, onSearch }: Props) => {
       const [mount] = useState(() => ++mounts);
       return createElement("button", {
         type: "button",
@@ -71,6 +82,7 @@ vi.mock("./SearchAreaButton", async () => {
         "data-mount": mount,
         "data-centred": String(centred),
         "data-settled": String(settled),
+        "data-covered": coveredBelow?.(800) ?? "",
         onClick: () => onSearch("BN3 1FG"),
       });
     },
@@ -164,6 +176,12 @@ describe("MapPane", () => {
     const before = screen.getByTestId("search-area").dataset.mount;
     fireEvent.click(screen.getByTestId("fit"));
     expect(screen.getByTestId("search-area").dataset.mount).not.toBe(before);
+  });
+
+  it("frames and searches clear of whatever covers the map's bottom", () => {
+    renderPane({ fitKey: "Location=Brighton", centre: BRIGHTON, coveredBelow: (height) => height / 2 });
+    expect(screen.getByTestId("fit").dataset.covered).toBe("400");
+    expect(screen.getByTestId("search-area").dataset.covered).toBe("400");
   });
 
   it("draws no circle without a centre, or before any card is further than 0 miles", () => {

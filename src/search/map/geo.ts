@@ -28,19 +28,17 @@ export function milesBetween(a: Point, b: Point): number {
 }
 
 /**
- * The middle of a view, when the visitor has moved the map on purpose from `framed`, as the search framed it, to
- * somewhere narrow enough to mean a place. `centred` says whether the search has a place of its own.
+ * Whether the visitor has moved the map on purpose from `framed`, as the search framed it, to a view narrow enough to
+ * mean a place. `centred` says whether the search has a place of its own.
  */
-export function areaToSearch(view: View, framed: View, centred: boolean): Point | undefined {
-  const middle = middleOf(view);
+export function movedElsewhere(view: View, framed: View, centred: boolean): boolean {
   const span = spanOf(view);
-  if (!meansAPlace(span)) return undefined;
+  if (!meansAPlace(span)) return false;
   // Nudges made while looking over the pins are no move to somewhere else.
-  const nudged = milesBetween(middle, middleOf(framed)) <= Math.max(span / 4, LEAST_MOVE_MILES);
+  const nudged = milesBetween(middleOf(view), middleOf(framed)) <= Math.max(span / 4, LEAST_MOVE_MILES);
   // Without a place of its own, a search framed too wide to mean one leaves any view that does somewhere new, even
   // one zoomed straight in.
-  if (nudged && (centred || meansAPlace(spanOf(framed)))) return undefined;
-  return middle;
+  return !nudged || (!centred && !meansAPlace(spanOf(framed)));
 }
 
 // Wider than a search reaches from side to side, a view's middle names no place anyone means.

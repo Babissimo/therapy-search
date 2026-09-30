@@ -77,6 +77,24 @@ describe("FitView", () => {
     expect(north! - south!).toBeCloseTo(0.87, 1);
   });
 
+  it("frames above whatever covers the map's bottom", () => {
+    const fit = spyFit();
+    // A fresh point each time, as Leaflet halves some in place.
+    vi.spyOn(L.Map.prototype, "getSize").mockImplementation(() => L.point(400, 800));
+    const { rerender } = render(onMap(<FitView fitKey="a" centre={BRIGHTON} points={[]} waiting={false} coveredBelow={(height) => height / 2} />));
+    expect(fit.mock.calls[0]?.[1]).toMatchObject({ paddingTopLeft: [48, 136], paddingBottomRight: [48, 448] });
+    rerender(onMap(<FitView fitKey="b" centre={BRIGHTON} points={[]} waiting={false} />));
+    expect(fit.mock.calls[1]?.[1]).toMatchObject({ paddingTopLeft: [48, 136], paddingBottomRight: [48, 48] });
+  });
+
+  it("keeps room to frame into on a map too short for all that covers it", () => {
+    const fit = spyFit();
+    vi.spyOn(L.Map.prototype, "getSize").mockImplementation(() => L.point(800, 400));
+    render(onMap(<FitView fitKey="a" centre={BRIGHTON} points={[]} waiting={false} coveredBelow={(height) => height / 2} />));
+    // 128px left beneath the toolbar's 136 and the 48 margin, of the 200 covered.
+    expect(fit.mock.calls[0]?.[1]).toMatchObject({ paddingBottomRight: [48, 136] });
+  });
+
   it("waits until it may frame", () => {
     const fit = spyFit();
     const { rerender } = render(onMap(<FitView fitKey="a" points={[BRIGHTON]} waiting />));

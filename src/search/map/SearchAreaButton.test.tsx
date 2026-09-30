@@ -7,9 +7,10 @@ import type { View } from "./geo";
 import { viewAround } from "./geo.testing";
 import { ALREADY_SEARCHED, AREA_UNKNOWN, NO_POSTCODE_HERE, SearchAreaButton } from "./SearchAreaButton";
 
-// A map that shows whatever view a test gives it, telling whoever is listening as a pan or zoom would.
+// A map 400 by 800 pixels that shows whatever view a test gives it, telling whoever is listening as a pan or zoom would.
 const leaflet = vi.hoisted(() => {
   let view: View = { north: 0, south: 0, east: 0, west: 0 };
+  const size = { x: 400, y: 800 };
   const listeners = new Set<() => void>();
   const container = document.createElement("div");
   container.tabIndex = 0;
@@ -17,6 +18,12 @@ const leaflet = vi.hoisted(() => {
   const map = {
     getBounds: () => ({ getNorth: () => view.north, getSouth: () => view.south, getEast: () => view.east, getWest: () => view.west }),
     getContainer: () => container,
+    getSize: () => size,
+    // Evenly across the view, which is near enough over a few miles.
+    containerPointToLatLng: ([x, y]: [number, number]) => ({
+      lat: view.north - ((view.north - view.south) * y) / size.y,
+      lng: view.west + ((view.east - view.west) * x) / size.x,
+    }),
     on: (type: string, listener: () => void) => void (type === "moveend" && listeners.add(listener)),
     off: (type: string, listener: () => void) => void (type === "moveend" && listeners.delete(listener)),
   };
@@ -36,9 +43,12 @@ const BRIGHTON = { lat: 50.8225, lng: -0.1372 };
 const HOVE = { lat: 50.835, lng: -0.178 };
 
 /** Mounts the button on a map framed around `framed`, then shows `view`. */
-function renderAt(view: View, { framed = viewAround(BRIGHTON, 5), settled = true, onSearch = vi.fn(() => true) } = {}) {
+function renderAt(
+  view: View,
+  { framed = viewAround(BRIGHTON, 5), settled = true, onSearch = vi.fn(() => true), coveredBelow = undefined as ((height: number) => number) | undefined } = {},
+) {
   leaflet.start(framed);
-  render(<SearchAreaButton centred settled={settled} onSearch={onSearch} />);
+  render(<SearchAreaButton centred settled={settled} onSearch={onSearch} coveredBelow={coveredBelow} />);
   act(() => leaflet.show(view));
   return onSearch;
 }
@@ -62,6 +72,15 @@ describe("SearchAreaButton", () => {
     expect(button()).toBeNull();
     act(() => leaflet.show(viewAround(HOVE, 5)));
     expect(button()).not.toBeNull();
+  });
+
+  it("counts moves of the whole map, so raising what covers it and nudging the map offers nothing", () => {
+    const framed = viewAround(BRIGHTON, 5);
+    leaflet.start(framed);
+    const { rerender } = render(<SearchAreaButton centred settled coveredBelow={() => 0} onSearch={vi.fn(() => true)} />);
+    rerender(<SearchAreaButton centred settled coveredBelow={(height) => (height * 3) / 4} onSearch={vi.fn(() => true)} />);
+    act(() => leaflet.show({ ...framed, north: framed.north + 0.001, south: framed.south + 0.001 }));
+    expect(button()).toBeNull();
   });
 
   it("hears a move made as it renders again", () => {
@@ -103,6 +122,16 @@ describe("SearchAreaButton", () => {
     press();
     await waitFor(() => expect(onSearch).toHaveBeenCalledWith("BN3 1FG"));
     expect(nearest).toHaveBeenCalledWith(expect.closeTo(HOVE.lat, 6), expect.closeTo(HOVE.lng, 6));
+  });
+
+  it("searches from the middle of the part of the map left uncovered", async () => {
+    const nearest = vi.spyOn(api, "nearest").mockResolvedValue({ found: true, postcode: "BN3 1FG" });
+    const view = viewAround(HOVE, 5);
+    renderAt(view, { coveredBelow: (height) => height / 2 });
+    press();
+    await waitFor(() => expect(nearest).toHaveBeenCalled());
+    // A quarter of the way down, halfway down the top half left in view.
+    expect(nearest).toHaveBeenCalledWith(expect.closeTo(view.north - (view.north - view.south) / 4, 6), expect.closeTo(HOVE.lng, 6));
   });
 
   it("says so when the postcode found is the one already searched", async () => {

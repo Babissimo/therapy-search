@@ -25,7 +25,7 @@ import { OnlineView } from "./OnlineView";
 import { reachMiles } from "./reach";
 import { Results } from "./Results";
 import { ResultsPanel } from "./ResultsPanel";
-import { ResultsSheet, type SheetPosition } from "./ResultsSheet";
+import { coverOf, ResultsSheet, type SheetPosition } from "./ResultsSheet";
 import { SearchBox } from "./SearchBox";
 import { tickedFilters, withFlag } from "./state";
 import { useResults } from "./useResults";
@@ -227,6 +227,7 @@ function SearchView({ params, onChange, wide }: ViewProps) {
                     return true;
                   }}
                   outsideUK={params.flags.LocationSearchOutsideUK}
+                  coveredBelow={wide ? undefined : (height) => coverOf(sheet, height)}
                 />
               </Suspense>
             ) : (

@@ -33,6 +33,8 @@ export type MapPaneProps = {
   onSearchArea: (postcode: string) => boolean;
   /** The search reads its location as a place anywhere in the world, so the map isn't kept to the UK. */
   outsideUK?: boolean;
+  /** How much of the map's bottom, in pixels, lies under the results, given the map's height. */
+  coveredBelow?: (height: number) => number;
 };
 
 /**
@@ -53,6 +55,7 @@ export default function MapPane({
   onSelect,
   onSearchArea,
   outsideUK,
+  coveredBelow,
 }: MapPaneProps) {
   const saved = savedView(entry).map;
   const restored = saved?.fitKey === fitKey ? saved : undefined;
@@ -95,13 +98,14 @@ export default function MapPane({
           restored={restored}
           // With no tiles drawn there is nothing to animate across, and they should load where the frame lands.
           instant={!tiles}
+          coveredBelow={coveredBelow}
           onFramed={() => {
             showTiles(true);
             countFraming();
           }}
         />
         {/* Mounted afresh on each frame, which it measures the visitor's moves from, and waiting as the frame does. */}
-        <SearchAreaButton key={framings} centred={centre !== undefined} settled={!framing} onSearch={onSearchArea} />
+        <SearchAreaButton key={framings} centred={centre !== undefined} settled={!framing} coveredBelow={coveredBelow} onSearch={onSearchArea} />
         <RememberView entry={entry} fitKey={fitKey} pins={pins.length} reach={reachMiles} />
       </Map>
     </div>
