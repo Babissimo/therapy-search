@@ -252,6 +252,21 @@ describe("SearchPage", () => {
     await loaded();
   });
 
+  it("leaves a search that nothing changes where it was, asking UKCP nothing more", async () => {
+    screenIs(true);
+    renderAt(SEARCH);
+    await loaded();
+    list().scrollTop = 400;
+    fireEvent.scroll(list());
+    fireEvent.change(screen.getByRole("textbox", { name: "Location" }), { target: { value: " Leeds " } });
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+    fireEvent.click(screen.getByRole("button", { name: "Filters" }));
+    fireEvent.click(screen.getByRole("button", { name: "Clear all filters" }));
+    await loaded();
+    expect(list().scrollTop).toBe(400);
+    expect(api.search).toHaveBeenCalledOnce();
+  });
+
   it("keeps Load more beneath the list rather than at its end", async () => {
     screenIs(true);
     renderAt(SEARCH);

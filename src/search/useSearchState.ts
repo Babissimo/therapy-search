@@ -16,7 +16,14 @@ export function useSearchState() {
       throw e;
     }
   }, [key]);
-  // Replacing rather than pushing history matches UKCP, whose page rewrites its URL in place.
-  const update = useCallback((next: SearchParams) => setQuery(toQuery(next), { replace: true }), [setQuery]);
+  // Replacing rather than pushing history matches UKCP, whose page rewrites its URL in place. An unchanged search keeps
+  // its history entry, and with it the list's scroll and the map's view.
+  const update = useCallback(
+    (next: SearchParams) => {
+      if (params && toQuery(next) === toQuery(params)) return;
+      setQuery(toQuery(next), { replace: true });
+    },
+    [params, setQuery],
+  );
   return { params, error, update };
 }
