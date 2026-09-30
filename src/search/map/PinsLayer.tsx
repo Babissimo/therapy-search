@@ -1,14 +1,25 @@
 import type L from "leaflet";
-import { useEffect, useRef, useState, useSyncExternalStore, type RefObject } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type RefObject } from "react";
 import { useMap } from "react-leaflet";
 import { useNavigate } from "react-router";
 import { MapMarker, MapMarkerClusterGroup, MapTooltip, markerData } from "@/components/ui/map";
 import { useProfileLink } from "@/profile/profileLink";
+import { useShortlistedSlugs } from "@/shortlist/useShortlist";
 import type { Highlight } from "./highlight";
 import { pinIcon } from "./pinIcon";
 import type { Pin } from "./pins";
 
-type Props = { pins: Pin[]; highlight: Highlight; selected?: Pin; onSelect: (pin: Pin) => void };
+type Props = {
+  pins: Pin[];
+  highlight: Highlight;
+  selected?: Pin;
+  onSelect: (pin: Pin) => void;
+  /** Badges and raises the pins of shortlisted therapists, which a map of the shortlist alone has no need to. */
+  marksShortlist?: boolean;
+};
+
+// Above other therapists' pins, but beneath the search's centre (MapPane) and a marked pin.
+const SHORTLISTED_Z = 100;
 
 /** Who is on a pin, identifying its membership alongside its place. */
 function who(pin: Pin): string {
@@ -19,25 +30,45 @@ function who(pin: Pin): string {
  * Therapists' pins, merged into clusters as the map zooms out. A highlighted therapist's pin, or the cluster holding it,
  * is ringed and raised; so is the selected pin, with a halo.
  */
-export function PinsLayer({ pins, highlight, selected, onSelect }: Props) {
+export function PinsLayer({ pins, highlight, selected, onSelect, marksShortlist = false }: Props) {
   const cluster = useRef<L.MarkerClusterGroup>(null);
   const markers = useRef(new Map<string, L.Marker>());
   const slug = useSyncExternalStore(highlight.subscribe, highlight.get);
-  useMarkedPin(cluster, markers.current, slug, "pin-highlight", pins);
-  useMarkedPin(cluster, markers.current, selected?.therapists[0]?.slug, "pin-selected", pins);
+  const shortlisted = useShortlistedSlugs(marksShortlist);
+  // Before the marks, which a redrawn icon has lost.
+  useRedrawnClusters(cluster, markers.current, shortlisted);
+  useMarkedPin(cluster, markers.current, slug, "pin-highlight", pins, shortlisted);
+  useMarkedPin(cluster, markers.current, selected?.therapists[0]?.slug, "pin-selected", pins, shortlisted);
   return (
     <MapMarkerClusterGroup
       ref={cluster}
-      icon={(inCluster) => pinIcon(inCluster.flatMap((m) => markerData<Pin>(m)?.therapists ?? []))}
+      icon={(inCluster) => pinIcon(inCluster.flatMap((m) => markerData<Pin>(m)?.therapists ?? []), shortlisted)}
       maxClusterRadius={60}
       disableClusteringAtZoom={16}
     >
       {pins.map((pin) => (
         // Leaflet reads a marker's title and data only when it is created, so a change of membership needs a fresh one.
-        <TherapistPin key={`${pin.key} ${who(pin)}`} pin={pin} markers={markers.current} onSelect={onSelect} />
+        <TherapistPin key={`${pin.key} ${who(pin)}`} pin={pin} shortlisted={shortlisted} markers={markers.current} onSelect={onSelect} />
       ))}
     </MapMarkerClusterGroup>
   );
+}
+
+/** Redraws the clusters holding anyone who joins or leaves the shortlist; their own pins redraw themselves. */
+function useRedrawnClusters(cluster: RefObject<L.MarkerClusterGroup | null>, markers: Map<string, L.Marker>, shortlisted: ReadonlySet<string>) {
+  const last = useRef(shortlisted);
+  useEffect(() => {
+    const before = last.current;
+    last.current = shortlisted;
+    const moved = [...before, ...shortlisted].filter((slug) => before.has(slug) !== shortlisted.has(slug));
+    const changed = [...new Set(moved.flatMap((slug) => markers.get(slug) ?? []))];
+    if (changed.length > 0) cluster.current?.refreshClusters(changed);
+  }, [cluster, markers, shortlisted]);
+}
+
+/** A pin holding a shortlisted therapist rests raised; a cluster, with no therapists of its own, rests level. */
+function restingZ(therapists: Pin["therapists"] | undefined, shortlisted: ReadonlySet<string>): number {
+  return therapists?.some((t) => shortlisted.has(t.slug)) ? SHORTLISTED_Z : 0;
 }
 
 const MARKS = ["pin-highlight", "pin-selected"] as const;
@@ -49,6 +80,7 @@ function useMarkedPin(
   slug: string | undefined,
   className: (typeof MARKS)[number],
   pins: Pin[],
+  shortlisted: ReadonlySet<string>,
 ) {
   const map = useMap();
   useEffect(() => {
@@ -60,7 +92,7 @@ function useMarkedPin(
       const { layer, element } = marked;
       element.classList.remove(className);
       // Kept raised while the other mark is on it.
-      if (!MARKS.some((mark) => element.classList.contains(mark))) layer.setZIndexOffset(0);
+      if (!MARKS.some((mark) => element.classList.contains(mark))) layer.setZIndexOffset(restingZ(markerData<Pin>(layer)?.therapists, shortlisted));
       marked = undefined;
     };
     const mark = () => {
@@ -84,16 +116,21 @@ function useMarkedPin(
       map.off("moveend", mark);
       unmark();
     };
-  }, [cluster, markers, map, slug, className, pins]);
+  }, [cluster, markers, map, slug, className, pins, shortlisted]);
 }
 
-function TherapistPin({ pin, markers, onSelect }: { pin: Pin; markers: Map<string, L.Marker>; onSelect: (pin: Pin) => void }) {
+type TherapistPinProps = { pin: Pin; shortlisted: ReadonlySet<string>; markers: Map<string, L.Marker>; onSelect: (pin: Pin) => void };
+
+function TherapistPin({ pin, shortlisted, markers, onSelect }: TherapistPinProps) {
   const navigate = useNavigate();
   const profile = useProfileLink();
   // Fresh only for the life of this marker (the key above remounts it for any change of place or membership), so
   // re-renders, such as another card being hovered, keep Leaflet's marker, icon and position rather than re-clustering it.
   const [position] = useState<[number, number]>(() => [pin.point.lat, pin.point.lng]);
-  const [icon] = useState(() => pinIcon(pin.therapists));
+  const [therapists] = useState(pin.therapists);
+  // Drawn afresh, and swapped in by Leaflet, only as this pin's own therapists join or leave the shortlist.
+  const listed = therapists.filter((t) => shortlisted.has(t.slug)).map((t) => t.slug).join(" ");
+  const icon = useMemo(() => pinIcon(therapists, new Set(listed.split(" "))), [therapists, listed]);
   const only = pin.therapists.length === 1 ? pin.therapists[0] : undefined;
   const register = (marker: L.Marker | null) => {
     if (!marker) return;
@@ -113,7 +150,14 @@ function TherapistPin({ pin, markers, onSelect }: { pin: Pin; markers: Map<strin
   };
   return (
     // No title: the icon names the marker, and a title would add the browser's own tooltip to this one.
-    <MapMarker position={position} icon={icon} data={pin} ref={register} eventHandlers={{ click: activate }}>
+    <MapMarker
+      position={position}
+      icon={icon}
+      zIndexOffset={restingZ(therapists, shortlisted)}
+      data={pin}
+      ref={register}
+      eventHandlers={{ click: activate }}
+    >
       {/* Lifted clear of the pin, which grows under the pointer (index.css). */}
       <MapTooltip offset={[0, -10]}>{only ? [only.name, only.location].filter(Boolean).join(" · ") : `${pin.therapists.length} therapists here`}</MapTooltip>
     </MapMarker>

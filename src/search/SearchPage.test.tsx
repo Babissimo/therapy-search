@@ -32,6 +32,7 @@ vi.mock("./map/MapPane", async () => {
     fitKey: string;
     centreSettled: boolean;
     pins: Pin[];
+    marksShortlist?: boolean;
     highlight: Highlight;
     selected?: Pin;
     onSelect: (pin: Pin) => void;
@@ -40,7 +41,7 @@ vi.mock("./map/MapPane", async () => {
     coveredBelow?: (height: number) => number;
   };
   return {
-    default: ({ label, fitKey, centreSettled, pins, highlight, selected, onSelect, onSearchArea, outsideUK, coveredBelow }: Props) => {
+    default: ({ label, fitKey, centreSettled, pins, marksShortlist, highlight, selected, onSelect, onSearchArea, outsideUK, coveredBelow }: Props) => {
       const slug = useSyncExternalStore(highlight.subscribe, highlight.get);
       return createElement(
         "div",
@@ -50,6 +51,7 @@ vi.mock("./map/MapPane", async () => {
           "data-testid": "map",
           "data-fit-key": fitKey,
           "data-settled": String(centreSettled),
+          "data-marks-shortlist": String(Boolean(marksShortlist)),
           "data-highlighted": slug ?? "",
           "data-selected": selected?.key ?? "",
           "data-outside-uk": String(Boolean(outsideUK)),
@@ -767,13 +769,17 @@ describe("SearchPage", () => {
     await waitFor(() => expect(mapPins()).toEqual([`Pin ${key(BRIGHTON)}: a`, `Pin ${key(HOVE)}: b`]));
     const framed = map().dataset.fitKey;
     expect(screen.getByRole("region", { name: "Map of results" })).toBe(map());
+    // Among the results, shortlisted therapists' pins are picked out; on the shortlist's own map, every pin would be.
+    expect(map().dataset.marksShortlist).toBe("true");
     pick(/^Shortlist/);
     await waitFor(() => expect(mapPins()).toEqual([`Pin ${key(HOVE)}: c`]));
     expect(map().dataset.fitKey).not.toBe(framed);
     expect(screen.getByRole("region", { name: "Map of your shortlist" })).toBe(map());
+    expect(map().dataset.marksShortlist).toBe("false");
     pick("Results");
     expect(mapPins()).toEqual([`Pin ${key(BRIGHTON)}: a`, `Pin ${key(HOVE)}: b`]);
     expect(map().dataset.fitKey).toBe(framed);
+    expect(map().dataset.marksShortlist).toBe("true");
   });
 
   it("takes a therapist's pin off the map as they leave the shortlist, though their card stays to put them back", async () => {

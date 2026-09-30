@@ -20,6 +20,8 @@ export type MapPaneProps = {
   centre?: Point;
   centreSettled: boolean;
   pins: Pin[];
+  /** Picks out shortlisted therapists' pins among the rest. */
+  marksShortlist?: boolean;
   /** True while any loaded card's location is still being looked up. */
   placing: boolean;
   /** The store of the therapist whose card is hovered or focused, which the pins subscribe to. */
@@ -43,6 +45,7 @@ export default function MapPane({
   centre,
   centreSettled,
   pins,
+  marksShortlist,
   placing,
   highlight,
   selected,
@@ -73,7 +76,7 @@ export default function MapPane({
         {/* Above the therapists' pins, which often share its point, but beneath one hovered (index.css raises it above
             every marker) or marked (PinsLayer raises it 1000); it lets clicks through to them. */}
         {centre && <MapMarker position={[centre.lat, centre.lng]} icon={centrePin} interactive={false} keyboard={false} zIndexOffset={200} />}
-        <PinsLayer pins={pins} highlight={highlight} selected={selected} onSelect={onSelect} />
+        <PinsLayer pins={pins} highlight={highlight} selected={selected} onSelect={onSelect} marksShortlist={marksShortlist} />
         <FitView
           fitKey={fitKey}
           centre={centre}

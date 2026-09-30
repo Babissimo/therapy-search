@@ -10,6 +10,9 @@ const STEP = 20;
 // lucide's "video" icon, inlined because pin icons are built outside React.
 const VIDEO_SVG =
   '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m16 13 5.223 3.482a.5.5 0 0 0 .777-.416V7.87a.5.5 0 0 0-.752-.432L16 10.5"/><rect x="2" y="6" width="14" height="12" rx="2"/></svg>';
+// lucide's "bookmark", filled as the shortlist button's is once someone is on it.
+const BOOKMARK_SVG =
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3a2 2 0 0 1 2 2v15a1 1 0 0 1-1.496.868l-4.512-2.578a2 2 0 0 0-1.984 0l-4.512 2.578A1 1 0 0 1 5 20V5a2 2 0 0 1 2-2z"/></svg>';
 
 const CENTRE: [number, number] = [27, 33];
 // lucide's "map-pin", filled and ringed, in a view cropped to it so its tip meets the bottom edge.
@@ -24,25 +27,33 @@ export function centreIcon(): DivIcon {
   return elementIcon(pin, CENTRE, "tip");
 }
 
-/** One therapist's photo or initials; a pin or cluster for several shows up to three, stacked, with the count. */
-export function pinIcon(therapists: TherapistCard[]): DivIcon {
+/**
+ * One therapist's photo or initials; a pin or cluster for several shows up to three, stacked, with the count. Anyone in
+ * `shortlisted` is badged, and leads a stack.
+ */
+export function pinIcon(therapists: TherapistCard[], shortlisted?: ReadonlySet<string>): DivIcon {
+  const onShortlist = (therapist: TherapistCard) => shortlisted?.has(therapist.slug) ?? false;
+  const listed = therapists.filter(onShortlist);
   const [first] = therapists;
   if (therapists.length === 1 && first) {
     const face = avatar(first, "size-10 text-sm");
     if (isRemoteOnly(first)) face.append(remoteBadge());
+    if (listed.length > 0) face.append(shortlistBadge("-top-1 -left-1"));
     const pin = holder([face]);
-    label(pin, first.name + (isRemoteOnly(first) ? ", remote sessions only" : ""));
+    label(pin, first.name + (isRemoteOnly(first) ? ", remote sessions only" : "") + (listed.length > 0 ? ", on your shortlist" : ""));
     return elementIcon(pin, [SINGLE, SINGLE]);
   }
-  const shown = therapists.slice(0, 3);
+  const shown = [...listed, ...therapists.filter((therapist) => !onShortlist(therapist))].slice(0, 3);
   const stack = holder(shown.map((therapist) => avatar(therapist, "size-8 text-xs")));
+  // Level with the count, at the stack's other end.
+  if (listed.length > 0) stack.append(shortlistBadge("-top-1.5 -left-1.5"));
   const count = element(
     "span",
     "absolute -top-1.5 -right-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[0.7rem] font-medium text-primary-foreground ring-2 ring-background",
   );
   count.textContent = String(therapists.length);
   stack.append(count);
-  label(stack, `${therapists.length} therapists here`);
+  label(stack, `${therapists.length} therapists here` + (listed.length > 0 ? `, ${listed.length} on your shortlist` : ""));
   return elementIcon(stack, [STACKED + (shown.length - 1) * STEP, STACKED]);
 }
 
@@ -80,13 +91,20 @@ function avatar(therapist: TherapistCard, size: string): HTMLElement {
 }
 
 function remoteBadge(): HTMLElement {
-  const badge = element(
-    "span",
-    "absolute -right-1 -bottom-1 flex size-5 items-center justify-center rounded-full bg-background text-foreground shadow ring-1 ring-border [&>svg]:size-3",
-  );
-  badge.title = "Remote sessions only";
-  badge.innerHTML = VIDEO_SVG;
-  return badge;
+  return badge("-right-1 -bottom-1 text-foreground", "Remote sessions only", VIDEO_SVG);
+}
+
+/** At the top left, clear of the remote badge at the bottom right and a stack's count at the top right. */
+function shortlistBadge(place: string): HTMLElement {
+  return badge(`${place} text-primary`, "On your shortlist", BOOKMARK_SVG);
+}
+
+/** A small disc on a pin's rim holding an icon; `look` places and colours it. */
+function badge(look: string, title: string, svg: string): HTMLElement {
+  const disc = element("span", `absolute ${look} flex size-5 items-center justify-center rounded-full bg-background shadow ring-1 ring-border [&>svg]:size-3`);
+  disc.title = title;
+  disc.innerHTML = svg;
+  return disc;
 }
 
 function element<K extends keyof HTMLElementTagNameMap>(tag: K, className: string): HTMLElementTagNameMap[K] {
