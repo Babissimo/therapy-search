@@ -29,7 +29,7 @@ const ASSET_CACHE_CONTROL = "public, max-age=31536000, immutable";
 export const UPSTREAM_DOWN = "UKCP's search isn't responding. Try again, or search on UKCP directly.";
 export const TOO_MANY = "Too many searches in a short time. Wait a minute and try again.";
 export const PLACE_DOWN = "Couldn't look up that place just now.";
-export const NEAREST_DOWN = "Couldn't find your postcode just now.";
+export const NEAREST_DOWN = "Couldn't find the nearest postcode just now.";
 // UKCP builds slugs from names, so they can carry accents and apostrophes.
 const SLUG = /^[\p{L}\p{N}][\p{L}\p{M}\p{N}'’.-]{2,119}$/u;
 

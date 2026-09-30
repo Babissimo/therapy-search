@@ -55,6 +55,25 @@ vi.mock("./FitView", async () => {
       }),
   };
 });
+vi.mock("./SearchAreaButton", async () => {
+  const { createElement, useState } = await import("react");
+  let mounts = 0;
+  type Props = { centred: boolean; settled: boolean; onSearch: (postcode: string) => boolean };
+  return {
+    // Numbered as it mounts, and clicked to stand for a postcode found near the middle of the map.
+    SearchAreaButton: ({ centred, settled, onSearch }: Props) => {
+      const [mount] = useState(() => ++mounts);
+      return createElement("button", {
+        type: "button",
+        "data-testid": "search-area",
+        "data-mount": mount,
+        "data-centred": String(centred),
+        "data-settled": String(settled),
+        onClick: () => onSearch("BN3 1FG"),
+      });
+    },
+  };
+});
 const moveend = vi.hoisted(() => ({ current: () => {} }));
 vi.mock("react-leaflet", () => ({
   useMapEvents: (handlers: { moveend: () => void }) => {
@@ -84,6 +103,7 @@ function renderPane(props: Partial<MapPaneProps> = {}) {
         placing={false}
         highlight={createHighlight()}
         onSelect={() => {}}
+        onSearchArea={() => true}
         {...props}
       />
       <Path />
@@ -116,6 +136,31 @@ describe("MapPane", () => {
     cleanup();
     renderPane({ pins: [pin("a")] });
     expect(screen.queryByTestId("static-marker")).toBeNull();
+  });
+
+  it("offers a search from the middle of the map once the view is settled, handing on the postcode found", () => {
+    const onSearchArea = vi.fn(() => true);
+    renderPane({ fitKey: "Location=Brighton", centre: BRIGHTON, onSearchArea });
+    const offer = screen.getByTestId("search-area");
+    expect([offer.dataset.centred, offer.dataset.settled]).toEqual(["true", "true"]);
+    fireEvent.click(offer);
+    expect(onSearchArea).toHaveBeenCalledWith("BN3 1FG");
+    cleanup();
+    renderPane({ fitKey: "Languages=French" });
+    expect(screen.getByTestId("search-area").dataset.centred).toBe("false");
+    cleanup();
+    renderPane({ fitKey: "Location=Brighton", centre: BRIGHTON, placing: true });
+    expect(screen.getByTestId("search-area").dataset.settled).toBe("false");
+    cleanup();
+    renderPane({ fitKey: "Location=Brighton", centre: BRIGHTON, centreSettled: false });
+    expect(screen.getByTestId("search-area").dataset.settled).toBe("false");
+  });
+
+  it("starts the offer afresh from each framing, which it measures the visitor's moves from", () => {
+    renderPane({ fitKey: "Location=Brighton", centre: BRIGHTON });
+    const before = screen.getByTestId("search-area").dataset.mount;
+    fireEvent.click(screen.getByTestId("fit"));
+    expect(screen.getByTestId("search-area").dataset.mount).not.toBe(before);
   });
 
   it("draws no circle without a centre, or before any card is further than 0 miles", () => {

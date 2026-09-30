@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useReducer, useState } from "react";
 import { useMapEvents } from "react-leaflet";
 import { Map, MapCircle, MapMarker, MapTileLayer, MapZoomControl } from "@/components/ui/map";
 import { savedView, saveView } from "../viewMemory";
@@ -8,6 +8,7 @@ import type { Highlight } from "./highlight";
 import { centreIcon } from "./pinIcon";
 import type { Pin } from "./pins";
 import { PinsLayer } from "./PinsLayer";
+import { SearchAreaButton } from "./SearchAreaButton";
 
 export type MapPaneProps = {
   /** The search as a query string: a new one frames the map afresh. */
@@ -26,16 +27,33 @@ export type MapPaneProps = {
   /** The pin whose place the results list marks. */
   selected?: Pin;
   onSelect: (pin: Pin) => void;
+  /** Searches at the postcode nearest the middle of the map, answering false when it is the one already searched. */
+  onSearchArea: (postcode: string) => boolean;
 };
 
 /** The map behind the results: pins and the circle the list reaches, framed as they are placed, with the view kept for Back. */
-export default function MapPane({ fitKey, entry, centre, reachMiles, centreSettled, pins, placing, highlight, selected, onSelect }: MapPaneProps) {
+export default function MapPane({
+  fitKey,
+  entry,
+  centre,
+  reachMiles,
+  centreSettled,
+  pins,
+  placing,
+  highlight,
+  selected,
+  onSelect,
+  onSearchArea,
+}: MapPaneProps) {
   const saved = savedView(entry).map;
   const restored = saved?.fitKey === fitKey ? saved : undefined;
   // A search keeps its tiles back until it is framed, so the whole UK's aren't fetched on the way. A view restored on
   // Back is already where it will stay.
   const [tiles, showTiles] = useState(restored !== undefined);
   const [centrePin] = useState(centreIcon);
+  const [framings, countFraming] = useReducer((count: number) => count + 1, 0);
+  // The frame takes in every loaded pin, so it waits until they are placed.
+  const framing = !centreSettled || placing;
   const points = pins.map((p) => p.point);
   return (
     <div role="region" aria-label="Map of results" className="isolate size-full">
@@ -56,18 +74,22 @@ export default function MapPane({ fitKey, entry, centre, reachMiles, centreSettl
             marked (PinsLayer raises it 1000); it lets clicks through to them. */}
         {centre && <MapMarker position={[centre.lat, centre.lng]} icon={centrePin} interactive={false} keyboard={false} zIndexOffset={200} />}
         <PinsLayer pins={pins} highlight={highlight} selected={selected} onSelect={onSelect} />
-        {/* The frame takes in every loaded pin, so it waits until they are placed. */}
         <FitView
           fitKey={fitKey}
           centre={centre}
           reachMiles={reachMiles}
           points={points}
-          waiting={!centreSettled || placing}
+          waiting={framing}
           restored={restored}
           // With no tiles drawn there is nothing to animate across, and they should load where the frame lands.
           instant={!tiles}
-          onFramed={() => showTiles(true)}
+          onFramed={() => {
+            showTiles(true);
+            countFraming();
+          }}
         />
+        {/* Mounted afresh on each frame, which it measures the visitor's moves from, and waiting as the frame does. */}
+        <SearchAreaButton key={framings} centred={centre !== undefined} settled={!framing} onSearch={onSearchArea} />
         <RememberView entry={entry} fitKey={fitKey} pins={pins.length} reach={reachMiles} />
       </Map>
     </div>

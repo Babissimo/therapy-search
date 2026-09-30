@@ -22,12 +22,21 @@ vi.mock("./map/pins", async (importOriginal) => {
   return { ...pins, layoutPins: vi.fn(pins.layoutPins) };
 });
 
-// The map pane is tested on its own; here it shows what the page passed it, with a button for each pin.
+// The map pane is tested on its own; here it shows what the page passed it, with a button for each pin and one that
+// finds BN3 1FG in the middle of the map.
 vi.mock("./map/MapPane", async () => {
   const { createElement, useSyncExternalStore } = await import("react");
-  type Props = { fitKey: string; centreSettled: boolean; pins: Pin[]; highlight: Highlight; selected?: Pin; onSelect: (pin: Pin) => void };
+  type Props = {
+    fitKey: string;
+    centreSettled: boolean;
+    pins: Pin[];
+    highlight: Highlight;
+    selected?: Pin;
+    onSelect: (pin: Pin) => void;
+    onSearchArea: (postcode: string) => boolean;
+  };
   return {
-    default: ({ fitKey, centreSettled, pins, highlight, selected, onSelect }: Props) => {
+    default: ({ fitKey, centreSettled, pins, highlight, selected, onSelect, onSearchArea }: Props) => {
       const slug = useSyncExternalStore(highlight.subscribe, highlight.get);
       return createElement(
         "div",
@@ -39,6 +48,11 @@ vi.mock("./map/MapPane", async () => {
           "data-selected": selected?.key ?? "",
         },
         pins.map((pin) => createElement("button", { key: pin.key, type: "button", onClick: () => onSelect(pin) }, `Pin ${pin.key}`)),
+        createElement(
+          "button",
+          { type: "button", onClick: (event: { currentTarget: HTMLElement }) => (event.currentTarget.dataset.searched = String(onSearchArea("BN3 1FG"))) },
+          "Search this area",
+        ),
       );
     },
   };
@@ -307,6 +321,31 @@ describe("SearchPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "Search" }));
     expect([url().get("Location"), url().get("KeywordFilter")]).toEqual(["York", "grief"]);
     await loaded();
+  });
+
+  it("searches the postcode the map finds in its middle, with the typed keyword and the ticks, putting the filters away", async () => {
+    screenIs(true);
+    renderAt("/?Location=Leeds&Languages=French");
+    await loaded();
+    fireEvent.click(screen.getByRole("button", { name: "Filters, 1 ticked" }));
+    fireEvent.change(screen.getByRole("searchbox", { name: "Keyword search" }), { target: { value: "grief" } });
+    const searchArea = await screen.findByRole("button", { name: "Search this area" });
+    fireEvent.click(searchArea);
+    expect(searchArea.dataset.searched).toBe("true");
+    expect([url().get("Location"), url().get("KeywordFilter"), url().get("Languages")]).toEqual(["BN3 1FG", "grief", "French"]);
+    expect(screen.getByRole<HTMLInputElement>("textbox", { name: "Location" }).value).toBe("BN3 1FG");
+    expect(screen.queryByRole("region", { name: "Refine your search" })).toBeNull();
+    await loaded();
+  });
+
+  it("tells the map when the postcode it finds is the one already searched, however it was typed", async () => {
+    screenIs(true);
+    renderAt("/?Location=bn3%201fg");
+    await loaded();
+    const searchArea = await screen.findByRole("button", { name: "Search this area" });
+    fireEvent.click(searchArea);
+    expect(searchArea.dataset.searched).toBe("false");
+    expect(url().get("Location")).toBe("bn3 1fg");
   });
 
   it("holds the map's framing until a first search arrives", async () => {

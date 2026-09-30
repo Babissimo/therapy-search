@@ -47,9 +47,10 @@ export function FitView({ fitKey, centre, reachMiles, points, waiting, restored,
       onFramed?.();
       return;
     }
+    // Leaflet ends every fit with a moveend, at once or when an animation comes to rest, even when the view stays put.
+    if (onFramed) map.once("moveend", onFramed);
     map.fitBounds(bounds, options);
     framed.current = { fitKey, pins: points.length, reach: reachMiles };
-    onFramed?.();
   }, [map, fitKey, centre, reachMiles, points, waiting, instant, onFramed]);
   return null;
 }

@@ -98,10 +98,10 @@ describe("SearchBox", () => {
 
   it("passes on the Worker's reason when the lookup fails", async () => {
     geolocation(at(50.826, -0.16));
-    vi.spyOn(api, "nearest").mockRejectedValue(new ApiError(502, "Couldn't find your postcode just now."));
+    vi.spyOn(api, "nearest").mockRejectedValue(new ApiError(502, "Couldn't find the nearest postcode just now."));
     renderBox();
     locate();
-    expect((await screen.findByRole("alert")).textContent).toBe("Couldn't find your postcode just now.");
+    expect((await screen.findByRole("alert")).textContent).toBe("Couldn't find the nearest postcode just now.");
   });
 
   it("ignores a second press while the first is locating", () => {
