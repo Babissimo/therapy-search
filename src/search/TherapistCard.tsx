@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Link } from "react-router";
 import { classifyLocation } from "@shared/location";
 import type { TherapistCard as Therapist } from "@shared/types";
@@ -12,10 +13,12 @@ type Props = {
   sought: ReadonlySet<string>;
   /** In a pin's box, whose heading names the place: the name drops to an h3 and the card gives only the distance. */
   grouped?: boolean;
+  /** A control beside the name, such as the shortlist's bookmark. */
+  action?: ReactNode;
   onHighlight?: (on: boolean) => void;
 };
 
-export function TherapistCard({ therapist: t, sought, grouped = false, onHighlight }: Props) {
+export function TherapistCard({ therapist: t, sought, grouped = false, action, onHighlight }: Props) {
   const profile = useProfileLink();
   const Heading = grouped ? "h3" : "h2";
   const where = grouped ? undefined : placeOf(t);
@@ -38,7 +41,7 @@ export function TherapistCard({ therapist: t, sought, grouped = false, onHighlig
             <AvatarImage src={t.photoUrl} alt="" />
             <AvatarFallback className="text-xl">{t.initials}</AvatarFallback>
           </Avatar>
-          <div className="min-w-0 space-y-1.5">
+          <div className="min-w-0 flex-1 space-y-1.5">
             <Heading className="font-semibold">
               {/* The stretched link makes the whole card clickable, as UKCP's is. */}
               <Link {...profile(t.slug)} className="after:absolute after:inset-0">
@@ -48,6 +51,8 @@ export function TherapistCard({ therapist: t, sought, grouped = false, onHighlig
             {place && <p className="text-sm">{place}</p>}
             {t.sessionTypes && <p className="text-sm text-muted-foreground">{t.sessionTypes}</p>}
           </div>
+          {/* Raised above the stretched link, which would otherwise take its clicks. */}
+          {action && <div className="relative z-10 -mt-1 -mr-1 self-start">{action}</div>}
         </div>
         {t.summary && <p className="text-sm">{t.summary}</p>}
         {tags.length > 0 && (

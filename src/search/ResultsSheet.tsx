@@ -1,4 +1,4 @@
-import { useRef, useState, type PointerEvent, type ReactNode, type Ref } from "react";
+import { useRef, useState, type MouseEvent, type PointerEvent, type ReactNode, type Ref } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -12,7 +12,10 @@ const HEIGHT: Record<SheetPosition, string> = { peek: `${PEEK_REM}rem`, half: "5
 type Props = {
   position: SheetPosition;
   onPositionChange: (position: SheetPosition) => void;
-  title: string;
+  /** The tabs between the results and the shortlist, in the header, so they show however low the sheet is. */
+  tabs: ReactNode;
+  /** What the button that lowers the sheet says, naming what lowering it shows. */
+  lowerLabel?: string;
   scrollRef?: Ref<HTMLDivElement>;
   onScroll?: (scrollTop: number) => void;
   /** Beneath the list rather than at its end, so it stays in view however far the list scrolls. */
@@ -21,10 +24,10 @@ type Props = {
 };
 
 /**
- * The results over the bottom of the map on narrow screens: a plain region rather than a dialog, so the map above
- * stays usable. Only the header drags; the list inside scrolls as normal, so the two gestures never compete.
+ * The results and shortlist over the bottom of the map on narrow screens: a plain region rather than a dialog, so the
+ * map above stays usable. Only the header drags; the list inside scrolls as normal, so the two gestures never compete.
  */
-export function ResultsSheet({ position, onPositionChange, title, scrollRef, onScroll, footer, children }: Props) {
+export function ResultsSheet({ position, onPositionChange, tabs, lowerLabel = "Show map", scrollRef, onScroll, footer, children }: Props) {
   const sheet = useRef<HTMLElement>(null);
   const drag = useRef<{ startY: number; startHeight: number } | null>(null);
   // The state draws the sheet; the ref is what a pointerup reads, as the last move may not have rendered yet.
@@ -32,7 +35,7 @@ export function ResultsSheet({ position, onPositionChange, title, scrollRef, onS
   const liveHeight = useRef<number | null>(null);
 
   function start(event: PointerEvent<HTMLDivElement>) {
-    // The header's button keeps its click.
+    // The header's buttons, tabs among them, keep their clicks.
     if (!sheet.current || (event.target as Element).closest("button")) return;
     event.currentTarget.setPointerCapture?.(event.pointerId);
     drag.current = { startY: event.clientY, startHeight: sheet.current.getBoundingClientRect().height };
@@ -44,6 +47,11 @@ export function ResultsSheet({ position, onPositionChange, title, scrollRef, onS
     const { peek, full } = heights(container);
     liveHeight.current = Math.min(full, Math.max(peek, drag.current.startHeight - (event.clientY - drag.current.startY)));
     setDragHeight(liveHeight.current);
+  }
+
+  // A tab pressed on a lowered sheet, whether or not it is the one open, is a list the visitor wants to see.
+  function raiseForTab(event: MouseEvent<HTMLDivElement>) {
+    if (position === "peek" && (event.target as Element).closest('[role="tab"]')) onPositionChange("full");
   }
 
   function end() {
@@ -58,7 +66,7 @@ export function ResultsSheet({ position, onPositionChange, title, scrollRef, onS
   return (
     <section
       ref={sheet}
-      aria-label="Results"
+      aria-label="Results and shortlist"
       data-position={position}
       style={{ height: dragHeight === null ? HEIGHT[position] : `${dragHeight}px` }}
       className={cn(
@@ -72,12 +80,13 @@ export function ResultsSheet({ position, onPositionChange, title, scrollRef, onS
         onPointerMove={move}
         onPointerUp={end}
         onPointerCancel={end}
+        onClick={raiseForTab}
         className="relative flex h-14 shrink-0 cursor-grab touch-none items-center justify-between gap-2 px-4"
       >
         <span aria-hidden className="absolute top-1.5 left-1/2 h-1 w-10 -translate-x-1/2 rounded-full bg-muted-foreground/40" />
-        <h2 className="text-sm font-semibold">{title}</h2>
+        {tabs}
         <Button type="button" variant="outline" size="sm" onClick={() => onPositionChange(position === "full" ? "peek" : "full")}>
-          {position === "full" ? "Show map" : "Show list"}
+          {position === "full" ? lowerLabel : "Show list"}
         </Button>
       </div>
       {/* Positioned so that visually hidden text is placed inside the list rather than stretching the page. */}

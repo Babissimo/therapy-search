@@ -5,8 +5,9 @@ import { IconButton } from "@/components/IconButton";
 type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  title: string;
-  /** Above the results, and hidden with them. */
+  /** The tabs between the results and the shortlist, heading the panel. */
+  tabs: ReactNode;
+  /** Above the tabs, and hidden with them. */
   masthead?: ReactNode;
   scrollRef?: Ref<HTMLDivElement>;
   onScroll?: (scrollTop: number) => void;
@@ -15,18 +16,18 @@ type Props = {
   children: ReactNode;
 };
 
-/** The results beside the map on wide screens: a plain region rather than a dialog, so the map stays usable. */
-export function ResultsPanel({ open, onOpenChange, title, masthead, scrollRef, onScroll, footer, children }: Props) {
+/** The results and shortlist beside the map on wide screens: a plain region rather than a dialog, so the map stays usable. */
+export function ResultsPanel({ open, onOpenChange, tabs, masthead, scrollRef, onScroll, footer, children }: Props) {
   const id = useId();
   return (
     <>
       <div id={id} hidden={!open} className="flex w-96 shrink-0 flex-col border-r bg-background">
         {masthead}
         {/* The panel and its list are positioned so that visually hidden text is placed inside them rather than stretching the page. */}
-        <section aria-label="Results" className="relative flex min-h-0 flex-1 flex-col">
+        <section aria-label="Results and shortlist" className="relative flex min-h-0 flex-1 flex-col">
           <div className="flex items-center justify-between gap-2 border-b px-4 py-2">
-            <h2 className="text-sm font-semibold">{title}</h2>
-            <IconButton label="Hide results" side="right" variant="ghost" size="icon-sm" aria-expanded aria-controls={id} onClick={() => onOpenChange(false)}>
+            {tabs}
+            <IconButton label="Hide list" side="right" variant="ghost" size="icon-sm" aria-expanded aria-controls={id} onClick={() => onOpenChange(false)}>
               <PanelLeftClose aria-hidden />
             </IconButton>
           </div>
@@ -39,7 +40,7 @@ export function ResultsPanel({ open, onOpenChange, title, masthead, scrollRef, o
       {!open && (
         <div className="shrink-0 border-r p-2">
           <IconButton
-            label="Show results"
+            label="Show list"
             side="right"
             variant="outline"
             size="icon-sm"

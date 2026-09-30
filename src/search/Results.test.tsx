@@ -5,6 +5,7 @@ import { useRef } from "react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { BATCH_SIZE, emptyParams, type SearchParams } from "@shared/query";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { api, ApiError } from "@/lib/api";
 import { listed } from "@/lib/listed.testing";
 import { LoadMore } from "./LoadMore";
@@ -58,9 +59,11 @@ function renderResults(params: SearchParams) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const ui = (next: SearchParams, placing: Placing = {}) => (
     <QueryClientProvider client={client}>
-      <MemoryRouter>
-        <Harness params={next} {...placing} />
-      </MemoryRouter>
+      <TooltipProvider>
+        <MemoryRouter>
+          <Harness params={next} {...placing} />
+        </MemoryRouter>
+      </TooltipProvider>
     </QueryClientProvider>
   );
   const view = render(ui(params));
@@ -94,6 +97,20 @@ describe("Results", () => {
     renderResults(leeds);
     act(() => vi.advanceTimersByTime(5000));
     expect(screen.queryByText(SLOW)).toBeNull();
+  });
+
+  it("heads the list with how many a searched place has within its area", async () => {
+    answerBatches();
+    renderResults(leeds);
+    expect(await screen.findByRole("heading", { name: "30 results within your area" })).toBeTruthy();
+  });
+
+  it("says once, and only once, that a search found no one", async () => {
+    answerBatches({ total: 0 });
+    renderResults(leeds);
+    await screen.findByRole("heading", { name: "No results within your area" });
+    expect(screen.queryByText("No results")).toBeNull();
+    expect(screen.queryByText(/^Pins show/)).toBeNull();
   });
 
   it("shows the nearest page, and adds the next with Load more", async () => {

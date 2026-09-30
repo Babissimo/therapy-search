@@ -2,11 +2,13 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation, useNavigate } from "react-router";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SearchResult, TherapistCard } from "@shared/types";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { api } from "@/lib/api";
 import { listed } from "@/lib/listed.testing";
+import { createShortlistStore, type ShortlistStore } from "@/shortlist/store";
+import { ShortlistContext } from "@/shortlist/useShortlist";
 import type { Highlight } from "./map/highlight";
 import { layoutPins, type Pin } from "./map/pins";
 import { SearchPage } from "./SearchPage";
@@ -86,26 +88,34 @@ function Url() {
   return <output data-testid="url">{useLocation().search}</output>;
 }
 
+/** The page's shortlist, empty at each test's start. */
+let shortlist: ShortlistStore;
+beforeEach(() => {
+  shortlist = createShortlistStore(null);
+});
+
 function renderAt(url: string, ...pages: TherapistCard[][]) {
   answer(pages);
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-      <TooltipProvider>
-        <MemoryRouter initialEntries={[url]}>
-          <Routes>
-            <Route
-              path="/"
-              element={
-                <>
-                  <SearchPage />
-                  <Url />
-                </>
-              }
-            />
-            <Route path="/therapist/:slug" element={<Profile />} />
-          </Routes>
-        </MemoryRouter>
-      </TooltipProvider>
+      <ShortlistContext.Provider value={shortlist}>
+        <TooltipProvider>
+          <MemoryRouter initialEntries={[url]}>
+            <Routes>
+              <Route
+                path="/"
+                element={
+                  <>
+                    <SearchPage />
+                    <Url />
+                  </>
+                }
+              />
+              <Route path="/therapist/:slug" element={<Profile />} />
+            </Routes>
+          </MemoryRouter>
+        </TooltipProvider>
+      </ShortlistContext.Provider>
     </QueryClientProvider>,
   );
 }
@@ -113,9 +123,9 @@ function renderAt(url: string, ...pages: TherapistCard[][]) {
 /** A search whose answer, with no "Location searched", has no centre to look up. */
 const SEARCH = "/?Location=Leeds";
 const url = () => new URLSearchParams(screen.getByTestId("url").textContent ?? "");
-const results = () => screen.getByRole("region", { name: "Results" });
+const results = () => screen.getByRole("region", { name: "Results and shortlist" });
 const loaded = () => within(results()).findByText(/^\d+ of 30/);
-/** The results' scrolling list, which holds everything but their header and footer. */
+/** The side bar's scrolling list, which holds everything but its tabs and footer. */
 const list = () => results().querySelector<HTMLElement>(".overflow-y-auto")!;
 const names = () => within(results()).getAllByRole("link", { name: /^Therapist/ }).map((link) => link.textContent);
 /** Gives the lazily loaded map time to arrive, were the page to ask for it. */
@@ -131,6 +141,7 @@ function placeByDistrict() {
 }
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
@@ -141,9 +152,9 @@ describe("SearchPage", () => {
     renderAt(SEARCH);
     await loaded();
     expect(await screen.findByTestId("map")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Hide results" }));
-    expect(screen.queryByRole("region", { name: "Results" })).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Show results" }));
+    fireEvent.click(screen.getByRole("button", { name: "Hide list" }));
+    expect(screen.queryByRole("region", { name: "Results and shortlist" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Show list" }));
     expect(results()).toBeTruthy();
   });
 
@@ -153,7 +164,7 @@ describe("SearchPage", () => {
     await mapLoads();
     expect(screen.getByText(/^Search a town, city or postcode/)).toBeTruthy();
     expect(screen.getByRole("heading", { level: 1, name: "Find a UKCP therapist" })).toBeTruthy();
-    expect(screen.queryByRole("region", { name: "Results" })).toBeNull();
+    expect(screen.queryByRole("region", { name: "Results and shortlist" })).toBeNull();
     expect(screen.queryByTestId("map")).toBeNull();
     expect(api.search).not.toHaveBeenCalled();
     fireEvent.change(screen.getByRole("textbox", { name: "Location" }), { target: { value: "York" } });
@@ -181,7 +192,7 @@ describe("SearchPage", () => {
     fireEvent.change(screen.getByRole("textbox", { name: "Location" }), { target: { value: "" } });
     fireEvent.click(screen.getByRole("button", { name: "Search" }));
     expect(screen.getByText(/^Search a town, city or postcode/)).toBeTruthy();
-    expect(screen.queryByRole("region", { name: "Results" })).toBeNull();
+    expect(screen.queryByRole("region", { name: "Results and shortlist" })).toBeNull();
     expect(screen.queryByTestId("map")).toBeNull();
     fireEvent.change(screen.getByRole("textbox", { name: "Location" }), { target: { value: "York" } });
     fireEvent.click(screen.getByRole("button", { name: "Search" }));
@@ -328,7 +339,7 @@ describe("SearchPage", () => {
     fireEvent.scroll(list());
     fireEvent.click(screen.getByRole("link", { name: "Therapist p1-3" }));
     fireEvent.click(await screen.findByRole("button", { name: "Back" }));
-    await screen.findByRole("region", { name: "Results" });
+    await screen.findByRole("region", { name: "Results and shortlist" });
     await loaded();
     expect(list().scrollTop).toBe(400);
   });
@@ -359,7 +370,7 @@ describe("SearchPage", () => {
     await loaded();
     expect(screen.getByRole("heading", { level: 1, name: "Find a UKCP therapist" })).toBeTruthy();
     expect(screen.getByRole("group", { name: "Theme" })).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Hide results" }));
+    fireEvent.click(screen.getByRole("button", { name: "Hide list" }));
     expect(screen.queryByRole("heading", { level: 1 })).toBeNull();
     expect(screen.queryByRole("group", { name: "Theme" })).toBeNull();
   });
@@ -439,7 +450,7 @@ describe("SearchPage", () => {
     expect(scrollTo).toHaveBeenLastCalledWith({ top: 50 + 700 - 100 - 8, behavior: "smooth" });
     // A list the selection opens starts at the entry rather than gliding there.
     fireEvent.click(screen.getByRole("button", { name: `Pin ${key(HOVE)}` }));
-    fireEvent.click(screen.getByRole("button", { name: "Hide results" }));
+    fireEvent.click(screen.getByRole("button", { name: "Hide list" }));
     fireEvent.click(screen.getByRole("button", { name: `Pin ${key(HOVE)}` }));
     expect(scrollTo).toHaveBeenLastCalledWith({ top: 50 + 700 - 100 - 8, behavior: "auto" });
   });
@@ -488,5 +499,161 @@ describe("SearchPage", () => {
     await act(async () => arrive({ total: 1, from: 1, to: 1, notices: [], therapists: [therapist("p1-2")] }));
     await within(results()).findByText(/^1 of 1/);
     expect(screen.getByTestId("map").dataset.highlighted).toBe("");
+  });
+
+  // Radix tabs switch on the mousedown that begins a click.
+  function pick(name: string | RegExp) {
+    const tab = screen.getByRole("tab", { name });
+    fireEvent.mouseDown(tab);
+    fireEvent.click(tab);
+  }
+
+  it("keeps the shortlist in a tab beside the results, counting who is on it", async () => {
+    screenIs(true);
+    renderAt(SEARCH);
+    await loaded();
+    fireEvent.click(screen.getByRole("button", { name: "Add Therapist p1-3 to your shortlist" }));
+    pick("Shortlist, 1 therapist");
+    const shortlist = screen.getByRole("tabpanel", { name: /^Shortlist/ });
+    expect(within(shortlist).getByRole("link", { name: "Therapist p1-3" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Load more" })).toBeNull();
+    pick("Results");
+    await loaded();
+    expect(screen.getByRole("button", { name: "Load more" })).toBeTruthy();
+  });
+
+  it("keeps each tab's own place in the list", async () => {
+    screenIs(true);
+    renderAt(SEARCH);
+    await loaded();
+    // As in a browser, the list scrolls no further than its content: with no entries in it, not at all.
+    let top = 0;
+    Object.defineProperty(list(), "scrollTop", {
+      configurable: true,
+      get: () => top,
+      set: (value: number) => (top = list().querySelector("li") ? value : 0),
+    });
+    list().scrollTop = 400;
+    fireEvent.scroll(list());
+    pick(/^Shortlist/);
+    expect(list().scrollTop).toBe(0);
+    pick("Results");
+    expect(list().scrollTop).toBe(400);
+  });
+
+  it("goes back to the results for a new search", async () => {
+    screenIs(true);
+    renderAt(SEARCH);
+    await loaded();
+    pick(/^Shortlist/);
+    fireEvent.change(screen.getByRole("textbox", { name: "Location" }), { target: { value: "York" } });
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+    expect(screen.getByRole("tab", { name: "Results" }).getAttribute("aria-selected")).toBe("true");
+    await loaded();
+  });
+
+  it("goes back to the results to mark a selected pin's place, one selected already included", async () => {
+    screenIs(true);
+    placeByDistrict();
+    renderAt(SEARCH, [therapist("a", "BRIGHTON BN1")]);
+    await within(results()).findByRole("link", { name: "Therapist a" });
+    const pin = await screen.findByRole("button", { name: `Pin ${key(BRIGHTON)}` });
+    const marked = () => screen.getByRole("link", { name: "Therapist a" }).closest("li")?.getAttribute("aria-current");
+    pick(/^Shortlist/);
+    fireEvent.click(pin);
+    expect(marked()).toBe("true");
+    pick(/^Shortlist/);
+    fireEvent.click(pin);
+    expect(marked()).toBe("true");
+  });
+
+  it("raises a lowered sheet to show the tab picked, or the one already open", async () => {
+    screenIs(false);
+    renderAt(SEARCH);
+    await loaded();
+    fireEvent.click(screen.getByRole("button", { name: "Show map" }));
+    pick(/^Shortlist/);
+    expect(results().dataset.position).toBe("full");
+    expect(screen.getByRole("tabpanel", { name: /^Shortlist/ }).textContent).toMatch(/^Nothing shortlisted yet/);
+    fireEvent.click(screen.getByRole("button", { name: "Show map" }));
+    pick(/^Shortlist/);
+    expect(results().dataset.position).toBe("full");
+  });
+
+  it("lists a shortlist beside the prompt before a search, as there are no results yet", async () => {
+    screenIs(true);
+    shortlist.add(therapist("a"));
+    renderAt("/");
+    await mapLoads();
+    expect(screen.getByText(/^Search a town, city or postcode/)).toBeTruthy();
+    expect(screen.queryByTestId("map")).toBeNull();
+    expect(screen.getByRole("tab", { name: "Results" }).hasAttribute("disabled")).toBe(true);
+    expect(within(screen.getByRole("tabpanel", { name: /^Shortlist/ })).getByRole("link", { name: "Therapist a" })).toBeTruthy();
+    expect(screen.getAllByRole("heading", { level: 1, name: "Find a UKCP therapist" })).toHaveLength(1);
+    expect(api.search).not.toHaveBeenCalled();
+  });
+
+  it("leaves the filters shut beside a shortlist before a search, which would leave the prompt too little room", () => {
+    screenIs(true);
+    shortlist.add(therapist("a"));
+    renderAt("/");
+    expect(screen.queryByRole("region", { name: "Refine your search" })).toBeNull();
+  });
+
+  it("keeps the side bar before a search when its last therapist is removed, so they can be put back", () => {
+    screenIs(true);
+    shortlist.add(therapist("a"));
+    renderAt("/");
+    fireEvent.click(screen.getByRole("button", { name: "Remove Therapist a from your shortlist" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add Therapist a to your shortlist" }));
+    expect(shortlist.has("a")).toBe(true);
+  });
+
+  it("sets no side bar beside the prompt for a shortlist emptied during a search", async () => {
+    screenIs(true);
+    renderAt(SEARCH);
+    await loaded();
+    fireEvent.click(screen.getByRole("button", { name: "Add Therapist p1-3 to your shortlist" }));
+    fireEvent.click(screen.getByRole("button", { name: "Remove Therapist p1-3 from your shortlist" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Location" }), { target: { value: "" } });
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+    expect(screen.getByText(/^Search a town, city or postcode/)).toBeTruthy();
+    expect(screen.queryByRole("region", { name: "Results and shortlist" })).toBeNull();
+  });
+
+  it("times a slow first search from the search, not from the prompt shown beside the shortlist before it", () => {
+    vi.useFakeTimers();
+    screenIs(true);
+    shortlist.add(therapist("a"));
+    renderAt("/");
+    vi.mocked(api.search).mockImplementation(() => new Promise(() => {}));
+    act(() => vi.advanceTimersByTime(5000));
+    fireEvent.click(screen.getByRole("button", { name: "Filters" }));
+    const keyword = screen.getByRole("searchbox", { name: "Keyword search" });
+    fireEvent.change(keyword, { target: { value: "grief" } });
+    fireEvent.submit(keyword.closest("form")!);
+    const slow = () => screen.queryByText(/^Getting every result/);
+    expect(slow()).toBeNull();
+    act(() => vi.advanceTimersByTime(2000));
+    expect(slow()).toBeTruthy();
+  });
+
+  it("lowers the sheet beneath the prompt before a search, raising it for the shortlist", async () => {
+    screenIs(false);
+    shortlist.add(therapist("a"));
+    renderAt("/");
+    await mapLoads();
+    expect(screen.getByText(/^Search a town, city or postcode/)).toBeTruthy();
+    expect(results().dataset.position).toBe("peek");
+    pick(/^Shortlist/);
+    expect(results().dataset.position).toBe("full");
+    // There is no map yet for lowering the sheet to show.
+    expect(screen.getByRole("button", { name: "Hide list" })).toBeTruthy();
+    expect(screen.getAllByRole("heading", { level: 1, name: "Find a UKCP therapist" })).toHaveLength(1);
+    fireEvent.change(screen.getByRole("textbox", { name: "Location" }), { target: { value: "York" } });
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+    expect(screen.getByRole("tab", { name: "Results" }).getAttribute("aria-selected")).toBe("true");
+    expect(results().dataset.position).toBe("full");
+    await loaded();
   });
 });

@@ -11,10 +11,11 @@ In scope:
 - The search form and all its filters (§3.2)
 - The results list with paging (§3.3)
 - The therapist profile, including the contact details UKCP reveals on request (§3.4)
+- A shortlist kept in the visitor's browser (§4.4). It does what UKCP's does (§3.5), and also lets a therapist be added from their result card.
 
 Out of scope for v1:
 
-- UKCP's shortlist ("My Shortlist"), the National Register search and the rest of the UKCP site
+- The National Register search and the rest of the UKCP site
 - The "In-person" and "Remote" toggles beside the location box. They only adjust that box (its placeholder, and making it required for in-person) and never reach the server's filtering (§3.2), so there is nothing to reproduce. The session-type facet does the real filtering and is included.
 
 ## 2. Constraints
@@ -107,6 +108,10 @@ A zero-result response has no `.results-no` and a "No therapists can be found" n
 
 Unless `data-nodata="true"`, UKCP's JS adds a "Show Contact Details" button. It sends `POST /Umbraco/Surface/ProfileSurface/ContactDetails` with `__RequestVerificationToken` and `id=<data-id>`, and gets back a fragment with `.therapist-contacts-details-tel`, `-email` and `-web` blocks, each holding one link, then strips the email block from every container without `data-email="true"`. We make the same request as a profile opens, and show the email only where UKCP's page would. The Worker caches each answer as it does profiles (§4.2), so UKCP sees roughly one contact request per therapist an hour from this site, not one per profile view. An unknown id gets an empty page, which is never cached.
 
+### 3.5 Shortlist
+
+UKCP keeps a visitor's shortlist in its own `localStorage`, under `UKCPShortlist`, as `{ "<data-id>": addedAtMs }`, with no copy on the server. Only the profile page's "Shortlist" button adds a therapist, since result cards carry no `data-id`. `/my-shortlist/`, and a strip at the foot of every profile, show the list by posting `shortlistedIds[n]`, newest first, with `__RequestVerificationToken` to `POST /umbraco/surface/shortlistsurface/Retrieve`. The answer holds one `.profile-shortlisting` card per therapist: name, town, tags and profile link, with no photo or summary. The ids are small sequential integers.
+
 ## 4. Architecture
 
 One Cloudflare Worker, deployed with Wrangler, serves the static app and a small API that relays UKCP's HTML. The browser parses that HTML with its built-in `DOMParser`. Parsing in the Worker would cost 20–40 ms of CPU on a cold isolate, beyond the free plan's 10 ms (§2), while a browser parses natively and has no such limit. TypeScript throughout.
@@ -172,6 +177,12 @@ Built files under `/assets` are named by a hash of their content, so the Worker 
 ### 4.3 Rate limit
 
 Each IP may cause at most 20 uncached upstream requests a minute (IPv6 addresses count per /64, since one visitor usually holds a whole /64), enforced with the Workers rate-limiting binding. Past that, the API returns `429` and the UI shows "Too many searches in a short time. Wait a minute and try again." Cached responses are never limited.
+
+### 4.4 Shortlist
+
+The shortlist lives in this site's `localStorage`, under `shortlist`, as `{ v: 1, entries: { <slug>: { addedAt, card } } }`, where `card` is the result card (§5) less its distance, which belonged to one search. A bookmark on each result card adds or removes a therapist. The shortlist is a tab beside the results in the side bar (the bottom sheet on narrow screens), there before a search too (map spec §4.10), counting who is on it, and lists the copies newest first, so showing it asks nothing of the Worker or UKCP. A therapist removed there stays in place, dimmed, until the visitor leaves the tab, so a slip can be undone. A new search, or a pin picked on the map, brings the results back. When a search returns a shortlisted therapist, their copy is replaced with the fresh card. Other browser tabs follow through the `storage` event, and where storage is refused the list lasts for the page load.
+
+We keep copies rather than relaying `Retrieve` (§3.5). A relay would cost an uncached upstream request on every view, since each visitor's ids differ; would allow additions only from profiles; would send the list off the visitor's device; and, with sequential ids, would let anyone walk the register through this site. A visitor's UKCP shortlist sits in storage belonging to UKCP's origin, so it cannot be brought across.
 
 ## 5. Data shapes
 

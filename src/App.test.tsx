@@ -7,6 +7,8 @@ import type { Profile } from "@shared/types";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { api } from "@/lib/api";
 import { listed } from "@/lib/listed.testing";
+import { createShortlistStore } from "@/shortlist/store";
+import { ShortlistContext } from "@/shortlist/useShortlist";
 import { AppRoutes } from "./App";
 
 // Leaflet draws nothing under jsdom; the map is tested on its own.
@@ -19,17 +21,20 @@ function Url() {
   return <output data-testid="url">{pathname + search}</output>;
 }
 
-function renderAt(url: string) {
+function renderAt(url: string, shortlist = createShortlistStore(null)) {
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-      <TooltipProvider>
-        <MemoryRouter initialEntries={[url]}>
-          <AppRoutes />
-          <Url />
-        </MemoryRouter>
-      </TooltipProvider>
+      <ShortlistContext.Provider value={shortlist}>
+        <TooltipProvider>
+          <MemoryRouter initialEntries={[url]}>
+            <AppRoutes />
+            <Url />
+          </MemoryRouter>
+        </TooltipProvider>
+      </ShortlistContext.Provider>
     </QueryClientProvider>,
   );
+  return shortlist;
 }
 
 beforeEach(() => {
@@ -54,7 +59,7 @@ describe("AppRoutes", () => {
     expect(await within(drawer).findByRole("heading", { name: "Jo Bloggs" })).toBeTruthy();
     expect(screen.getByTestId("url").textContent).toBe("/therapist/Jo-ABCDEFGH");
     // The search is still there beneath, not loaded again.
-    expect(screen.getByRole("region", { name: "Results", hidden: true })).toBeTruthy();
+    expect(screen.getByRole("region", { name: "Results and shortlist", hidden: true })).toBeTruthy();
     fireEvent.click(within(drawer).getByRole("button", { name: "Close" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(screen.getByTestId("url").textContent).toBe("/?Location=Leeds");
@@ -68,5 +73,25 @@ describe("AppRoutes", () => {
     expect(await screen.findByRole("heading", { name: "Jo Bloggs" })).toBeTruthy();
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(screen.getByRole("link", { name: "Search for a therapist" })).toBeTruthy();
+  });
+
+  it("shortlists a therapist from the search, and opens them from the shortlist's tab over it", async () => {
+    renderAt("/?Location=Leeds");
+    fireEvent.click(await screen.findByRole("button", { name: "Add Jo Bloggs to your shortlist" }));
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Shortlist, 1 therapist" }));
+    fireEvent.click(within(screen.getByRole("tabpanel", { name: /^Shortlist/ })).getByRole("link", { name: "Jo Bloggs" }));
+    const drawer = await screen.findByRole("dialog", { name: "Therapist profile" });
+    fireEvent.click(within(drawer).getByRole("button", { name: "Close" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(screen.getByTestId("url").textContent).toBe("/?Location=Leeds");
+    expect(screen.getByRole("tab", { name: /^Shortlist/ }).getAttribute("aria-selected")).toBe("true");
+  });
+
+  it("brings a shortlisted therapist's card up to date from a search", async () => {
+    const shortlist = createShortlistStore(null);
+    shortlist.add({ slug: PROFILE.slug, name: "Jo Old-Name", initials: "JO", tags: [] });
+    renderAt("/?Location=Leeds", shortlist);
+    await screen.findByRole("link", { name: "Jo Bloggs" });
+    expect(shortlist.get()[0]?.card.name).toBe("Jo Bloggs");
   });
 });

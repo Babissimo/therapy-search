@@ -17,8 +17,8 @@ export function AboutText() {
         servers, and each visitor's requests are rate-limited.
       </p>
       <p>
-        No searches are logged. Your browser keeps one random number so that results stay in the same order while you page through them,
-        and your choice of light or dark theme if you pick one.
+        No searches are logged. Your browser keeps your shortlist, your choice of light or dark theme if you pick one, and one random number
+        that holds results in the same order when you come back to a search. None of these is sent to this site or to UKCP.
       </p>
       <p>
         The map's tiles come from CARTO, with map data from OpenStreetMap contributors. Your browser fetches them directly, so CARTO sees the

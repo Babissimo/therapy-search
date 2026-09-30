@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it } from "vitest";
 import type { TherapistCard as Therapist } from "@shared/types";
@@ -17,10 +18,10 @@ const therapist = (extra: Partial<Therapist> = {}): Therapist => ({
   ...extra,
 });
 
-function renderCard(t: Therapist, sought: string[] = [], { grouped }: { grouped?: boolean } = {}) {
+function renderCard(t: Therapist, sought: string[] = [], { grouped, action }: { grouped?: boolean; action?: ReactNode } = {}) {
   render(
     <MemoryRouter>
-      <TherapistCard therapist={t} sought={new Set(sought)} grouped={grouped} />
+      <TherapistCard therapist={t} sought={new Set(sought)} grouped={grouped} action={action} />
     </MemoryRouter>,
   );
 }
@@ -69,5 +70,12 @@ describe("TherapistCard", () => {
   it("shows no tags for a search that asks for none", () => {
     renderCard(therapist());
     expect(screen.queryByRole("list")).toBeNull();
+  });
+
+  it("puts an action beside the name, outside the link to the profile", () => {
+    renderCard(therapist(), [], { action: <button type="button">Shortlist</button> });
+    const link = screen.getByRole("link", { name: "Test Therapist 1" });
+    expect(within(link).queryByRole("button")).toBeNull();
+    expect(screen.getByRole("button", { name: "Shortlist" }).parentElement?.className).toMatch(/\bz-10\b/);
   });
 });

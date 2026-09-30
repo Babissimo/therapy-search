@@ -14,7 +14,10 @@ export function saveView(entry: string, view: SavedView) {
   views.set(entry, { ...views.get(entry), ...view });
 }
 
-/** Scrolls a list back to where it was for this history entry once it has content, and records it as it moves. */
+/**
+ * Scrolls a list back to where it was for this history entry once it has content, and records it as it moves. A list
+ * that shares its element with another passes a key of its own in place of the entry.
+ */
 export function useRememberedScroll(entry: string, ready: boolean) {
   const ref = useRef<HTMLDivElement>(null);
   const restored = useRef<{ entry: string; element: HTMLDivElement } | null>(null);

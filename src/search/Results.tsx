@@ -5,10 +5,11 @@ import type { TherapistCard as Therapist } from "@shared/types";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { ShortlistButton } from "@/shortlist/ShortlistButton";
 import { soughtTerms } from "./activeFilters";
 import { LocationNotice } from "./LocationNotice";
 import { listEntries, pinLabel, type Pin } from "./map/pins";
-import { reachLine } from "./reach";
+import { reachLine, resultCount } from "./reach";
 import { ResultsError } from "./ResultsError";
 import { TherapistCard } from "./TherapistCard";
 import type { SearchResults } from "./useResults";
@@ -53,15 +54,23 @@ function ResultsList({ params, results, listRef, pins = [], unplaced = [], selec
   }
   if (query.isLoadingError) return <ResultsError error={query.error} params={params} />;
 
-  const reach = reachLine(therapists, first?.total ?? 0, searchedPlace !== undefined);
+  const count = first?.total;
+  const title = searchedPlace === undefined || count === undefined ? resultCount(count) : `${resultCount(count)} within your area`;
+  const reach = reachLine(therapists, count ?? 0, searchedPlace !== undefined);
   const highlight = (slug: string) => (on: boolean) => onHighlight?.(on ? slug : undefined);
   const sought = soughtTerms(params);
 
   return (
     <section aria-busy={query.isPlaceholderData} className={cn("space-y-4", query.isPlaceholderData && "opacity-60")}>
       <div className="space-y-1">
-        <p className="text-sm text-muted-foreground">{unplaced.length > 0 ? `${reach} · ${unplaced.length} not on the map` : reach}</p>
-        <p className="text-xs text-muted-foreground">Pins show the postcode or area each therapist lists.</p>
+        <h2 className="text-sm font-semibold">{title}</h2>
+        {/* With no one found, the heading has said so. */}
+        {therapists.length > 0 && (
+          <>
+            <p className="text-sm text-muted-foreground">{unplaced.length > 0 ? `${reach} · ${unplaced.length} not on the map` : reach}</p>
+            <p className="text-xs text-muted-foreground">Pins show the postcode or area each therapist lists.</p>
+          </>
+        )}
       </div>
       <LocationNotice typed={params.text.Location} searched={first?.locationSearched} />
       {first?.notices.map((notice) => (
@@ -82,7 +91,7 @@ function ResultsList({ params, results, listRef, pins = [], unplaced = [], selec
               className={cn("rounded-xl", marked && t && "ring-2 ring-sky-500")}
             >
               {t ? (
-                <TherapistCard therapist={t} sought={sought} onHighlight={highlight(t.slug)} />
+                <TherapistCard therapist={t} sought={sought} action={<ShortlistButton therapist={t} />} onHighlight={highlight(t.slug)} />
               ) : (
                 <PinGroup pin={entry.pin} marked={marked} sought={sought} highlight={highlight} />
               )}
@@ -136,7 +145,7 @@ function PinGroup({ pin, marked, sought, highlight }: PinGroupProps) {
       <ul className="space-y-3">
         {pin.therapists.map((t) => (
           <li key={t.slug}>
-            <TherapistCard therapist={t} sought={sought} grouped onHighlight={highlight(t.slug)} />
+            <TherapistCard therapist={t} sought={sought} grouped action={<ShortlistButton therapist={t} />} onHighlight={highlight(t.slug)} />
           </li>
         ))}
       </ul>

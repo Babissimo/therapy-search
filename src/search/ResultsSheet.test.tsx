@@ -7,13 +7,22 @@ import { ResultsSheet, type SheetPosition } from "./ResultsSheet";
 function Harness({ start }: { start: SheetPosition }) {
   const [position, setPosition] = useState(start);
   return (
-    <ResultsSheet position={position} onPositionChange={setPosition} title="3 results" footer={<button type="button">Load more</button>}>
+    <ResultsSheet
+      position={position}
+      onPositionChange={setPosition}
+      tabs={
+        <button type="button" role="tab">
+          Shortlist
+        </button>
+      }
+      footer={<button type="button">Load more</button>}
+    >
       <a href="/therapist/jo">Jo</a>
     </ResultsSheet>
   );
 }
 
-const sheet = () => screen.getByRole("region", { name: "Results" });
+const sheet = () => screen.getByRole("region", { name: "Results and shortlist" });
 
 /** jsdom lays nothing out: an 800px map area, so peek is 56px, half 400px and full 672px, with the sheet `height` tall. */
 function measure(height: number) {
@@ -21,7 +30,8 @@ function measure(height: number) {
   vi.spyOn(sheet(), "getBoundingClientRect").mockReturnValue({ height } as DOMRect);
 }
 
-const header = () => screen.getByRole("heading", { name: "3 results" }).parentElement as HTMLElement;
+const tab = () => screen.getByRole("tab", { name: "Shortlist" });
+const header = () => tab().parentElement as HTMLElement;
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -63,9 +73,30 @@ describe("ResultsSheet", () => {
     expect(sheet().dataset.position).toBe("half");
   });
 
-  it("keeps its count in view when lowered, and the hidden list and footer out of reach", () => {
+  it("rises to the list when a tab is pressed while lowered", () => {
     render(<Harness start="peek" />);
-    expect(sheet().textContent).toContain("3 results");
+    fireEvent.click(tab());
+    expect(sheet().dataset.position).toBe("full");
+  });
+
+  it("stays put when a tab is pressed at half height", () => {
+    render(<Harness start="half" />);
+    fireEvent.click(tab());
+    expect(sheet().dataset.position).toBe("half");
+  });
+
+  it("leaves a press on a tab to the tab rather than dragging", () => {
+    render(<Harness start="full" />);
+    measure(672);
+    fireEvent.pointerDown(tab(), { clientY: 100 });
+    fireEvent.pointerMove(header(), { clientY: 700 });
+    fireEvent.pointerUp(header(), { clientY: 700 });
+    expect(sheet().dataset.position).toBe("full");
+  });
+
+  it("keeps its tabs in view when lowered, and the hidden list and footer out of reach", () => {
+    render(<Harness start="peek" />);
+    expect(tab().closest("[inert]")).toBeNull();
     expect(screen.getByText("Jo").closest("[inert]")).not.toBeNull();
     expect(screen.getByText("Load more").closest("[inert]")).not.toBeNull();
   });
