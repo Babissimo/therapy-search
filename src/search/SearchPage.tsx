@@ -1,4 +1,3 @@
-import { SlidersHorizontal } from "lucide-react";
 import { Tabs } from "radix-ui";
 import { lazy, Suspense, useEffect, useId, useRef, useState } from "react";
 import { Link, useLocation, useMatch } from "react-router";
@@ -22,6 +21,7 @@ import { LoadMore } from "./LoadMore";
 import { ModeSwitch } from "./ModeSwitch";
 import { ONLINE_PATH, onlineParams } from "./online";
 import { OnlineView } from "./OnlineView";
+import { FiltersIcon, Prompt } from "./Prompt";
 import { Results } from "./Results";
 import { ResultsPanel } from "./ResultsPanel";
 import { coverOf, ResultsSheet, type SheetPosition } from "./ResultsSheet";
@@ -339,15 +339,9 @@ function SearchPrompt({ besideFilters, besideToggle }: { besideFilters: boolean;
     // Clear of the toolbar over its top, or beside the filters open beneath it.
     <div className={cn("flex size-full overflow-y-auto", besideFilters ? ["py-6 pr-6", besideToggle ? "pl-116" : "pl-105"] : "px-6 py-28")}>
       {/* Centred by its margins, so text taller than the space scrolls from its top rather than being cut off there. */}
-      <div className="m-auto max-w-2xl space-y-4 text-center text-balance sm:space-y-6">
-        <p className="text-2xl font-semibold tracking-tight sm:text-4xl">
-          Search a town, city or postcode to see the UKCP therapists within your area, nearest first.
-        </p>
-        <p className="text-lg text-muted-foreground sm:text-xl">
-          Filters <SlidersHorizontal aria-hidden className="inline size-[0.9em] align-[-0.1em]" /> narrow the search by what therapists help with, how
-          they work, the languages they speak and more.
-        </p>
-      </div>
+      <Prompt ask="Search a town, city or postcode to see the UKCP therapists within your area, nearest first." className="m-auto max-w-2xl">
+        Filters <FiltersIcon /> narrow the search by what therapists help with, how they work, the languages they speak and more.
+      </Prompt>
     </div>
   );
 }
