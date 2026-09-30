@@ -378,7 +378,7 @@ function OfficeCard({ office, profile }: { office: Office; profile: Profile }) {
           {office.isMain && <Badge variant="outline">Main address</Badge>}
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-3 text-sm">
+      <CardContent className="flex flex-1 flex-col gap-3 text-sm">
         {office.address.length > 0 && (
           <address className="not-italic">
             {office.address.map((line, i) => (
@@ -392,6 +392,7 @@ function OfficeCard({ office, profile }: { office: Office; profile: Profile }) {
             <p className="whitespace-pre-line">{office.cost}</p>
           </div>
         )}
+        {/* The map takes the card's foot, so maps in a row of cards line up. */}
         <OfficeMap office={office} profile={profile} />
       </CardContent>
     </Card>
@@ -404,7 +405,7 @@ function OfficeMap({ office, profile }: { office: Office; profile: Profile }) {
   if (!place) return null;
   const fallback = <div className="size-full bg-muted" />;
   return (
-    <div role="region" aria-label={`Map of ${office.name || "the office"}`} className="isolate h-40 overflow-hidden rounded-lg border">
+    <div role="region" aria-label={`Map of ${office.name || "the office"}`} className="isolate mt-auto h-40 overflow-hidden rounded-lg border">
       <Suspense fallback={fallback}>
         {/* Leaflet takes its centre only once, so a new place makes a new map. */}
         <ProfileMap key={`${place.point.lat},${place.point.lng}`} profile={profile} point={place.point} zoom={place.zoom} />
