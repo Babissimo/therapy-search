@@ -18,7 +18,7 @@ export function parseOptions(html: string): Options {
           .map((n) => n.textContent)
           .join(""),
       ),
-      help: optional(oneLine(h3.querySelector(".help")?.getAttribute("title"))),
+      help: optional(helpNote(h3.querySelector(".help"))),
       fields: checkboxes.map((input) => ({
         name: input.getAttribute("name") ?? "",
         value: input.getAttribute("value") ?? "",
@@ -33,6 +33,12 @@ export function parseOptions(html: string): Options {
   const withComma = helpWith.find((term) => term.includes(","));
   if (withComma !== undefined) throw new ParseError(`options: help-with term "${withComma}" contains a comma`);
   return { helpWith, groups };
+}
+
+/** A group's help note, less any closing "find out more here:" that leads into UKCP's link, which a tooltip can't carry. */
+function helpNote(help: Element | null): string {
+  const note = oneLine(help?.getAttribute("title"));
+  return help?.hasAttribute("data-help-linkurl") ? note.replace(/\s*[^.?!]*:$/, "") : note;
 }
 
 /** Checkboxes between this heading and the next one. */

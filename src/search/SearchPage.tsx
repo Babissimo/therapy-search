@@ -389,13 +389,13 @@ function NearPrompt({ wide }: { wide: boolean }) {
   return (
     <Prompt ask="Start with where you are." className="py-10 sm:py-16">
       {wide ? (
-        "Search a town, city or postcode in the box to the right to see the UKCP therapists nearest to it. The filters beneath it"
+        "Type a town, city or postcode in the box to the right to see the UKCP therapists nearest to it. The filters beneath"
       ) : (
         <>
-          Search a town, city or postcode to see the UKCP therapists nearest to it. Filters <FiltersIcon />
+          Type a town, city or postcode to see the UKCP therapists nearest to it. Filters <FiltersIcon />
         </>
       )}{" "}
-      then narrow it down by what therapists help with, how they work, the languages they speak and more.
+      then narrow the list by what they help with, how they work, the languages they speak and more.
     </Prompt>
   );
 }

@@ -107,16 +107,16 @@ export function OnlineView({ params, onChange, wide }: Props) {
 /** In place of the results until a filter narrows the search. The filters sit to its right on wide screens, behind their button otherwise. */
 function OnlinePrompt({ wide }: { wide: boolean }) {
   return (
-    <Prompt ask="Choose a filter to see the UKCP therapists who work online or by phone." className="py-10 sm:py-16">
+    <Prompt ask="Start with what matters to you." className="py-10 sm:py-16">
+      Thousands of UKCP therapists work online or by phone.{" "}
       {wide ? (
-        "The filters to the right"
+        "Choose a filter to the right"
       ) : (
         <>
-          Filters <FiltersIcon />
+          Open Filters <FiltersIcon /> and choose one
         </>
-      )}{" "}
-      narrow the search by what therapists help with, how they work, the languages they speak and more. Thousands work online or by phone, so choosing
-      between the two isn't enough on its own.
+      )}
+      , such as what they help with, how they work or the languages they speak, to see who fits. Type of Session alone won't narrow them enough.
     </Prompt>
   );
 }

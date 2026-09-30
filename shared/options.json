@@ -1344,7 +1344,7 @@
     },
     {
       "label": "UKCP Colleges",
-      "help": "All UKCP therapists are members of a College which represents their philosophy of psychotherapy. If you are looking to work with someone who has a specific philosophy, you can filter results by College. You can find out more here:",
+      "help": "All UKCP therapists are members of a College which represents their philosophy of psychotherapy. If you are looking to work with someone who has a specific philosophy, you can filter results by College.",
       "fields": [
         {
           "name": "Colleges",
