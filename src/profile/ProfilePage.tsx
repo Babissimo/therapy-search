@@ -1,11 +1,10 @@
 import { Fragment, lazy, Suspense, useEffect, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, ChevronLeft, ExternalLink } from "lucide-react";
+import { Check, ChevronLeft, Diamond, ExternalLink } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router";
 import type { Office, Profile, ProfileSection } from "@shared/types";
 import { Portrait } from "@/components/Portrait";
 import { SkeletonText } from "@/components/SkeletonText";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -18,6 +17,7 @@ import { cachedCard } from "@/search/useResults";
 import { ShortlistButton } from "@/shortlist/ShortlistButton";
 import type { ShortlistCard } from "@/shortlist/store";
 import { ContactList, ContactListSkeleton } from "./ContactList";
+import { isInterestOf, type ShownSection } from "./interests";
 import { useOfficePlace } from "./place";
 import { sectionsBySize } from "./sectionsBySize";
 import { matchingTags, useSearchMatch } from "./searchedTerms";
@@ -104,6 +104,7 @@ export function ProfileBody({ slug, back, close }: { slug: string } & Exits) {
                   <SectionView
                     section={{ heading: "Matches your search", paragraphs: [], items: matches, details: [] }}
                     isMatch={isMatch}
+                    isInterest={isInterestOf(profile)}
                     announce={false}
                   />
                   <Separator />
@@ -262,15 +263,18 @@ function headerCard({ slug, name, initials, photoUrl, location }: Profile): Shor
   return { slug, name, initials, photoUrl, location, tags: [] };
 }
 
-type SectionProps = {
-  section: ProfileSection;
+type TagProps = {
   isMatch: (tag: string) => boolean;
+  /** Marks the tags that are special interests, where no heading already says so. */
+  isInterest?: (tag: string) => boolean;
   /** Tells screen readers which tags match, where the heading doesn't already say so. */
   announce?: boolean;
 };
 
+type SectionProps = TagProps & { section: ShownSection };
+
 /** Sections one after another, with a rule between each. */
-function Sections({ sections, isMatch }: { sections: ProfileSection[]; isMatch: SectionProps["isMatch"] }) {
+function Sections({ sections, isMatch }: { sections: ShownSection[]; isMatch: SectionProps["isMatch"] }) {
   return sections.map((section, i) => (
     <Fragment key={i}>
       {i > 0 && <Separator />}
@@ -314,48 +318,113 @@ function Section({ heading, children }: { heading: ReactNode; children: ReactNod
   );
 }
 
-function SectionView({ section, isMatch, announce = true }: SectionProps) {
+function SectionView({ section, ...tags }: SectionProps) {
+  const { interests } = section;
+  const hasInterests = interests !== undefined && interests.paragraphs.length + interests.details.length > 0;
   return (
     <Section heading={section.heading}>
-      {section.paragraphs.map((text, i) => (
-        <p key={i} className={cn(READING, "whitespace-pre-line")}>
-          {text}
-        </p>
-      ))}
-      {section.items.length > 0 && (
-        <ul className="flex flex-wrap gap-1.5">
-          {section.items.map((item, i) => (
-            <li key={i}>
-              {isMatch(item) ? (
-                <Badge className={TAG}>
-                  <Check data-icon="inline-start" aria-hidden />
-                  {item}
-                  {announce && <span className="sr-only">, in your search</span>}
-                </Badge>
-              ) : (
-                <Badge variant="secondary" className={TAG}>{item}</Badge>
-              )}
-            </li>
-          ))}
-        </ul>
+      <Paragraphs paragraphs={section.paragraphs} />
+      {hasInterests ? (
+        <div className="space-y-6">
+          <Group heading={<><InterestMark />Special interests</>}>
+            <Paragraphs paragraphs={interests.paragraphs} />
+            <Details details={interests.details} {...tags} />
+          </Group>
+          {section.items.length > 0 && (
+            <Group heading="Other areas">
+              <Tags tags={section.items} {...tags} />
+            </Group>
+          )}
+        </div>
+      ) : (
+        section.items.length > 0 && <Tags tags={section.items} {...tags} />
       )}
-      {section.details.length > 0 && (
-        <Accordion type="multiple">
-          {section.details.map((detail, i) => (
-            <AccordionItem key={i} value={String(i)}>
-              <AccordionTrigger>
-                <span className="flex items-center gap-2">
-                  {isMatch(detail.title) && <Check aria-hidden className="size-4 shrink-0" />}
-                  {detail.title}
-                  {announce && isMatch(detail.title) && <span className="sr-only">, in your search</span>}
-                </span>
-              </AccordionTrigger>
-              <AccordionContent className={cn(READING, "whitespace-pre-line")}>{detail.text}</AccordionContent>
-            </AccordionItem>
-          ))}
-        </Accordion>
-      )}
+      {section.details.length > 0 && <Details details={section.details} {...tags} />}
     </Section>
+  );
+}
+
+function Paragraphs({ paragraphs }: { paragraphs: string[] }) {
+  return paragraphs.map((text, i) => (
+    <p key={i} className={cn(READING, "whitespace-pre-line")}>
+      {text}
+    </p>
+  ));
+}
+
+/** A part of a section under a heading of its own. */
+function Group({ heading, children }: { heading: ReactNode; children: ReactNode }) {
+  return (
+    <div className="space-y-2.5">
+      <h3 className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">{heading}</h3>
+      {children}
+    </div>
+  );
+}
+
+/** Marks a special interest, beside its group's heading and among the matches. A diamond, since a star echoes UKCP's branding. */
+function InterestMark(props: { "data-icon"?: string }) {
+  // A badge sizes its icons to size-3, so the heading's matches it.
+  return <Diamond aria-hidden fill="currentColor" className="size-3 shrink-0" {...props} />;
+}
+
+/** Each tag above what the therapist wrote of it, then the tags they wrote nothing of on one line. */
+function Details({ details, ...tags }: TagProps & { details: ProfileSection["details"] }) {
+  const written = details.filter((detail) => detail.text);
+  const bare = details.filter((detail) => !detail.text).map((detail) => detail.title);
+  return (
+    <div className="space-y-4">
+      {written.length > 0 && (
+        <dl className="space-y-4">
+          {written.map((detail, i) => (
+            <div key={i} className="space-y-1.5">
+              <dt>
+                <Tag tag={detail.title} {...tags} />
+              </dt>
+              <dd className={cn(READING, "whitespace-pre-line")}>{detail.text}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+      {bare.length > 0 && <Tags tags={bare} {...tags} />}
+    </div>
+  );
+}
+
+function Tags({ tags, ...props }: TagProps & { tags: string[] }) {
+  return (
+    <ul className="flex flex-wrap gap-1.5">
+      {tags.map((tag, i) => (
+        <li key={i}>
+          <Tag tag={tag} {...props} />
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function Tag({ tag, isMatch, isInterest, announce = true }: TagProps & { tag: string }) {
+  const interest = isInterest?.(tag) && (
+    <>
+      <InterestMark data-icon="inline-end" />
+      <span className="sr-only">, a special interest</span>
+    </>
+  );
+  if (!isMatch(tag)) {
+    return (
+      <Badge variant="secondary" className={TAG}>
+        {tag}
+        {interest}
+      </Badge>
+    );
+  }
+  return (
+    <Badge className={TAG}>
+      <Check data-icon="inline-start" aria-hidden />
+      {tag}
+      {announce && <span className="sr-only">, in your search</span>}
+      {interest}
+    </Badge>
   );
 }
 

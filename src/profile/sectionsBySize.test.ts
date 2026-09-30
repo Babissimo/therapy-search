@@ -14,7 +14,7 @@ describe("sectionsBySize", () => {
       about: ["My Approach", "About Me", "I work with", "Special Interests", "Types of Therapies Offered", "What I can help with"].map(section),
       practical: ["Types of sessions", "Working with Children", "UKCP College"].map(section),
     });
-    expect(headings(long)).toEqual(["My Approach", "About Me", "Special Interests", "What I can help with"]);
+    expect(headings(long)).toEqual(["My Approach", "About Me", "What I can help with"]);
     expect(headings(short)).toEqual(["I work with", "Types of Therapies Offered", "Languages", "Types of sessions", "Working with Children", "UKCP College"]);
   });
 
