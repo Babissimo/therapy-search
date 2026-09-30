@@ -194,10 +194,14 @@ describe("SearchPage", () => {
     renderAt(SEARCH);
     await loaded();
     expect(await screen.findByTestId("map")).toBeTruthy();
+    const toolbar = () => screen.getByRole("button", { name: "Filters" }).closest(".absolute")!;
     fireEvent.click(screen.getByRole("button", { name: "Hide list" }));
     expect(screen.queryByRole("region", { name: "Results and shortlist" })).toBeNull();
+    // The toolbar stands aside for the toggle left over the map's top left.
+    expect(toolbar().className).toContain("left-14");
     fireEvent.click(screen.getByRole("button", { name: "Show list" }));
     expect(results()).toBeTruthy();
+    expect(toolbar().className).not.toContain("left-14");
   });
 
   it("asks for a search in place of the map and results when there is nothing to search for", async () => {

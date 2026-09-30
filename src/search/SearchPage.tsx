@@ -187,6 +187,8 @@ function SearchView({ params, onChange, wide }: ViewProps) {
   );
   const footer = tab === "results" ? <LoadMore results={results} listRef={listRef} placing={placing} /> : undefined;
   const tabs = <ListTabs searching={searching} />;
+  // The side bar's toggle, left over the top left as the side bar hides, moves the toolbar aside.
+  const besideToggle = wide && sideBar && !panelOpen;
 
   // The toolbar keeps its place in the tree as the prompt gives way to a search, so what is typed or open in it stays.
   return (
@@ -201,7 +203,7 @@ function SearchView({ params, onChange, wide }: ViewProps) {
               open={panelOpen}
               onOpenChange={setPanelOpen}
               tabs={tabs}
-              masthead={searching && <Masthead className="border-b px-4 py-3" />}
+              masthead={searching && <Masthead />}
               scrollRef={scroll.ref}
               onScroll={scroll.save}
               footer={footer}
@@ -229,9 +231,17 @@ function SearchView({ params, onChange, wide }: ViewProps) {
                 />
               </Suspense>
             ) : (
-              <SearchPrompt besideFilters={wide && filtersOpen} />
+              <SearchPrompt besideFilters={wide && filtersOpen} besideToggle={besideToggle} />
             )}
-            <MapToolbar params={params} onChange={onChange} drafts={drafts} wide={wide} filtersOpen={filtersOpen} onFiltersOpenChange={setFiltersOpen} />
+            <MapToolbar
+              params={params}
+              onChange={onChange}
+              drafts={drafts}
+              wide={wide}
+              besideToggle={besideToggle}
+              filtersOpen={filtersOpen}
+              onFiltersOpenChange={setFiltersOpen}
+            />
             {!wide && sideBar && (
               <ResultsSheet
                 position={sheet}
@@ -278,14 +288,15 @@ function MapToolbar({
   onChange,
   drafts,
   wide,
+  besideToggle,
   filtersOpen,
   onFiltersOpenChange,
-}: ViewProps & { drafts: SearchDrafts; filtersOpen: boolean; onFiltersOpenChange: (open: boolean) => void }) {
+}: ViewProps & { drafts: SearchDrafts; besideToggle: boolean; filtersOpen: boolean; onFiltersOpenChange: (open: boolean) => void }) {
   const filtersId = useId();
   const ticked = tickedFilters(params);
   return (
     // Only the toolbar's own controls take the pointer; the map shows through the rest of it.
-    <div className="pointer-events-none absolute inset-3 z-10 flex flex-col items-start gap-2 lg:right-auto lg:w-96">
+    <div className={cn("pointer-events-none absolute inset-3 z-10 flex flex-col items-start gap-2 lg:right-auto lg:w-96", besideToggle && "left-14")}>
       <div className="pointer-events-auto flex w-full flex-col gap-2 rounded-xl border bg-background p-2 shadow-md">
         <ModeSwitch online={false} params={params} />
         <div className="flex items-start gap-2">
@@ -323,10 +334,10 @@ function MapToolbar({
 }
 
 /** In place of the map and results until there is something to search for, so no map tiles are fetched for nothing. */
-function SearchPrompt({ besideFilters }: { besideFilters: boolean }) {
+function SearchPrompt({ besideFilters, besideToggle }: { besideFilters: boolean; besideToggle: boolean }) {
   return (
     // Clear of the toolbar over its top, or beside the filters open beneath it.
-    <div className={cn("flex size-full overflow-y-auto", besideFilters ? "py-6 pr-6 pl-105" : "px-6 py-28")}>
+    <div className={cn("flex size-full overflow-y-auto", besideFilters ? ["py-6 pr-6", besideToggle ? "pl-116" : "pl-105"] : "px-6 py-28")}>
       {/* Centred by its margins, so text taller than the space scrolls from its top rather than being cut off there. */}
       <div className="m-auto max-w-2xl space-y-4 text-center text-balance sm:space-y-6">
         <p className="text-2xl font-semibold tracking-tight sm:text-4xl">
