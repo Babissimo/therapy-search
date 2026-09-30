@@ -65,6 +65,7 @@ export default function MapPane({
   // The frame takes in every loaded pin, so it waits until they are placed.
   const framing = !centreSettled || placing;
   const points = pins.map((p) => p.point);
+  const placed = pins.reduce((count, pin) => count + pin.therapists.length, 0);
   const bounds = outsideUK ? undefined : UK_BOUNDS;
   return (
     <div role="region" aria-label={label} className="isolate size-full">
@@ -81,6 +82,7 @@ export default function MapPane({
           fitKey={fitKey}
           centre={centre}
           points={points}
+          placed={placed}
           waiting={framing}
           restored={restored}
           // With no tiles drawn there is nothing to animate across, and they should load where the frame lands.
@@ -101,17 +103,17 @@ export default function MapPane({
           onSearch={onSearchArea}
           onRecentre={centre || pins.length > 0 ? recentre : undefined}
         />
-        <RememberView entry={entry} fitKey={fitKey} pins={pins.length} />
+        <RememberView entry={entry} fitKey={fitKey} placed={placed} />
       </Map>
     </div>
   );
 }
 
-function RememberView({ entry, fitKey, pins }: { entry: string; fitKey: string; pins: number }) {
+function RememberView({ entry, fitKey, placed }: { entry: string; fitKey: string; placed: number }) {
   const map = useMapEvents({
     moveend: () => {
       const { lat, lng } = map.getCenter();
-      saveView(entry, { map: { fitKey, pins, centre: [lat, lng], zoom: map.getZoom() } });
+      saveView(entry, { map: { fitKey, placed, centre: [lat, lng], zoom: map.getZoom() } });
     },
   });
   return null;

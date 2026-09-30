@@ -47,13 +47,15 @@ vi.mock("./FitView", async () => {
   return {
     // Clicked to stand for the view being framed.
     FitView: ({
+      placed,
       restored,
       instant,
       coveredBelow,
       recentres,
       onFramed,
     }: {
-      restored?: { fitKey: string; pins: number };
+      placed: number;
+      restored?: { fitKey: string; placed: number };
       instant?: boolean;
       coveredBelow?: (height: number) => number;
       recentres?: number;
@@ -62,10 +64,11 @@ vi.mock("./FitView", async () => {
       createElement("button", {
         type: "button",
         "data-testid": "fit",
+        "data-placed": placed,
         "data-instant": String(Boolean(instant)),
         "data-covered": coveredBelow?.(800) ?? "",
         "data-recentres": recentres ?? 0,
-        "data-restored": restored ? `${restored.fitKey} with ${restored.pins} pins` : "",
+        "data-restored": restored ? `${restored.fitKey} with ${restored.placed} placed` : "",
         onClick: onFramed,
       }),
   };
@@ -205,18 +208,20 @@ describe("MapPane", () => {
     expect(screen.getByTestId("search-area").dataset.covered).toBe("400");
   });
 
-  it("remembers its view and pins for the history entry, and opens there again for the same search", () => {
+  it("remembers its view and how many it placed for the history entry, and opens there again for the same search", () => {
     const { unmount } = renderPane({ fitKey: "Location=Leeds", entry: "remembered", pins: [pin("a"), pin("b", "c")] });
     expect(screen.getByTestId("map").dataset.view).toBe("54.5,-3@5");
+    // Counted by therapist, so a stack splitting into more pins frames nothing again.
+    expect(screen.getByTestId("fit").dataset.placed).toBe("3");
     moveend.current();
     unmount();
     renderPane({ fitKey: "Location=Leeds", entry: "remembered" });
     expect(screen.getByTestId("map").dataset.view).toBe("51.5,-0.12@11");
-    expect(screen.getByTestId("fit").dataset.restored).toBe("Location=Leeds with 2 pins");
+    expect(screen.getByTestId("fit").dataset.restored).toBe("Location=Leeds with 3 placed");
   });
 
   it("frames a different search afresh", () => {
-    saveView("afresh", { map: { fitKey: "Location=Leeds", pins: 2, centre: [53.8, -1.55], zoom: 12 } });
+    saveView("afresh", { map: { fitKey: "Location=Leeds", placed: 2, centre: [53.8, -1.55], zoom: 12 } });
     renderPane({ fitKey: "Location=York", entry: "afresh" });
     expect(screen.getByTestId("map").dataset.view).toBe("54.5,-3@5");
     expect(screen.getByTestId("fit").dataset.restored).toBe("");
@@ -245,7 +250,7 @@ describe("MapPane", () => {
   });
 
   it("shows a view restored at once, with its tiles", () => {
-    saveView("restored", { map: { fitKey: "Location=Leeds", pins: 2, centre: [53.8, -1.55], zoom: 12 } });
+    saveView("restored", { map: { fitKey: "Location=Leeds", placed: 2, centre: [53.8, -1.55], zoom: 12 } });
     renderPane({ fitKey: "Location=Leeds", entry: "restored" });
     expect(screen.getByTestId("tiles")).toBeTruthy();
   });
