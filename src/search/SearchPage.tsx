@@ -270,8 +270,8 @@ function reveal(list: HTMLElement, entry: HTMLElement, glide: boolean) {
 
 /**
  * The switch to online, search box, filters and active-filter chips, floating over the top of the map or the prompt.
- * The map's "Search this area" button is placed to keep clear of it, so a change to its inset, width or height moves
- * that too.
+ * The buttons the map offers once moved, to search there or recentre, are placed to keep clear of it, so a change to
+ * its inset, width or height moves them too.
  */
 function MapToolbar({
   params,

@@ -1,0 +1,147 @@
+import type { LatLng, Map as LeafletMap } from "leaflet";
+import { Focus, Loader2, Search } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { useMap } from "react-leaflet";
+import { IconButton } from "@/components/IconButton";
+import { Button } from "@/components/ui/button";
+import { ButtonGroup } from "@/components/ui/button-group";
+import { MapControlContainer } from "@/components/ui/map";
+import { usePostcodeNear } from "../usePostcodeNear";
+import { movedElsewhere, type Point, type View } from "./geo";
+
+// Each fits one line beneath the button on a phone.
+export const NO_POSTCODE_HERE = "No postcode near here. Move the map nearer a town.";
+export const AREA_UNKNOWN = "Couldn't look up this area just now. Try again.";
+export const ALREADY_SEARCHED = "This is the area already searched.";
+
+// A map resized keeps its middle to within a pixel, which is no move of the visitor's.
+const LEAST_MOVE_PX = 2;
+
+type Props = {
+  /** Whether the search has a place of its own, which zooming in on is no move to somewhere else. */
+  centred: boolean;
+  /** False while a search is on its way, whose results will frame the map afresh. */
+  settled: boolean;
+  /** How much of the map's bottom, in pixels, lies under something laid over it, given the map's height. */
+  coveredBelow?: (height: number) => number;
+  /** Searches at the postcode, answering false when it is the one already searched. */
+  onSearch: (postcode: string) => boolean;
+  /** Frames the search again; absent when there is nothing to frame. */
+  onRecentre?: () => void;
+};
+
+/** The view as the search framed it, with the middle and zoom that a visitor's pan or zoom moves. */
+type Framing = { view: View; centre: LatLng; zoom: number };
+
+/**
+ * Once the visitor moves the map from where the search framed it, offers to frame the search again and, if the move
+ * is somewhere a search could mean, a search at the postcode nearest the middle of the map in view. It measures the
+ * move from the view it mounts on, so its owner mounts it afresh as each search is framed.
+ */
+export function MovedMapButtons({ centred, settled, coveredBelow, onSearch, onRecentre }: Props) {
+  const near = usePostcodeNear((postcode) => (onSearch(postcode) ? undefined : ALREADY_SEARCHED), {
+    none: NO_POSTCODE_HERE,
+    failed: () => AREA_UNKNOWN,
+  });
+  const map = useMap();
+  const [framed] = useState(() => framingOf(map));
+  const [seen, see] = useState({ view: framed.view, strayed: false });
+  // Gone at once, rather than as the map glides back: the framing that recentring starts mounts this afresh.
+  const [recentred, recentre] = useState(false);
+  const { dismiss } = near;
+  // Subscribed for as long as it is mounted: listening afresh on each render would miss a move made in between.
+  useEffect(() => {
+    const moved = () => {
+      see({ view: viewOf(map), strayed: strayedFrom(map, framed) });
+      dismiss();
+    };
+    map.on("moveend", moved);
+    return () => void map.off("moveend", moved);
+  }, [map, framed, dismiss]);
+  // Going as the search or framing it starts gets under way, a button hands focus to the map rather than dropping it.
+  // The same function on every render, so only a button's going runs its cleanup.
+  const handFocus = useCallback(
+    (button: HTMLButtonElement | null) => () => {
+      if (button && document.activeElement === button) map.getContainer().focus();
+    },
+    [map],
+  );
+  if (!settled || recentred) return null;
+  const elsewhere = movedElsewhere(seen.view, framed.view, centred);
+  const back = onRecentre !== undefined && seen.strayed;
+  if (!elsewhere && !back) return null;
+  return (
+    // Clear of SearchPage's toolbar, whose inset, width and row of filter chips these offsets follow: beneath it on a
+    // phone, where it spans the map, and beside it on a wide screen.
+    <div className="pointer-events-none absolute inset-x-3 top-40 z-1000 flex justify-center lg:top-5 lg:left-102">
+      <MapControlContainer className="pointer-events-auto relative flex flex-col items-center gap-1.5">
+        {/* A pill however many buttons it holds, overriding the group's own rounding of its last one. */}
+        <ButtonGroup className="rounded-full shadow-md [&>[data-slot]:not(:has(~[data-slot]))]:rounded-r-full!">
+          {elsewhere && (
+            <Button
+              ref={handFocus}
+              type="button"
+              variant="outline"
+              className="rounded-full px-3 dark:bg-background"
+              // Not disabled while looking, which would drop focus; a second press is ignored.
+              aria-disabled={near.looking}
+              onClick={() => near.lookNear(() => Promise.resolve(middleInView(map, coveredBelow)))}
+            >
+              {near.looking ? <Loader2 aria-hidden className="animate-spin" /> : <Search aria-hidden />}
+              Search this area
+            </Button>
+          )}
+          {back && (
+            <IconButton
+              ref={handFocus}
+              label="Recentre on the search"
+              variant="outline"
+              className="rounded-full dark:bg-background"
+              // The search under way would move the map again as it arrives, so this waits for it.
+              aria-disabled={near.looking}
+              onClick={() => {
+                if (near.looking) return;
+                recentre(true);
+                onRecentre();
+              }}
+            >
+              <Focus aria-hidden />
+            </IconButton>
+          )}
+        </ButtonGroup>
+        <p aria-live="polite" className="sr-only">
+          {near.looking ? "Finding the nearest postcode" : ""}
+        </p>
+        {near.problem && (
+          <p role="alert" className="rounded-md bg-background px-2 py-1 text-xs text-destructive shadow-md">
+            {near.problem}
+          </p>
+        )}
+      </MapControlContainer>
+    </div>
+  );
+}
+
+function framingOf(map: LeafletMap): Framing {
+  return { view: viewOf(map), centre: map.getCenter(), zoom: map.getZoom() };
+}
+
+// The whole map, rather than the part in view, so that raising or lowering what covers it is no move.
+function viewOf(map: LeafletMap): View {
+  const bounds = map.getBounds();
+  return { north: bounds.getNorth(), south: bounds.getSouth(), east: bounds.getEast(), west: bounds.getWest() };
+}
+
+/** Whether the map is zoomed or panned away from `framing`. */
+function strayedFrom(map: LeafletMap, framing: Framing): boolean {
+  if (map.getZoom() !== framing.zoom) return true;
+  const { x, y } = map.latLngToContainerPoint(framing.centre);
+  const size = map.getSize();
+  return Math.hypot(x - size.x / 2, y - size.y / 2) > LEAST_MOVE_PX;
+}
+
+function middleInView(map: LeafletMap, coveredBelow?: (height: number) => number): Point {
+  const { x, y } = map.getSize();
+  const { lat, lng } = map.containerPointToLatLng([x / 2, (y - (coveredBelow?.(y) ?? 0)) / 2]);
+  return { lat, lng };
+}
