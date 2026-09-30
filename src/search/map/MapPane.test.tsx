@@ -18,12 +18,24 @@ vi.mock("@/components/ui/map", async () => {
     MapZoomControl: () => null,
     MapCircle: ({ radius }: { radius: number }) => createElement("div", { "data-testid": "circle", "data-radius": radius }),
     MapMarkerClusterGroup: ({ children }: { children?: unknown }) => createElement(Fragment, null, children as never),
-    MapMarker: ({ eventHandlers, children }: { eventHandlers?: { click?: (event: { originalEvent: MouseEvent }) => void }; children?: unknown }) =>
-      createElement(
-        "button",
-        { type: "button", onClick: (event: { nativeEvent: MouseEvent }) => eventHandlers?.click?.({ originalEvent: event.nativeEvent }) },
-        children as never,
-      ),
+    MapMarker: ({
+      position,
+      interactive,
+      eventHandlers,
+      children,
+    }: {
+      position: [number, number];
+      interactive?: boolean;
+      eventHandlers?: { click?: (event: { originalEvent: MouseEvent }) => void };
+      children?: unknown;
+    }) =>
+      interactive === false
+        ? createElement("div", { "data-testid": "static-marker", "data-position": position.join(",") })
+        : createElement(
+            "button",
+            { type: "button", onClick: (event: { nativeEvent: MouseEvent }) => eventHandlers?.click?.({ originalEvent: event.nativeEvent }) },
+            children as never,
+          ),
     MapTooltip: ({ children }: { children?: unknown }) => createElement(Fragment, null, children as never),
     markerData: () => undefined,
     elementIcon: () => ({}),
@@ -96,6 +108,14 @@ describe("MapPane", () => {
     renderPane({ fitKey: "Location=Brighton", centre: BRIGHTON, reachMiles: 0.4, pins: [pin("a", "b"), lewes] });
     expect(Number(screen.getByTestId("circle").dataset.radius)).toBeCloseTo(0.4 * 1609.344);
     expect(screen.getByRole("region", { name: "Map of results" })).toBeTruthy();
+  });
+
+  it("marks the centre with a pin that takes no clicks, even before the circle is drawn", () => {
+    renderPane({ fitKey: "Location=Brighton", centre: BRIGHTON, reachMiles: 0, pins: [pin("a")] });
+    expect(screen.getByTestId("static-marker").dataset.position).toBe("50.82,-0.14");
+    cleanup();
+    renderPane({ pins: [pin("a")] });
+    expect(screen.queryByTestId("static-marker")).toBeNull();
   });
 
   it("draws no circle without a centre, or before any card is further than 0 miles", () => {

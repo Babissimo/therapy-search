@@ -93,14 +93,18 @@ function markerData<T>(marker: Marker): T | undefined {
   return (marker.options as { data?: T }).data;
 }
 
-/** Leaflet creates and discards marker icons itself as clusters change, so icons are plain DOM rather than React. */
-function elementIcon(html: HTMLElement, [width, height]: [number, number]): DivIcon {
+/**
+ * Leaflet creates and discards marker icons itself as clusters change, so icons are plain DOM rather than React. An
+ * icon is centred on its point, or with `stand: "tip"`, stands on it by the middle of its bottom edge.
+ */
+function elementIcon(html: HTMLElement, [width, height]: [number, number], stand: "centre" | "tip" = "centre"): DivIcon {
+  const anchorY = stand === "tip" ? height : height / 2;
   return L.divIcon({
     html,
     className: "",
     iconSize: [width, height],
-    iconAnchor: [width / 2, height / 2],
-    tooltipAnchor: [0, -height / 2],
+    iconAnchor: [width / 2, anchorY],
+    tooltipAnchor: [0, -anchorY],
   });
 }
 

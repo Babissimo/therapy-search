@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
 import type { TherapistCard } from "@shared/types";
-import { pinIcon } from "./pinIcon";
+import { centreIcon, pinIcon } from "./pinIcon";
 
 const card = (slug: string, extra: Partial<TherapistCard> = {}): TherapistCard => ({ slug, name: slug, initials: slug.toUpperCase(), tags: [], ...extra });
 const html = (therapists: TherapistCard[]) => pinIcon(therapists).options.html as HTMLElement;
@@ -48,5 +48,17 @@ describe("pinIcon", () => {
     const root = html(["ab", "cd", "ef", "gh"].map((slug) => card(slug)));
     expect(root.getAttribute("role")).toBe("img");
     expect(root.getAttribute("aria-label")).toBe("4 therapists here");
+  });
+});
+
+describe("centreIcon", () => {
+  it("stands on the search's centre by its tip", () => {
+    const { iconSize, iconAnchor } = centreIcon().options;
+    const [width, height] = iconSize as [number, number];
+    expect(iconAnchor).toEqual([width / 2, height]);
+  });
+
+  it("is hidden from assistive technology, which reads the place searched beside the results", () => {
+    expect((centreIcon().options.html as HTMLElement).getAttribute("aria-hidden")).toBe("true");
   });
 });

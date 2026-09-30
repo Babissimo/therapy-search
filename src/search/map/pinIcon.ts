@@ -11,6 +11,19 @@ const STEP = 20;
 const VIDEO_SVG =
   '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m16 13 5.223 3.482a.5.5 0 0 0 .777-.416V7.87a.5.5 0 0 0-.752-.432L16 10.5"/><rect x="2" y="6" width="14" height="12" rx="2"/></svg>';
 
+const CENTRE: [number, number] = [27, 33];
+// lucide's "map-pin", filled and ringed, in a view cropped to it so its tip meets the bottom edge.
+const CENTRE_SVG =
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="3 1 18 22" class="size-full drop-shadow-sm"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0" class="fill-sky-500 stroke-background" stroke-width="1.5"/><circle cx="12" cy="10" r="3" class="fill-background"/></svg>';
+
+/** Where the search is centred: blue like the circle around it, and a pin rather than an avatar, so it reads as no therapist. */
+export function centreIcon(): DivIcon {
+  const pin = element("span", "block size-full");
+  pin.setAttribute("aria-hidden", "true");
+  pin.innerHTML = CENTRE_SVG;
+  return elementIcon(pin, CENTRE, "tip");
+}
+
 /** One therapist's photo or initials; a pin or cluster for several shows up to three, stacked, with the count. */
 export function pinIcon(therapists: TherapistCard[]): DivIcon {
   const [first] = therapists;

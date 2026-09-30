@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { useMapEvents } from "react-leaflet";
-import { Map, MapCircle, MapTileLayer, MapZoomControl } from "@/components/ui/map";
+import { Map, MapCircle, MapMarker, MapTileLayer, MapZoomControl } from "@/components/ui/map";
 import { savedView, saveView } from "../viewMemory";
 import { FitView } from "./FitView";
 import { METRES_PER_MILE, UK_VIEW, type Point } from "./geo";
 import type { Highlight } from "./highlight";
+import { centreIcon } from "./pinIcon";
 import type { Pin } from "./pins";
 import { PinsLayer } from "./PinsLayer";
 
@@ -34,6 +35,7 @@ export default function MapPane({ fitKey, entry, centre, reachMiles, centreSettl
   // A search keeps its tiles back until it is framed, so the whole UK's aren't fetched on the way. A view restored on
   // Back is already where it will stay.
   const [tiles, showTiles] = useState(restored !== undefined);
+  const [centrePin] = useState(centreIcon);
   const points = pins.map((p) => p.point);
   return (
     <div role="region" aria-label="Map of results" className="isolate size-full">
@@ -50,6 +52,9 @@ export default function MapPane({ fitKey, entry, centre, reachMiles, centreSettl
             pathOptions={{ fillOpacity: 0.06, dashArray: "6 6" }}
           />
         )}
+        {/* Above the therapists' pins, which often share its point, but beneath one hovered (Leaflet raises it 250) or
+            marked (PinsLayer raises it 1000); it lets clicks through to them. */}
+        {centre && <MapMarker position={[centre.lat, centre.lng]} icon={centrePin} interactive={false} keyboard={false} zIndexOffset={200} />}
         <PinsLayer pins={pins} highlight={highlight} selected={selected} onSelect={onSelect} />
         {/* The frame takes in every loaded pin, so it waits until they are placed. */}
         <FitView
