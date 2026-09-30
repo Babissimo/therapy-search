@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api";
+import { useStuck } from "@/lib/useStuck";
 import { cn } from "@/lib/utils";
 import { cachedCard } from "@/search/useResults";
 import { ShortlistButton } from "@/shortlist/ShortlistButton";
@@ -82,11 +83,16 @@ export function ProfileBody({ slug, back, close }: { slug: string } & Exits) {
   const hasMatches = matches.length > 0;
   const besideLong = long.length > 0;
   return (
-    <article className="@container space-y-8">
+    <article className={BODY}>
       <StickyHeader back={back} close={close} bookmark={<ProfileBookmark profile={profile} />}>
         <Identity
           photo={
-            <Portrait photoUrl={profile.photoUrl} initials={profile.initials} className="size-full" initialsClassName="text-xl @lg:text-2xl" />
+            <Portrait
+              photoUrl={profile.photoUrl}
+              initials={profile.initials}
+              className="size-full"
+              initialsClassName="text-[length:max(1.25rem,32cqi)]"
+            />
           }
           name={profile.name}
           location={
@@ -144,10 +150,13 @@ export function ProfileBody({ slug, back, close }: { slug: string } & Exits) {
   );
 }
 
+// Lest a sticking header's shrink take back the scroll that stuck it: no scroll anchors, and a foot as tall as its largest shrink.
+const BODY = "@container space-y-8 [overflow-anchor:none] has-data-stuck:pb-12";
+
 /** A profile still loading, laid out as most are: long sections beside short ones. */
 function ProfileSkeleton({ back, close }: Exits) {
   return (
-    <div aria-busy className="@container space-y-8">
+    <div aria-busy className={BODY}>
       <StickyHeader back={back} close={close}>
         <div aria-hidden>
           <Identity
@@ -209,7 +218,16 @@ type IdentityProps = { photo: ReactNode; name: ReactNode; location?: ReactNode; 
 function Identity({ photo, name, location, contacts }: IdentityProps) {
   return (
     <div className="flex items-start gap-4">
-      <div className="size-14 shrink-0 @lg:size-20">{photo}</div>
+      {/* Large for a first look, as far as UKCP's 200 px photos allow, then no taller than the text beside it once the header
+          sticks, shrinking by no more than BODY's foot. A container, which the initials size to. */}
+      <div
+        className={cn(
+          "@container size-24 shrink-0 @lg:size-32 group-data-stuck/header:size-14 @lg:group-data-stuck/header:size-20",
+          "motion-safe:transition-[width,height] motion-safe:duration-200",
+        )}
+      >
+        {photo}
+      </div>
       <div className="min-w-0 space-y-1.5">
         <div>
           <h1 className="font-heading text-2xl leading-tight font-medium @lg:text-3xl">{name}</h1>
@@ -237,11 +255,16 @@ function Columns({ main, aside, besideLong }: { main?: ReactNode; aside?: ReactN
 
 /** Who the profile is and how to reach them, kept in view as the visitor reads on. */
 function StickyHeader({ back, close, bookmark, children }: Exits & { bookmark?: ReactNode; children?: ReactNode }) {
+  const [ref, stuck] = useStuck();
   return (
     // A drawer is drawn in the popover colour, which the header matches so text scrolling beneath it stays hidden. The
     // background reaches a little past the content either side, over the rings that cards and focused controls draw
-    // outside their boxes; the rule keeps to the content's width.
-    <header className="sticky top-0 z-10 -mx-1 bg-background px-1 in-data-[slot=sheet-content]:bg-popover">
+    // outside their boxes; the rule keeps to the content's width. It sticks a pixel high, for `useStuck` to see it clipped.
+    <header
+      ref={ref}
+      data-stuck={stuck || undefined}
+      className="group/header sticky -top-px z-10 -mx-1 bg-background px-1 in-data-[slot=sheet-content]:bg-popover"
+    >
       <div className="space-y-2 border-b py-3">
         {back}
         <div className="flex items-start justify-between gap-4">
