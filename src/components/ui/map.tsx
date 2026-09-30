@@ -5,13 +5,11 @@ import type {} from "leaflet.markercluster";
 import { MinusIcon, PlusIcon } from "lucide-react";
 import { useEffect, useRef, useState, type ComponentProps, type ReactNode, type Ref } from "react";
 import {
-  Circle,
   MapContainer,
   Marker as LeafletMarker,
   TileLayer,
   Tooltip,
   useMap,
-  type CircleProps,
   type MapContainerProps,
   type MarkerProps,
   type TileLayerProps,
@@ -126,10 +124,6 @@ function MapMarkerClusterGroup({
   );
 }
 
-function MapCircle({ className, ...props }: CircleProps & { ref?: Ref<L.Circle> }) {
-  return <Circle className={cn("fill-primary stroke-primary stroke-2", className)} {...props} />;
-}
-
 function MapTooltip({ className, ...props }: TooltipProps & { ref?: Ref<L.Tooltip> }) {
   return <Tooltip direction="top" opacity={1} className={cn("w-fit text-xs", className)} {...props} />;
 }
@@ -231,4 +225,4 @@ function MapControlContainer({ className, ...props }: ComponentProps<"div">) {
   return <div ref={ref} className={cn("absolute z-1000 size-fit cursor-default", className)} {...props} />;
 }
 
-export { Map, MapBounds, MapCircle, MapControlContainer, MapMarker, MapMarkerClusterGroup, MapTileLayer, MapTooltip, MapZoomControl, elementIcon, markerData, tileSource };
+export { Map, MapBounds, MapControlContainer, MapMarker, MapMarkerClusterGroup, MapTileLayer, MapTooltip, MapZoomControl, elementIcon, markerData, tileSource };

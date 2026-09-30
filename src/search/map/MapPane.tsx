@@ -1,9 +1,9 @@
 import { useReducer, useState } from "react";
 import { useMapEvents } from "react-leaflet";
-import { Map, MapBounds, MapCircle, MapMarker, MapTileLayer, MapZoomControl } from "@/components/ui/map";
+import { Map, MapBounds, MapMarker, MapTileLayer, MapZoomControl } from "@/components/ui/map";
 import { savedView, saveView } from "../viewMemory";
 import { FitView } from "./FitView";
-import { METRES_PER_MILE, UK_BOUNDS, UK_VIEW, type Point } from "./geo";
+import { UK_BOUNDS, UK_VIEW, type Point } from "./geo";
 import type { Highlight } from "./highlight";
 import { centreIcon } from "./pinIcon";
 import type { Pin } from "./pins";
@@ -18,8 +18,6 @@ export type MapPaneProps = {
   /** The history entry the view is remembered against. */
   entry: string;
   centre?: Point;
-  /** The furthest of UKCP's distances among the loaded cards, which the circle reaches. */
-  reachMiles?: number;
   centreSettled: boolean;
   pins: Pin[];
   /** True while any loaded card's location is still being looked up. */
@@ -37,16 +35,12 @@ export type MapPaneProps = {
   coveredBelow?: (height: number) => number;
 };
 
-/**
- * The map behind the side bar: the open list's pins, with the results' circle and the search's centre, framed as they
- * are placed, with the view kept for Back.
- */
+/** The map behind the side bar: the open list's pins, with the search's centre, framed as they are placed, with the view kept for Back. */
 export default function MapPane({
   label,
   fitKey,
   entry,
   centre,
-  reachMiles,
   centreSettled,
   pins,
   placing,
@@ -75,16 +69,6 @@ export default function MapPane({
         {tiles && <MapTileLayer bounds={bounds} />}
         <MapBounds bounds={bounds} />
         <MapZoomControl className="top-auto right-2 bottom-8 left-auto max-lg:hidden" />
-        {/* Pins mark only the district or town a card lists, so one can sit a little either side of the edge. */}
-        {centre && reachMiles !== undefined && reachMiles > 0 && (
-          // Blue, which shows on light and dark tiles alike.
-          <MapCircle
-            center={[centre.lat, centre.lng]}
-            radius={reachMiles * METRES_PER_MILE}
-            className="fill-sky-500 stroke-sky-500"
-            pathOptions={{ fillOpacity: 0.06, dashArray: "6 6" }}
-          />
-        )}
         {/* Above the therapists' pins, which often share its point, but beneath one hovered (Leaflet raises it 250) or
             marked (PinsLayer raises it 1000); it lets clicks through to them. */}
         {centre && <MapMarker position={[centre.lat, centre.lng]} icon={centrePin} interactive={false} keyboard={false} zIndexOffset={200} />}
@@ -92,7 +76,6 @@ export default function MapPane({
         <FitView
           fitKey={fitKey}
           centre={centre}
-          reachMiles={reachMiles}
           points={points}
           waiting={framing}
           restored={restored}
@@ -106,17 +89,17 @@ export default function MapPane({
         />
         {/* Mounted afresh on each frame, which it measures the visitor's moves from, and waiting as the frame does. */}
         <SearchAreaButton key={framings} centred={centre !== undefined} settled={!framing} coveredBelow={coveredBelow} onSearch={onSearchArea} />
-        <RememberView entry={entry} fitKey={fitKey} pins={pins.length} reach={reachMiles} />
+        <RememberView entry={entry} fitKey={fitKey} pins={pins.length} />
       </Map>
     </div>
   );
 }
 
-function RememberView({ entry, fitKey, pins, reach }: { entry: string; fitKey: string; pins: number; reach?: number }) {
+function RememberView({ entry, fitKey, pins }: { entry: string; fitKey: string; pins: number }) {
   const map = useMapEvents({
     moveend: () => {
       const { lat, lng } = map.getCenter();
-      saveView(entry, { map: { fitKey, pins, reach, centre: [lat, lng], zoom: map.getZoom() } });
+      saveView(entry, { map: { fitKey, pins, centre: [lat, lng], zoom: map.getZoom() } });
     },
   });
   return null;

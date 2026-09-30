@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef } from "react";
 
-/** How far a visitor had got in a search: the list's scroll, and the map's view with the pins and circle it had then. */
-export type SavedView = { scrollTop?: number; map?: { fitKey: string; pins: number; reach?: number; centre: [number, number]; zoom: number } };
+/** How far a visitor had got in a search: the list's scroll, and the map's view with the pins it had then. */
+export type SavedView = { scrollTop?: number; map?: { fitKey: string; pins: number; centre: [number, number]; zoom: number } };
 
 // Keyed by history entry, so Back from a profile finds what that entry showed. Memory only: a reload starts afresh.
 const views = new Map<string, SavedView>();

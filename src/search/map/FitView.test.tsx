@@ -27,53 +27,27 @@ const framed = (fit: ReturnType<typeof spyFit>, call = 0) => {
 afterEach(() => vi.restoreAllMocks());
 
 describe("FitView", () => {
-  it("frames the circle and the pins, no closer than street level, and again only as more pins or a new search arrive", () => {
+  it("frames the centre and the pins, no closer than street level, and again only as more pins or a new search arrive", () => {
     const fit = spyFit();
-    const { rerender } = render(onMap(<FitView fitKey="a" centre={BRIGHTON} reachMiles={1} points={[HOVE]} waiting={false} />));
+    const { rerender } = render(onMap(<FitView fitKey="a" centre={BRIGHTON} points={[HOVE]} waiting={false} />));
     expect(fit).toHaveBeenCalledOnce();
-    // A mile each way of Brighton, and west to the pin in Hove, which is further.
-    expect(framed(fit)).toEqual([50.81, -0.17, 50.83, -0.12]);
+    expect(framed(fit)).toEqual([50.82, -0.17, 50.83, -0.14]);
     expect(fit.mock.calls[0]?.[1]).toMatchObject({ maxZoom: 14 });
-    rerender(onMap(<FitView fitKey="a" centre={BRIGHTON} reachMiles={1} points={[HOVE]} waiting={false} />));
+    rerender(onMap(<FitView fitKey="a" centre={BRIGHTON} points={[HOVE]} waiting={false} />));
     expect(fit).toHaveBeenCalledOnce();
     // Load more placed a pin 12 miles north.
-    rerender(onMap(<FitView fitKey="a" centre={BRIGHTON} reachMiles={12} points={[HOVE, { lat: 51, lng: -0.14 }]} waiting={false} />));
+    rerender(onMap(<FitView fitKey="a" centre={BRIGHTON} points={[HOVE, { lat: 51, lng: -0.14 }]} waiting={false} />));
     expect(fit).toHaveBeenCalledTimes(2);
-    const [south, , north] = framed(fit, 1);
-    // 24 miles from edge to edge is about 0.35 degrees of latitude.
-    expect(north! - south!).toBeCloseTo(0.35, 1);
-    rerender(onMap(<FitView fitKey="b" centre={BRIGHTON} reachMiles={1} points={[HOVE]} waiting={false} />));
+    expect(framed(fit, 1)).toEqual([50.82, -0.17, 51, -0.14]);
+    rerender(onMap(<FitView fitKey="b" centre={BRIGHTON} points={[HOVE]} waiting={false} />));
     expect(fit).toHaveBeenCalledTimes(3);
   });
 
-  it("frames again when the circle reaches further though no new pin arrives", () => {
-    const fit = spyFit();
-    const { rerender } = render(onMap(<FitView fitKey="a" centre={BRIGHTON} reachMiles={1} points={[HOVE]} waiting={false} />));
-    rerender(onMap(<FitView fitKey="a" centre={BRIGHTON} reachMiles={1} points={[HOVE]} waiting={false} />));
-    expect(fit).toHaveBeenCalledOnce();
-    // Load more brought only cards at the pin already there, the furthest of them 4 miles out.
-    rerender(onMap(<FitView fitKey="a" centre={BRIGHTON} reachMiles={4} points={[HOVE]} waiting={false} />));
-    expect(fit).toHaveBeenCalledTimes(2);
-  });
-
-  it("takes in a pin beyond the circle", () => {
-    const fit = spyFit();
-    render(onMap(<FitView fitKey="a" centre={BRIGHTON} reachMiles={1} points={[{ lat: 50.87, lng: 0.01 }]} waiting={false} />));
-    expect(framed(fit)).toEqual([50.81, -0.16, 50.87, 0.01]);
-  });
-
-  it("frames the whole area searched when no card has a distance and there are no pins", () => {
+  it("frames the whole area searched when no card is placed", () => {
     const fit = spyFit();
     render(onMap(<FitView fitKey="a" centre={BRIGHTON} points={[]} waiting={false} />));
     const [south, , north] = framed(fit);
     // 60 miles from edge to edge is about 0.87 degrees of latitude.
-    expect(north! - south!).toBeCloseTo(0.87, 1);
-  });
-
-  it("frames the whole area searched when every card is at the centre and none is placed", () => {
-    const fit = spyFit();
-    render(onMap(<FitView fitKey="a" centre={BRIGHTON} reachMiles={0} points={[]} waiting={false} />));
-    const [south, , north] = framed(fit);
     expect(north! - south!).toBeCloseTo(0.87, 1);
   });
 
@@ -99,7 +73,7 @@ describe("FitView", () => {
     const fit = spyFit();
     const { rerender } = render(onMap(<FitView fitKey="a" points={[BRIGHTON]} waiting />));
     expect(fit).not.toHaveBeenCalled();
-    rerender(onMap(<FitView fitKey="a" centre={BRIGHTON} reachMiles={1} points={[HOVE]} waiting={false} />));
+    rerender(onMap(<FitView fitKey="a" centre={BRIGHTON} points={[HOVE]} waiting={false} />));
     expect(fit).toHaveBeenCalledOnce();
   });
 
@@ -117,10 +91,10 @@ describe("FitView", () => {
 
   it("leaves a view restored for this search alone until pins arrive beyond those it had", () => {
     const fit = spyFit();
-    const restored = { fitKey: "a", pins: 1, reach: 1 };
-    const { rerender } = render(onMap(<FitView fitKey="a" centre={BRIGHTON} reachMiles={1} points={[HOVE]} waiting={false} restored={restored} />));
+    const restored = { fitKey: "a", pins: 1 };
+    const { rerender } = render(onMap(<FitView fitKey="a" centre={BRIGHTON} points={[HOVE]} waiting={false} restored={restored} />));
     expect(fit).not.toHaveBeenCalled();
-    rerender(onMap(<FitView fitKey="a" centre={BRIGHTON} reachMiles={12} points={[HOVE, { lat: 51, lng: -0.14 }]} waiting={false} restored={restored} />));
+    rerender(onMap(<FitView fitKey="a" centre={BRIGHTON} points={[HOVE, { lat: 51, lng: -0.14 }]} waiting={false} restored={restored} />));
     expect(fit).toHaveBeenCalledOnce();
   });
 
@@ -129,18 +103,18 @@ describe("FitView", () => {
     const onFramed = vi.fn();
     const { rerender } = render(onMap(<FitView fitKey="a" points={[BRIGHTON]} waiting instant onFramed={onFramed} />));
     expect(onFramed).not.toHaveBeenCalled();
-    rerender(onMap(<FitView fitKey="a" centre={BRIGHTON} reachMiles={1} points={[HOVE]} waiting={false} instant onFramed={onFramed} />));
+    rerender(onMap(<FitView fitKey="a" centre={BRIGHTON} points={[HOVE]} waiting={false} instant onFramed={onFramed} />));
     expect(fit.mock.calls[0]?.[1]).toMatchObject({ animate: false });
     expect(onFramed).toHaveBeenCalledOnce();
     // Load more placed a pin further out, with the tiles drawn by now: Leaflet decides whether to animate.
-    rerender(onMap(<FitView fitKey="a" centre={BRIGHTON} reachMiles={12} points={[HOVE, { lat: 51, lng: -0.14 }]} waiting={false} onFramed={onFramed} />));
+    rerender(onMap(<FitView fitKey="a" centre={BRIGHTON} points={[HOVE, { lat: 51, lng: -0.14 }]} waiting={false} onFramed={onFramed} />));
     expect(fit.mock.calls[1]?.[1]).not.toHaveProperty("animate");
   });
 
   it("tells the pane only once an animated framing comes to rest", () => {
     const fit = spyFit({ animating: true });
     const onFramed = vi.fn();
-    render(onMap(<FitView fitKey="a" centre={BRIGHTON} reachMiles={1} points={[HOVE]} waiting={false} onFramed={onFramed} />));
+    render(onMap(<FitView fitKey="a" centre={BRIGHTON} points={[HOVE]} waiting={false} onFramed={onFramed} />));
     expect(onFramed).not.toHaveBeenCalled();
     (fit.mock.contexts[0] as L.Map).fire("moveend");
     expect(onFramed).toHaveBeenCalledOnce();
