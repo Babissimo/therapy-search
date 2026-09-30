@@ -7,10 +7,11 @@ import { emptyParams } from "@shared/query";
 import type { TherapistCard } from "@shared/types";
 import { api } from "@/lib/api";
 import { inOrder, orderSeed } from "./order";
-import { useResults } from "./useResults";
+import { cachedCard, useResults } from "./useResults";
 
-function withClient() {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+const newClient = () => new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+function withClient(client = newClient()) {
   return ({ children }: { children: ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>;
 }
 
@@ -59,5 +60,15 @@ describe("useResults", () => {
     const { result } = renderHook(() => useResults(emptyParams()), { wrapper: withClient() });
     await waitFor(() => expect(result.current.therapists).toHaveLength(12));
     expect(shown(result.current.therapists)).toEqual(shown(inOrder(located.slice(6), orderSeed()).slice(0, 12)));
+  });
+
+  it("finds the card a search showed for a therapist, but not one of those it has yet to show", async () => {
+    answerShuffled();
+    const client = newClient();
+    const { result } = renderHook(() => useResults(emptyParams()), { wrapper: withClient(client) });
+    await waitFor(() => expect(result.current.therapists).toHaveLength(12));
+    const [first] = result.current.therapists;
+    expect(cachedCard(client, first!.slug)).toBe(first);
+    expect(cachedCard(client, expected[12]!)).toBeUndefined();
   });
 });

@@ -1,4 +1,4 @@
-import { keepPreviousData, useInfiniteQuery, type InfiniteData, type UseInfiniteQueryResult } from "@tanstack/react-query";
+import { keepPreviousData, useInfiniteQuery, type InfiniteData, type QueryClient, type UseInfiniteQueryResult } from "@tanstack/react-query";
 import { PAGE_SIZE, toQuery, type SearchParams } from "@shared/query";
 import type { SearchResult, TherapistCard } from "@shared/types";
 import type { Listings } from "@shared/ukcp/parseResults";
@@ -49,6 +49,15 @@ export function useResults(params: SearchParams, enabled = true): SearchResults 
     therapists: distinct(pages),
     searchedPlace: searched !== undefined && !locationFellBack(params.text.Location, searched) ? searched : undefined,
   };
+}
+
+/** The card a search still in `client`'s cache showed for this therapist, if one did. */
+export function cachedCard(client: QueryClient, slug: string): TherapistCard | undefined {
+  for (const [, data] of client.getQueriesData<InfiniteData<Page, After>>({ queryKey: ["results"] })) {
+    const card = data?.pages.flatMap((page) => page.therapists).find((therapist) => therapist.slug === slug);
+    if (card) return card;
+  }
+  return undefined;
 }
 
 /**

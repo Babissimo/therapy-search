@@ -15,7 +15,7 @@ export function ShortlistTab({ sought }: { sought: ReadonlySet<string> }) {
     return (
       <div className="flex gap-3 py-2">
         <Bookmark aria-hidden className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
-        <p className="text-sm">Nothing shortlisted yet. The bookmark on a therapist's card keeps them here, in this browser only.</p>
+        <p className="text-sm">Nothing shortlisted yet. The bookmark on a therapist's card or profile keeps them here, in this browser only.</p>
       </div>
     );
   }
@@ -23,9 +23,9 @@ export function ShortlistTab({ sought }: { sought: ReadonlySet<string> }) {
     <div className="space-y-4">
       {shortlist.length > 0 && <p className="text-sm text-muted-foreground">{therapistCount(shortlist.length)}, kept in this browser only.</p>}
       <ul className="space-y-4">
-        {shown.map(({ addedAt, card }) => (
+        {shown.map(({ card }) => (
           <li key={card.slug} className={cn("transition-opacity", !listed.has(card.slug) && "opacity-60")}>
-            <TherapistCard therapist={card} sought={sought} action={<ShortlistButton therapist={card} addedAt={addedAt} />} />
+            <TherapistCard therapist={card} sought={sought} action={<ShortlistButton therapist={card} />} />
           </li>
         ))}
       </ul>

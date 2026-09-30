@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useSyncExternalStore } from "react";
 import type { TherapistCard } from "@shared/types";
 import { browserStorage } from "@/lib/storage";
-import { createShortlistStore, type Shortlist, type ShortlistStore } from "./store";
+import { createShortlistStore, type Shortlist, type ShortlistEntry, type ShortlistStore } from "./store";
 
 /** The store the page's components share; left unset, it is the one kept in this browser. */
 export const ShortlistContext = createContext<ShortlistStore | null>(null);
@@ -23,9 +23,9 @@ export function useHasShortlist(): boolean {
   return useSyncExternalStore(store.subscribe, () => store.get().length > 0);
 }
 
-export function useShortlisted(slug: string): boolean {
+export function useShortlistEntry(slug: string): ShortlistEntry | undefined {
   const store = useShortlistStore();
-  return useSyncExternalStore(store.subscribe, () => store.has(slug));
+  return useSyncExternalStore(store.subscribe, () => store.get().find((entry) => entry.card.slug === slug));
 }
 
 export function therapistCount(n: number): string {
