@@ -4,7 +4,7 @@ import { lazy, Suspense, useEffect, useId, useRef, useState, type ComponentProps
 import { Link, useLocation } from "react-router";
 import { canonicalLocation } from "@shared/location";
 import { OPTIONS } from "@shared/options";
-import { SEARCH_MILES, toQuery, type SearchParams } from "@shared/query";
+import { toQuery, type SearchParams } from "@shared/query";
 import { IconButton } from "@/components/IconButton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -14,14 +14,15 @@ import { Masthead } from "@/layout/Masthead";
 import { useMediaQuery } from "@/lib/useMediaQuery";
 import { cn } from "@/lib/utils";
 import { ShortlistTab } from "@/shortlist/ShortlistTab";
-import { useHasShortlist, useShortlistRefresh } from "@/shortlist/useShortlist";
+import { useHasShortlist, useShortlistIf, useShortlistRefresh } from "@/shortlist/useShortlist";
 import { soughtTerms } from "./activeFilters";
 import { FilterChips } from "./FilterChips";
 import { FilterPanel } from "./FilterPanel";
 import { ListTabs, type ListTab } from "./ListTabs";
 import { createHighlight } from "./map/highlight";
-import { layoutPins, type Pin } from "./map/pins";
-import { useCardLookups, useCentre } from "./map/usePlaces";
+import type { MapPaneProps } from "./map/MapPane";
+import type { Pin } from "./map/pins";
+import { useCentre, usePins } from "./map/usePlaces";
 import { LoadMore } from "./LoadMore";
 import { reachMiles } from "./reach";
 import { Results } from "./Results";
@@ -41,11 +42,13 @@ const MapPane = lazy(() => import("./map/MapPane"));
 /** Wide enough for the results to sit beside the map rather than over it. */
 const WIDE = "(min-width: 64rem)";
 
-/** Before the centre is known, when place names can't yet be judged by their distance from it. */
-const NOT_LAID_OUT: ReturnType<typeof layoutPins> = { pins: [], unplaced: [] };
+const NO_CENTRE = { settled: true };
 
 /** Space left above a selected pin's entry as it scrolls into view. */
 const REVEAL_GAP_PX = 8;
+
+/** What the map shows of the list that is open. */
+type MapView = Pick<MapPaneProps, "label" | "fitKey" | "centre" | "reachMiles" | "centreSettled" | "pins" | "placing">;
 
 export function SearchPage() {
   const { params, error, update } = useSearchState();
@@ -76,7 +79,7 @@ function SearchView({ params, onChange }: ViewProps) {
   // With nothing to search for, UKCP would list everyone in a random order, which answers no one's question. The
   // outside-UK tick alone is nothing to search for: it only changes how a location is read.
   const searching = toQuery(withFlag(params, "LocationSearchOutsideUK", false)) !== "";
-  // What the map frames, and what a selection belongs to.
+  // The search, which the tab chosen and a selection belong to.
   const fitKey = searching ? toQuery(params) : "";
   const results = useResults(params, searching);
   useShortlistRefresh(results.therapists);
@@ -84,17 +87,23 @@ function SearchView({ params, onChange }: ViewProps) {
   // The place searched comes with the results, so there is none until a first search's results arrive; while the next
   // search loads, the results, and so the place, are still the last search's.
   const centreSettled = centre.settled && !results.query.isPending && !results.query.isPlaceholderData;
-  const lookupFor = useCardLookups(
-    results.therapists.map((t) => t.location),
-    params.flags.LocationSearchOutsideUK,
-  );
-  const { pins, unplaced } = centre.settled
-    ? layoutPins(results.therapists, (t) => lookupFor(t.location), centre.point, SEARCH_MILES)
-    : NOT_LAID_OUT;
-  const placing = results.therapists.some((t) => lookupFor(t.location) === undefined);
+  const { pins, unplaced, placing } = usePins(results.therapists, centre, params.flags.LocationSearchOutsideUK);
+  // Kept by key, so a new search shows its results whichever tab was open.
+  const [tabChoice, setTabChoice] = useState<{ fitKey: string; tab: ListTab }>();
+  const tab = tabChoice?.fitKey === fitKey ? tabChoice.tab : searching ? "results" : "shortlist";
+  // Beside a search, the map shows whichever list is open, framing each afresh as its tab opens. The circle measures the
+  // results alone.
+  const mapsShortlist = searching && tab === "shortlist";
+  const shortlisted = useShortlistIf(mapsShortlist).map((entry) => entry.card);
+  // A shortlist gathers therapists from any search, so their places are read with no centre to choose by or be too far
+  // from, and as UK places, since an overseas reading with no centre could put a UK therapist abroad.
+  const shortlistPins = usePins(shortlisted, NO_CENTRE, false);
+  const mapView: MapView = mapsShortlist
+    ? { label: "Map of your shortlist", fitKey: `${fitKey} shortlist`, centreSettled: true, pins: shortlistPins.pins, placing: shortlistPins.placing }
+    : { label: "Map of results", fitKey, centre: centre.point, reachMiles: reachMiles(results.therapists), centreSettled, pins, placing };
   // Kept by key, so the selection follows its pin as Load more adds to it; a new search clears it.
   const [selection, setSelection] = useState<{ fitKey: string; pinKey: string }>();
-  const selected = selection?.fitKey === fitKey ? pins.find((pin) => pin.key === selection.pinKey) : undefined;
+  const selected = selection?.fitKey === fitKey ? mapView.pins.find((pin) => pin.key === selection.pinKey) : undefined;
   const [highlight] = useState(createHighlight);
   // A new search's list can replace a hovered card without a pointerleave or blur, so the highlight ends with the search.
   useEffect(() => {
@@ -118,9 +127,6 @@ function SearchView({ params, onChange }: ViewProps) {
     setSheetFor(searching);
     setSheet(searching ? "full" : "peek");
   }
-  // Kept by key, like the selection, so a new search shows its results whichever tab was open.
-  const [tabChoice, setTabChoice] = useState<{ fitKey: string; tab: ListTab }>();
-  const tab = tabChoice?.fitKey === fitKey ? tabChoice.tab : searching ? "results" : "shortlist";
   // The shortlist keeps its place apart from the results', under a key of its own.
   const scroll = useRememberedScroll(tab === "results" ? entry : `${entry} shortlist`, tab === "shortlist" || !results.query.isPending);
   const listRef = useRef<HTMLUListElement>(null);
@@ -128,26 +134,31 @@ function SearchView({ params, onChange }: ViewProps) {
   const listShowing = useRef(false);
 
   function select(pin: Pin) {
-    // Activating the selected pin lets it go, unless the shortlist is showing, when its place is shown again instead.
-    if (pin.key === selected?.key && tab === "results") {
+    // Activating the selected pin lets it go.
+    if (pin.key === selected?.key) {
       setSelection(undefined);
       return;
     }
     setSelection({ fitKey, pinKey: pin.key });
-    listShowing.current = tab === "results" && (wide ? panelOpen : sheet !== "peek");
-    setTabChoice({ fitKey, tab: "results" });
+    listShowing.current = wide ? panelOpen : sheet !== "peek";
     if (wide) setPanelOpen(true);
     else if (sheet === "peek") setSheet("half");
   }
 
+  function pickTab(value: string) {
+    setTabChoice({ fitKey, tab: value as ListTab });
+    // A selected pin belongs to the list the map was showing.
+    setSelection(undefined);
+  }
+
   const selectedKey = selected?.key;
-  // After the render that opens the panel or raises the sheet, so the list is there to scroll. It follows `selection`
-  // too, which a pin selected again from the shortlist renews without changing its key.
+  // After the render that opens the panel or raises the sheet, so the list is there to scroll. The entry is the open
+  // tab's, as the results keep theirs, hidden, while the shortlist shows.
   useEffect(() => {
     const list = scroll.ref.current;
-    const entry = selectedKey === undefined ? null : list?.querySelector<HTMLElement>(`[data-pin="${selectedKey}"]`);
+    const entry = selectedKey === undefined ? null : list?.querySelector<HTMLElement>(`[role="tabpanel"]:not([hidden]) [data-pin="${selectedKey}"]`);
     if (list && entry) reveal(list, entry, listShowing.current);
-  }, [scroll.ref, selectedKey, selection]);
+  }, [scroll.ref, selectedKey]);
 
   const list = (
     <Results
@@ -156,7 +167,7 @@ function SearchView({ params, onChange }: ViewProps) {
       listRef={listRef}
       pins={pins}
       unplaced={unplaced}
-      selected={selected}
+      selected={mapsShortlist ? undefined : selected}
       onHighlight={highlight.set}
     />
   );
@@ -173,7 +184,15 @@ function SearchView({ params, onChange }: ViewProps) {
         {searching && list}
       </TabsContent>
       <TabsContent value="shortlist" forceMount hidden={tab !== "shortlist"} className={panel}>
-        {tab === "shortlist" && <ShortlistTab sought={soughtTerms(params)} />}
+        {tab === "shortlist" && (
+          <ShortlistTab
+            sought={soughtTerms(params)}
+            pins={shortlistPins.pins}
+            unplaced={shortlistPins.unplaced.length}
+            selected={selected}
+            onHighlight={highlight.set}
+          />
+        )}
       </TabsContent>
     </>
   );
@@ -186,7 +205,7 @@ function SearchView({ params, onChange }: ViewProps) {
       {/* With no results to head, the site's name heads the page. */}
       {!searching && <Masthead className="border-b px-4 py-3" />}
       {/* The tabs' root is the rest of the page, as their list heads the side bar and their panels fill it. */}
-      <Tabs.Root value={tab} onValueChange={(value) => setTabChoice({ fitKey, tab: value as ListTab })} asChild>
+      <Tabs.Root value={tab} onValueChange={pickTab} asChild>
         <div className="group/tabs flex min-h-0 flex-1">
           {wide && sideBar && (
             <ResultsPanel
@@ -205,13 +224,8 @@ function SearchView({ params, onChange }: ViewProps) {
             {searching ? (
               <Suspense fallback={<div className="size-full bg-muted" />}>
                 <MapPane
-                  fitKey={fitKey}
+                  {...mapView}
                   entry={entry}
-                  centre={centre.point}
-                  reachMiles={reachMiles(results.therapists)}
-                  centreSettled={centreSettled}
-                  pins={pins}
-                  placing={placing}
                   highlight={highlight}
                   selected={selected}
                   onSelect={select}

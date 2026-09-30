@@ -47,12 +47,17 @@ export function layoutPins(
   return { pins: [...pins.values()], unplaced };
 }
 
+/** The pin each therapist is on, by their slug. */
+export function pinsBySlug(pins: Pin[]): Map<string, Pin> {
+  return new Map(pins.flatMap((pin) => pin.therapists.map((t) => [t.slug, pin] as const)));
+}
+
 /** A row of the results list: one therapist, or everyone at a stacked pin. */
 export type Entry = { key: string; pin?: Pin; therapist: TherapistCard } | { key: string; pin: Pin; therapist?: undefined };
 
 /** The results in their own order, with everyone at a stacked pin gathered where the first of them comes. */
 export function listEntries(therapists: TherapistCard[], pins: Pin[]): Entry[] {
-  const pinOf = new Map(pins.flatMap((pin) => pin.therapists.map((t) => [t.slug, pin] as const)));
+  const pinOf = pinsBySlug(pins);
   const gathered = new Set<string>();
   const entries: Entry[] = [];
   for (const therapist of therapists) {

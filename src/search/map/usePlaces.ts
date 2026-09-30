@@ -1,8 +1,13 @@
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { canonicalLocation } from "@shared/location";
+import { SEARCH_MILES } from "@shared/query";
+import type { TherapistCard } from "@shared/types";
 import { api } from "@/lib/api";
 import { choosePoint, type Point } from "./geo";
-import { lookupText, type LookupResult } from "./pins";
+import { layoutPins, lookupText, type LookupResult, type Pin } from "./pins";
+
+/** Before the centre is known, when place names can't yet be judged by their distance from it. */
+const NOT_LAID_OUT: ReturnType<typeof layoutPins> = { pins: [], unplaced: [] };
 
 /** The point UKCP measured distances from; `settled` is false while it is being looked up. Places don't move, so answers last the session. */
 export function useCentre(place: string | undefined, outsideUK: boolean): { point?: Point; settled: boolean } {
@@ -42,4 +47,15 @@ export function useCardLookups(locations: (string | undefined)[], outsideUK: boo
     if (query?.status === "success") return { ok: true, lookup: query.data };
     return undefined;
   };
+}
+
+/** The therapists' pins, those who can't be placed, and whether any place is still being looked up. */
+export function usePins(
+  therapists: TherapistCard[],
+  centre: { point?: Point; settled: boolean },
+  outsideUK: boolean,
+): { pins: Pin[]; unplaced: TherapistCard[]; placing: boolean } {
+  const lookupFor = useCardLookups(therapists.map((t) => t.location), outsideUK);
+  const { pins, unplaced } = centre.settled ? layoutPins(therapists, (t) => lookupFor(t.location), centre.point, SEARCH_MILES) : NOT_LAID_OUT;
+  return { pins, unplaced, placing: therapists.some((t) => lookupFor(t.location) === undefined) };
 }

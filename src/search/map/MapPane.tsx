@@ -11,7 +11,9 @@ import { PinsLayer } from "./PinsLayer";
 import { SearchAreaButton } from "./SearchAreaButton";
 
 export type MapPaneProps = {
-  /** The search as a query string: a new one frames the map afresh. */
+  /** Names what the map shows, for screen readers. */
+  label: string;
+  /** What the map shows, as a key: a new one frames the map afresh. */
   fitKey: string;
   /** The history entry the view is remembered against. */
   entry: string;
@@ -31,8 +33,12 @@ export type MapPaneProps = {
   onSearchArea: (postcode: string) => boolean;
 };
 
-/** The map behind the results: pins and the circle the list reaches, framed as they are placed, with the view kept for Back. */
+/**
+ * The map behind the side bar: the open list's pins, with the results' circle and the search's centre, framed as they
+ * are placed, with the view kept for Back.
+ */
 export default function MapPane({
+  label,
   fitKey,
   entry,
   centre,
@@ -56,7 +62,7 @@ export default function MapPane({
   const framing = !centreSettled || placing;
   const points = pins.map((p) => p.point);
   return (
-    <div role="region" aria-label="Map of results" className="isolate size-full">
+    <div role="region" aria-label={label} className="isolate size-full">
       <Map center={restored?.centre ?? UK_VIEW.centre} zoom={restored?.zoom ?? UK_VIEW.zoom}>
         {tiles && <MapTileLayer />}
         <MapZoomControl className="top-auto right-2 bottom-8 left-auto max-lg:hidden" />

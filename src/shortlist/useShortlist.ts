@@ -17,6 +17,14 @@ export function useShortlist(): Shortlist {
   return useSyncExternalStore(store.subscribe, store.get);
 }
 
+const NOBODY: Shortlist = [];
+
+/** The shortlist while `wanted`, and nobody otherwise, so a page that shows it only at times redraws for it only then. */
+export function useShortlistIf(wanted: boolean): Shortlist {
+  const store = useShortlistStore();
+  return useSyncExternalStore(store.subscribe, () => (wanted ? store.get() : NOBODY));
+}
+
 /** Whether anyone is on the shortlist, which changes far less often than who is. */
 export function useHasShortlist(): boolean {
   const store = useShortlistStore();

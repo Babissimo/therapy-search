@@ -1,16 +1,31 @@
 import { Bookmark } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { pinsBySlug, type Pin } from "@/search/map/pins";
 import { TherapistCard } from "@/search/TherapistCard";
 import { ShortlistButton } from "./ShortlistButton";
 import type { Shortlist } from "./store";
 import { therapistCount, useShortlist } from "./useShortlist";
 
-/** The shortlist beside the search's results. `sought` is the search's terms, which pick out tags as they do in the results. */
-export function ShortlistTab({ sought }: { sought: ReadonlySet<string> }) {
+type Props = {
+  /** The search's terms, which pick out tags as they do in the results. */
+  sought: ReadonlySet<string>;
+  /** The shortlist's pins, while the map shows them. */
+  pins?: Pin[];
+  /** How many shortlisted therapists the map can't place, while it shows them. */
+  unplaced?: number;
+  /** The pin last activated on the map, whose therapists are marked. */
+  selected?: Pin;
+  /** The therapist whose card the pointer or focus is on, for the map to ring their pin. */
+  onHighlight?: (slug: string | undefined) => void;
+};
+
+/** The shortlist beside the search's results. */
+export function ShortlistTab({ sought, pins = [], unplaced = 0, selected, onHighlight }: Props) {
   const shortlist = useShortlist();
   const shown = useShown(shortlist);
   const listed = new Set(shortlist.map((entry) => entry.card.slug));
+  const pinOf = pinsBySlug(pins);
   if (shown.length === 0) {
     return (
       <div className="flex gap-3 py-2">
@@ -21,13 +36,32 @@ export function ShortlistTab({ sought }: { sought: ReadonlySet<string> }) {
   }
   return (
     <div className="space-y-4">
-      {shortlist.length > 0 && <p className="text-sm text-muted-foreground">{therapistCount(shortlist.length)}, kept in this browser only.</p>}
+      {shortlist.length > 0 && (
+        <p className="text-sm text-muted-foreground">
+          {therapistCount(shortlist.length)}, kept in this browser only{unplaced > 0 && ` · ${unplaced} not on the map`}.
+        </p>
+      )}
       <ul className="space-y-4">
-        {shown.map(({ card }) => (
-          <li key={card.slug} className={cn("transition-opacity", !listed.has(card.slug) && "opacity-60")}>
-            <TherapistCard therapist={card} sought={sought} action={<ShortlistButton therapist={card} />} />
-          </li>
-        ))}
+        {shown.map(({ card }) => {
+          const pinKey = pinOf.get(card.slug)?.key;
+          const marked = pinKey !== undefined && pinKey === selected?.key;
+          return (
+            // Marked by pin, so the page can bring a selected pin's therapists into view.
+            <li
+              key={card.slug}
+              data-pin={pinKey}
+              aria-current={marked || undefined}
+              className={cn("rounded-xl transition-opacity", !listed.has(card.slug) && "opacity-60", marked && "ring-2 ring-sky-500")}
+            >
+              <TherapistCard
+                therapist={card}
+                sought={sought}
+                action={<ShortlistButton therapist={card} />}
+                onHighlight={(on) => onHighlight?.(on ? card.slug : undefined)}
+              />
+            </li>
+          );
+        })}
       </ul>
     </div>
   );
