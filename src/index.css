@@ -148,19 +148,23 @@
   .leaflet-control-attribution {
     @apply rounded-md bg-muted! px-1! py-0.5! text-[10px] leading-none! text-muted-foreground!;
   }
-  /* Rings go on the icon inside the marker, so they scale with it rather than being covered by it. Blue stands out
-     against both the light and dark tiles, where the theme's greys don't. */
-  .pin-highlight > *,
-  .pin-selected > * {
-    @apply rounded-full outline-3 outline-offset-2 outline-sky-500;
+  /* A marked pin's ring is a disc behind each avatar, which shows past the avatars' own rings, so on a stack it traces
+     the circles. Blue stands out against both the light and dark tiles, where the theme's greys don't. It keeps its
+     colour in forced-colours mode, which would otherwise paint the disc as the page's background. */
+  .pin-avatar::before {
+    @apply absolute -inset-1.25 -z-10 hidden rounded-full bg-sky-500 content-[''] forced-color-adjust-none;
+  }
+  .pin-highlight .pin-avatar::before,
+  .pin-selected .pin-avatar::before {
+    @apply block;
   }
   /* A pin or cluster whose therapist's card is hovered or focused. */
   .pin-highlight > * {
     @apply scale-125 transition-[scale];
   }
   /* The selected pin, whose entry the list marks, or the cluster holding it. */
-  .pin-selected > * {
-    @apply ring-6 ring-sky-500/40 motion-safe:animate-[pin-pulse_1.2s_ease-out_3];
+  .pin-selected .pin-avatar::before {
+    @apply ring-1 ring-sky-500/40 motion-safe:animate-[pin-pulse_1.2s_ease-out_3];
   }
 }
 

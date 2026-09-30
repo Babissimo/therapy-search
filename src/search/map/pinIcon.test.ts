@@ -44,6 +44,12 @@ describe("pinIcon", () => {
     expect(icon.options.iconSize).toEqual([72, 32]);
   });
 
+  it("marks each avatar shown, and nothing else, for the ring index.css draws behind a marked pin", () => {
+    expect(html([card("jo")]).querySelectorAll(".pin-avatar")).toHaveLength(1);
+    const stack = html(["ab", "cd", "ef", "gh"].map((slug) => card(slug)));
+    expect([...stack.querySelectorAll(".pin-avatar")].map((a) => a.textContent)).toEqual(["AB", "CD", "EF"]);
+  });
+
   it("names a stacked pin's marker by how many therapists are on it", () => {
     const root = html(["ab", "cd", "ef", "gh"].map((slug) => card(slug)));
     expect(root.getAttribute("role")).toBe("img");

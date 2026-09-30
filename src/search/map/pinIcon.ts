@@ -28,14 +28,14 @@ export function centreIcon(): DivIcon {
 export function pinIcon(therapists: TherapistCard[]): DivIcon {
   const [first] = therapists;
   if (therapists.length === 1 && first) {
-    const pin = avatar(first, "size-10 text-sm");
-    if (isRemoteOnly(first)) pin.append(remoteBadge());
+    const face = avatar(first, "size-10 text-sm");
+    if (isRemoteOnly(first)) face.append(remoteBadge());
+    const pin = holder([face]);
     label(pin, first.name + (isRemoteOnly(first) ? ", remote sessions only" : ""));
     return elementIcon(pin, [SINGLE, SINGLE]);
   }
   const shown = therapists.slice(0, 3);
-  const stack = element("span", "relative flex -space-x-3");
-  for (const therapist of shown) stack.append(avatar(therapist, "size-8 text-xs"));
+  const stack = holder(shown.map((therapist) => avatar(therapist, "size-8 text-xs")));
   const count = element(
     "span",
     "absolute -top-1.5 -right-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[0.7rem] font-medium text-primary-foreground ring-2 ring-background",
@@ -52,10 +52,17 @@ function label(root: HTMLElement, name: string): void {
   root.setAttribute("aria-label", name);
 }
 
+/** A pin's avatars, overlapping, in a layer of their own so the rings of a marked pin (index.css) sit behind them all. */
+function holder(avatars: HTMLElement[]): HTMLElement {
+  const root = element("span", "relative isolate flex -space-x-3");
+  root.append(...avatars);
+  return root;
+}
+
 function avatar(therapist: TherapistCard, size: string): HTMLElement {
   const circle = element(
     "span",
-    `relative flex ${size} shrink-0 items-center justify-center rounded-full bg-muted font-medium text-muted-foreground shadow-md ring-2 ring-background`,
+    `pin-avatar relative flex ${size} shrink-0 items-center justify-center rounded-full bg-muted font-medium text-muted-foreground shadow-md ring-2 ring-background`,
   );
   circle.textContent = therapist.initials;
   if (therapist.photoUrl) {
