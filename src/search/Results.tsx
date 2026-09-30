@@ -124,7 +124,7 @@ function ResultsList({ params, results, listRef, pins = [], unplaced = [], selec
 function Summary({ title, reach, note }: { title: ReactNode; reach?: ReactNode; note?: ReactNode }) {
   return (
     <div className="space-y-1">
-      <h2 className="text-sm font-semibold">{title}</h2>
+      <h2 className="font-heading text-xl font-medium">{title}</h2>
       {reach && <p className="text-sm text-muted-foreground">{reach}</p>}
       {note && <p className="text-xs text-muted-foreground">{note}</p>}
     </div>
@@ -165,10 +165,10 @@ function PinGroup({ pin, marked, sought, highlight }: PinGroupProps) {
       aria-labelledby={headingId}
       className={cn("space-y-3 rounded-xl border p-3 transition-colors", marked && "border-sky-500 bg-sky-500/10 ring-1 ring-sky-500")}
     >
-      <h2 id={headingId} className="flex items-center gap-1.5 text-sm font-semibold">
+      <h2 id={headingId} className="eyebrow flex items-center gap-1.5">
         <MapPin aria-hidden className={cn("size-4 shrink-0", marked ? "text-sky-600 dark:text-sky-400" : "text-muted-foreground")} />
-        {/* The space parts the two in the group's name; the gap does so on screen. */}
-        {pinLabel(pin)} <span className="font-normal text-muted-foreground">{pin.therapists.length} therapists</span>
+        {/* The space parts the two in the group's name; the dot does so on screen, where spaced capitals run together. */}
+        {pinLabel(pin)} <span aria-hidden>·</span> <span className="font-normal text-muted-foreground">{pin.therapists.length} therapists</span>
       </h2>
       <ul className="space-y-3">
         {pin.therapists.map((t) => (

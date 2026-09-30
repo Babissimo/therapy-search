@@ -48,7 +48,7 @@ export function SiteTitle({ as: Title = "h1" }: { as?: "h1" | "p" }) {
         setShown(null);
       }}
     >
-      <Title className="min-w-0 font-semibold">
+      <Title className="min-w-0 font-heading text-lg font-medium">
         <PopoverTrigger
           {...hoverProps}
           onClick={(e) => {

@@ -183,7 +183,7 @@ function SectionSkeleton({ lines = 0, tags = 0 }: { lines?: number; tags?: numbe
   return (
     <Section heading={<SkeletonText className="w-40" />}>
       {lines > 0 && (
-        <p>
+        <p className={READING}>
           <SkeletonText lines={lines} className="w-1/2" />
         </p>
       )}
@@ -207,7 +207,7 @@ function Identity({ photo, name, location, contacts }: IdentityProps) {
       <div className="size-14 shrink-0 @lg:size-20">{photo}</div>
       <div className="min-w-0 space-y-1.5">
         <div>
-          <h1 className="text-2xl leading-tight font-semibold">{name}</h1>
+          <h1 className="font-heading text-2xl leading-tight font-medium @lg:text-3xl">{name}</h1>
           {location && <p className="text-sm text-muted-foreground">{location}</p>}
         </div>
         {contacts}
@@ -303,11 +303,14 @@ function ShortSections({ besideLong, children }: { besideLong: boolean; children
 // wrap; the thinner padding keeps a one-line tag at the badge's height.
 const TAG = "h-auto py-px whitespace-normal";
 
+// Therapists write at length about themselves, and visitors read it closely, so it is set for reading.
+const READING = "max-w-prose text-[1.0625rem] leading-relaxed";
+
 /** A section's heading above what it says, laid out for the profile and its skeleton. */
 function Section({ heading, children }: { heading: ReactNode; children: ReactNode }) {
   return (
     <section className="space-y-3">
-      <h2 className="text-lg font-semibold">{heading}</h2>
+      <h2 className="eyebrow text-muted-foreground">{heading}</h2>
       {children}
     </section>
   );
@@ -317,7 +320,7 @@ function SectionView({ section, isMatch, announce = true }: SectionProps) {
   return (
     <Section heading={section.heading}>
       {section.paragraphs.map((text, i) => (
-        <p key={i} className="whitespace-pre-line">
+        <p key={i} className={cn(READING, "whitespace-pre-line")}>
           {text}
         </p>
       ))}
@@ -349,7 +352,7 @@ function SectionView({ section, isMatch, announce = true }: SectionProps) {
                   {announce && isMatch(detail.title) && <span className="sr-only">, in your search</span>}
                 </span>
               </AccordionTrigger>
-              <AccordionContent className="whitespace-pre-line">{detail.text}</AccordionContent>
+              <AccordionContent className={cn(READING, "whitespace-pre-line")}>{detail.text}</AccordionContent>
             </AccordionItem>
           ))}
         </Accordion>

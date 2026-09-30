@@ -534,7 +534,7 @@ describe("SearchPage", () => {
     renderAt(SEARCH, [therapist("a", "BRIGHTON BN3"), therapist("b", "BRIGHTON BN1"), therapist("c", "Hove BN3")]);
     const here = await within(results()).findByRole("group", { name: "BN3 2 therapists" });
     expect(within(here).getAllByRole("heading").map((h) => [h.tagName, h.textContent])).toEqual([
-      ["H2", "BN3 2 therapists"],
+      ["H2", "BN3 · 2 therapists"],
       ["H3", "Therapist a"],
       ["H3", "Therapist c"],
     ]);
