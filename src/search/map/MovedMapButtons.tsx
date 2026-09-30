@@ -1,10 +1,11 @@
 import type { Map as LeafletMap } from "leaflet";
 import { Focus, Loader2, Search } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useMap } from "react-leaflet";
 import { Button } from "@/components/ui/button";
 import { ButtonGroup } from "@/components/ui/button-group";
 import { MapControlContainer } from "@/components/ui/map";
+import { usePresence } from "@/lib/useLeaving";
 import { usePostcodeNear } from "../usePostcodeNear";
 import { movedElsewhere, type Point, type View } from "./geo";
 
@@ -39,7 +40,7 @@ export function MovedMapButtons({ centre, settled, coveredBelow, onSearch, onRec
   const map = useMap();
   const [framed] = useState(() => viewOf(map));
   const [seen, see] = useState(framed);
-  // Gone at once, rather than as the map glides back: the framing that recentring starts mounts this afresh.
+  // Going at once, rather than as the map glides back: the framing that recentring starts mounts this afresh.
   const [recentred, recentre] = useState(false);
   const { dismiss } = near;
   // Subscribed for as long as it is mounted: listening afresh on each render would miss a move made in between.
@@ -51,23 +52,28 @@ export function MovedMapButtons({ centre, settled, coveredBelow, onSearch, onRec
     map.on("moveend", moved);
     return () => void map.off("moveend", moved);
   }, [map, dismiss]);
-  // Going as the search or framing it starts gets under way, a button hands focus to the map rather than dropping it.
-  // The same function on every render, so only a button's going runs its cleanup.
-  const handFocus = useCallback(
-    (button: HTMLButtonElement | null) => () => {
-      if (button && document.activeElement === button) map.getContainer().focus();
-    },
-    [map],
-  );
-  if (!settled || recentred) return null;
   const covered = coveredBelow?.(map.getSize().y) ?? 0;
   // Read as the map lies now, since raising the sheet re-aims the part in view without a move.
-  if (!movedElsewhere(seen, framed, middleInView(map, covered), centre)) return null;
+  const wanted = settled && !recentred && movedElsewhere(seen, framed, middleInView(map, covered), centre);
+  const shown = usePresence(wanted);
+  const group = useRef<HTMLDivElement>(null);
+  // Focus on a button goes to the map, rather than dropping, as the search or framing it starts takes the buttons away or
+  // the framing mounts this afresh. As they go, it moves after the commit, which puts back focus moved during it on a
+  // button still there.
+  useLayoutEffect(() => {
+    const handOn = () => {
+      if (group.current?.contains(document.activeElement)) map.getContainer().focus();
+    };
+    if (!wanted) handOn();
+    return handOn;
+  }, [wanted, map]);
+  if (!shown) return null;
   return (
     // Level with the zoom buttons on a wide screen; on a phone, above the sheet, gliding as it does. A resize, which
     // moves the sheet's top, ends with a moveend, which renders this again.
     <div
-      className="pointer-events-none absolute inset-x-3 z-1000 flex justify-center transition-[bottom] duration-200"
+      {...shown.props}
+      className="pointer-events-none absolute inset-x-3 z-1000 flex justify-center transition-[bottom] duration-200 fade-in-0 fade-out-0 slide-in-from-bottom-2 slide-out-to-bottom-2 motion-safe:data-entering:animate-in motion-safe:data-leaving:animate-out"
       style={{ bottom: `calc(${covered}px + 2rem)` }}
     >
       <MapControlContainer className="pointer-events-auto relative flex flex-col items-center gap-1.5">
@@ -77,9 +83,8 @@ export function MovedMapButtons({ centre, settled, coveredBelow, onSearch, onRec
           </p>
         )}
         {/* A pill however many buttons it holds, overriding the group's own rounding of its last one. */}
-        <ButtonGroup className="rounded-full shadow-md [&>[data-slot]:not(:has(~[data-slot]))]:rounded-r-full!">
+        <ButtonGroup ref={group} className="rounded-full shadow-md [&>[data-slot]:not(:has(~[data-slot]))]:rounded-r-full!">
           <Button
-            ref={handFocus}
             type="button"
             variant="outline"
             className="rounded-full px-3 dark:bg-background"
@@ -92,7 +97,6 @@ export function MovedMapButtons({ centre, settled, coveredBelow, onSearch, onRec
           </Button>
           {onRecentre && (
             <Button
-              ref={handFocus}
               type="button"
               variant="outline"
               className="rounded-full px-3 dark:bg-background"

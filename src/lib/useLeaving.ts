@@ -36,6 +36,14 @@ export function useLeaving<T>(items: readonly T[], keyOf: (item: T) => string): 
   }));
 }
 
+const PRESENT = [true] as const;
+const ABSENT: readonly true[] = [];
+
+/** One element's entry, as `useLeaving` gives it, while `present` and as it goes once not; nothing once it has gone. */
+export function usePresence(present: boolean): Shown<true> | undefined {
+  return useLeaving(present ? PRESENT : ABSENT, () => "present")[0];
+}
+
 /** `items` in their order, with each entry gone from them kept after whichever entry it followed. */
 function merge<T>(before: Entry<T>[], items: readonly T[], keyOf: (item: T) => string): Entry<T>[] {
   const prior = new Map(before.map((entry) => [entry.key, entry]));
