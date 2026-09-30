@@ -135,11 +135,11 @@ describe("ProfilePage's content", () => {
     expect(screen.queryByText(", in your search")).toBeNull();
   });
 
-  it("puts each office's fees above the profile's text", async () => {
+  it("gives each office's fees in that office's card", async () => {
     renderAt(["/therapist/Test-ABCDEFGH"], RICH);
-    const fees = await screen.findByRole("heading", { name: "Fees" });
-    expect(fees.compareDocumentPosition(screen.getByRole("heading", { name: "What I can help with" })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    screen.getByText("£90 per session");
+    const card = (await screen.findByText("£90 per session")).closest("[data-slot=card]");
+    expect(card?.textContent).toContain("London Office");
+    expect(card?.textContent).not.toContain("£70 per session");
   });
 
   it("puts the long sections first and the short ones beside or after them", async () => {
