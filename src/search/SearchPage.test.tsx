@@ -992,16 +992,17 @@ describe("SearchPage online", () => {
     expect(api.search).toHaveBeenCalledOnce();
   });
 
-  it("asks for no place, nor a session type needing one, that a link carries", async () => {
+  it("asks for no place, nor wheelchair access or a session type needing one, that a link carries", async () => {
     screenIs(true);
-    renderAt(`${GREEK}&Location=Leeds&TypesOfSession=Face+to+Face+-+Long+Term`);
+    renderAt(`${GREEK}&Location=Leeds&TypesOfSession=Face+to+Face+-+Long+Term&OnlyWheelchairAccessible=true`);
     await loaded();
     expect(asked()).toBe(GREEK_ONLINE);
+    expect(screen.queryByRole("button", { name: "Remove Only show wheelchair accessible" })).toBeNull();
   });
 
   it("goes online from a search near a place, taking its filters, and comes back to the place", async () => {
     screenIs(true);
-    renderAt("/?Location=Leeds&Languages=Greek&TypesOfSession=Face+to+Face+-+Long+Term");
+    renderAt("/?Location=Leeds&Languages=Greek&TypesOfSession=Face+to+Face+-+Long+Term&OnlyWheelchairAccessible=true");
     await loaded();
     expect(screen.getByRole("link", { name: "Near me" }).getAttribute("aria-current")).toBe("page");
     fireEvent.click(screen.getByRole("link", { name: "Online" }));
@@ -1009,7 +1010,7 @@ describe("SearchPage online", () => {
     expect(screen.getByRole("link", { name: "Online" }).getAttribute("aria-current")).toBe("page");
     await loaded();
     fireEvent.click(screen.getByRole("link", { name: "Near me" }));
-    expect([path(), url().toString()]).toEqual(["/", "Location=Leeds&Languages=Greek"]);
+    expect([path(), url().toString()]).toEqual(["/", "Location=Leeds&Languages=Greek&OnlyWheelchairAccessible=true"]);
     await loaded();
   });
 
@@ -1042,13 +1043,15 @@ describe("SearchPage online", () => {
     expect(within(screen.getByRole("tabpanel", { name: /^Shortlist/ })).getByText("Online Therapy").outerHTML).toBe(inResults);
   });
 
-  it("keeps its filters open beside the list on wide screens, offering only video and phone among the session types", async () => {
+  it("keeps its filters open beside the list on wide screens, offering only video and phone among the session types and no wheelchair access", async () => {
     screenIs(true);
     renderAt(GREEK);
     await loaded();
     expect(screen.queryByRole("button", { name: "Filters" })).toBeNull();
     fireEvent.click(within(filters()).getByRole("button", { name: /^Type of Session/ }));
     expect(within(filters()).queryByRole("checkbox", { name: "Face to Face - Long Term" })).toBeNull();
+    fireEvent.click(within(filters()).getByRole("button", { name: /^Additional Filters/ }));
+    expect(within(filters()).queryByRole("checkbox", { name: "Only show wheelchair accessible" })).toBeNull();
     fireEvent.click(within(filters()).getByRole("checkbox", { name: "Telephone Therapy" }));
     expect(url().toString()).toBe("TypesOfSession=Telephone+Therapy&Languages=Greek");
     await waitFor(() => expect(asked()).toBe("TypesOfSession=Telephone+Therapy&Languages=Greek"));

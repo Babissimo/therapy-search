@@ -3,6 +3,7 @@ import type { FilterGroup } from "@shared/types";
 import { filterGroups, onlineFilterGroups } from "./filterGroups";
 
 const photos = { name: "OnlyProfilesWithPhotos", value: "true", label: "Only show profiles with photos" };
+const wheelchair = { name: "OnlyWheelchairAccessible", value: "true", label: "Only show wheelchair accessible" };
 const languages: FilterGroup = { label: "Languages", fields: [{ name: "Languages", value: "French", label: "French" }] };
 const session = (value: string) => ({ name: "TypesOfSession", value, label: value });
 const sessions: FilterGroup = { label: "Type of Session", fields: [session("Face to Face - Long Term"), session("Online Therapy"), session("Telephone Therapy")] };
@@ -23,14 +24,16 @@ describe("filterGroups", () => {
 });
 
 describe("onlineFilterGroups", () => {
-  const groups = onlineFilterGroups({ helpWith: [], groups: [sessions, languages, { label: "Additional Filters", fields: [photos] }] });
+  const additional: FilterGroup = { label: "Additional Filters", help: "Photos and wheelchair access.", fields: [photos, wheelchair] };
+  const groups = onlineFilterGroups({ helpWith: [], groups: [sessions, languages, additional] });
 
   it("offers only the session types that can be had remotely", () => {
     expect(groups[0]?.fields.map((f) => f.value)).toEqual(["Online Therapy", "Telephone Therapy"]);
     expect(groups[1]).toBe(languages);
   });
 
-  it("leaves out the outside-UK tick, as there is no place to read", () => {
+  it("leaves out the outside-UK tick, as there is no place to read, and wheelchair access, as there are no premises", () => {
     expect(groups[2]?.fields.map((f) => f.name)).toEqual(["OnlyProfilesWithPhotos"]);
+    expect(groups[2]?.help).not.toMatch(/wheelchair/i);
   });
 });

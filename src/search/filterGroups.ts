@@ -5,6 +5,7 @@ import { REMOTE_SESSIONS } from "./online";
 const ADDITIONAL = "Additional Filters";
 const OUTSIDE_UK: FilterField = { name: "LocationSearchOutsideUK", value: "true", label: "Search locations outside the UK" };
 const OUTSIDE_UK_HELP = "Searching locations outside the UK reads the location as a place anywhere in the world.";
+const ONLINE_ADDITIONAL_HELP = "Use this filter to narrow down your results to only therapists who have added a picture to their profile.";
 
 /**
  * UKCP's groups as the filter panel lists them. UKCP sets its outside-UK tick beside the location box; here it joins the
@@ -17,12 +18,23 @@ export function filterGroups(options: Options): FilterGroup[] {
   return options.groups.map((g) => (g === additional ? { ...g, help, fields: [...g.fields, OUTSIDE_UK] } : g));
 }
 
-/** UKCP's groups as the online view lists them: with no place to read, and only the session types that can be had remotely. */
+/**
+ * UKCP's groups as the online view lists them: with no place to read, no premises to reach, and only the session types
+ * that can be had remotely.
+ */
 export function onlineFilterGroups(options: Options): FilterGroup[] {
   return options.groups.map((g) => {
-    const remote = g.fields.filter((f) => f.name !== "TypesOfSession" || REMOTE_SESSIONS.includes(f.value));
-    return remote.length === g.fields.length ? g : { ...g, fields: remote };
+    const remote = g.fields.filter(offeredOnline);
+    if (remote.length === g.fields.length) return g;
+    // UKCP's word on the additional filters covers wheelchair access too.
+    return g.label === ADDITIONAL ? { ...g, help: ONLINE_ADDITIONAL_HELP, fields: remote } : { ...g, fields: remote };
   });
+}
+
+/** Whether a filter means anything for sessions had remotely. */
+function offeredOnline(field: FilterField): boolean {
+  if (field.name === "TypesOfSession") return REMOTE_SESSIONS.includes(field.value);
+  return field.name !== "OnlyWheelchairAccessible";
 }
 
 export const FILTER_GROUPS = filterGroups(OPTIONS);
