@@ -56,8 +56,8 @@ export function OnlineView({ params, onChange, wide }: Props) {
   const lists = (
     <ListPanels
       tab={tab}
-      shortlist={<ShortlistTab sought={soughtTerms(search)} />}
-      results={<Results params={search} results={results} listRef={listRef} note="Only therapists who say they work online or by phone." />}
+      shortlist={<ShortlistTab sought={soughtTerms(search)} online />}
+      results={<Results params={search} results={results} listRef={listRef} online />}
     />
   );
   const footer = tab === "results" ? <LoadMore results={results} listRef={listRef} /> : undefined;
