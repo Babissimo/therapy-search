@@ -1,3 +1,4 @@
+import { Armchair, MapPin, Video, type LucideIcon } from "lucide-react";
 import type { ComponentProps, ReactNode } from "react";
 import { Link } from "react-router";
 import { classifyLocation } from "@shared/location";
@@ -48,8 +49,15 @@ export function TherapistCard({ therapist: t, sought, grouped = false, online = 
           {t.name}
         </Link>
       }
-      place={place}
-      meets={meets}
+      place={
+        place && (
+          <span className="flex gap-1.5">
+            <MapPin aria-hidden className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+            {place}
+          </span>
+        )
+      }
+      meets={meets && <Sessions text={meets} />}
       action={action}
       summary={t.summary}
       tags={t.tags.filter((tag) => sought.has(tag.toLowerCase()))}
@@ -110,6 +118,32 @@ function CardLayout({ heading: Heading = "h2", photo, name, place, meets, action
         )}
       </CardContent>
     </Card>
+  );
+}
+
+// UKCP's two ways of meeting, matched as isRemoteOnly matches them.
+const SESSION_ICONS: [RegExp, LucideIcon][] = [
+  [/in-person/i, Armchair],
+  [/remote/i, Video],
+];
+
+/** UKCP's "In-person & Remote" as its kinds side by side, each after its icon; a kind it doesn't know keeps its words alone. */
+function Sessions({ text }: { text: string }) {
+  const kinds = text.split(/\s*&\s*/).filter(Boolean);
+  return (
+    <span className="flex flex-wrap gap-x-3 gap-y-1">
+      {kinds.map((kind, i) => {
+        const Icon = SESSION_ICONS.find(([pattern]) => pattern.test(kind))?.[1];
+        return (
+          <span key={i} className="inline-flex items-center gap-1.5">
+            {/* Parts the kinds for a screen reader, which would otherwise run them together. */}
+            {i > 0 && <span className="sr-only">, </span>}
+            {Icon && <Icon aria-hidden className="size-4 shrink-0" />}
+            {kind}
+          </span>
+        );
+      })}
+    </span>
   );
 }
 

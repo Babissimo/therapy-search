@@ -31,7 +31,8 @@ describe("TherapistCard", () => {
     renderCard(therapist());
     expect(screen.getByRole("link", { name: "Test Therapist 1" }).getAttribute("href")).toBe("/therapist/Test-Therapist-1-TESTID01");
     screen.getByText("E8 (0.2 miles away)");
-    screen.getByText("In-person & Remote");
+    screen.getByText("In-person");
+    screen.getByText("Remote");
     screen.getByText("Summary text.");
   });
 
@@ -66,12 +67,25 @@ describe("TherapistCard", () => {
     renderCard(therapist(), [], { online: true });
     screen.getByText("Summary text.");
     expect(screen.queryByText(/E8|away/)).toBeNull();
-    expect(screen.queryByText("In-person & Remote")).toBeNull();
+    expect(screen.queryByText(/In-person|Remote/)).toBeNull();
   });
 
   it("says online that a therapist meets only in person", () => {
     renderCard(therapist({ sessionTypes: "In-person" }), [], { online: true });
     screen.getByText("In-person");
+  });
+
+  it("marks each way of meeting with its icon", () => {
+    renderCard(therapist());
+    const icons = screen.getByText("Remote").closest("p")!.querySelectorAll("svg");
+    expect([...icons].map((svg) => ["armchair", "video"].find((name) => svg.classList.contains(`lucide-${name}`)))).toEqual(["armchair", "video"]);
+  });
+
+  it("parts the ways of meeting for a screen reader, keeping one it has no icon for", () => {
+    renderCard(therapist({ sessionTypes: "In-person & Home visits &" }));
+    const line = screen.getByText("Home visits").closest("p")!;
+    expect(line.textContent).toBe("In-person, Home visits");
+    expect(line.querySelectorAll("svg")).toHaveLength(1);
   });
 
   it("shows only the tags the search asked for", () => {

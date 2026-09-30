@@ -1161,7 +1161,7 @@ describe("SearchPage online", () => {
     const saysNeither = (panel: HTMLElement) => {
       expect(within(panel).getByRole("link", { name: "Therapist a" })).toBeTruthy();
       expect(within(panel).queryByText("London E8")).toBeNull();
-      expect(within(panel).queryByText("In-person & Remote")).toBeNull();
+      expect(within(panel).queryByText(/In-person|Remote/)).toBeNull();
     };
     saysNeither(screen.getByRole("tabpanel", { name: "Results" }));
     const tab = screen.getByRole("tab", { name: /^Shortlist/ });

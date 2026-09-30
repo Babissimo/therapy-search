@@ -1,6 +1,6 @@
 import { Fragment, lazy, Suspense, useEffect, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, ChevronLeft, Diamond, ExternalLink } from "lucide-react";
+import { Check, ChevronLeft, Diamond, ExternalLink, MapPin } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router";
 import type { Office, Profile, ProfileSection } from "@shared/types";
 import { Portrait } from "@/components/Portrait";
@@ -89,7 +89,14 @@ export function ProfileBody({ slug, back, close }: { slug: string } & Exits) {
             <Portrait photoUrl={profile.photoUrl} initials={profile.initials} className="size-full" initialsClassName="text-xl @lg:text-2xl" />
           }
           name={profile.name}
-          location={profile.location}
+          location={
+            profile.location && (
+              <span className="flex gap-1.5">
+                <MapPin aria-hidden className="mt-0.5 size-4 shrink-0" />
+                {profile.location}
+              </span>
+            )
+          }
           contacts={<ContactList profile={profile} />}
         />
       </StickyHeader>
