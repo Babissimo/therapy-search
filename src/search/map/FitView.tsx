@@ -4,12 +4,14 @@ import { useMap } from "react-leaflet";
 import { SEARCH_MILES } from "@shared/query";
 import { METRES_PER_MILE, type Point } from "./geo";
 
-/** A search's view, with how many pins it took in. */
-export type Framed = { fitKey: string; pins: number };
+/** A search's view, with how many therapists it took in. */
+export type Framed = { fitKey: string; placed: number };
 type Props = {
   fitKey: string;
   centre?: Point;
   points: Point[];
+  /** How many therapists the points place, which a stack splitting into more pins leaves as it was. */
+  placed: number;
   waiting: boolean;
   restored?: Framed;
   /** Frames without animating. */
@@ -30,19 +32,19 @@ const LEAST_ROOM = 128;
 const MAX_ZOOM = 14;
 
 /**
- * Frames each search as its first page is placed, and again whenever Load more places further pins or the visitor
+ * Frames each search as its first page is placed, and again whenever Load more places further therapists or the visitor
  * asks to recentre: around the centre and every pin, or the whole area searched when no pin is placed. With no centre
- * it frames the pins alone. A view restored on Back is left as it was until pins arrive beyond those it had, or the
- * visitor asks.
+ * it frames the pins alone. A pin moving, as to an office's postcode, frames nothing again. A view restored on Back is
+ * left as it was until therapists are placed beyond those it had, or the visitor asks.
  * `onFramed` hears when the view is where the search puts it, or that there is nothing to frame.
  */
-export function FitView({ fitKey, centre, points, waiting, restored, instant, coveredBelow, recentres = 0, onFramed }: Props) {
+export function FitView({ fitKey, centre, points, placed, waiting, restored, instant, coveredBelow, recentres = 0, onFramed }: Props) {
   const map = useMap();
   const framed = useRef(restored);
   const recentred = useRef(recentres);
   useEffect(() => {
     const last = framed.current;
-    const taken = recentres === recentred.current && last?.fitKey === fitKey && points.length <= last.pins;
+    const taken = recentres === recentred.current && last?.fitKey === fitKey && placed <= last.placed;
     if (waiting || taken) return;
     recentred.current = recentres;
     const bounds = L.latLngBounds(points.map((p) => [p.lat, p.lng]));
@@ -59,7 +61,7 @@ export function FitView({ fitKey, centre, points, waiting, restored, instant, co
     // Leaflet ends every fit with a moveend, at once or when an animation comes to rest, even when the view stays put.
     if (onFramed) map.once("moveend", onFramed);
     map.fitBounds(bounds, options);
-    framed.current = { fitKey, pins: points.length };
-  }, [map, fitKey, centre, points, waiting, instant, coveredBelow, recentres, onFramed]);
+    framed.current = { fitKey, placed };
+  }, [map, fitKey, centre, points, placed, waiting, instant, coveredBelow, recentres, onFramed]);
   return null;
 }

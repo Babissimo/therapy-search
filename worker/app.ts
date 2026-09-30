@@ -1,13 +1,31 @@
 import { Hono, type Context } from "hono";
 import { bodyLimit } from "hono/body-limit";
-import { LOCATION_MAX_LENGTH, canonicalLocation, nearestQuery, placeQuery, type NearestLookup, type PlaceLookup, type PlaceOptions } from "../shared/location";
+import {
+  LOCATION_MAX_LENGTH,
+  canonicalLocation,
+  classifyLocation,
+  nearestQuery,
+  placeQuery,
+  type NearestLookup,
+  type OfficePostcode,
+  type PlaceLookup,
+  type PlaceOptions,
+} from "../shared/location";
 import { ALLOWED } from "../shared/options";
 import { InvalidParam, asksWhole, readParams, toQuery } from "../shared/query";
 import { UpstreamError, type SessionStore, type UkcpClient } from "./ukcp/client";
+import { officePostcode } from "./ukcp/offices";
 
 export type RateLimit = { limit(options: { key: string }): Promise<{ success: boolean }> };
 export type Assets = { fetch(url: string): Promise<Response> };
-export type Env = { ASSETS: Assets; UPSTREAM_LIMIT: RateLimit; PLACE_LIMIT: RateLimit; UKCP_SESSION: SessionStore; SITE_URL: string };
+export type Env = {
+  ASSETS: Assets;
+  UPSTREAM_LIMIT: RateLimit;
+  PLACE_LIMIT: RateLimit;
+  OFFICE_LIMIT: RateLimit;
+  UKCP_SESSION: SessionStore;
+  SITE_URL: string;
+};
 export type PlaceFinder = {
   lookup(text: string, options: PlaceOptions): Promise<PlaceLookup>;
   nearest(lat: number, lng: number): Promise<NearestLookup>;
@@ -27,6 +45,12 @@ const PROFILE_MAX_AGE = 60 * 60;
 // Places don't move; a miss is kept shorter in case the geocoders learn it.
 const PLACE_FOUND_MAX_AGE = 30 * 24 * 60 * 60;
 const PLACE_MISSING_MAX_AGE = 24 * 60 * 60;
+// Offices rarely move, and the card asking, kept far less long, still decides who is listed and in which district. No
+// postcode is kept for less, in case the therapist adds one or UKCP served the page without its offices.
+const OFFICE_FOUND_MAX_AGE = 30 * 24 * 60 * 60;
+const OFFICE_MISSING_MAX_AGE = 7 * 24 * 60 * 60;
+/** The date of the last change to what an office lookup answers, which retires its cached answers as LOOKUP_VERSION does places'. */
+export const OFFICE_VERSION = "2026-10-01";
 // Vite names each built file by a hash of its content, so a browser can keep one for good.
 const ASSET_CACHE_CONTROL = "public, max-age=31536000, immutable";
 // Far more than the form can send; a body is read whole before it is checked.
@@ -40,6 +64,7 @@ export const TOO_MANY = "Too many searches in a short time. Wait a minute and tr
 export const PLACE_DOWN = "Couldn't look up that place just now.";
 export const NEAREST_DOWN = "Couldn't find the nearest postcode just now.";
 export const STALE_PAGE = "This page is out of date. Reload it to search.";
+const NO_PROFILE = "This profile isn't on UKCP any more.";
 // UKCP builds slugs from names, so they can carry accents and apostrophes.
 const SLUG = /^[\p{L}\p{N}][\p{L}\p{M}\p{N}'’.-]{2,119}$/u;
 
@@ -86,6 +111,16 @@ export function createGateway(cachedFor: (c: Ctx) => Cached) {
     const { lat, lng } = pointOf(await formOf(c));
     // Rounded before it reaches the cache, so a finer point is never looked up or kept.
     return forward(c, `/api/nearest?${nearestQuery(lat, lng)}`);
+  });
+
+  app.post("/api/office", async (c) => {
+    const form = await formOf(c);
+    const slug = form.get("slug") ?? "";
+    if (!SLUG.test(slug)) return c.json({ error: "That isn't a UKCP profile address." }, 400);
+    // Read as a card's location is, so the district asked for is the one the browser took from the card.
+    const district = classifyLocation(form.get("outcode") ?? "");
+    if (district.kind !== "outcode" || district.rest !== "") throw new InvalidParam("outcode", "outcode must be a UK postcode district");
+    return forward(c, `/api/office/${encodeURIComponent(slug)}?${new URLSearchParams({ outcode: district.outcode, v: OFFICE_VERSION })}`);
   });
 
   // Only a page loaded from an older deploy asks by URL; reloading brings one that doesn't.
@@ -140,7 +175,7 @@ export function createCache(clientFor: (env: Env) => UkcpClient, placesFor: (env
     if (!(await allow(c, c.env.UPSTREAM_LIMIT))) return c.json({ error: TOO_MANY }, 429);
     const slug = c.req.param("slug");
     const html = await clientFor(c.env).profile(slug);
-    if (html === null) return c.json({ error: "This profile isn't on UKCP any more." }, 404);
+    if (html === null) return c.json({ error: NO_PROFILE }, 404);
     return upstreamHtml(c, expectPage(html, "therapist-header"), `public, max-age=${PROFILE_MAX_AGE}`);
   });
 
@@ -177,6 +212,15 @@ export function createCache(clientFor: (env: Env) => UkcpClient, placesFor: (env
       return c.json({ error: NEAREST_DOWN }, 502);
     }
     return c.json(nearest, 200, { "Cache-Control": `public, max-age=${nearest.found ? PLACE_FOUND_MAX_AGE : PLACE_MISSING_MAX_AGE}` });
+  });
+
+  app.get("/api/office/:slug", async (c) => {
+    if (!(await allow(c, c.env.OFFICE_LIMIT))) return c.json({ error: TOO_MANY }, 429);
+    const html = await clientFor(c.env).profile(c.req.param("slug"));
+    if (html === null) return c.json({ error: NO_PROFILE }, 404);
+    const postcode = officePostcode(expectPage(html, "therapist-header"), new URL(c.req.url).searchParams.get("outcode") ?? "");
+    const answer: OfficePostcode = postcode === undefined ? { found: false } : { found: true, postcode };
+    return c.json(answer, 200, { "Cache-Control": `public, max-age=${answer.found ? OFFICE_FOUND_MAX_AGE : OFFICE_MISSING_MAX_AGE}` });
   });
 
   app.notFound((c) => c.json({ error: "Not found" }, 404));

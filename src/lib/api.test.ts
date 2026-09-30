@@ -34,6 +34,24 @@ describe("api", () => {
     ]);
   });
 
+  it("asks for an office's postcode by body, four at most at a time", async () => {
+    const pending: (() => void)[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => new Promise<Response>((resolve) => pending.push(() => resolve(new Response(JSON.stringify({ found: true, postcode: "BN3 2FL" })))))),
+    );
+    const answers = ["a", "b", "c", "d", "e"].map((slug) => api.office(`Jo-Bloggs-${slug}`, "BN3"));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(sent()).toHaveLength(4);
+    expect(sent()[0]).toEqual(["/api/office", "POST", "slug=Jo-Bloggs-a&outcode=BN3"]);
+    pending.shift()?.();
+    await expect(answers[0]).resolves.toEqual({ found: true, postcode: "BN3 2FL" });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(sent()).toHaveLength(5);
+    for (const answer of pending) answer();
+    await Promise.all(answers);
+  });
+
   it("reports a card it can't read as UKCP having changed, once the card is shown", async () => {
     answer(`<span class="results-no">1-1 of 1 results</span><div class="profile-listing"><a href="therapist/Jo-Bloggs-ABCDEFGH"></a></div>`);
     const [listing] = (await api.search("")).listings;

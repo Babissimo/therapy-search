@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TherapistCard } from "@shared/types";
-import { isRemoteOnly, layoutPins, listEntries, lookupText, pinLabel, type LookupResult, type Pin } from "./pins";
+import { isRemoteOnly, layoutPins, listEntries, lookupText, officeDistrict, pinLabel, type LookupResult, type Pin } from "./pins";
 
 const card = (slug: string, extra: Partial<TherapistCard> = {}): TherapistCard => ({ slug, name: slug, initials: "T", tags: [], ...extra });
 const BRIGHTON = { lat: 50.8225, lng: -0.1372 };
@@ -17,6 +17,17 @@ describe("lookupText", () => {
   });
 });
 
+describe("officeDistrict", () => {
+  it("is the district of a card that gives no more than that, whose office's postcode the profile may give", () => {
+    expect(officeDistrict("Brighton bn1")).toBe("BN1");
+    expect(officeDistrict("LS1")).toBe("LS1");
+  });
+
+  it("is nothing for a card giving a full postcode, only a town, or nothing to place", () => {
+    for (const location of ["BRIGHTON BN3 2FL", "BN31FG", "Brighton", "Brighton BN", undefined]) expect(officeDistrict(location)).toBeUndefined();
+  });
+});
+
 describe("layoutPins", () => {
   const layout = (therapists: TherapistCard[], results: Record<string, LookupResult | undefined>, centre = BRIGHTON, distance = 10) =>
     layoutPins(therapists, (t) => results[t.slug], centre, distance);
@@ -26,6 +37,13 @@ describe("layoutPins", () => {
     const { pins, unplaced } = layout([card("a"), card("b"), card("c")], { a: bn3, b: bn3, c: found("outcode", { lat: 50.83, lng: -0.13 }) });
     expect(pins.map((p) => p.therapists.map((t) => t.slug))).toEqual([["a", "b"], ["c"]]);
     expect(unplaced).toEqual([]);
+  });
+
+  it("keeps the office postcode that placed a therapist, where it was that rather than their card", () => {
+    const office = { lat: 50.824, lng: -0.139 };
+    const byOffice: LookupResult = { ok: true, lookup: { found: true, kind: "postcode", candidates: [office] }, office: "BN1 1EL" };
+    const { pins } = layout([card("a"), card("b")], { a: byOffice, b: found("postcode", office) });
+    expect(pins.map((p) => [p.therapists.map((t) => t.slug), p.offices])).toEqual([[["a", "b"], { a: "BN1 1EL" }]]);
   });
 
   it("leaves out therapists whose lookup is still loading", () => {
@@ -75,6 +93,11 @@ describe("pinLabel", () => {
 
   it("gives the location everyone at the pin lists, as the first of them writes it", () => {
     expect(pinLabel(at("outcode", "LONDON E8", "London  e8 "))).toBe("LONDON E8");
+  });
+
+  it("names a pin by the office postcodes that placed those at it, not the districts their cards give", () => {
+    const moved = { ...at("postcode", "Brighton BN1", "BN1", "BN1 1EL"), offices: { t0: "BN1 1EL", t1: "BN1 1EL" } };
+    expect(pinLabel(moved)).toBe("BN1 1EL");
   });
 
   it("falls back to what placed the pin when they write it differently", () => {

@@ -4,7 +4,7 @@ import { SEARCH_MILES } from "@shared/query";
 import type { TherapistCard } from "@shared/types";
 import { api } from "@/lib/api";
 import { choosePoint, type Point } from "./geo";
-import { layoutPins, lookupText, type LookupResult, type Pin } from "./pins";
+import { layoutPins, lookupText, officeDistrict, type LookupResult, type Pin } from "./pins";
 
 /** Before the centre is known, when place names can't yet be judged by their distance from it. */
 const NOT_LAID_OUT: ReturnType<typeof layoutPins> = { pins: [], unplaced: [] };
@@ -49,13 +49,61 @@ export function useCardLookups(locations: (string | undefined)[], outsideUK: boo
   };
 }
 
-/** The therapists' pins, those who can't be placed, and whether any place is still being looked up. */
+/**
+ * The postcode of each therapist's office in the district their card gives, where their profile has one, and whether any
+ * is still being asked for. Asked only of cards giving no more than a district, at home, and kept for the session; an
+ * answer nothing shows any more is no longer waited for.
+ */
+export function useOfficePostcodes(
+  therapists: TherapistCard[],
+  enabled: boolean,
+): { officeOf: (therapist: TherapistCard) => string | undefined; asking: boolean } {
+  const asked = enabled
+    ? therapists.flatMap((t) => {
+        const outcode = officeDistrict(t.location);
+        return outcode ? [{ slug: t.slug, outcode }] : [];
+      })
+    : [];
+  const queries = useQueries({
+    queries: asked.map(({ slug, outcode }) => ({
+      queryKey: ["office", { slug, outcode }],
+      queryFn: ({ signal }: { signal: AbortSignal }) => api.office(slug, outcode, signal),
+      staleTime: Infinity,
+      gcTime: Infinity,
+    })),
+  });
+  const answers = new Map(asked.map(({ slug, outcode }, i) => [`${slug} ${outcode}`, queries[i]?.data] as const));
+  const officeOf = (therapist: TherapistCard) => {
+    const answer = answers.get(`${therapist.slug} ${officeDistrict(therapist.location)}`);
+    return answer?.found ? answer.postcode : undefined;
+  };
+  return { officeOf, asking: queries.some((query) => query.isPending) };
+}
+
+/**
+ * The therapists' pins, those who can't be placed, and whether any card's place is still being looked up. A pin moves
+ * to its office's postcode once that is placed, and until then, or if it can't be, stays where the card's location puts
+ * it. Offices are left out of `placing`, so the map never waits on UKCP to frame, and counted in `moving`, as a pin they
+ * move can join or leave a stack, redrawing the list's entries.
+ */
 export function usePins(
   therapists: TherapistCard[],
   centre: { point?: Point; settled: boolean },
   outsideUK: boolean,
-): { pins: Pin[]; unplaced: TherapistCard[]; placing: boolean } {
-  const lookupFor = useCardLookups(therapists.map((t) => t.location), outsideUK);
-  const { pins, unplaced } = centre.settled ? layoutPins(therapists, (t) => lookupFor(t.location), centre.point, SEARCH_MILES) : NOT_LAID_OUT;
-  return { pins, unplaced, placing: therapists.some((t) => lookupFor(t.location) === undefined) };
+): { pins: Pin[]; unplaced: TherapistCard[]; placing: boolean; moving: boolean } {
+  const { officeOf, asking } = useOfficePostcodes(therapists, !outsideUK);
+  const lookupFor = useCardLookups([...therapists.map((t) => t.location), ...therapists.map(officeOf)], outsideUK);
+  const placeOf = (therapist: TherapistCard): LookupResult | undefined => {
+    const office = officeOf(therapist);
+    const atOffice = office === undefined ? undefined : lookupFor(office);
+    // A retired postcode falls back to its district, which places no better than the card.
+    return atOffice?.ok && atOffice.lookup.found && atOffice.lookup.kind === "postcode" ? { ...atOffice, office } : lookupFor(therapist.location);
+  };
+  const { pins, unplaced } = centre.settled ? layoutPins(therapists, placeOf, centre.point, SEARCH_MILES) : NOT_LAID_OUT;
+  return {
+    pins,
+    unplaced,
+    placing: therapists.some((t) => lookupFor(t.location) === undefined),
+    moving: asking || therapists.some((t) => officeOf(t) !== undefined && lookupFor(officeOf(t)) === undefined),
+  };
 }

@@ -23,7 +23,7 @@ Out of scope for v1:
 - **Free to run.** Cloudflare Workers free plan: 100,000 Worker requests a day and 10 ms of CPU per request. With Workers Caching on (§4.2), cached answers and static files count as requests too.
 - **Respectful of UKCP.**
   - Cache identical searches (15 minutes, or 6 hours without a location, §4.2), and profiles and their contact details (1 hour), and collapse concurrent identical requests, so repeated traffic never reaches UKCP.
-  - Send upstream only what a visitor's action on UKCP would send, with two exceptions: a search asks for 480 results at once where UKCP's page asks for 12, or for every result when it has no location (map spec §4.4), and an opened profile asks for its contact details where UKCP's page waits for a click (§3.4). That makes one search POST per uncached batch of results, and one profile GET and one contact POST per opened profile. Never prefetch or crawl.
+  - Send upstream only what a visitor's action on UKCP would send, with three exceptions: a search asks for 480 results at once where UKCP's page asks for 12, or for every result when it has no location (map spec §4.4); an opened profile asks for its contact details where UKCP's page waits for a click (§3.4); and a card on the map asks for its therapist's profile to place the pin at their office's postcode (map spec §3.4). That makes one search POST per uncached batch of results, one profile GET and one contact POST per opened profile, and at most one profile GET a month for each therapist the map shows in a district, or a week where their profile gives no postcode there. Never prefetch or crawl.
   - Identify ourselves in the `User-Agent` with a link to the site, so UKCP can see and contact us.
   - Cap uncached upstream requests per visitor IP (§4.3).
 - **Clearly unofficial.** The site's name opens the about text, which says the site is not affiliated with UKCP, and every profile has a "View on UKCP" link.
@@ -176,7 +176,7 @@ Built files under `/assets` are named by a hash of their content, so the Worker 
 
 ### 4.3 Rate limit
 
-Each IP may cause at most 20 uncached upstream requests a minute (IPv6 addresses count per /64, since one visitor usually holds a whole /64), enforced with the Workers rate-limiting binding. Past that, the API returns `429` and the UI shows "Too many searches in a short time. Wait a minute and try again." Cached responses are never limited: `CachedApi` counts the request, and runs only on a miss. The default entrypoint passes it the visitor's key in a header, since headers are no part of the cache key, where `ctx.props` would split the cache by visitor.
+Each IP may cause at most 20 uncached upstream requests a minute (IPv6 addresses count per /64, since one visitor usually holds a whole /64), enforced with the Workers rate-limiting binding. The map's office lookups have an allowance of their own (map spec §5.3). Past that, the API returns `429` and the UI shows "Too many searches in a short time. Wait a minute and try again." Cached responses are never limited: `CachedApi` counts the request, and runs only on a miss. The default entrypoint passes it the visitor's key in a header, since headers are no part of the cache key, where `ctx.props` would split the cache by visitor.
 
 ### 4.4 Shortlist
 
