@@ -8,9 +8,10 @@ import { FitView } from "./FitView";
 
 const BRIGHTON = { lat: 50.82, lng: -0.14 };
 const HOVE = { lat: 50.83, lng: -0.17 };
-const spyFit = () =>
+/** Frames at once, as a fit without animation does, or leaves the move under way until the map is told it has ended. */
+const spyFit = ({ animating = false } = {}) =>
   vi.spyOn(L.Map.prototype, "fitBounds").mockImplementation(function (this: L.Map) {
-    return this;
+    return animating ? this : this.fire("moveend");
   });
 const onMap = (fitView: ReactNode) => (
   <Map center={[54.5, -3]} zoom={5} style={{ height: 400, width: 400 }}>
@@ -116,6 +117,15 @@ describe("FitView", () => {
     // Load more placed a pin further out, with the tiles drawn by now: Leaflet decides whether to animate.
     rerender(onMap(<FitView fitKey="a" centre={BRIGHTON} reachMiles={12} points={[HOVE, { lat: 51, lng: -0.14 }]} waiting={false} onFramed={onFramed} />));
     expect(fit.mock.calls[1]?.[1]).not.toHaveProperty("animate");
+  });
+
+  it("tells the pane only once an animated framing comes to rest", () => {
+    const fit = spyFit({ animating: true });
+    const onFramed = vi.fn();
+    render(onMap(<FitView fitKey="a" centre={BRIGHTON} reachMiles={1} points={[HOVE]} waiting={false} onFramed={onFramed} />));
+    expect(onFramed).not.toHaveBeenCalled();
+    (fit.mock.contexts[0] as L.Map).fire("moveend");
+    expect(onFramed).toHaveBeenCalledOnce();
   });
 
   it("tells the pane when there is nothing to frame", () => {

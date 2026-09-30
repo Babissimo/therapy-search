@@ -18,12 +18,24 @@ vi.mock("@/components/ui/map", async () => {
     MapZoomControl: () => null,
     MapCircle: ({ radius }: { radius: number }) => createElement("div", { "data-testid": "circle", "data-radius": radius }),
     MapMarkerClusterGroup: ({ children }: { children?: unknown }) => createElement(Fragment, null, children as never),
-    MapMarker: ({ eventHandlers, children }: { eventHandlers?: { click?: (event: { originalEvent: MouseEvent }) => void }; children?: unknown }) =>
-      createElement(
-        "button",
-        { type: "button", onClick: (event: { nativeEvent: MouseEvent }) => eventHandlers?.click?.({ originalEvent: event.nativeEvent }) },
-        children as never,
-      ),
+    MapMarker: ({
+      position,
+      interactive,
+      eventHandlers,
+      children,
+    }: {
+      position: [number, number];
+      interactive?: boolean;
+      eventHandlers?: { click?: (event: { originalEvent: MouseEvent }) => void };
+      children?: unknown;
+    }) =>
+      interactive === false
+        ? createElement("div", { "data-testid": "static-marker", "data-position": position.join(",") })
+        : createElement(
+            "button",
+            { type: "button", onClick: (event: { nativeEvent: MouseEvent }) => eventHandlers?.click?.({ originalEvent: event.nativeEvent }) },
+            children as never,
+          ),
     MapTooltip: ({ children }: { children?: unknown }) => createElement(Fragment, null, children as never),
     markerData: () => undefined,
     elementIcon: () => ({}),
@@ -41,6 +53,25 @@ vi.mock("./FitView", async () => {
         "data-restored": restored ? `${restored.fitKey} with ${restored.pins} pins${restored.reach === undefined ? "" : ` to ${restored.reach} miles`}` : "",
         onClick: onFramed,
       }),
+  };
+});
+vi.mock("./SearchAreaButton", async () => {
+  const { createElement, useState } = await import("react");
+  let mounts = 0;
+  type Props = { centred: boolean; settled: boolean; onSearch: (postcode: string) => boolean };
+  return {
+    // Numbered as it mounts, and clicked to stand for a postcode found near the middle of the map.
+    SearchAreaButton: ({ centred, settled, onSearch }: Props) => {
+      const [mount] = useState(() => ++mounts);
+      return createElement("button", {
+        type: "button",
+        "data-testid": "search-area",
+        "data-mount": mount,
+        "data-centred": String(centred),
+        "data-settled": String(settled),
+        onClick: () => onSearch("BN3 1FG"),
+      });
+    },
   };
 });
 const moveend = vi.hoisted(() => ({ current: () => {} }));
@@ -72,6 +103,7 @@ function renderPane(props: Partial<MapPaneProps> = {}) {
         placing={false}
         highlight={createHighlight()}
         onSelect={() => {}}
+        onSearchArea={() => true}
         {...props}
       />
       <Path />
@@ -96,6 +128,39 @@ describe("MapPane", () => {
     renderPane({ fitKey: "Location=Brighton", centre: BRIGHTON, reachMiles: 0.4, pins: [pin("a", "b"), lewes] });
     expect(Number(screen.getByTestId("circle").dataset.radius)).toBeCloseTo(0.4 * 1609.344);
     expect(screen.getByRole("region", { name: "Map of results" })).toBeTruthy();
+  });
+
+  it("marks the centre with a pin that takes no clicks, even before the circle is drawn", () => {
+    renderPane({ fitKey: "Location=Brighton", centre: BRIGHTON, reachMiles: 0, pins: [pin("a")] });
+    expect(screen.getByTestId("static-marker").dataset.position).toBe("50.82,-0.14");
+    cleanup();
+    renderPane({ pins: [pin("a")] });
+    expect(screen.queryByTestId("static-marker")).toBeNull();
+  });
+
+  it("offers a search from the middle of the map once the view is settled, handing on the postcode found", () => {
+    const onSearchArea = vi.fn(() => true);
+    renderPane({ fitKey: "Location=Brighton", centre: BRIGHTON, onSearchArea });
+    const offer = screen.getByTestId("search-area");
+    expect([offer.dataset.centred, offer.dataset.settled]).toEqual(["true", "true"]);
+    fireEvent.click(offer);
+    expect(onSearchArea).toHaveBeenCalledWith("BN3 1FG");
+    cleanup();
+    renderPane({ fitKey: "Languages=French" });
+    expect(screen.getByTestId("search-area").dataset.centred).toBe("false");
+    cleanup();
+    renderPane({ fitKey: "Location=Brighton", centre: BRIGHTON, placing: true });
+    expect(screen.getByTestId("search-area").dataset.settled).toBe("false");
+    cleanup();
+    renderPane({ fitKey: "Location=Brighton", centre: BRIGHTON, centreSettled: false });
+    expect(screen.getByTestId("search-area").dataset.settled).toBe("false");
+  });
+
+  it("starts the offer afresh from each framing, which it measures the visitor's moves from", () => {
+    renderPane({ fitKey: "Location=Brighton", centre: BRIGHTON });
+    const before = screen.getByTestId("search-area").dataset.mount;
+    fireEvent.click(screen.getByTestId("fit"));
+    expect(screen.getByTestId("search-area").dataset.mount).not.toBe(before);
   });
 
   it("draws no circle without a centre, or before any card is further than 0 miles", () => {

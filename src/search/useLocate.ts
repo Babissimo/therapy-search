@@ -1,5 +1,5 @@
-import { useLayoutEffect, useRef, useState } from "react";
-import { ApiError, api } from "@/lib/api";
+import type { Point } from "./map/geo";
+import { usePostcodeNear } from "./usePostcodeNear";
 
 // Each fits one line beneath the box on a phone, so the toolbar stays clear of the results sheet.
 export const REFUSED = "Location access is off. Type a town or postcode.";
@@ -21,42 +21,24 @@ export type Locate = {
 
 /** Finds the postcode nearest the visitor, through the Worker, and hands it to `onFound`. */
 export function useLocate(onFound: (postcode: string) => void): Locate {
-  const [locating, setLocating] = useState(false);
-  const [problem, setProblem] = useState<string>();
-  // The latest callback, so a search made once the position arrives carries whatever changed while it was awaited.
-  const found = useRef(onFound);
-  useLayoutEffect(() => {
-    found.current = onFound;
-  });
-
-  async function locate() {
-    if (locating) return;
-    setLocating(true);
-    setProblem(undefined);
-    try {
-      const { coords } = await currentPosition();
-      const nearest = await api.nearest(coords.latitude, coords.longitude);
-      if (nearest.found) found.current(nearest.postcode);
-      else setProblem(NO_POSTCODE);
-    } catch (error) {
-      setProblem(error instanceof ApiError ? error.message : refused(error) ? REFUSED : UNKNOWN);
-    } finally {
-      setLocating(false);
-    }
-  }
-
+  const near = usePostcodeNear(onFound, { none: NO_POSTCODE, failed: (error) => (refused(error) ? REFUSED : UNKNOWN) });
   return {
     supported: "geolocation" in navigator,
-    locating,
-    problem,
-    locate: () => void locate(),
-    dismiss: () => setProblem(undefined),
+    locating: near.looking,
+    problem: near.problem,
+    locate: () => near.lookNear(currentPosition),
+    dismiss: near.dismiss,
   };
 }
 
-function currentPosition(): Promise<GeolocationPosition> {
+function currentPosition(): Promise<Point> {
   // A position up to five minutes old will do, as the Worker rounds it to about 100 metres.
-  return new Promise((resolve, reject) => navigator.geolocation.getCurrentPosition(resolve, reject, { maximumAge: 5 * 60 * 1000, timeout: 15_000 }));
+  return new Promise((resolve, reject) =>
+    navigator.geolocation.getCurrentPosition(({ coords }) => resolve({ lat: coords.latitude, lng: coords.longitude }), reject, {
+      maximumAge: 5 * 60 * 1000,
+      timeout: 15_000,
+    }),
+  );
 }
 
 function refused(error: unknown): boolean {

@@ -2,6 +2,7 @@ import { SlidersHorizontal, X } from "lucide-react";
 import { Tabs } from "radix-ui";
 import { lazy, Suspense, useEffect, useId, useRef, useState, type ComponentProps } from "react";
 import { Link, useLocation } from "react-router";
+import { canonicalLocation } from "@shared/location";
 import { OPTIONS } from "@shared/options";
 import { SEARCH_MILES, toQuery, type SearchParams } from "@shared/query";
 import { IconButton } from "@/components/IconButton";
@@ -214,6 +215,12 @@ function SearchView({ params, onChange }: ViewProps) {
                   highlight={highlight}
                   selected={selected}
                   onSelect={select}
+                  onSearchArea={(postcode) => {
+                    if (samePostcode(postcode, params.text.Location)) return false;
+                    drafts.submitAt(params, postcode);
+                    setFiltersOpen(false);
+                    return true;
+                  }}
                 />
               </Suspense>
             ) : (
@@ -241,6 +248,12 @@ function SearchView({ params, onChange }: ViewProps) {
   );
 }
 
+/** Whether a location is `postcode`, whatever its case or spacing. */
+function samePostcode(postcode: string, location: string): boolean {
+  const squeezed = (text: string) => canonicalLocation(text).replaceAll(" ", "");
+  return squeezed(postcode) === squeezed(location);
+}
+
 /** Scrolls the list to put `entry` just below its top, unless it is already wholly in view. */
 function reveal(list: HTMLElement, entry: HTMLElement, glide: boolean) {
   const view = list.getBoundingClientRect();
@@ -250,7 +263,10 @@ function reveal(list: HTMLElement, entry: HTMLElement, glide: boolean) {
   list.scrollTo({ top: list.scrollTop + top - view.top - REVEAL_GAP_PX, behavior: smooth ? "smooth" : "auto" });
 }
 
-/** The search box, filters and active-filter chips, floating over the top of the map or the prompt. */
+/**
+ * The search box, filters and active-filter chips, floating over the top of the map or the prompt. The map's "Search
+ * this area" button is placed to keep clear of it, so a change to its inset, width or height moves that too.
+ */
 function MapToolbar({
   params,
   onChange,
