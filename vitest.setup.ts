@@ -1,4 +1,4 @@
-import { cleanup } from "@testing-library/react";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach } from "vitest";
 
 // Radix measures elements with ResizeObserver, which jsdom lacks.
@@ -10,8 +10,8 @@ globalThis.ResizeObserver ??= class {
 
 afterEach(() => cleanup());
 
-// jsdom has no matchMedia: pages see a narrow screen without hover unless a test stubs its own.
 if (typeof window !== "undefined") {
+  // jsdom has no matchMedia: pages see a narrow screen without hover unless a test stubs its own.
   window.matchMedia ??= (query) => ({
     matches: false,
     media: query,
@@ -22,4 +22,10 @@ if (typeof window !== "undefined") {
     removeEventListener() {},
     dispatchEvent: () => false,
   });
+
+  // A file's first role query parses jsdom's default stylesheet and compiles the selectors roles are matched by. Under
+  // load that outlasts a findBy's one-second wait, so it is made here rather than in whichever test queries first.
+  document.body.innerHTML = '<a href="/">Warm</a>';
+  screen.getByRole("link", { name: "Warm" });
+  document.body.innerHTML = "";
 }
