@@ -42,13 +42,27 @@ export function rank(seed: number, slug: string): number {
   return hash >>> 0;
 }
 
+type Shown = { hasPhoto: boolean; hasSummary: boolean };
+
+/** How much a card shows beyond a name: one each for a photo and a summary. */
+function detail({ hasPhoto, hasSummary }: Shown): number {
+  return Number(hasPhoto) + Number(hasSummary);
+}
+
 /**
  * Listings in a seed's order. UKCP's distances come first, so a location search stays nearest first and only the
- * people at the same distance are reordered. A card without a distance counts as 0 miles, as UKCP ranks it.
+ * people at the same distance are reordered, those whose cards show more ahead. A card without a distance counts as
+ * 0 miles, as UKCP ranks it, so a search without a location orders everyone by what their card shows.
  */
-export function inOrder<T extends { slug: string; distance?: string }>(listings: T[], seed: number): T[] {
+export function inOrder<T extends Shown & { slug: string; distance?: string }>(listings: T[], seed: number): T[] {
   return listings
-    .map((listing) => ({ listing, miles: parseMiles(listing.distance) ?? 0, rank: rank(seed, listing.slug) }))
-    .sort((a, b) => a.miles - b.miles || a.rank - b.rank || (a.listing.slug < b.listing.slug ? -1 : a.listing.slug > b.listing.slug ? 1 : 0))
+    .map((listing) => ({ listing, miles: parseMiles(listing.distance) ?? 0, detail: detail(listing), rank: rank(seed, listing.slug) }))
+    .sort(
+      (a, b) =>
+        a.miles - b.miles ||
+        b.detail - a.detail ||
+        a.rank - b.rank ||
+        (a.listing.slug < b.listing.slug ? -1 : a.listing.slug > b.listing.slug ? 1 : 0),
+    )
     .map(({ listing }) => listing);
 }
