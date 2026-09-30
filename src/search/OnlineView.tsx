@@ -75,12 +75,13 @@ export function OnlineView({ params, onChange, wide }: Props) {
   );
 
   return (
-    <>
-      {wide && <Masthead className="border-b px-4 py-3" />}
-      <div className="flex min-h-0 flex-1">
+    <div className="flex min-h-0 flex-1">
+      {/* The site's name heads the list alone, leaving the side bar the window's full height. */}
+      <div className="flex min-w-0 flex-1 flex-col">
+        {wide && <Masthead className="border-b px-4 py-3" />}
         {/* The list is positioned so that visually hidden text is placed inside it rather than stretching the page. */}
         <Tabs.Root value={tab} onValueChange={(value) => setTabChoice({ query, tab: value as ListTab })} asChild>
-          <section aria-label="Results and shortlist" className="group/tabs relative flex min-w-0 flex-1 flex-col">
+          <section aria-label="Results and shortlist" className="group/tabs relative flex min-h-0 flex-1 flex-col">
             {wide ? (
               <>
                 <div className="border-b px-4 py-2">
@@ -106,16 +107,16 @@ export function OnlineView({ params, onChange, wide }: Props) {
             )}
           </section>
         </Tabs.Root>
-        {/* Right of the list, as Near me sets its toolbar and filters right of its results. */}
-        {wide && (
-          <div className="flex w-96 shrink-0 flex-col gap-2 border-l p-3">
-            {toolbar}
-            {chips}
-            <FiltersSection id={filtersId} params={params} drafts={drafts} groups={ONLINE_FILTER_GROUPS} />
-          </div>
-        )}
       </div>
-    </>
+      {/* Right of the list, as Near me sets its toolbar and filters right of its results. */}
+      {wide && (
+        <div className="flex w-96 shrink-0 flex-col gap-2 border-l p-3">
+          {toolbar}
+          {chips}
+          <FiltersSection id={filtersId} params={params} drafts={drafts} groups={ONLINE_FILTER_GROUPS} />
+        </div>
+      )}
+    </div>
   );
 }
 
