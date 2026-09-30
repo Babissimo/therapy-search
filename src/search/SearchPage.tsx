@@ -1,4 +1,5 @@
 import { SlidersHorizontal, X } from "lucide-react";
+import { Tabs } from "radix-ui";
 import { lazy, Suspense, useEffect, useId, useRef, useState, type ComponentProps } from "react";
 import { Link, useLocation } from "react-router";
 import { OPTIONS } from "@shared/options";
@@ -7,16 +8,21 @@ import { IconButton } from "@/components/IconButton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { TabsContent } from "@/components/ui/tabs";
 import { Masthead } from "@/layout/Masthead";
 import { useMediaQuery } from "@/lib/useMediaQuery";
 import { cn } from "@/lib/utils";
+import { ShortlistTab } from "@/shortlist/ShortlistTab";
+import { useHasShortlist, useShortlistRefresh } from "@/shortlist/useShortlist";
+import { soughtTerms } from "./activeFilters";
 import { FilterChips } from "./FilterChips";
 import { FilterPanel } from "./FilterPanel";
+import { ListTabs, type ListTab } from "./ListTabs";
 import { createHighlight } from "./map/highlight";
 import { layoutPins, type Pin } from "./map/pins";
 import { useCardLookups, useCentre } from "./map/usePlaces";
 import { LoadMore } from "./LoadMore";
-import { reachMiles, resultCount } from "./reach";
+import { reachMiles } from "./reach";
 import { Results } from "./Results";
 import { ResultsPanel } from "./ResultsPanel";
 import { ResultsSheet, type SheetPosition } from "./ResultsSheet";
@@ -72,6 +78,7 @@ function SearchView({ params, onChange }: ViewProps) {
   // What the map frames, and what a selection belongs to.
   const fitKey = searching ? toQuery(params) : "";
   const results = useResults(params, searching);
+  useShortlistRefresh(results.therapists);
   const centre = useCentre(results.searchedPlace, params.flags.LocationSearchOutsideUK);
   // The place searched comes with the results, so there is none until a first search's results arrive; while the next
   // search loads, the results, and so the place, are still the last search's.
@@ -93,37 +100,53 @@ function SearchView({ params, onChange }: ViewProps) {
     highlight.set(undefined);
   }, [highlight, fitKey]);
   const [panelOpen, setPanelOpen] = useState(true);
-  // Open on arriving at the prompt on a wide screen, where there is no map for them to cover.
-  const [filtersOpen, setFiltersOpen] = useState(!searching && wide);
-  // The sheet opens on the list, and does again after the prompt, which has none.
-  const [sheet, setSheet] = useState<SheetPosition>("full");
-  if (!searching && sheet !== "full") setSheet("full");
-  const scroll = useRememberedScroll(entry, !results.query.isPending);
+  // The side bar lists a search's results or, before a search, the shortlist if there is one. Once beside the prompt it
+  // stays until a search, so a therapist removed from the shortlist can still be put back.
+  const hasShortlist = useHasShortlist();
+  const [shortlistKept, setShortlistKept] = useState(!searching && hasShortlist);
+  const shortlistBeside = !searching && (hasShortlist || shortlistKept);
+  if (shortlistBeside !== shortlistKept) setShortlistKept(shortlistBeside);
+  const sideBar = searching || shortlistBeside;
+  // Open on arriving at the prompt on a wide screen, where there is no map for them to cover, unless the side bar would
+  // leave the prompt too little room beside them.
+  const [filtersOpen, setFiltersOpen] = useState(wide && !sideBar);
+  // The sheet opens on a search's list, and lowered beneath the prompt, which it would otherwise cover.
+  const [sheet, setSheet] = useState<SheetPosition>(searching ? "full" : "peek");
+  const [sheetFor, setSheetFor] = useState(searching);
+  if (sheetFor !== searching) {
+    setSheetFor(searching);
+    setSheet(searching ? "full" : "peek");
+  }
+  // Kept by key, like the selection, so a new search shows its results whichever tab was open.
+  const [tabChoice, setTabChoice] = useState<{ fitKey: string; tab: ListTab }>();
+  const tab = tabChoice?.fitKey === fitKey ? tabChoice.tab : searching ? "results" : "shortlist";
+  // The shortlist keeps its place apart from the results', under a key of its own.
+  const scroll = useRememberedScroll(tab === "results" ? entry : `${entry} shortlist`, tab === "shortlist" || !results.query.isPending);
   const listRef = useRef<HTMLUListElement>(null);
   // Whether the list was showing when a pin was selected, so it can glide to the pin's entry rather than jump.
   const listShowing = useRef(false);
 
   function select(pin: Pin) {
-    if (pin.key === selected?.key) {
+    // Activating the selected pin lets it go, unless the shortlist is showing, when its place is shown again instead.
+    if (pin.key === selected?.key && tab === "results") {
       setSelection(undefined);
       return;
     }
     setSelection({ fitKey, pinKey: pin.key });
-    listShowing.current = wide ? panelOpen : sheet !== "peek";
+    listShowing.current = tab === "results" && (wide ? panelOpen : sheet !== "peek");
+    setTabChoice({ fitKey, tab: "results" });
     if (wide) setPanelOpen(true);
     else if (sheet === "peek") setSheet("half");
   }
 
   const selectedKey = selected?.key;
-  // After the render that opens the panel or raises the sheet, so the list is there to scroll.
+  // After the render that opens the panel or raises the sheet, so the list is there to scroll. It follows `selection`
+  // too, which a pin selected again from the shortlist renews without changing its key.
   useEffect(() => {
     const list = scroll.ref.current;
     const entry = selectedKey === undefined ? null : list?.querySelector<HTMLElement>(`[data-pin="${selectedKey}"]`);
     if (list && entry) reveal(list, entry, listShowing.current);
-  }, [scroll.ref, selectedKey]);
-
-  const count = results.first?.total;
-  const title = results.searchedPlace === undefined || count === undefined ? resultCount(count) : `${resultCount(count)} within your area`;
+  }, [scroll.ref, selectedKey, selection]);
 
   const list = (
     <Results
@@ -136,55 +159,84 @@ function SearchView({ params, onChange }: ViewProps) {
       onHighlight={highlight.set}
     />
   );
-  const footer = <LoadMore results={results} listRef={listRef} placing={placing} />;
+  // The page's text size rather than the tabs' own, which is set for short text. A panel is a Tab stop of its own, so it
+  // shows a ring when it has focus.
+  const panel = "rounded-md text-base focus-visible:ring-3 focus-visible:ring-ring/50";
+  // Mounted throughout and hidden here, rather than shown by Radix a render after their tab, so a panel's entries are
+  // there for the list's scroll to be restored or a pin's entry found. The shortlist's cards come and go with their tab,
+  // which lets go of those removed while it was open.
+  const lists = (
+    <>
+      <TabsContent value="results" forceMount hidden={tab !== "results"} className={panel}>
+        {/* Until a search there is nothing to list, and nothing loading whose wait could be timed. */}
+        {searching && list}
+      </TabsContent>
+      <TabsContent value="shortlist" forceMount hidden={tab !== "shortlist"} className={panel}>
+        {tab === "shortlist" && <ShortlistTab sought={soughtTerms(params)} />}
+      </TabsContent>
+    </>
+  );
+  const footer = tab === "results" ? <LoadMore results={results} listRef={listRef} placing={placing} /> : undefined;
+  const tabs = <ListTabs searching={searching} />;
 
   // The toolbar keeps its place in the tree as the prompt gives way to a search, so what is typed or open in it stays.
   return (
     <>
       {/* With no results to head, the site's name heads the page. */}
       {!searching && <Masthead className="border-b px-4 py-3" />}
-      <div className="flex min-h-0 flex-1">
-        {wide && searching && (
-          <ResultsPanel
-            open={panelOpen}
-            onOpenChange={setPanelOpen}
-            title={title}
-            masthead={<Masthead className="border-b px-4 py-3" />}
-            scrollRef={scroll.ref}
-            onScroll={scroll.save}
-            footer={footer}
-          >
-            {list}
-          </ResultsPanel>
-        )}
-        <div className="relative min-w-0 flex-1">
-          {searching ? (
-            <Suspense fallback={<div className="size-full bg-muted" />}>
-              <MapPane
-                fitKey={fitKey}
-                entry={entry}
-                centre={centre.point}
-                reachMiles={reachMiles(results.therapists)}
-                centreSettled={centreSettled}
-                pins={pins}
-                placing={placing}
-                highlight={highlight}
-                selected={selected}
-                onSelect={select}
-              />
-            </Suspense>
-          ) : (
-            <SearchPrompt besideFilters={wide && filtersOpen} />
+      {/* The tabs' root is the rest of the page, as their list heads the side bar and their panels fill it. */}
+      <Tabs.Root value={tab} onValueChange={(value) => setTabChoice({ fitKey, tab: value as ListTab })} asChild>
+        <div className="group/tabs flex min-h-0 flex-1">
+          {wide && sideBar && (
+            <ResultsPanel
+              open={panelOpen}
+              onOpenChange={setPanelOpen}
+              tabs={tabs}
+              masthead={searching && <Masthead className="border-b px-4 py-3" />}
+              scrollRef={scroll.ref}
+              onScroll={scroll.save}
+              footer={footer}
+            >
+              {lists}
+            </ResultsPanel>
           )}
-          <MapToolbar params={params} onChange={onChange} drafts={drafts} wide={wide} filtersOpen={filtersOpen} onFiltersOpenChange={setFiltersOpen} />
-          {!wide && searching && (
-            <ResultsSheet position={sheet} onPositionChange={setSheet} title={title} scrollRef={scroll.ref} onScroll={scroll.save} footer={footer}>
-              <Masthead className="pb-3" />
-              {list}
-            </ResultsSheet>
-          )}
+          <div className="relative min-w-0 flex-1">
+            {searching ? (
+              <Suspense fallback={<div className="size-full bg-muted" />}>
+                <MapPane
+                  fitKey={fitKey}
+                  entry={entry}
+                  centre={centre.point}
+                  reachMiles={reachMiles(results.therapists)}
+                  centreSettled={centreSettled}
+                  pins={pins}
+                  placing={placing}
+                  highlight={highlight}
+                  selected={selected}
+                  onSelect={select}
+                />
+              </Suspense>
+            ) : (
+              <SearchPrompt besideFilters={wide && filtersOpen} />
+            )}
+            <MapToolbar params={params} onChange={onChange} drafts={drafts} wide={wide} filtersOpen={filtersOpen} onFiltersOpenChange={setFiltersOpen} />
+            {!wide && sideBar && (
+              <ResultsSheet
+                position={sheet}
+                onPositionChange={setSheet}
+                tabs={tabs}
+                lowerLabel={searching ? "Show map" : "Hide list"}
+                scrollRef={scroll.ref}
+                onScroll={scroll.save}
+                footer={footer}
+              >
+                {searching && <Masthead className="pb-3" />}
+                {lists}
+              </ResultsSheet>
+            )}
+          </div>
         </div>
-      </div>
+      </Tabs.Root>
     </>
   );
 }
