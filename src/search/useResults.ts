@@ -31,7 +31,7 @@ export function useResults(params: SearchParams, enabled = true): SearchResults 
   const batchQuery = (n: number) => toQuery(withPage(params, n));
   // Spelt out because TypeScript otherwise fills in the page data's type before inferring the page parameter's.
   const query = useInfiniteQuery<Page, Error, InfiniteData<Page, After>, readonly unknown[], After>({
-    queryKey: ["results", batchQuery(1)],
+    queryKey: resultsKey(params),
     queryFn: ({ pageParam }) => pageAfter(pageParam, (n) => batchInOrder(batchQuery(n))),
     initialPageParam: { shown: 0 },
     getNextPageParam: (last) => (last.therapists.length > 0 && last.to < last.total ? { shown: last.to, batch: last.batch, stride: last.stride } : undefined),
@@ -54,10 +54,23 @@ export function useResults(params: SearchParams, enabled = true): SearchResults 
 /** The card a search still in `client`'s cache showed for this therapist, if one did. */
 export function cachedCard(client: QueryClient, slug: string): TherapistCard | undefined {
   for (const [, data] of client.getQueriesData<InfiniteData<Page, After>>({ queryKey: ["results"] })) {
-    const card = data?.pages.flatMap((page) => page.therapists).find((therapist) => therapist.slug === slug);
+    const card = cardIn(data, slug);
     if (card) return card;
   }
   return undefined;
+}
+
+/** The card this search showed for this therapist, while its results are in `client`'s cache. */
+export function shownCard(client: QueryClient, params: SearchParams, slug: string): TherapistCard | undefined {
+  return cardIn(client.getQueryData<InfiniteData<Page, After>>(resultsKey(params)), slug);
+}
+
+function cardIn(data: InfiniteData<Page, After> | undefined, slug: string): TherapistCard | undefined {
+  return data?.pages.flatMap((page) => page.therapists).find((therapist) => therapist.slug === slug);
+}
+
+function resultsKey(params: SearchParams) {
+  return ["results", toQuery(withPage(params, 1))];
 }
 
 /**
