@@ -1,8 +1,9 @@
 import type { MultiParam } from "./query";
 import type { FilterField, FilterGroup, Options } from "./types";
 
-export type Section = { heading: string; values: string[] };
-export type FieldSection = { heading: string; fields: FilterField[] };
+/** `about` says in plain words what a heading's titles have in common, for anyone the titles alone would lose. */
+export type Section = { heading: string; about?: string; values: string[] };
+export type FieldSection = { heading: string; about?: string; fields: FilterField[] };
 
 /** Where an option UKCP adds lands until it is placed below. */
 export const OTHER = "Other";
@@ -43,6 +44,7 @@ export const SECTIONS: Partial<Record<MultiParam, Section[]>> = {
   TypesOfTherapy: [
     {
       heading: "Children and young people",
+      about: "Therapists trained to work with babies, children or teenagers, often through play, drawing and talk, and usually alongside parents or carers.",
       values: [
         "Adolescent Counsellor",
         "Adolescent Psychotherapeutic Counsellor",
@@ -59,6 +61,7 @@ export const SECTIONS: Partial<Record<MultiParam, Section[]>> = {
     },
     {
       heading: "Couples, families and relationships",
+      about: "For couples, families and relationships, including sex and intimacy. Systemic therapists look at the patterns between people rather than at one person alone.",
       values: [
         "Couples Psychotherapeutic Counsellor",
         "Family and Systemic Psychotherapist",
@@ -71,6 +74,7 @@ export const SECTIONS: Partial<Record<MultiParam, Section[]>> = {
     },
     {
       heading: "Humanistic and integrative",
+      about: "Talking therapies that treat you as the expert on your own life, with the relationship with the therapist at the centre. Integrative therapists combine several approaches to suit each person.",
       values: [
         "Gestalt Group Psychotherapist",
         "Gestalt Psychotherapeutic Counsellor",
@@ -88,6 +92,7 @@ export const SECTIONS: Partial<Record<MultiParam, Section[]>> = {
     },
     {
       heading: "Psychoanalytic and psychodynamic",
+      about: "Explores how feelings and patterns from the past, including ones you may not be aware of, shape your life now. Often open-ended.",
       values: [
         "Attachment-based Psychoanalytic Psychotherapist",
         "Contemporary Psychoanalyst",
@@ -104,6 +109,7 @@ export const SECTIONS: Partial<Record<MultiParam, Section[]>> = {
     },
     {
       heading: "Jungian",
+      about: "Based on Carl Jung's ideas, exploring dreams, images and symbols as well as talk. Jung called his approach analytical psychology, so every title here is Jungian.",
       values: [
         "Analytical Psychologist",
         "Analytical Psychologist - Jungian Analyst",
@@ -114,6 +120,7 @@ export const SECTIONS: Partial<Record<MultiParam, Section[]>> = {
     },
     {
       heading: "Cognitive and brief therapies",
+      about: "Structured, goal-focused approaches, often shorter-term, aimed at a specific problem and practical change.",
       values: [
         "Cognitive Analytic Therapist",
         "Cognitive and Behavioural Psychotherapist",
@@ -124,6 +131,7 @@ export const SECTIONS: Partial<Record<MultiParam, Section[]>> = {
     },
     {
       heading: "Existential and constructivist",
+      about: "Philosophical approaches exploring how you make sense of your life, your choices and what gives it meaning.",
       values: [
         "Constructivist Psychotherapist",
         "Existential Psychotherapist",
@@ -134,6 +142,7 @@ export const SECTIONS: Partial<Record<MultiParam, Section[]>> = {
     },
     {
       heading: "Transpersonal and mindfulness",
+      about: "Approaches that include spiritual experience and present-moment awareness, sometimes using meditation or imagery.",
       values: [
         "Core Process Psychotherapist",
         "Integrative Psychosynthesis Psychotherapist",
@@ -147,6 +156,7 @@ export const SECTIONS: Partial<Record<MultiParam, Section[]>> = {
     },
     {
       heading: "Body, arts and movement",
+      about: "Works through the body, movement, art or drama as well as words, which can help when feelings are hard to put into speech.",
       values: [
         "Autogenic Psychotherapist",
         "Biodynamic Psychotherapist",
@@ -158,6 +168,7 @@ export const SECTIONS: Partial<Record<MultiParam, Section[]>> = {
     },
     {
       heading: "General titles",
+      about: "Titles that describe a training rather than one approach. The therapist's profile usually says how they work.",
       values: ["Adult Psychotherapist", "Contemporary Psychotherapist", "Medical Psychotherapist", "Psychotherapeutic Counsellor", "UTC Psychotherapist"],
     },
   ],
@@ -170,7 +181,7 @@ export function sectionsOf(group: FilterGroup, sections = SECTIONS): FieldSectio
   if (!defined || group.fields.some((f) => f.name !== name)) return undefined;
   const placed = new Set(defined.flatMap((s) => s.values));
   return [
-    ...defined.map((s) => ({ heading: s.heading, fields: group.fields.filter((f) => s.values.includes(f.value)) })),
+    ...defined.map((s) => ({ heading: s.heading, about: s.about, fields: group.fields.filter((f) => s.values.includes(f.value)) })),
     { heading: OTHER, fields: group.fields.filter((f) => !placed.has(f.value)) },
   ].filter((s) => s.fields.length > 0);
 }

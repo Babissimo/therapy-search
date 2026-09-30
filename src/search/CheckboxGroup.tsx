@@ -93,6 +93,7 @@ export function CheckboxGroup({ group, searchable, isChecked, onToggle }: Props)
                     </CollapsibleTrigger>
                   )}
                   <CollapsibleContent>
+                    {section.about && <p className="pt-1 pb-1.5 pl-5.5 text-sm text-muted-foreground">{section.about}</p>}
                     <ul className="space-y-2 py-1 pl-5.5">{fields.map(item)}</ul>
                   </CollapsibleContent>
                 </li>

@@ -6,7 +6,7 @@ const group = { label: "Type of Therapy", fields: ["Child Counsellor", "Gestalt 
 const sections = {
   TypesOfTherapy: [
     { heading: "Children", values: ["Adolescent Counsellor", "Child Counsellor"] },
-    { heading: "Humanistic", values: ["Gestalt Psychotherapist", "Withdrawn Title"] },
+    { heading: "Humanistic", about: "Warm and collaborative.", values: ["Gestalt Psychotherapist", "Withdrawn Title"] },
     { heading: "Empty", values: ["Also Withdrawn"] },
   ],
 };
@@ -15,7 +15,7 @@ describe("sectionsOf", () => {
   it("puts boxes under their headings in UKCP's order, with unplaced ones last under Other", () => {
     expect(sectionsOf(group, sections)).toEqual([
       { heading: "Children", fields: [field("Child Counsellor"), field("Adolescent Counsellor")] },
-      { heading: "Humanistic", fields: [field("Gestalt Psychotherapist")] },
+      { heading: "Humanistic", about: "Warm and collaborative.", fields: [field("Gestalt Psychotherapist")] },
       { heading: OTHER, fields: [field("Psychoanalyst")] },
     ]);
   });
@@ -32,6 +32,10 @@ describe("SECTIONS", () => {
       const values = defined.flatMap((s) => s.values);
       expect(values.length).toBe(new Set(values).size);
     }
+  });
+
+  it("says what each school of therapy is, as its titles alone rarely do", () => {
+    expect(SECTIONS.TypesOfTherapy?.filter((s) => !s.about)).toEqual([]);
   });
 });
 
