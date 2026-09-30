@@ -31,20 +31,23 @@ export class UpstreamError extends Error {
  * Talks to UKCP the way its own pages do. One instance lives per Worker isolate and reuses the
  * anti-forgery session, taking it from the store when another isolate has one; only plain strings
  * are kept between requests, never in-flight promises, because Workers cannot share I/O across requests.
+ * Profiles are fetched with `profileFetch`, everything else with `fetchImpl`.
  */
 export class UkcpClient {
   #session?: Session;
   #dropped?: string;
   readonly #store?: SessionStore;
   readonly #now: () => number;
+  readonly #profileFetch: Fetch;
 
   constructor(
     private readonly fetchImpl: Fetch,
     private readonly userAgent: string,
-    { store, now = Date.now }: { store?: SessionStore; now?: () => number } = {},
+    { store, now = Date.now, profileFetch = fetchImpl }: { store?: SessionStore; now?: () => number; profileFetch?: Fetch } = {},
   ) {
     this.#store = store;
     this.#now = now;
+    this.#profileFetch = profileFetch;
   }
 
   /** The search page's HTML, from which the scripts read UKCP's option lists. */
@@ -64,7 +67,7 @@ export class UkcpClient {
 
   /** Resolves to null when UKCP has no such profile; it redirects unknown slugs to its home page. */
   async profile(slug: string): Promise<string | null> {
-    const res = await this.#fetch(`/therapist/${encodeURIComponent(slug)}`, { redirect: "manual" });
+    const res = await this.#fetch(`/therapist/${encodeURIComponent(slug)}`, { redirect: "manual" }, TIMEOUT_MS, this.#profileFetch);
     if (res.status === 404 || (res.status >= 300 && res.status < 400)) return null;
     return bodyOf(res);
   }
@@ -133,10 +136,10 @@ export class UkcpClient {
   }
 
   /** Bounded by `timeoutMs` from asking to the body's last byte. */
-  #fetch(path: string, init: RequestInit = {}, timeoutMs = TIMEOUT_MS): Promise<Response> {
+  #fetch(path: string, init: RequestInit = {}, timeoutMs = TIMEOUT_MS, fetchImpl = this.fetchImpl): Promise<Response> {
     const headers = new Headers(init.headers);
     headers.set("User-Agent", this.userAgent);
-    return this.fetchImpl(UKCP_ORIGIN + path, { ...init, headers, signal: AbortSignal.timeout(timeoutMs) });
+    return fetchImpl(UKCP_ORIGIN + path, { ...init, headers, signal: AbortSignal.timeout(timeoutMs) });
   }
 }
 

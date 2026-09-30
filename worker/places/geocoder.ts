@@ -12,11 +12,13 @@ export class GeocodeError extends Error {
 /**
  * Places location text. postcodes.io answers UK postcodes, outcodes and card place names; Nominatim, which
  * ranks places by prominence, answers search centres and anything outside the UK, where postcodes.io has no data.
+ * Nominatim is asked with `nominatimFetch`, postcodes.io with `fetchImpl`.
  */
 export class Geocoder {
   constructor(
     private readonly fetchImpl: Fetch,
     private readonly userAgent: string,
+    private readonly nominatimFetch: Fetch = fetchImpl,
   ) {}
 
   /** An unknown postcode falls back to its outcode, and an unknown outcode to the words beside it. */
@@ -57,7 +59,7 @@ export class Geocoder {
       const query = new URLSearchParams({ q: name, format: "jsonv2", limit: centre ? "1" : "10" });
       const countrycodes = country ?? (outsideUK ? undefined : "gb");
       if (countrycodes) query.set("countrycodes", countrycodes);
-      const places = await this.#json<{ lat: string; lon: string; addresstype?: string }[]>(`${NOMINATIM}/search?${query}`);
+      const places = await this.#json<{ lat: string; lon: string; addresstype?: string }[]>(`${NOMINATIM}/search?${query}`, this.nominatimFetch);
       return (places ?? []).map((p) => ({ lat: Number(p.lat), lng: Number(p.lon), type: p.addresstype?.toLowerCase() }));
     }
     const query = new URLSearchParams({ q: name, limit: "10" });
@@ -66,8 +68,8 @@ export class Geocoder {
   }
 
   /** The parsed body, or null for a 404. Other failures throw, naming only the service and status. */
-  async #json<T>(url: string): Promise<T | null> {
-    const res = await this.fetchImpl(url, {
+  async #json<T>(url: string, fetchImpl = this.fetchImpl): Promise<T | null> {
+    const res = await fetchImpl(url, {
       headers: { "User-Agent": this.userAgent, Accept: "application/json" },
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });

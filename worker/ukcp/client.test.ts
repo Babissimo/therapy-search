@@ -254,6 +254,17 @@ describe("UkcpClient.profile", () => {
     const { fetch } = upstream(new Response(null, { status: 302, headers: { Location: "https://www.psychotherapy.org.uk/" } }));
     await expect(new UkcpClient(fetch, "ua").profile("Nobody-ZZZZZZZZ")).resolves.toBeNull();
   });
+
+  it("fetches profiles with its own fetch, and searches with the other", async () => {
+    const { fetch, calls } = upstream(pageResponse(), new Response("results-no"));
+    const profiles = upstream(new Response("<h1>Name</h1>"));
+    const client = new UkcpClient(fetch, "ua", { profileFetch: profiles.fetch });
+    await client.profile("Jo-Bloggs-ABCDEFGH");
+    await client.search(emptyParams());
+    expect(profiles.calls.map((c) => c.url)).toEqual(["https://www.psychotherapy.org.uk/therapist/Jo-Bloggs-ABCDEFGH"]);
+    expect(new Headers(profiles.calls[0]!.init.headers).get("User-Agent")).toBe("ua");
+    expect(calls.map((c) => c.url)).toEqual(["https://www.psychotherapy.org.uk/find-a-therapist/", "https://www.psychotherapy.org.uk/umbraco/surface/searchsurface/Search"]);
+  });
 });
 
 describe("UkcpClient.contact", () => {

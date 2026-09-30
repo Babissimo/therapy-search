@@ -91,6 +91,15 @@ describe("Geocoder.lookup", () => {
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 
+  it("asks Nominatim with its own fetch, and postcodes.io with the other", async () => {
+    const { fetch } = upstream({ [`${P}/outcodes/ZZ9`]: missing });
+    const nominatim = upstream({ [`${N}/search?q=BRIGHTON&format=jsonv2&limit=1&countrycodes=gb`]: json([]) }).fetch;
+    await new Geocoder(fetch, "test-agent", nominatim).lookup("Brighton ZZ9", { centre: true });
+    expect(fetch.mock.calls.map(([url]) => url)).toEqual([`${P}/outcodes/ZZ9`]);
+    expect(nominatim).toHaveBeenCalledTimes(1);
+    expect(new Headers(nominatim.mock.calls[0]?.[1]?.headers).get("User-Agent")).toBe("test-agent");
+  });
+
   it("reports text too general to place without asking anyone", async () => {
     const { geocoder, fetch } = upstream({});
     await expect(geocoder.lookup(" BN")).resolves.toEqual({ found: false, reason: "too-general" });

@@ -22,8 +22,8 @@ export function AboutText() {
           Your browser keeps your shortlist, your theme and a random number that holds results in the same order, and shares none of them.
         </li>
         <li>
-          Cloudflare hosts the site and logs your IP address, but never alongside your searches or the profiles you open. A place or profile the
-          site fetches afresh is logged with your internet provider and country instead.
+          Cloudflare hosts the site and logs your IP address, but never alongside your searches or the profiles you open. It also serves
+          postcodes.io, so what this site asks postcodes.io is logged there.
         </li>
         <li>UKCP sees your IP address and whose photos you're shown, as photos load straight from its site.</li>
         <li>CARTO sees your IP address and the area of map you view, as your browser fetches its map tiles.</li>
