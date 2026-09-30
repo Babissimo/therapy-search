@@ -19,6 +19,9 @@ npm run typecheck
 
 Searches in development go to UKCP's live site, so keep them few.
 
+The site's icon in `public/` is drawn from the colour tokens in `src/index.css`. After changing `--primary`, `--background` or
+`--highlight`, redraw it with `uv run scripts/icons.py`, which needs Cairo (`brew install cairo`).
+
 ## Deploying
 
 Each push to `main` deploys once CI passes, using the repository secrets `CLOUDFLARE_API_TOKEN` (made from
