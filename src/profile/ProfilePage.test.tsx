@@ -141,6 +141,42 @@ describe("ProfilePage's content", () => {
     expect(screen.queryByText(", in your search")).toBeNull();
   });
 
+  describe("special interests", () => {
+    const STOCK =
+      "Like all UKCP registered psychotherapists and psychotherapeutic counsellors I can work with a wide range of issues, but here are some areas in which I have a special interest or additional experience.";
+    const INTERESTED: Profile = {
+      ...PROFILE,
+      about: [
+        { heading: "Special Interests", paragraphs: [STOCK], items: [], details: [{ title: "Trauma", text: "Trauma text." }, { title: "Gender", text: "" }] },
+        section("What I can help with", ["Anxiety", "Trauma"]),
+      ],
+    };
+
+    it("lists them first among what the therapist can help with, each above what they wrote of it, with nothing to open", async () => {
+      renderAt(["/therapist/Test-ABCDEFGH"], INTERESTED);
+      const help = (await screen.findByRole("heading", { level: 2, name: "What I can help with" })).parentElement;
+      expect([...(help?.querySelectorAll("h3") ?? [])].map((h) => h.textContent)).toEqual(["Special interests", "Other areas"]);
+      expect(screen.queryByRole("heading", { level: 2, name: "Special Interests" })).toBeNull();
+      expect(screen.getByText("Trauma text.").closest("dl")?.textContent).toContain("Trauma");
+      expect(screen.queryByRole("button", { name: "Trauma" })).toBeNull();
+      expect(screen.getAllByText("Trauma")).toHaveLength(1);
+      expect(screen.getByText("Gender").closest("dl")).toBeNull();
+      expect(screen.queryByText(STOCK)).toBeNull();
+    });
+
+    it("has no other areas where every tag the therapist can help with is a special interest", async () => {
+      renderAt(["/therapist/Test-ABCDEFGH"], { ...INTERESTED, about: [INTERESTED.about[0]!, section("What I can help with", ["Trauma"])] });
+      await screen.findByRole("heading", { level: 3, name: "Special interests" });
+      expect(screen.queryByRole("heading", { name: "Other areas" })).toBeNull();
+    });
+
+    it("marks the matches that are special interests", async () => {
+      renderAt(["/", overSearch("?HelpWith=Anxiety&HelpWithAdvanced=Trauma")], INTERESTED);
+      const matches = (await screen.findByRole("heading", { name: "Matches your search" })).parentElement;
+      expect([...(matches?.querySelectorAll("li") ?? [])].map((li) => li.textContent)).toEqual(["Trauma, a special interest", "Anxiety"]);
+    });
+  });
+
   it("gives each office's fees in that office's card", async () => {
     renderAt(["/therapist/Test-ABCDEFGH"], RICH);
     const card = (await screen.findByText("£90 per session")).closest("[data-slot=card]");
