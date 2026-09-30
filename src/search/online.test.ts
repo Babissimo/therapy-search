@@ -5,12 +5,14 @@ import { withFlag, withMulti, withText } from "./state";
 
 const sessions = (...values: string[]): SearchParams => values.reduce((p, v) => withMulti(p, "TypesOfSession", v, true), emptyParams());
 const inLeeds = withFlag(withText(withMulti(sessions("Online Therapy", "Home Visits"), "Languages", "Greek", true), "Location", "Leeds"), "LocationSearchOutsideUK", true);
+const accessible = (params: SearchParams) => withFlag(params, "OnlyWheelchairAccessible", true);
 
 describe("onlineParams", () => {
-  it("leaves the place behind and keeps the other filters", () => {
-    const online = onlineParams(inLeeds);
+  it("leaves the place and its premises behind and keeps the other filters", () => {
+    const online = onlineParams(accessible(inLeeds));
     expect(online.text.Location).toBe("");
     expect(online.flags.LocationSearchOutsideUK).toBe(false);
+    expect(online.flags.OnlyWheelchairAccessible).toBe(false);
     expect(online.multi.Languages).toEqual(["Greek"]);
   });
 
@@ -42,17 +44,18 @@ describe("narrowsOnline", () => {
     expect(narrowsOnline(withFlag(emptyParams(), "OnlyProfilesWithPhotos", true))).toBe(true);
   });
 
-  it("takes neither a place nor a session type needing one as a filter", () => {
-    expect(narrowsOnline(withFlag(withText(sessions("Home Visits"), "Location", "Leeds"), "LocationSearchOutsideUK", true))).toBe(false);
+  it("takes neither a place, wheelchair access nor a session type needing one as a filter", () => {
+    expect(narrowsOnline(accessible(withFlag(withText(sessions("Home Visits"), "Location", "Leeds"), "LocationSearchOutsideUK", true)))).toBe(false);
   });
 });
 
 describe("nearMeParams", () => {
-  it("searches the place last left for online again, with the filters chosen since", () => {
-    rememberPlace(inLeeds);
+  it("searches the place last left for online again, with its wheelchair tick and the filters chosen since", () => {
+    rememberPlace(accessible(inLeeds));
     const near = nearMeParams(withMulti(onlineParams(inLeeds), "Languages", "French", true));
     expect(near.text.Location).toBe("Leeds");
     expect(near.flags.LocationSearchOutsideUK).toBe(true);
+    expect(near.flags.OnlyWheelchairAccessible).toBe(true);
     expect(near.multi.Languages).toEqual(["Greek", "French"]);
     expect(near.multi.TypesOfSession).toEqual(["Online Therapy"]);
   });

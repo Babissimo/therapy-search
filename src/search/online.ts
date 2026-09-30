@@ -7,9 +7,12 @@ export const ONLINE_PATH = "/online";
 /** UKCP's session types that need no shared room. */
 export const REMOTE_SESSIONS: readonly string[] = ["Online Therapy", "Telephone Therapy"];
 
-/** A search as the online view keeps it: no place, and of the session types only those that can be had remotely. */
+/**
+ * A search as the online view keeps it: no place, no wheelchair access to premises that remote sessions never use, and
+ * of the session types only those that can be had remotely.
+ */
 export function onlineParams(params: SearchParams): SearchParams {
-  const placeless = withFlag(withText(params, "Location", ""), "LocationSearchOutsideUK", false);
+  const placeless = withFlag(withFlag(withText(params, "Location", ""), "LocationSearchOutsideUK", false), "OnlyWheelchairAccessible", false);
   const remote = params.multi.TypesOfSession.filter((type) => REMOTE_SESSIONS.includes(type));
   return { ...placeless, multi: { ...placeless.multi, TypesOfSession: remote } };
 }
@@ -38,7 +41,8 @@ export function rememberPlace(params: SearchParams) {
   place = params;
 }
 
-/** The online view's search near the place last left for it, filters and all. */
+/** The online view's search near the place last left for it, filters and all, with that search's wheelchair tick. */
 export function nearMeParams(params: SearchParams): SearchParams {
-  return withFlag(withText(params, "Location", place.text.Location), "LocationSearchOutsideUK", place.flags.LocationSearchOutsideUK);
+  const near = withFlag(withText(params, "Location", place.text.Location), "LocationSearchOutsideUK", place.flags.LocationSearchOutsideUK);
+  return withFlag(near, "OnlyWheelchairAccessible", place.flags.OnlyWheelchairAccessible);
 }
