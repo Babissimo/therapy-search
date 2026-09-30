@@ -1,5 +1,5 @@
 import { Fragment, lazy, Suspense, useEffect, type ReactNode } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, ChevronLeft, ExternalLink } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router";
 import type { Office, Profile, ProfileSection } from "@shared/types";
@@ -13,6 +13,9 @@ import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { cachedCard } from "@/search/useResults";
+import { ShortlistButton } from "@/shortlist/ShortlistButton";
+import type { ShortlistCard } from "@/shortlist/store";
 import { ContactList } from "./ContactList";
 import { useOfficePlace } from "./place";
 import { sectionsBySize } from "./sectionsBySize";
@@ -91,7 +94,7 @@ export function ProfileBody({ slug, back, close }: { slug: string } & Exits) {
   const below = (headed: boolean) => (headed ? "@4xl:row-2" : "@4xl:row-[1/span_2]");
   return (
     <article className="@container space-y-8">
-      <StickyHeader back={back} close={close}>
+      <StickyHeader back={back} close={close} bookmark={<ProfileBookmark profile={profile} />}>
         <div className="flex items-start gap-4">
           <Avatar className="size-14 shrink-0 @lg:size-20">
             <AvatarImage src={profile.photoUrl} alt="" />
@@ -144,17 +147,34 @@ export function ProfileBody({ slug, back, close }: { slug: string } & Exits) {
 }
 
 /** Who the profile is and how to reach them, kept in view as the visitor reads on. */
-function StickyHeader({ back, close, children }: Exits & { children?: ReactNode }) {
+function StickyHeader({ back, close, bookmark, children }: Exits & { bookmark?: ReactNode; children?: ReactNode }) {
   return (
     // A drawer is drawn in the popover colour, which the header matches so text scrolling beneath it stays hidden.
     <header className="sticky top-0 z-10 space-y-2 border-b bg-background py-3 in-data-[slot=sheet-content]:bg-popover">
       {back}
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0 flex-1">{children}</div>
-        {close}
+        {/* Pulls the last icon out to the content's right edge, past the ghost button's padding. */}
+        {(bookmark || close) && (
+          <div className="-mr-2 flex shrink-0">
+            {bookmark}
+            {close}
+          </div>
+        )}
       </div>
     </header>
   );
+}
+
+/** Shortlists the card the visitor's search showed where there was one, since it says more than the header. */
+function ProfileBookmark({ profile }: { profile: Profile }) {
+  const client = useQueryClient();
+  return <ShortlistButton therapist={cachedCard(client, profile.slug) ?? headerCard(profile)} />;
+}
+
+/** The therapist as the header shows them, for a shortlist card until a search that finds them fills it in. */
+function headerCard({ slug, name, initials, photoUrl, location }: Profile): ShortlistCard {
+  return { slug, name, initials, photoUrl, location, tags: [] };
 }
 
 type SectionProps = {

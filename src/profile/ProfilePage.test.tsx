@@ -1,28 +1,42 @@
 // @vitest-environment jsdom
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, renderHook, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, type Location } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { Profile } from "@shared/types";
+import { emptyParams } from "@shared/query";
+import type { Profile, TherapistCard } from "@shared/types";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { api, ApiError } from "@/lib/api";
+import { listed } from "@/lib/listed.testing";
+import { useResults } from "@/search/useResults";
+import { createShortlistStore, type ShortlistStore } from "@/shortlist/store";
+import { ShortlistContext } from "@/shortlist/useShortlist";
 import { ProfilePage } from "./ProfilePage";
 
 const PROFILE: Profile = { slug: "Test-ABCDEFGH", name: "Test Therapist", initials: "TT", languages: [], emailInContact: false, social: [], about: [], practical: [], offices: [] };
 
-function renderAt(entries: (string | Partial<Location>)[], result: Profile | ApiError = PROFILE) {
+const newClient = () => new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+type Setup = { store?: ShortlistStore; client?: QueryClient };
+
+function renderAt(entries: (string | Partial<Location>)[], result: Profile | ApiError = PROFILE, { store = createShortlistStore(null), client = newClient() }: Setup = {}) {
   const profile = vi.spyOn(api, "profile");
   if (result instanceof ApiError) profile.mockRejectedValue(result);
   else profile.mockResolvedValue(result);
   // Current Chrome's scrollTo returns a promise.
   vi.spyOn(window, "scrollTo").mockImplementation(async () => {});
   render(
-    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-      <MemoryRouter initialEntries={entries} initialIndex={entries.length - 1}>
-        <Routes>
-          <Route path="/" element={<p>Search page</p>} />
-          <Route path="/therapist/:slug" element={<ProfilePage slug="Test-ABCDEFGH" />} />
-        </Routes>
-      </MemoryRouter>
+    <QueryClientProvider client={client}>
+      <ShortlistContext.Provider value={store}>
+        <TooltipProvider>
+          <MemoryRouter initialEntries={entries} initialIndex={entries.length - 1}>
+            <Routes>
+              <Route path="/" element={<p>Search page</p>} />
+              <Route path="/therapist/:slug" element={<ProfilePage slug="Test-ABCDEFGH" />} />
+            </Routes>
+          </MemoryRouter>
+        </TooltipProvider>
+      </ShortlistContext.Provider>
     </QueryClientProvider>,
   );
 }
@@ -61,6 +75,35 @@ describe("ProfilePage's header", () => {
     renderAt(["/therapist/Test-ABCDEFGH"], { ...PROFILE, email: "test@example.com" });
     const email = await screen.findByRole("link", { name: "Email: test@example.com" });
     expect(email.closest("header")).not.toBeNull();
+  });
+});
+
+describe("ProfilePage's bookmark", () => {
+  const CARD: TherapistCard = { slug: "Test-ABCDEFGH", name: "Test Therapist", initials: "TT", location: "Testtown", sessionTypes: "Remote", summary: "Summary text.", tags: ["Anxiety"] };
+  const add = () => fireEvent.click(screen.getByRole("button", { name: "Add Test Therapist to your shortlist" }));
+  const remove = () => fireEvent.click(screen.getByRole("button", { name: "Remove Test Therapist from your shortlist" }));
+
+  it("shortlists the therapist from the header with what it shows of them, where no search showed their card", async () => {
+    const store = createShortlistStore(null);
+    renderAt(["/therapist/Test-ABCDEFGH"], { ...PROFILE, location: "Testtown", photoUrl: "https://example.invalid/photo.jpg" }, { store });
+    await screen.findByRole("heading", { name: "Test Therapist" });
+    expect(screen.getByRole("button", { name: "Add Test Therapist to your shortlist" }).closest("header")).not.toBeNull();
+    add();
+    expect(store.get().map((entry) => entry.card)).toEqual([{ slug: "Test-ABCDEFGH", name: "Test Therapist", initials: "TT", photoUrl: "https://example.invalid/photo.jpg", location: "Testtown", tags: [] }]);
+    remove();
+    expect(store.get()).toEqual([]);
+  });
+
+  it("shortlists the card the visitor's search showed, which says more than the header", async () => {
+    const client = newClient();
+    vi.spyOn(api, "search").mockResolvedValue(listed({ total: 1, from: 1, to: 1, notices: [], therapists: [{ ...CARD, distance: "1 mile from Leeds" }] }));
+    const search = renderHook(() => useResults(emptyParams()), { wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider> });
+    await waitFor(() => expect(search.result.current.therapists).toHaveLength(1));
+    const store = createShortlistStore(null);
+    renderAt(["/", { pathname: "/therapist/Test-ABCDEFGH", state: { background: { pathname: "/", search: "" } } }], PROFILE, { store, client });
+    await screen.findByRole("heading", { name: "Test Therapist" });
+    add();
+    expect(store.get().map((entry) => entry.card)).toEqual([CARD]);
   });
 });
 

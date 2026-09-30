@@ -13,7 +13,7 @@ export function ProfileDrawer({ slug }: { slug: string }) {
   // The close button lives in the profile's header, which stays in view as the drawer scrolls.
   const close = (
     <SheetClose asChild>
-      <Button variant="ghost" size="icon-sm" className="-mr-2 shrink-0">
+      <Button variant="ghost" size="icon-sm">
         <XIcon />
         <span className="sr-only">Close</span>
       </Button>

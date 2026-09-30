@@ -81,7 +81,10 @@ describe("AppRoutes", () => {
     fireEvent.mouseDown(screen.getByRole("tab", { name: "Shortlist, 1 therapist" }));
     fireEvent.click(within(screen.getByRole("tabpanel", { name: /^Shortlist/ })).getByRole("link", { name: "Jo Bloggs" }));
     const drawer = await screen.findByRole("dialog", { name: "Therapist profile" });
-    fireEvent.click(within(drawer).getByRole("button", { name: "Close" }));
+    // The profile's header carries the bookmark too, beside the drawer's close button.
+    const header = (await within(drawer).findByRole("heading", { name: "Jo Bloggs" })).closest("header")!;
+    within(header).getByRole("button", { name: "Remove Jo Bloggs from your shortlist" });
+    fireEvent.click(within(header).getByRole("button", { name: "Close" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(screen.getByTestId("url").textContent).toBe("/?Location=Leeds");
     expect(screen.getByRole("tab", { name: /^Shortlist/ }).getAttribute("aria-selected")).toBe("true");
