@@ -5,7 +5,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CheckboxGroup } from "./CheckboxGroup";
-import { FILTER_GROUPS } from "./filterGroups";
+import { FILTER_GROUPS, groupName, groupNameInSentence } from "./filterGroups";
 import { isChecked, tickedIn } from "./state";
 import { TickedCount } from "./TickedCount";
 import { useDraft, useDraftFilters, type SearchDrafts } from "./useSearchDrafts";
@@ -38,11 +38,11 @@ export function FilterPanel({ params, drafts, groups = FILTER_GROUPS, onSearch }
             <div className="flex items-center gap-1">
               <AccordionTrigger className="flex-1">
                 <span className="flex items-center gap-2">
-                  {group.label}
+                  {groupName(group)}
                   <TickedCount count={tickedIn(draft, group)} />
                 </span>
               </AccordionTrigger>
-              {group.help && <HelpTip label={`About ${group.label}`}>{group.help}</HelpTip>}
+              {group.help && <HelpTip label={`About ${groupNameInSentence(group)}`}>{group.help}</HelpTip>}
             </div>
             {/* Headings open and searches narrow inside an open group, so its height follows the content. */}
             <AccordionContent className="h-auto">

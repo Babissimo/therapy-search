@@ -557,7 +557,14 @@ function FiltersFirst({ place, wide }: { place: string; wide: boolean }) {
   useEffect(() => ref.current?.focus(), [place]);
   return (
     <div ref={ref} tabIndex={-1} className="outline-none">
-      <Prompt ask={`Before we search near ${place}`} className={wide ? "py-10 sm:py-16" : "pt-6"}>
+      <Prompt
+        ask={
+          <>
+            Before we search near <span translate="no">{place}</span>
+          </>
+        }
+        className={wide ? "py-10 sm:py-16" : "pt-6"}
+      >
         A tick or two {wide ? "to the right" : "below"} keeps the list to people who suit you.
       </Prompt>
     </div>

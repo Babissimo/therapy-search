@@ -635,7 +635,9 @@ describe("SearchPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "Search" }));
     expect(url().toString()).toBe("");
     expect(api.search).not.toHaveBeenCalled();
-    const ask = within(results()).getByText("Before we search near York");
+    const ask = within(results()).getByText(/^Before we search near/);
+    expect(ask.textContent).toBe("Before we search near York");
+    expect(within(ask).getByText("York").getAttribute("translate")).toBe("no");
     expect(document.activeElement?.contains(ask)).toBe(true);
     expect(screen.queryByText(/^Tick anything that matters to you/)).toBeNull();
     const filters = screen.getByRole("region", { name: "Refine your search" });
@@ -702,7 +704,7 @@ describe("SearchPage", () => {
     vi.spyOn(api, "nearest").mockResolvedValue({ found: true, postcode: "BN3 1FG" });
     renderAt("/");
     fireEvent.click(screen.getByRole("button", { name: "Use my location" }));
-    expect(await within(results()).findByText("Before we search near BN3 1FG")).toBeTruthy();
+    expect((await within(results()).findByText(/^Before we search near/)).textContent).toBe("Before we search near BN3 1FG");
     expect(screen.getByRole<HTMLInputElement>("textbox", { name: "Location" }).value).toBe("BN3 1FG");
     expect(url().toString()).toBe("");
     expect(api.search).not.toHaveBeenCalled();
@@ -1580,10 +1582,10 @@ describe("SearchPage online", () => {
     expect(prompt()).toBeTruthy();
     const show = () => within(filters()).getByRole("button", { name: "Show results" });
     expect(show().getAttribute("aria-disabled")).toBe("true");
-    fireEvent.click(within(filters()).getByRole("button", { name: /^Type of Session/ }));
+    fireEvent.click(within(filters()).getByRole("button", { name: /^Type of session/ }));
     fireEvent.click(within(filters()).getByRole("checkbox", { name: "Telephone Therapy" }));
     expect(show().getAttribute("aria-disabled")).toBe("true");
-    fireEvent.click(within(filters()).getByRole("button", { name: /^Additional Filters/ }));
+    fireEvent.click(within(filters()).getByRole("button", { name: /^More filters/ }));
     fireEvent.click(within(filters()).getByRole("checkbox", { name: "Only show profiles with photos" }));
     expect(show().getAttribute("aria-disabled")).toBeNull();
     expect(url().toString()).toBe("");
@@ -1751,9 +1753,9 @@ describe("SearchPage online", () => {
     await loaded();
     expect(screen.queryByRole("button", { name: "Filters" })).toBeNull();
     expect(results().compareDocumentPosition(filters()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    fireEvent.click(within(filters()).getByRole("button", { name: /^Type of Session/ }));
+    fireEvent.click(within(filters()).getByRole("button", { name: /^Type of session/ }));
     expect(within(filters()).queryByRole("checkbox", { name: "Face to Face - Long Term" })).toBeNull();
-    fireEvent.click(within(filters()).getByRole("button", { name: /^Additional Filters/ }));
+    fireEvent.click(within(filters()).getByRole("button", { name: /^More filters/ }));
     expect(within(filters()).queryByRole("checkbox", { name: "Only show wheelchair accessible" })).toBeNull();
     fireEvent.click(within(filters()).getByRole("checkbox", { name: "Telephone Therapy" }));
     fireEvent.click(within(filters()).getByRole("button", { name: "Update results" }));
@@ -1784,7 +1786,7 @@ describe("SearchPage online", () => {
     const panel = screen.getByRole("tabpanel", { name: "Results" });
     const show = within(panel).getByRole("button", { name: "Show results" });
     expect(show.getAttribute("aria-disabled")).toBe("true");
-    fireEvent.click(within(panel).getByRole("button", { name: /^Type of Session/ }));
+    fireEvent.click(within(panel).getByRole("button", { name: /^Type of session/ }));
     fireEvent.click(within(panel).getByRole("checkbox", { name: "Telephone Therapy" }));
     expect(show.getAttribute("aria-disabled")).toBe("true");
     fireEvent.click(within(panel).getByRole("button", { name: /^Languages/ }));

@@ -13,6 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api";
+import { NEW_TAB } from "@/lib/newTab";
 import { useStuck } from "@/lib/useStuck";
 import { useTitle } from "@/lib/useTitle";
 import { cn } from "@/lib/utils";
@@ -247,11 +248,16 @@ function Identity({ photo, name, location, contacts, headingRef }: IdentityProps
           <h1
             ref={headingRef}
             tabIndex={-1}
+            translate="no"
             className="rounded-sm font-heading text-2xl leading-tight font-medium outline-none focus-visible:ring-3 focus-visible:ring-ring/50 @lg:text-3xl"
           >
             {name}
           </h1>
-          {location && <p className="text-sm text-muted-foreground">{location}</p>}
+          {location && (
+            <p translate="no" className="text-sm text-muted-foreground">
+              {location}
+            </p>
+          )}
         </div>
         {contacts}
       </div>
@@ -486,12 +492,12 @@ function OfficeCard({ office, profile, distance }: { office: Office; profile: Pr
         <CardTitle className="flex flex-wrap items-center gap-2">
           {office.mapUrl ? (
             <a className="inline-flex items-center gap-1.5 underline-offset-4 hover:underline" href={office.mapUrl} target="_blank" rel="noreferrer">
-              {office.name}
+              <span translate="no">{office.name}</span>
               <ExternalLink aria-hidden className="size-4 text-muted-foreground" />
-              <span className="sr-only">, map</span>
+              <span className="sr-only">, map {NEW_TAB}</span>
             </a>
           ) : (
-            office.name
+            <span translate="no">{office.name}</span>
           )}
           {office.isMain && <Badge variant="outline">Main address</Badge>}
           {distance && (
@@ -505,7 +511,7 @@ function OfficeCard({ office, profile, distance }: { office: Office; profile: Pr
       </CardHeader>
       <CardContent className="flex flex-1 flex-col gap-3 text-sm">
         {office.address.length > 0 && (
-          <address className="not-italic">
+          <address translate="no" className="not-italic">
             {office.address.map((line, i) => (
               <div key={i}>{line}</div>
             ))}

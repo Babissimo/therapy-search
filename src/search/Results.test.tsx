@@ -210,6 +210,8 @@ describe("Results", () => {
     renderResults(leeds);
     const heading = await screen.findByRole("heading", { name: "12 results within 0.1 miles" });
     expect(heading.nextElementSibling?.textContent).toBe("Leeds");
+    // Left as it is by a browser translating the page.
+    expect(screen.getByText("Leeds").getAttribute("translate")).toBe("no");
     expect(screen.getByText(/^Nearest first/).textContent).toBe(
       "Nearest first, measured from the centre of the place searched. Pins show the postcode or area each therapist lists.",
     );
@@ -577,7 +579,7 @@ describe("Results", () => {
   it("offers UKCP's own search in a new tab when the first page fails", async () => {
     answerBatches({ fail: 1 });
     renderResults(leeds);
-    const link = await screen.findByRole("link", { name: "Search on UKCP" });
+    const link = await screen.findByRole("link", { name: "Search on UKCP (opens in a new tab)" });
     expect(link.getAttribute("href")).toContain("Location=Leeds");
     expect(link.getAttribute("target")).toBe("_blank");
   });

@@ -164,7 +164,7 @@ function OnlinePrompt({ wide }: { wide: boolean }) {
   return (
     <Prompt ask="Start with what matters to you." className={wide ? "py-10 sm:py-16" : "pt-6"}>
       Thousands of UKCP therapists work online or by phone. Choose a filter {wide ? "to the right" : "below"}, such as what they
-      help with, how they work or the languages they speak, then show who fits. Type of Session alone won't narrow them enough.
+      help with, how they work or the languages they speak, then show who fits. Type of session alone won't narrow them enough.
     </Prompt>
   );
 }

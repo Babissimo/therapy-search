@@ -95,6 +95,12 @@ describe("StatusTrack", () => {
     expect(currentStep()).toBe("To contact");
   });
 
+  it("keeps the therapist's name in the next step's button from machine translation", () => {
+    renderTrack("toContact");
+    const button = screen.getByRole("button", { name: "Mark contacted, Jo Bloggs" });
+    expect(within(button).getByText("Jo Bloggs").getAttribute("translate")).toBe("no");
+  });
+
   it("gives focus to the menu once the path's last step takes the button with it", () => {
     renderTrack("consultation");
     const button = screen.getByRole("button", { name: "Seeing them, Jo Bloggs" });
