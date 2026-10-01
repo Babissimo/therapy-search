@@ -1,12 +1,12 @@
 // @vitest-environment jsdom
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { onlineManager, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { useRef } from "react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { BATCH_SIZE, emptyParams, type SearchParams } from "@shared/query";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { api, ApiError } from "@/lib/api";
+import { api, ApiError, OFFLINE } from "@/lib/api";
 import { listed } from "@/lib/listed.testing";
 import { createShortlistStore, type ShortlistStore } from "@/shortlist/store";
 import { ShortlistContext } from "@/shortlist/useShortlist";
@@ -85,24 +85,42 @@ afterEach(() => {
 });
 
 describe("Results", () => {
-  const SLOW = /^Getting every result/;
+  const WHOLE = "Getting every result. The first time can take a few seconds.";
+  const WAITING = "Still waiting for UKCP. A slow connection can take a while.";
+  /** The note in the list, and what the status region says. */
+  const said = (text: string) => screen.queryAllByText(text).map((el) => (el.getAttribute("role") === "status" ? "status" : "note"));
 
   it("says why a search without a location is taking a while, once it has", () => {
     vi.useFakeTimers();
     vi.spyOn(api, "search").mockImplementation(() => new Promise(() => {}));
     renderResults(emptyParams());
     act(() => vi.advanceTimersByTime(1900));
-    expect(screen.queryByText(SLOW)).toBeNull();
+    expect(said(WHOLE)).toEqual([]);
     act(() => vi.advanceTimersByTime(100));
-    expect(screen.getByText(SLOW).textContent).toBe("Getting every result. The first time can take a few seconds.");
+    expect(said(WHOLE).sort()).toEqual(["note", "status"]);
   });
 
-  it("says nothing of the kind while a location search loads", () => {
+  it("says when any search is slow to answer, as on a slow connection", () => {
     vi.useFakeTimers();
     vi.spyOn(api, "search").mockImplementation(() => new Promise(() => {}));
     renderResults(leeds);
+    act(() => vi.advanceTimersByTime(4900));
+    expect(said(WAITING)).toEqual([]);
+    act(() => vi.advanceTimersByTime(100));
+    expect(said(WAITING).sort()).toEqual(["note", "status"]);
+    expect(said(WHOLE)).toEqual([]);
+  });
+
+  it("says so too while the next search's answer is slow, over the dimmed list", async () => {
+    const search = answerBatches();
+    const view = renderResults(leeds);
+    await screen.findByRole("heading", { name: "12 results within 0.1 miles" });
+    vi.useFakeTimers();
+    search.mockImplementation(() => new Promise(() => {}));
+    view.rerender(withHelpWithTerms(leeds, ["Anxiety"]));
     act(() => vi.advanceTimersByTime(5000));
-    expect(screen.queryByText(SLOW)).toBeNull();
+    const note = screen.getAllByText(WAITING).find((el) => el.getAttribute("role") !== "status")!;
+    expect(note.closest('[aria-busy="true"]')).toBeNull();
   });
 
   it("tells a screen reader what each search found, and names the page by it", async () => {
@@ -439,6 +457,31 @@ describe("Results", () => {
     await waitFor(() => expect(search.mock.calls.filter(([query]) => query.includes("page=2"))).toHaveLength(2));
   });
 
+  it("leaves the keyboard alone when another search answers in place of a failed one", async () => {
+    const search = answerBatches();
+    search.mockRejectedValueOnce(new ApiError(0, OFFLINE));
+    const view = renderResults(leeds);
+    await screen.findByRole("button", { name: "Try again" });
+    view.rerender(withHelpWithTerms(leeds, ["Anxiety"]));
+    await screen.findByRole("heading", { name: "12 results within 0.1 miles" });
+    expect(document.activeElement).toBe(document.body);
+  });
+
+  it("keeps what loaded as Load more tries again, though the first page once failed too", async () => {
+    const search = answerBatches();
+    search.mockRejectedValueOnce(new ApiError(0, OFFLINE));
+    renderResults(leeds);
+    fireEvent.click(await screen.findByRole("button", { name: "Try again" }));
+    await screen.findByRole("heading", { name: "12 results within 0.1 miles" });
+    search.mockRejectedValueOnce(new ApiError(0, OFFLINE));
+    fireEvent.click(screen.getByRole("button", { name: "Load more" }));
+    const retry = await screen.findByRole("button", { name: "Try again" });
+    search.mockImplementationOnce(() => new Promise(() => {}));
+    fireEvent.click(retry);
+    await waitFor(() => expect(retry.getAttribute("aria-disabled")).toBe("true"));
+    expect(cards()).toHaveLength(12);
+  });
+
   it("carries keyboard focus from Load more to Try again when the next page fails", async () => {
     answerBatches({ fail: 2 });
     renderResults(leeds);
@@ -473,6 +516,62 @@ describe("Results", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Try again" }));
     await screen.findByRole("heading", { name: /^24 results/ });
     expect(document.activeElement).toBe(screen.getByRole("link", { name: "Therapist 2-0" }));
+  });
+
+  it("tries a failed search again, keeping keyboard focus on Try again, and hands it to the list's heading once it works", async () => {
+    const search = answerBatches();
+    const answer = search.getMockImplementation()!;
+    search.mockRejectedValueOnce(new ApiError(0, TOO_MANY));
+    renderResults(leeds);
+    const retry = await screen.findByRole("button", { name: "Try again" });
+    expect(screen.getByRole("alert").textContent).toContain(TOO_MANY);
+    let release = () => {};
+    search.mockImplementationOnce(async (query) => {
+      await new Promise<void>((resolve) => (release = resolve));
+      return answer(query);
+    });
+    act(() => retry.focus());
+    fireEvent.click(retry);
+    await waitFor(() => expect(retry.getAttribute("aria-disabled")).toBe("true"));
+    expect(screen.getByText("Trying again")).toBeTruthy();
+    fireEvent.click(retry);
+    expect(search).toHaveBeenCalledTimes(2);
+    expect(document.activeElement).toBe(retry);
+    await act(async () => release());
+    const heading = await screen.findByRole("heading", { name: "12 results within 0.1 miles" });
+    expect(document.activeElement).toBe(heading);
+  });
+
+  it("keeps a failed search's alert, and the keyboard on Try again, while the returning connection asks it again", async () => {
+    const search = answerBatches();
+    const answer = search.getMockImplementation()!;
+    search.mockRejectedValueOnce(new ApiError(0, OFFLINE));
+    renderResults(leeds);
+    const retry = await screen.findByRole("button", { name: "Try again" });
+    act(() => retry.focus());
+    let release = () => {};
+    search.mockImplementationOnce(async (query) => {
+      await new Promise<void>((resolve) => (release = resolve));
+      return answer(query);
+    });
+    act(() => {
+      onlineManager.setOnline(false);
+      onlineManager.setOnline(true);
+    });
+    await waitFor(() => expect(search).toHaveBeenCalledTimes(2));
+    expect(screen.getByRole("alert").textContent).toContain(OFFLINE);
+    expect(document.activeElement).toBe(retry);
+    await act(async () => release());
+    const heading = await screen.findByRole("heading", { name: "12 results within 0.1 miles" });
+    expect(document.activeElement).toBe(heading);
+  });
+
+  it("says when a search tried again fails again", async () => {
+    const search = answerBatches({ fail: 1 });
+    renderResults(leeds);
+    fireEvent.click(await screen.findByRole("button", { name: "Try again" }));
+    await waitFor(() => expect(search).toHaveBeenCalledTimes(2));
+    expect(await screen.findByText(TOO_MANY, { selector: "[aria-live] " })).toBeTruthy();
   });
 
   it("offers UKCP's own search in a new tab when the first page fails", async () => {

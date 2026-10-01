@@ -2,6 +2,7 @@ import type { Map as LeafletMap } from "leaflet";
 import { Focus, Loader2, Search } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useMap } from "react-leaflet";
+import { ErrorLine } from "@/components/ErrorLine";
 import { Button } from "@/components/ui/button";
 import { ButtonGroup } from "@/components/ui/button-group";
 import { MapControlContainer } from "@/components/ui/map";
@@ -79,9 +80,7 @@ export function MovedMapButtons({ centre, settled, coveredBelow, onSearch, onRec
     >
       <MapControlContainer className="pointer-events-auto relative flex flex-col items-center gap-1.5">
         {near.problem && (
-          <p role="alert" className="rounded-md bg-background px-2 py-1 text-xs text-destructive shadow-md">
-            {near.problem}
-          </p>
+          <ErrorLine className="rounded-md bg-background px-2 py-1 shadow-md">{near.problem}</ErrorLine>
         )}
         {/* A pill however many buttons it holds, overriding the group's own rounding of its last one. */}
         <ButtonGroup ref={group} className="rounded-full shadow-md [&>[data-slot]:not(:has(~[data-slot]))]:rounded-r-full!">
