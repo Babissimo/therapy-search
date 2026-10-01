@@ -1,6 +1,6 @@
 import { useReducer, useState } from "react";
 import { useMapEvents } from "react-leaflet";
-import { Map, MapBounds, MapMarker, MapTileLayer, MapZoomControl } from "@/components/ui/map";
+import { Map, MapBounds, MapMarker, MapTileLayer, MapZoomControl, useReducedMotion } from "@/components/ui/map";
 import { savedView, saveView } from "../viewMemory";
 import { FitView } from "./FitView";
 import { UK_BOUNDS, UK_VIEW, type Point } from "./geo";
@@ -62,6 +62,7 @@ export default function MapPane({
   // A search keeps its tiles back until it is framed, so the whole UK's aren't fetched on the way. A view restored on
   // Back is already where it will stay.
   const [tiles, showTiles] = useState(restored !== undefined);
+  const still = useReducedMotion();
   const [centrePin] = useState(centreIcon);
   const [framings, countFraming] = useReducer((count: number) => count + 1, 0);
   const [recentres, recentre] = useReducer((count: number) => count + 1, 0);
@@ -88,8 +89,9 @@ export default function MapPane({
           placed={placed}
           waiting={framing}
           restored={restored}
-          // With no tiles drawn there is nothing to animate across, and they should load where the frame lands.
-          instant={!tiles}
+          // With no tiles drawn there is nothing to animate across, and they should load where the frame lands. Nor does it
+          // glide for a visitor who asks for less motion.
+          instant={!tiles || still}
           coveredBelow={coveredBelow}
           recentres={recentres}
           onFramed={() => {

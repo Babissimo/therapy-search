@@ -174,7 +174,7 @@ describe("Results", () => {
     });
     fireEvent.click(more);
     // The spinner shows the next page is on its way.
-    await waitFor(() => expect(more.querySelector(".animate-spin")).not.toBeNull());
+    await waitFor(() => expect(more.querySelector('[class*="animate-spin"]')).not.toBeNull());
     expect((more as HTMLButtonElement).disabled).toBe(false);
     expect(more.getAttribute("aria-disabled")).toBe("true");
     act(() => more.focus());

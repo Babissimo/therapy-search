@@ -1,13 +1,16 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, useLocation } from "react-router";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import type { TherapistCard } from "@shared/types";
 import { saveView } from "../viewMemory";
 import { UK_BOUNDS } from "./geo";
 import { createHighlight } from "./highlight";
 import MapPane, { type MapPaneProps } from "./MapPane";
 import type { Pin } from "./pins";
+
+// Whether the visitor asks for less motion, as the mocked map reads it.
+const motion = vi.hoisted(() => ({ reduced: false }));
 
 // Leaflet draws nothing under jsdom, so the map's pieces become plain elements that show what the pane passed them.
 vi.mock("@/components/ui/map", async () => {
@@ -18,6 +21,7 @@ vi.mock("@/components/ui/map", async () => {
     MapTileLayer: ({ bounds }: { bounds?: unknown }) => createElement("div", { "data-testid": "tiles", "data-bounds": JSON.stringify(bounds ?? null) }),
     MapBounds: ({ bounds }: { bounds?: unknown }) => createElement("div", { "data-testid": "bounds", "data-bounds": JSON.stringify(bounds ?? null) }),
     MapZoomControl: () => null,
+    useReducedMotion: () => motion.reduced,
     MapMarkerClusterGroup: ({ children }: { children?: unknown }) => createElement(Fragment, null, children as never),
     MapMarker: ({
       position,
@@ -249,6 +253,15 @@ describe("MapPane", () => {
     fireEvent.click(screen.getByTestId("fit"));
     expect(screen.getByTestId("tiles")).toBeTruthy();
     expect(screen.getByTestId("fit").dataset.instant).toBe("false");
+  });
+
+  it("frames every search without gliding for a visitor who asks for less motion", () => {
+    motion.reduced = true;
+    onTestFinished(() => void (motion.reduced = false));
+    renderPane({ fitKey: "Location=York" });
+    fireEvent.click(screen.getByTestId("fit"));
+    expect(screen.getByTestId("tiles")).toBeTruthy();
+    expect(screen.getByTestId("fit").dataset.instant).toBe("true");
   });
 
   it("shows a view restored at once, with its tiles", () => {

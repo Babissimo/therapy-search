@@ -72,7 +72,7 @@ export function LoadMore({ results: { query }, listRef, placing = false, atEnd =
         query.fetchNextPage();
       }}
     >
-      <Icon className={cn(query.isFetchingNextPage && "animate-spin")} aria-hidden />
+      <Icon className={cn(query.isFetchingNextPage && "motion-safe:animate-spin")} aria-hidden />
       {/* Shrinks away when folded, then hides, so find in page passes over it. */}
       <span
         className={cn(

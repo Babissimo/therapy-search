@@ -78,7 +78,7 @@ export function SearchBox({ params, drafts, onPlaceSearch, className }: Props) {
               }}
               className="absolute top-0.5 right-0.5 text-muted-foreground aria-disabled:opacity-50"
             >
-              {here.locating ? <Loader2 aria-hidden className="animate-spin" /> : <LocateFixed aria-hidden />}
+              {here.locating ? <Loader2 aria-hidden className="motion-safe:animate-spin" /> : <LocateFixed aria-hidden />}
             </IconButton>
           )}
         </div>

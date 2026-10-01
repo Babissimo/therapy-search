@@ -194,7 +194,7 @@
   }
   /* A pin or cluster whose therapist's card is hovered or focused. */
   .pin-highlight > * {
-    @apply scale-125 transition-[scale];
+    @apply scale-125 motion-safe:transition-[scale];
   }
   /* The selected pin, whose entry the list marks, or the cluster holding it. */
   .pin-selected .pin-avatar::before {
@@ -207,7 +207,7 @@
       /* Beats the z-index Leaflet sets inline, the marker's y position on the map plus any offset. */
       z-index: 100000 !important;
       & > * {
-        @apply scale-125 transition-[scale];
+        @apply scale-125 motion-safe:transition-[scale];
       }
       & .pin-avatar::before {
         @apply block;

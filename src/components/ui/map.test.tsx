@@ -148,6 +148,20 @@ describe("Map", () => {
     resized();
     expect(invalidate).toHaveBeenCalled();
   });
+
+  it("zooms, fades and splits clusters without gliding for a visitor who asks for less motion", () => {
+    vi.stubGlobal("matchMedia", (query: string) => ({ matches: query === "(prefers-reduced-motion: reduce)", media: query, addEventListener() {}, removeEventListener() {} }));
+    const map = createRef<L.Map>();
+    const cluster = createRef<L.MarkerClusterGroup>();
+    render(
+      <Map ref={map} center={[51.5, -0.1]} zoom={10} style={{ height: 400, width: 400 }}>
+        <MapMarkerClusterGroup ref={cluster}>{null}</MapMarkerClusterGroup>
+      </Map>,
+    );
+    const { zoomAnimation, fadeAnimation, markerZoomAnimation, inertia } = map.current!.options;
+    expect([zoomAnimation, fadeAnimation, markerZoomAnimation, inertia]).toEqual([false, false, false, false]);
+    expect((cluster.current!.options as L.MarkerClusterGroupOptions).animate).toBe(false);
+  });
 });
 
 describe("MapBounds", () => {

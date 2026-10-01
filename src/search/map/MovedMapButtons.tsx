@@ -73,7 +73,7 @@ export function MovedMapButtons({ centre, settled, coveredBelow, onSearch, onRec
     // moves the sheet's top, ends with a moveend, which renders this again.
     <div
       {...shown.props}
-      className="pointer-events-none absolute inset-x-3 z-1000 flex justify-center transition-[bottom] duration-200 fade-in-0 fade-out-0 slide-in-from-bottom-2 slide-out-to-bottom-2 motion-safe:data-entering:animate-in motion-safe:data-leaving:animate-out"
+      className="pointer-events-none absolute inset-x-3 z-1000 flex justify-center motion-safe:transition-[bottom] motion-safe:duration-200 fade-in-0 fade-out-0 slide-in-from-bottom-2 slide-out-to-bottom-2 motion-safe:data-entering:animate-in motion-safe:data-leaving:animate-out"
       style={{ bottom: `calc(${covered}px + 2rem)` }}
     >
       <MapControlContainer className="pointer-events-auto relative flex flex-col items-center gap-1.5">
@@ -92,7 +92,7 @@ export function MovedMapButtons({ centre, settled, coveredBelow, onSearch, onRec
             aria-disabled={near.looking}
             onClick={() => near.lookNear(() => Promise.resolve(middleInView(map, covered)))}
           >
-            {near.looking ? <Loader2 aria-hidden className="animate-spin" /> : <Search aria-hidden />}
+            {near.looking ? <Loader2 aria-hidden className="motion-safe:animate-spin" /> : <Search aria-hidden />}
             Search this area
           </Button>
           {onRecentre && (
