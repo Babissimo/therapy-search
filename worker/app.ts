@@ -10,7 +10,7 @@ import {
   type PlaceOptions,
 } from "../shared/location";
 import { ALLOWED } from "../shared/options";
-import { InvalidParam, asksWhole, readParams, toQuery } from "../shared/query";
+import { EARLY_SIZE, InvalidParam, asksWhole, batchSize, readParams, toQuery, type SearchParams } from "../shared/query";
 import { UpstreamError, type SessionStore, type UkcpClient } from "./ukcp/client";
 import { officeDetails } from "./ukcp/offices";
 
@@ -21,6 +21,8 @@ export type Env = {
   UPSTREAM_LIMIT: RateLimit;
   PLACE_LIMIT: RateLimit;
   OFFICE_LIMIT: RateLimit;
+  /** For a location search's nearest few, asked beside its first batch; their own, so they never spend a search's. */
+  EARLY_LIMIT: RateLimit;
   UKCP_SESSION: SessionStore;
   SITE_URL: string;
 };
@@ -84,6 +86,10 @@ export function createGateway(cachedFor: (c: Ctx) => Cached) {
   app.post("/api/search", async (c) => {
     const query = toQuery(readParams(await formOf(c), ALLOWED));
     return forward(c, `/api/search${query ? `?${query}` : ""}`);
+  });
+
+  app.post("/api/search/early", async (c) => {
+    return forward(c, `/api/search/early?${toQuery(earlyParams(await formOf(c)))}`);
   });
 
   app.post("/api/therapist", async (c) => {
@@ -166,10 +172,19 @@ export function createCache(clientFor: (env: Env) => UkcpClient, placesFor: (env
 
   app.get("/api/search", async (c) => {
     const params = readParams(new URL(c.req.url).searchParams, ALLOWED);
-    if (!(await allow(c, c.env.UPSTREAM_LIMIT))) return c.json({ error: TOO_MANY }, 429);
-    const body = expectOpening(await clientFor(c.env).search(params), "results-no", "fat-search-alert");
-    return upstreamHtml(c, body, `public, max-age=${asksWhole(params) ? WHOLE_SEARCH_MAX_AGE : SEARCH_MAX_AGE}`);
+    return results(c, c.env.UPSTREAM_LIMIT, params, batchSize(params), asksWhole(params) ? WHOLE_SEARCH_MAX_AGE : SEARCH_MAX_AGE);
   });
+
+  app.get("/api/search/early", async (c) => {
+    return results(c, c.env.EARLY_LIMIT, earlyParams(new URL(c.req.url).searchParams), EARLY_SIZE, SEARCH_MAX_AGE);
+  });
+
+  /** UKCP's results for a search, `pageSize` at a time, counted against `limiter`. */
+  async function results(c: Ctx, limiter: RateLimit, params: SearchParams, pageSize: number, maxAge: number): Promise<Response> {
+    if (!(await allow(c, limiter))) return c.json({ error: TOO_MANY }, 429);
+    const body = expectOpening(await clientFor(c.env).search(params, pageSize), "results-no", "fat-search-alert");
+    return upstreamHtml(c, body, `public, max-age=${maxAge}`);
+  }
 
   app.get("/api/therapist/:slug", async (c) => {
     if (!(await allow(c, c.env.UPSTREAM_LIMIT))) return c.json({ error: TOO_MANY }, 429);
@@ -242,6 +257,13 @@ function answerError(error: Error, c: Context): Response {
 
 async function formOf(c: Ctx): Promise<URLSearchParams> {
   return new URLSearchParams(await c.req.text());
+}
+
+/** A location search's nearest few: the start of its first batch, as UKCP lists a location search nearest first. */
+function earlyParams(query: URLSearchParams): SearchParams {
+  const params = readParams(query, ALLOWED);
+  if (asksWhole(params)) throw new InvalidParam("Location", "Only a search near a place has a nearest few");
+  return { ...params, page: 1 };
 }
 
 /** The text and options of a place lookup, in their canonical form. */

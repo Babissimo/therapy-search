@@ -21,7 +21,11 @@ describe("api", () => {
   it("sends a search in the request's body, never its address", async () => {
     answer(RESULTS);
     await api.search("Location=Leeds&HelpWith=Anxiety");
-    expect(sent()).toEqual([["/api/search", "POST", "Location=Leeds&HelpWith=Anxiety"]]);
+    await api.searchEarly("Location=Leeds");
+    expect(sent()).toEqual([
+      ["/api/search", "POST", "Location=Leeds&HelpWith=Anxiety"],
+      ["/api/search/early", "POST", "Location=Leeds"],
+    ]);
   });
 
   it("asks for a profile and its contact details by body", async () => {

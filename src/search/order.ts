@@ -43,10 +43,16 @@ export function rank(seed: number, slug: string): number {
 }
 
 type Shown = { hasPhoto: boolean; hasSummary: boolean };
+type Ordered = Shown & { slug: string; distance?: string };
 
 /** How much a card shows beyond a name: one each for a photo and a summary. */
 function detail({ hasPhoto, hasSummary }: Shown): number {
   return Number(hasPhoto) + Number(hasSummary);
+}
+
+/** A card's distance as UKCP ranks it, a card without one counting as 0 miles. */
+function milesOf({ distance }: { distance?: string }): number {
+  return parseMiles(distance) ?? 0;
 }
 
 /**
@@ -54,9 +60,9 @@ function detail({ hasPhoto, hasSummary }: Shown): number {
  * people at the same distance are reordered, those whose cards show more ahead. A card without a distance counts as
  * 0 miles, as UKCP ranks it, so a search without a location orders everyone by what their card shows.
  */
-export function inOrder<T extends Shown & { slug: string; distance?: string }>(listings: T[], seed: number): T[] {
+export function inOrder<T extends Ordered>(listings: T[], seed: number): T[] {
   return listings
-    .map((listing) => ({ listing, miles: parseMiles(listing.distance) ?? 0, detail: detail(listing), rank: rank(seed, listing.slug) }))
+    .map((listing) => ({ listing, miles: milesOf(listing), detail: detail(listing), rank: rank(seed, listing.slug) }))
     .sort(
       (a, b) =>
         a.miles - b.miles ||
@@ -65,4 +71,16 @@ export function inOrder<T extends Shown & { slug: string; distance?: string }>(l
         (a.listing.slug < b.listing.slug ? -1 : a.listing.slug > b.listing.slug ? 1 : 0),
     )
     .map(({ listing }) => listing);
+}
+
+/**
+ * Of a location search's nearest few, those its whole batch puts first, in the batch's order. UKCP sends results nearest
+ * first, so everyone nearer than the furthest sent has been sent, but the furthest may share their distance with people
+ * not yet sent; `complete` says UKCP sent all it found.
+ */
+export function settled<T extends Ordered>(nearest: T[], complete: boolean, seed: number): T[] {
+  const ordered = inOrder(nearest, seed);
+  if (complete) return ordered;
+  const furthest = Math.max(...nearest.map(milesOf));
+  return ordered.filter((listing) => milesOf(listing) < furthest);
 }

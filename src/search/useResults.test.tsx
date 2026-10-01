@@ -8,7 +8,7 @@ import type { TherapistCard } from "@shared/types";
 import { api } from "@/lib/api";
 import { listed } from "@/lib/listed.testing";
 import { inOrder, orderSeed } from "./order";
-import { cachedCard, useResults } from "./useResults";
+import { cachedCard, shownCard, useResults } from "./useResults";
 
 const newClient = () => new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
@@ -77,5 +77,105 @@ describe("useResults", () => {
     const [first] = result.current.therapists;
     expect(cachedCard(client, first!.slug)).toBe(first);
     expect(cachedCard(client, expected[12]!)).toBeUndefined();
+  });
+});
+
+describe("useResults near a place", () => {
+  const near = (Location: string) => ({ ...emptyParams(), text: { ...emptyParams().text, Location } });
+  // Five people at each tenth of a mile.
+  const located = cards.map((card, i) => ({ ...card, distance: `${(Math.floor(i / 5) + 1) / 10} miles from Leeds` }));
+  const expectedNear = expectedOf(located);
+
+  /** UKCP answering the batch once `release` is called. */
+  function answerLater(answer = located) {
+    let release!: () => void;
+    const released = new Promise<void>((resolve) => (release = resolve));
+    const search = vi.spyOn(api, "search").mockImplementation(async () => {
+      await released;
+      return listingsOf(answer);
+    });
+    return { search, release: () => act(release) };
+  }
+
+  /** UKCP answering with the nearest `count`, nearest first but in another order among people at one distance. */
+  function answerEarly(count: number, answer = located) {
+    return vi.spyOn(api, "searchEarly").mockImplementation(async () => {
+      const nearest = inOrder(listingsOf(answer).listings, 99).slice(0, count);
+      return { total: answer.length, from: 1, to: nearest.length, notices: [], listings: nearest };
+    });
+  }
+
+  it("shows the nearest few before the batch, only those the batch lists first, then its first page beyond them", async () => {
+    const { release } = answerLater();
+    answerEarly(12);
+    const { result } = renderHook(() => useResults(near("Leeds")), { wrapper: withClient() });
+    // The twelve sent reach 0.3 miles, where three more are still to come.
+    await waitFor(() => expect(shown(result.current.therapists)).toEqual(expectedNear.slice(0, 10)));
+    expect([result.current.loading, result.current.first?.total]).toEqual([false, 30]);
+    await release();
+    await waitFor(() => expect(shown(result.current.therapists)).toEqual(expectedNear.slice(0, 12)));
+  });
+
+  it("waits for the batch while the nearest few all share one distance", async () => {
+    const together = cards.map((card) => ({ ...card, distance: "0.4 miles from Leeds" }));
+    const { release } = answerLater(together);
+    const early = answerEarly(12, together);
+    const { result } = renderHook(() => useResults(near("Leeds")), { wrapper: withClient() });
+    await waitFor(() => expect(early).toHaveBeenCalled());
+    await act(() => early.mock.results[0]?.value);
+    expect([result.current.loading, result.current.therapists]).toEqual([true, []]);
+    await release();
+    await waitFor(() => expect(shown(result.current.therapists)).toEqual(expectedOf(together).slice(0, 12)));
+  });
+
+  it("puts a new search's nearest few in place of the last search's results", async () => {
+    answerShuffled(located);
+    answerEarly(12);
+    const { result, rerender } = renderHook((params) => useResults(params), { wrapper: withClient(), initialProps: near("Leeds") });
+    await waitFor(() => expect(result.current.therapists).toHaveLength(12));
+    answerLater();
+    rerender(near("York"));
+    expect(result.current.stale).toBe(true);
+    await waitFor(() => expect(result.current.stale).toBe(false));
+    expect(shown(result.current.therapists)).toEqual(expectedNear.slice(0, 10));
+  });
+
+  it("drops the nearest few when the batch fails, leaving its error", async () => {
+    vi.spyOn(api, "search").mockRejectedValue(new Error("UKCP is down"));
+    answerEarly(12);
+    const { result } = renderHook(() => useResults(near("Leeds")), { wrapper: withClient() });
+    await waitFor(() => expect(result.current.query.isLoadingError).toBe(true));
+    expect([result.current.loading, result.current.therapists]).toEqual([false, []]);
+  });
+
+  it("shows the batch alone when the nearest few fail", async () => {
+    answerShuffled(located);
+    vi.spyOn(api, "searchEarly").mockRejectedValue(new Error("Too many searches"));
+    const { result } = renderHook(() => useResults(near("Leeds")), { wrapper: withClient() });
+    await waitFor(() => expect(shown(result.current.therapists)).toEqual(expectedNear.slice(0, 12)));
+  });
+
+  it("asks for no nearest few without a place, nor for a search whose batch it has", async () => {
+    answerShuffled(located);
+    const early = answerEarly(12);
+    const client = newClient();
+    const online = renderHook(() => useResults(emptyParams()), { wrapper: withClient(client) });
+    await waitFor(() => expect(online.result.current.therapists).toHaveLength(12));
+    expect(early).not.toHaveBeenCalled();
+    const first = renderHook(() => useResults(near("Leeds")), { wrapper: withClient(client) });
+    await waitFor(() => expect(first.result.current.query.isSuccess).toBe(true));
+    renderHook(() => useResults(near("Leeds")), { wrapper: withClient(client) });
+    expect(early).toHaveBeenCalledTimes(1);
+  });
+
+  it("finds the card of one of the nearest few shown before the batch", async () => {
+    answerLater();
+    answerEarly(12);
+    const client = newClient();
+    const { result } = renderHook(() => useResults(near("Leeds")), { wrapper: withClient(client) });
+    await waitFor(() => expect(result.current.therapists).toHaveLength(10));
+    const [first] = result.current.therapists;
+    expect(cachedCard(client, first!.slug)).toBe(first);
+    expect(shownCard(client, near("Leeds"), first!.slug)).toBe(first);
   });
 });

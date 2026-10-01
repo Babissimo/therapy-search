@@ -39,20 +39,20 @@ const SLOW_MS = 2000;
 const UKCP_PAGING = /^(Location searches are grouped by distance|This search returns more than \d+ results)/;
 
 export function Results(props: Props) {
-  const { query } = props.results;
+  const { loading, stale } = props.results;
   // Outside the list, which is marked busy and dimmed while it loads, so the line is announced and read as it comes.
   return (
     <div className="space-y-4">
-      <SlowNote loading={query.isPending || query.isPlaceholderData} whole={asksWhole(props.params)} />
+      <SlowNote loading={loading || stale} whole={asksWhole(props.params)} />
       <ResultsList {...props} />
     </div>
   );
 }
 
 function ResultsList({ params, results, listRef, pins = [], unplaced = [], selected, onHighlight, online = false }: Props) {
-  const { query, first, therapists, searchedPlace } = results;
+  const { query, first, therapists, searchedPlace, loading, stale } = results;
   const { officeOf } = useOffices(therapists, !params.flags.LocationSearchOutsideUK);
-  if (query.isPending) {
+  if (loading) {
     return (
       <div className="space-y-4" aria-busy>
         <div aria-hidden>
@@ -80,7 +80,7 @@ function ResultsList({ params, results, listRef, pins = [], unplaced = [], selec
 
   return (
     // Dims while the next search's results are on their way.
-    <section aria-busy={query.isPlaceholderData} className={cn("space-y-4 motion-safe:transition-opacity", query.isPlaceholderData && "opacity-60")}>
+    <section aria-busy={stale} className={cn("space-y-4 motion-safe:transition-opacity", stale && "opacity-60")}>
       {/* The heading and each entry fade in as they replace their skeleton or arrive, and again as their tab is shown,
           which starts their animations afresh. Side by side rather than one within another, so no fade dims another. */}
       <div className="space-y-4 fade-in-0 motion-safe:animate-in">

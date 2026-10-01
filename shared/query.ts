@@ -14,6 +14,11 @@ export const SEARCH_MILES = 30;
 export const PAGE_SIZE = 12;
 /** Results asked of UKCP at once, since pages asked for a minute apart come from different shuffles. */
 export const BATCH_SIZE = 40 * PAGE_SIZE;
+/**
+ * Results asked of UKCP beside a location search's first batch, which UKCP answers several times sooner, so the nearest
+ * can show before the batch arrives: enough that the first page is usually theirs.
+ */
+export const EARLY_SIZE = 4 * PAGE_SIZE;
 /** More than UKCP's whole register (8,461 on 2026-09-29), so one request brings every result. */
 export const WHOLE_SET_SIZE = 10_000;
 export const TEXT_MAX_LENGTH = 200;

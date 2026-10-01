@@ -66,6 +66,8 @@ async function json<T>(url: string, init: RequestInit): Promise<T> {
 
 export const api = {
   search: (query: string) => request("/api/search", listingsOf, post(query)),
+  /** A location search's nearest few, which come several times sooner than its first batch. */
+  searchEarly: (query: string) => request("/api/search/early", listingsOf, post(query)),
   profile: (slug: string) => request("/api/therapist", (html) => parseProfile(html, slug), post({ slug })),
   contact: (id: string) => request("/api/contact", parseContact, post({ id })),
   place: (text: string, options: PlaceOptions = {}) => json<PlaceLookup>("/api/place", post(placeQuery(text, options))),

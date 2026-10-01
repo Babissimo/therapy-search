@@ -99,7 +99,7 @@ function SearchView({ params, onChange, wide }: ViewProps) {
   const centre = useCentre(results.searchedPlace, params.flags.LocationSearchOutsideUK);
   // The place searched comes with the results, so there is none until a first search's results arrive; while the next
   // search loads, the results, and so the place, are still the last search's.
-  const centreSettled = centre.settled && !results.query.isPending && !results.query.isPlaceholderData;
+  const centreSettled = centre.settled && !results.loading && !results.stale;
   const { pins, unplaced, placing, moving } = usePins(results.therapists, centre, params.flags.LocationSearchOutsideUK);
   // Kept by key, so a new search shows its results whichever tab was open.
   const [tabChoice, setTabChoice] = useState<{ fitKey: string; tab: ListTab }>();
@@ -139,7 +139,7 @@ function SearchView({ params, onChange, wide }: ViewProps) {
     else setFiltersOpen(wide);
   }
   // The shortlist keeps its place apart from the results', under a key of its own.
-  const scroll = useRememberedScroll(tab === "results" ? entry : `${entry} shortlist`, tab === "shortlist" || !searching || !results.query.isPending);
+  const scroll = useRememberedScroll(tab === "results" ? entry : `${entry} shortlist`, tab === "shortlist" || !searching || !results.loading);
   const listRef = useRef<HTMLUListElement>(null);
   const panelToggleRef = useRef<HTMLButtonElement>(null);
   // Whether the list was showing when a pin was selected, so it can glide to the pin's entry rather than jump.

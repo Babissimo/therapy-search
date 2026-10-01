@@ -39,7 +39,7 @@ export function OnlineView({ params, onChange, wide }: Props) {
   const [tabChoice, setTabChoice] = useState<{ query: string; tab: ListTab }>();
   const tab = tabChoice?.query === query ? tabChoice.tab : "results";
   // The shortlist keeps its place apart from the results', under a key of its own.
-  const scroll = useRememberedScroll(tab === "results" ? entry : `${entry} shortlist`, tab === "shortlist" || !searching || !results.query.isPending);
+  const scroll = useRememberedScroll(tab === "results" ? entry : `${entry} shortlist`, tab === "shortlist" || !searching || !results.loading);
   const listRef = useRef<HTMLUListElement>(null);
 
   const toolbar = (
