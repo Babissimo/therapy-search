@@ -7,6 +7,7 @@ import { Morph, startMorph } from "@/components/Morph";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
 import { Masthead } from "@/layout/Masthead";
+import { focusOnceShown, SkipLinks, type Skip } from "@/layout/SkipLinks";
 import { useMediaQuery } from "@/lib/useMediaQuery";
 import { cn } from "@/lib/utils";
 import { useClosedGroups } from "@/shortlist/groups";
@@ -30,7 +31,7 @@ import { FiltersIcon, Prompt } from "./Prompt";
 import { Results } from "./Results";
 import { ResultsPanel } from "./ResultsPanel";
 import { coverOf, ResultsSheet, type SheetPosition } from "./ResultsSheet";
-import { SearchBox } from "./SearchBox";
+import { SEARCH_BOX_ID, SearchBox } from "./SearchBox";
 import { tickedFilters } from "./state";
 import { useResults } from "./useResults";
 import { useSearchDrafts, type SearchDrafts } from "./useSearchDrafts";
@@ -171,6 +172,19 @@ function SearchView({ params, onChange, wide }: ViewProps) {
     setSelection(undefined);
   }
 
+  // Past the list and the map's pins to the search box, which comes after them; and to the list, put away or not.
+  const skips: Skip[] = [
+    { label: "Skip to the search box", onSkip: () => document.getElementById(SEARCH_BOX_ID)?.focus() },
+    {
+      label: "Skip to the results",
+      onSkip: () => {
+        if (wide) setPanelOpen(true);
+        else if (sheet === "peek") setSheet("half");
+        focusOnceShown(() => scroll.ref.current?.querySelector<HTMLElement>('[role="tabpanel"]:not([hidden])'));
+      },
+    },
+  ];
+
   const selectedKey = selected?.key;
   // After the render that opens the panel or raises the sheet, so the list is there to scroll. The entry is the open
   // tab's, as the results keep theirs, hidden, while the shortlist shows.
@@ -239,6 +253,7 @@ function SearchView({ params, onChange, wide }: ViewProps) {
       {/* The tabs' root spans the page, around wherever their list and panels sit. */}
       <Tabs.Root value={tab} onValueChange={pickTab} asChild>
         <div className="group/tabs flex min-h-0 flex-1">
+          {searching && <SkipLinks skips={skips} />}
           {!searching ? (
             <ListColumn wide={wide} tabs={tabs} top={!wide && toolbar("list")} scroll={scroll}>
               {lists}
@@ -343,6 +358,13 @@ function Toolbar({
   const filtersId = useId();
   const ticked = tickedFilters(params);
   const overMap = placement === "map";
+  const toolbar = useRef<HTMLDivElement>(null);
+  const filtersButton = useRef<HTMLButtonElement>(null);
+  // Putting the filters away takes the keyboard with them, so it goes back to the button that opens them.
+  const closeFilters = () => {
+    filtersButton.current?.focus();
+    onFiltersOpenChange(false);
+  };
   return (
     <Collapsible open={wide && (placement === "aside" || filtersOpen)} asChild>
       <div
@@ -357,9 +379,14 @@ function Toolbar({
           overMap && "lg:right-auto lg:w-[calc(24rem-1.5rem-1px)]",
           besideToggle && "left-14",
         )}
+        // Escape anywhere in the toolbar puts away the filters open over the map, unless it has just closed something open
+        // within it, such as help.
+        onKeyDown={(event) => {
+          if (overMap && filtersOpen && event.key === "Escape" && !event.defaultPrevented) closeFilters();
+        }}
       >
         <Morph name="toolbar">
-          <div className={cn("pointer-events-auto flex w-full flex-col gap-2 rounded-xl border bg-background p-2", overMap && "shadow-md")}>
+          <div ref={toolbar} className={cn("pointer-events-auto flex w-full flex-col gap-2 rounded-xl border bg-background p-2", overMap && "shadow-md")}>
             <ModeSwitch online={false} params={params} />
             <div className="flex items-start gap-2">
               {/* A search for a place puts the filters away to show where it is; ticks and the keyword leave them open for more. */}
@@ -369,6 +396,7 @@ function Toolbar({
               {wide ? (
                 overMap && (
                   <FiltersButton
+                    ref={filtersButton}
                     ticked={ticked}
                     aria-expanded={filtersOpen}
                     aria-controls={filtersOpen ? filtersId : undefined}
@@ -376,7 +404,7 @@ function Toolbar({
                   />
                 )
               ) : (
-                <FiltersSheetButton ticked={ticked} />
+                <FiltersSheetButton ref={filtersButton} ticked={ticked} />
               )}
             </div>
           </div>
@@ -384,18 +412,14 @@ function Toolbar({
         <FilterChips
           params={params}
           onChange={onChange}
+          // The button opening the filters, or beside the list, where there is none, the search box above.
+          onEmptied={() => (filtersButton.current ?? toolbar.current?.querySelector("input"))?.focus()}
           // Only as wide as its chips, up to the toolbar's width, so it covers no more of the map than they do.
           className={cn("pointer-events-auto", !wide && "max-w-full flex-nowrap overflow-x-auto [&>li]:shrink-0")}
         />
         {/* Shrinks with the toolbar, scrolling the filters within. Its shadow is its own, as it clips the filters' as it unrolls. */}
         <CollapsibleContent className={cn("flex min-h-0 w-full flex-col rounded-xl", overMap && "shadow-lg")}>
-          <FiltersSection
-            id={filtersId}
-            params={params}
-            drafts={drafts}
-            onClose={overMap ? () => onFiltersOpenChange(false) : undefined}
-            className="pointer-events-auto"
-          />
+          <FiltersSection id={filtersId} params={params} drafts={drafts} onClose={overMap ? closeFilters : undefined} className="pointer-events-auto" />
         </CollapsibleContent>
       </div>
     </Collapsible>

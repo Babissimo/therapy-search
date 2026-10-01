@@ -415,6 +415,38 @@ describe("SearchPage", () => {
     expect(screen.queryByRole("region", { name: "Refine your search" })).toBeNull();
   });
 
+  it("hands the keyboard back to the Filters button as they close, by their button or by Escape", async () => {
+    screenIs(true);
+    renderAt(SEARCH);
+    await loaded();
+    const open = screen.getByRole("button", { name: "Filters" });
+    const filters = () => screen.queryByRole("region", { name: "Refine your search" });
+    fireEvent.click(open);
+    const close = screen.getByRole("button", { name: "Close filters" });
+    act(() => close.focus());
+    fireEvent.click(close);
+    expect(filters()).toBeNull();
+    expect(document.activeElement).toBe(open);
+    fireEvent.click(open);
+    fireEvent.keyDown(within(filters()!).getAllByRole("button")[1]!, { key: "Escape" });
+    expect(filters()).toBeNull();
+    expect(document.activeElement).toBe(open);
+  });
+
+  it("skips the keyboard past the list to the search box, and to the list when it is put away", async () => {
+    screenIs(true);
+    renderAt(SEARCH);
+    await loaded();
+    await screen.findByTestId("map");
+    fireEvent.click(screen.getByRole("link", { name: "Skip to the search box" }));
+    expect(document.activeElement).toBe(screen.getByRole("textbox", { name: "Location" }));
+    fireEvent.click(screen.getByRole("button", { name: "Hide list" }));
+    expect(list().closest("[inert]")).not.toBeNull();
+    fireEvent.click(screen.getByRole("link", { name: "Skip to the results" }));
+    expect(list().closest("[inert]")).toBeNull();
+    await waitFor(() => expect(document.activeElement).toBe(within(results()).getByRole("tabpanel", { name: /^Results/ })));
+  });
+
   it("keeps the filters open right of the prompt on wide screens, as they are set, until a search for a place puts them away", async () => {
     screenIs(true);
     renderAt("/");

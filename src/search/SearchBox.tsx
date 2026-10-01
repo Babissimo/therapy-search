@@ -9,6 +9,9 @@ import type { SearchDrafts } from "./useSearchDrafts";
 
 export const NO_PLACE = "Type a town or postcode to search.";
 
+/** The box for a place, which a skip link sends the keyboard to. The page shows one at a time. */
+export const SEARCH_BOX_ID = "search-place";
+
 type Props = {
   params: SearchParams;
   drafts: SearchDrafts;
@@ -52,6 +55,7 @@ export function SearchBox({ params, drafts, onPlaceSearch, className }: Props) {
         <div className="relative min-w-0 flex-1">
           <Input
             ref={input}
+            id={SEARCH_BOX_ID}
             aria-label="Location"
             aria-invalid={wanting || undefined}
             aria-describedby={problem ? problemId : undefined}

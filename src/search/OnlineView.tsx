@@ -3,6 +3,7 @@ import { useId, useRef, useState } from "react";
 import { useLocation } from "react-router";
 import { toQuery, type SearchParams } from "@shared/query";
 import { Morph } from "@/components/Morph";
+import { SkipLinks } from "@/layout/SkipLinks";
 import { cn } from "@/lib/utils";
 import { ShortlistTab } from "@/shortlist/ShortlistTab";
 import { useShortlistRefresh } from "@/shortlist/useShortlist";
@@ -41,6 +42,7 @@ export function OnlineView({ params, onChange, wide }: Props) {
   // The shortlist keeps its place apart from the results', under a key of its own.
   const scroll = useRememberedScroll(tab === "results" ? entry : `${entry} shortlist`, tab === "shortlist" || !searching || !results.query.isPending);
   const listRef = useRef<HTMLUListElement>(null);
+  const filtersButton = useRef<HTMLButtonElement>(null);
 
   const toolbar = (
     <Morph name="toolbar">
@@ -51,12 +53,22 @@ export function OnlineView({ params, onChange, wide }: Props) {
             {/* As tall as Near me's search box, so the one gives way to the other in a toolbar of one size. */}
             <p className="flex min-h-8 min-w-0 flex-1 items-center px-1 text-sm">Online or by phone, wherever you are</p>
           </Morph>
-          {!wide && <MobileFilters params={params} drafts={drafts} groups={ONLINE_FILTER_GROUPS} ticked={tickedFilters(params)} />}
+          {!wide && (
+            <MobileFilters buttonRef={filtersButton} params={params} drafts={drafts} groups={ONLINE_FILTER_GROUPS} ticked={tickedFilters(params)} />
+          )}
         </div>
       </div>
     </Morph>
   );
-  const chips = <FilterChips params={params} onChange={onChange} className={cn(!wide && "flex-nowrap overflow-x-auto [&>li]:shrink-0")} />;
+  const chips = (
+    <FilterChips
+      params={params}
+      onChange={onChange}
+      // The button opening the filters on a phone, or the first of the filters beneath on wide screens.
+      onEmptied={() => (filtersButton.current ?? document.getElementById(filtersId)?.querySelector<HTMLElement>("button"))?.focus()}
+      className={cn(!wide && "flex-nowrap overflow-x-auto [&>li]:shrink-0")}
+    />
+  );
   const lists = (
     <ListPanels
       tab={tab}
@@ -78,6 +90,12 @@ export function OnlineView({ params, onChange, wide }: Props) {
   return (
     <Tabs.Root value={tab} onValueChange={(value) => setTabChoice({ query, tab: value as ListTab })} asChild>
       <div className="group/tabs flex min-h-0 flex-1">
+        {/* The filters come after the list on wide screens. */}
+        {wide && (
+          <SkipLinks
+            skips={[{ label: "Skip to the filters", onSkip: () => document.getElementById(filtersId)?.querySelector<HTMLElement>("button")?.focus() }]}
+          />
+        )}
         <ListColumn
           wide={wide}
           tabs={<ListTabs />}
