@@ -60,7 +60,7 @@ export function SiteTitle({ as: Title = "h1" }: { as?: "h1" | "p" }) {
           className="relative flex cursor-help items-center gap-1.5 rounded-md text-left touch-target outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
         >
           Find a UKCP therapist
-          <Info aria-hidden className="size-4 shrink-0 text-muted-foreground" />
+          <Info aria-hidden className="size-4 shrink-0 text-muted-foreground print:hidden" />
         </PopoverTrigger>
       </Title>
       <PopoverContent

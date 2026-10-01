@@ -62,11 +62,36 @@ describe("ContactList", () => {
     screen.getByRole("link", { name: "LinkedIn (opens in a new tab)" });
   });
 
+  it("writes a web address as a person would type it, its escapes read back into letters, unless they'd hide or turn text", () => {
+    renderList({ social: ["https://www.facebook.com/Zo%C3%AB.Therapy/", "https://example.invalid/#/therapist/12", "https://x.com/%E2%80%AEjo"] });
+    const text = (name: string) => screen.getByRole("link", { name }).textContent;
+    expect(text("Facebook (opens in a new tab)")).toContain("facebook.com/Zoë.Therapy");
+    expect(text("example.invalid (opens in a new tab)")).toContain("example.invalid#/therapist/12");
+    expect(text("X (opens in a new tab)")).toContain("x.com/%E2%80%AEjo");
+  });
+
   it("names social links by where they go", () => {
     renderList({ social: ["https://uk.linkedin.com/in/jo", "https://threads.net/@jo", "https://www.psychologytoday.com/jo"] });
     expect(href("LinkedIn (opens in a new tab)")).toBe("https://uk.linkedin.com/in/jo");
     screen.getByRole("link", { name: "Threads (opens in a new tab)" });
     screen.getByRole("link", { name: "psychologytoday.com (opens in a new tab)" });
+  });
+
+  it("prints where a social link goes in place of the site's name, and where UKCP's goes after its words, leaving the rest as they read", async () => {
+    vi.spyOn(api, "contact").mockResolvedValue({ phone: "01234 567890", website: "https://www.example.invalid/practice/" });
+    renderList({ contactId: "9239", email: "jo@example.com", social: ["https://uk.linkedin.com/in/jo"] });
+    await screen.findByRole("link", { name: "Telephone: 01234 567890" });
+    // What paper shows of each link, its parts hidden on screen or in print by class. A part hidden on screen is hidden from
+    // the link's name too, which says where it goes already.
+    const onPaper = (name: string) =>
+      [...screen.getByRole("link", { name }).querySelectorAll("span")]
+        .filter((part) => part.classList.contains("hidden") === part.classList.contains("print:inline") && !part.classList.contains("print:hidden"))
+        .map((part) => part.textContent);
+    expect(onPaper("LinkedIn (opens in a new tab)")).toEqual(["uk.linkedin.com/in/jo"]);
+    expect(onPaper("View on UKCP (opens in a new tab)")).toEqual(["View on UKCP", "psychotherapy.org.uk/therapist/Jo-ABCDEFGH"]);
+    expect(onPaper("Telephone: 01234 567890")).toEqual(["01234 567890"]);
+    expect(onPaper("Email: jo@example.com")).toEqual(["jo@example.com"]);
+    expect(onPaper("Website: example.invalid/practice (opens in a new tab)")).toEqual(["example.invalid/practice"]);
   });
 
   it("says why the details couldn't be fetched", async () => {

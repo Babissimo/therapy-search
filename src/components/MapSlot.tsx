@@ -6,13 +6,17 @@ import { LoadFailed } from "./LoadFailed";
 
 /**
  * Where a lazily loaded map draws: a muted box while its code arrives, and a note in its place if the code can't be fetched.
- * Only a reload tries again, as React keeps a failed import's error and the browser may keep the failed fetch.
+ * Only a reload tries again, as React keeps a failed import's error and the browser may keep the failed fetch. Maps stay
+ * off paper, where their tiles print in pieces and the words around them say where each place is.
  */
 export function MapSlot({ children }: { children: ReactNode }) {
   return (
-    <LoadFailed fallback={<MapFailed />}>
-      <Suspense fallback={<div className="size-full bg-muted" />}>{children}</Suspense>
-    </LoadFailed>
+    // No box of its own on screen, so the map sizes to what holds the slot.
+    <div className="contents print:hidden">
+      <LoadFailed fallback={<MapFailed />}>
+        <Suspense fallback={<div className="size-full bg-muted" />}>{children}</Suspense>
+      </LoadFailed>
+    </div>
   );
 }
 

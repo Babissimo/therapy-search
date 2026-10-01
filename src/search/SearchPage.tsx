@@ -341,7 +341,7 @@ function SearchView({ params, onChange, wide }: ViewProps) {
     <FiltersSheet phone={!wide} params={params} drafts={drafts}>
       {/* The tabs' root spans the page, around wherever their list and panels sit. */}
       <Tabs.Root value={tab} onValueChange={pickTab} asChild>
-        <div className="group/tabs flex min-h-0 flex-1">
+        <div className="group/tabs flex min-h-0 flex-1 print:block">
           {(searching || wide) && <SkipLinks skips={skips} />}
           {/* Apart from the list, which goes inert as it is put away over the map, and stays put as it moves between the side
               bar and the sheet. There before a search starts, as a live region is heard only once it is there. */}
@@ -354,13 +354,14 @@ function SearchView({ params, onChange, wide }: ViewProps) {
           {(searching || wide) && (
             // Before a search it holds the toolbar alone, so it goes with it, leaving the shortlist the page. With a search it
             // holds the toolbar, the list and the map, in the order the keyboard takes them: the map in the second column with
-            // the toolbar drawn over it, and the side bar in the first, or on a phone the sheet over them both.
+            // the toolbar drawn over it, and the side bar in the first, or on a phone the sheet over them both. Paper, without
+            // the map, gives the list the page's width.
             <div
               ref={aside}
               hidden={!searching && shortlistOpen}
               className={cn(
                 "relative",
-                searching ? "grid min-w-0 flex-1 grid-cols-[auto_minmax(0,1fr)] grid-rows-[minmax(0,1fr)]" : "w-96 shrink-0 border-l",
+                searching ? "grid min-w-0 flex-1 grid-cols-[auto_minmax(0,1fr)] grid-rows-[minmax(0,1fr)] print:block" : "w-96 shrink-0 border-l",
               )}
             >
               {toolbar(searching ? "map" : "aside")}
@@ -482,7 +483,7 @@ function Toolbar({
         // Out of reach while it fades.
         inert={hidden}
         className={cn(
-          "flex flex-col items-start gap-2",
+          "flex flex-col items-start gap-2 print:hidden",
           placement !== "list" && "absolute inset-3 z-10",
           // Only the toolbar's own controls take the pointer; the map shows through the rest of it. It steps aside for the
           // side bar's toggle as the side bar slides, and in time with it. Coming and going in place, it fades.

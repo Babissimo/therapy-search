@@ -1,13 +1,14 @@
 import type { ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { AtSign, ExternalLink, Globe, Mail, Phone, type LucideIcon } from "lucide-react";
-import { ukcpProfileUrl } from "@shared/query";
+import { ukcpProfileAddress, ukcpProfileUrl } from "@shared/query";
 import type { Profile } from "@shared/types";
 import { ErrorLine } from "@/components/ErrorLine";
 import { SkeletonText } from "@/components/SkeletonText";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 import { NEW_TAB } from "@/lib/newTab";
+import { cn } from "@/lib/utils";
 
 /**
  * `title` gives the whole of a text that is shortened or may be cut off. A `verbatim` text, an address or a number, is
@@ -22,6 +23,8 @@ type Item = {
   external?: boolean;
   verbatim?: boolean;
   reaches?: boolean;
+  /** Where the link goes, which paper, unable to follow it, gives in place of a text that only names the site, or after its text. */
+  printed?: { text: string; after?: boolean };
 };
 
 type Props = {
@@ -49,15 +52,15 @@ export function ContactList({ profile, onReach }: Props) {
   if (email) items.push({ icon: Mail, kind: "Email", text: email, title: email, href: `mailto:${email}`, verbatim: true, reaches: true });
   if (website) items.push({ icon: Globe, kind: "Website", text: shortUrl(website), title: website, href: website, external: true, verbatim: true });
   for (const url of profile.social) {
-    if (url !== website) items.push({ icon: AtSign, text: socialName(url), title: url, href: url, external: true, verbatim: true });
+    if (url !== website) items.push({ icon: AtSign, text: socialName(url), title: url, href: url, external: true, verbatim: true, printed: { text: shortUrl(url) } });
   }
-  items.push({ icon: ExternalLink, text: "View on UKCP", href: ukcpProfileUrl(profile.slug), external: true });
+  items.push({ icon: ExternalLink, text: "View on UKCP", href: ukcpProfileUrl(profile.slug), external: true, printed: { text: ukcpProfileAddress(profile.slug), after: true } });
 
   return (
     <div className="space-y-1">
       <ContactRow>
         {items.map((item) => (
-          <li key={item.href} className="shrink-0 @lg:max-w-full @lg:min-w-0 @lg:shrink">
+          <li key={item.href} className="shrink-0 @lg:max-w-full @lg:min-w-0 @lg:shrink print:max-w-full print:min-w-0 print:shrink">
             <a
               href={item.href}
               title={item.title}
@@ -67,9 +70,18 @@ export function ContactList({ profile, onReach }: Props) {
               {...(item.external && { target: "_blank", rel: "noreferrer" })}
             >
               <item.icon aria-hidden className="size-4 shrink-0 text-muted-foreground" />
-              <span translate={item.verbatim ? "no" : undefined} className="truncate">
+              {/* Whole on paper, where nothing can show the rest. */}
+              <span
+                translate={item.verbatim ? "no" : undefined}
+                className={cn("truncate print:overflow-visible print:whitespace-normal print:wrap-anywhere", item.printed && !item.printed.after && "print:hidden")}
+              >
                 {item.text}
               </span>
+              {item.printed && (
+                <span translate="no" className={cn("hidden print:inline print:wrap-anywhere", item.printed.after && "text-muted-foreground")}>
+                  {item.printed.text}
+                </span>
+              )}
             </a>
           </li>
         ))}
@@ -113,25 +125,43 @@ export function ContactListSkeleton() {
 }
 
 /**
- * One row that scrolls sideways where the header is narrow, so the header stays short enough to keep in view. On a touch
- * screen it is padded for the links' targets, which its scrolling would otherwise clip, and drawn out by as much to keep
- * its place.
+ * One row that scrolls sideways where the header is narrow, so the header stays short enough to keep in view; paper wraps
+ * it. On a touch screen it is padded for the links' targets, which its scrolling would otherwise clip, and drawn out by as
+ * much to keep its place.
  */
 function ContactRow({ children }: { children: ReactNode }) {
   return (
-    <ul className="flex gap-x-4 gap-y-1 overflow-x-auto text-sm whitespace-nowrap [scrollbar-width:none] pointer-coarse:-my-3 pointer-coarse:gap-y-6 pointer-coarse:py-3 @lg:flex-wrap @lg:overflow-visible">
+    <ul
+      className={cn(
+        "flex gap-x-4 gap-y-1 overflow-x-auto text-sm whitespace-nowrap [scrollbar-width:none] pointer-coarse:-my-3 pointer-coarse:gap-y-6 pointer-coarse:py-3",
+        "@lg:flex-wrap @lg:overflow-visible print:flex-wrap print:overflow-visible print:whitespace-normal",
+      )}
+    >
       {children}
     </ul>
   );
 }
 
-/** A web address as a person would say it: its host without "www.", then the rest without a trailing slash. */
+/** A web address as a person would say it: its host without "www.", then the rest without a trailing slash or escapes. */
 function splitUrl(url: string): { host: string; rest: string } | undefined {
   try {
-    const { hostname, pathname, search } = new URL(url);
-    return { host: hostname.replace(/^www\./, ""), rest: pathname.replace(/\/$/, "") + search };
+    const { hostname, pathname, search, hash } = new URL(url);
+    return { host: hostname.replace(/^www\./, ""), rest: unescaped(pathname.replace(/\/$/, "") + search + hash) };
   } catch {
     return undefined;
+  }
+}
+
+/**
+ * `text` with its %-escapes read back into letters, or as it is where they make anything else: a space, a % or a character
+ * that doesn't show or turns the text around, none of which would type back to the same address.
+ */
+function unescaped(text: string): string {
+  try {
+    const read = decodeURI(text);
+    return /[\p{C}\p{Z}%]/u.test(read) ? text : read;
+  } catch {
+    return text;
   }
 }
 

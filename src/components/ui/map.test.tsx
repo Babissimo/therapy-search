@@ -216,11 +216,19 @@ describe("Map", () => {
         disconnect() {}
       },
     );
+    const size = { width: 400, height: 400 };
+    sizeElements(size);
     const map = createRef<L.Map>();
     render(<Map ref={map} center={[51.5, -0.1]} zoom={10} style={{ height: 400, width: 400 }} />);
     const invalidate = vi.spyOn(map.current!, "invalidateSize");
     resized();
-    expect(invalidate).toHaveBeenCalled();
+    expect(invalidate).toHaveBeenCalledOnce();
+    // Hidden, as on paper, it keeps the size it had, which a search's pins arriving meanwhile are framed in.
+    size.width = 0;
+    size.height = 0;
+    resized();
+    expect(invalidate).toHaveBeenCalledOnce();
+    expect(map.current!.getSize()).toEqual(L.point(400, 400));
   });
 
   it("zooms, pans, fades and splits clusters without gliding for a visitor who asks for less motion", () => {

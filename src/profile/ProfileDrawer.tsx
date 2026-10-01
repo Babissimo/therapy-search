@@ -38,11 +38,13 @@ export function ProfileDrawer({ slug, open }: { slug: string; open: boolean }) {
           event.preventDefault();
           if (opener instanceof HTMLElement) opener.focus();
         }}
+        // Printed, the profile is the whole of what comes out, at its full length (see index.css).
+        data-print-alone
         className="overflow-y-auto data-[side=right]:w-full data-[side=right]:sm:max-w-2xl"
       >
         {/* Names the drawer without heading it a second time, as the profile's name heads it once the profile is in. */}
         <SheetTitle hidden>{name ?? "Therapist profile"}</SheetTitle>
-        <div className="px-6 pb-8">
+        <div className="px-6 pb-8 print:pb-0">
           <ProfileBody slug={slug} close={close} />
         </div>
       </SheetContent>

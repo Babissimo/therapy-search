@@ -83,6 +83,12 @@ describe("AppRoutes", () => {
     await waitFor(() => expect(document.activeElement).toBe(card));
   });
 
+  it("marks the drawer to print alone, in place of the search beneath it", async () => {
+    renderAt("/?Location=Leeds");
+    fireEvent.click(await screen.findByRole("link", { name: "Jo Bloggs" }));
+    expect((await screen.findByRole("dialog", { name: "Jo Bloggs" })).hasAttribute("data-print-alone")).toBe(true);
+  });
+
   it("names the drawer, and the page while it is open, after the therapist", async () => {
     let answer = (_: Profile) => {};
     vi.mocked(api.profile).mockImplementation(() => new Promise((resolve) => (answer = resolve)));

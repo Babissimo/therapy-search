@@ -15,7 +15,8 @@ function setSystemDark(dark: boolean) {
 beforeEach(() => {
   vi.stubGlobal("matchMedia", (query: string) => ({
     get matches() {
-      return query === "(prefers-reduced-motion: reduce)" ? reducedMotion : systemDark;
+      if (query === "(prefers-reduced-motion: reduce)") return reducedMotion;
+      return query === "(prefers-color-scheme: dark)" && systemDark;
     },
     addEventListener: (_: string, l: () => void) => listeners.add(l),
     removeEventListener: (_: string, l: () => void) => listeners.delete(l),

@@ -12,6 +12,7 @@ import { createShortlistStore, type ShortlistStore } from "@/shortlist/store";
 import { ShortlistContext } from "@/shortlist/useShortlist";
 import { LoadMore } from "./LoadMore";
 import type { Pin } from "./map/pins";
+import { onlineSearch } from "./online";
 import { Results } from "./Results";
 import { ResultsStatus } from "./ResultsStatus";
 import { withFlag, withHelpWithTerms, withText } from "./state";
@@ -47,26 +48,29 @@ function answerBatches({ total = 30, size = 12, fail }: { total?: number; size?:
 /** The pins and whether they are still being placed, as the search page would pass them. */
 type Placing = { pins?: Pin[]; placing?: boolean };
 
-function Harness({ params, pins, placing }: { params: SearchParams } & Placing) {
+/** Online, with the search as the visitor set it where `params` adds to it, as the online view passes them. */
+type View = { online?: boolean; asked?: SearchParams };
+
+function Harness({ params, pins, placing, online, asked }: { params: SearchParams } & Placing & View) {
   const results = useResults(params);
   const listRef = useRef<HTMLUListElement>(null);
   return (
     <>
       <ResultsStatus params={params} results={results} />
-      <Results params={params} results={results} listRef={listRef} pins={pins} />
+      <Results params={params} results={results} listRef={listRef} pins={pins} online={online} asked={asked} />
       <LoadMore results={results} listRef={listRef} placing={placing} />
     </>
   );
 }
 
-function renderResults(params: SearchParams, shortlist: ShortlistStore = createShortlistStore(null)) {
+function renderResults(params: SearchParams, shortlist: ShortlistStore = createShortlistStore(null), shown: View = {}) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const ui = (next: SearchParams, placing: Placing = {}) => (
     <QueryClientProvider client={client}>
       <TooltipProvider>
         <ShortlistContext.Provider value={shortlist}>
           <MemoryRouter>
-            <Harness params={next} {...placing} />
+            <Harness params={next} {...placing} {...shown} />
           </MemoryRouter>
         </ShortlistContext.Provider>
       </TooltipProvider>
@@ -215,6 +219,25 @@ describe("Results", () => {
     expect(screen.getByText(/^Nearest first/).textContent).toBe(
       "Nearest first, measured from the centre of the place searched. Pins show the postcode or area each therapist lists.",
     );
+  });
+
+  it("names its filters on paper alone, which leaves off the chips that name them and the map its note's pins are on", async () => {
+    answerBatches();
+    renderResults(withText(withHelpWithTerms(leeds, ["Anxiety"]), "KeywordFilter", "grief"));
+    await screen.findByRole("heading", { name: "12 results within 0.1 miles" });
+    const display = (element: HTMLElement) => [...element.classList].filter((name) => /^(print:)?(hidden|block)$/.test(name));
+    expect(display(screen.getByText("Filters: Anxiety, Keyword: grief"))).toEqual(["hidden", "print:block"]);
+    expect(display(screen.getByText(/^Pins show/))).toEqual(["print:hidden"]);
+  });
+
+  it("says on paper that an online list is online, how many of the whole it holds, and the filters the visitor set, not those it adds", async () => {
+    answerBatches();
+    const asked = withHelpWithTerms(emptyParams(), ["Anxiety"]);
+    renderResults(onlineSearch(asked), undefined, { online: true, asked });
+    await screen.findByRole("heading", { name: "30 results" });
+    expect(screen.getByText(/^Working online/).textContent).toBe("Working online or by phone: the first 12 of 30.");
+    expect(screen.getByText(/^Working online/).classList.contains("print:block")).toBe(true);
+    expect(screen.getByText(/^Filters:/).textContent).toBe("Filters: Anxiety");
   });
 
   it("leaves out UKCP's notices about its own pages, keeping its others", async () => {

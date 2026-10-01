@@ -94,7 +94,7 @@ export function OnlineView({ params, onChange, wide }: Props) {
       results={
         searching ? (
           <>
-            <Results params={search} results={results} listRef={listRef} online />
+            <Results params={search} asked={params} results={results} listRef={listRef} online />
             {/* The list is the page here, so the button comes at its end rather than holding a strip beneath it. */}
             <LoadMore results={results} listRef={listRef} atEnd />
           </>
@@ -123,7 +123,7 @@ export function OnlineView({ params, onChange, wide }: Props) {
 
   return (
     <Tabs.Root value={tab} onValueChange={pickTab} asChild>
-      <div className="group/tabs flex min-h-0 flex-1">
+      <div className="group/tabs flex min-h-0 flex-1 print:block">
         {wide && <SkipLinks skips={[{ label: "Skip to the filters", onSkip: skipToFilters }]} />}
         {/* Apart from the results' panel, which is hidden while the shortlist's shows. There before a search starts, as a live
             region is heard only once it is there. */}
@@ -145,7 +145,7 @@ export function OnlineView({ params, onChange, wide }: Props) {
         {/* Right of the list, as Near me sets its toolbar and filters right of its results. Nothing in it acts on the
             shortlist, so it stands aside for it, hidden so what is open in it stays for the results. */}
         {wide && (
-          <div hidden={shortlistOpen} className="flex w-96 shrink-0 flex-col gap-2 border-l p-3">
+          <div hidden={shortlistOpen} className="flex w-96 shrink-0 flex-col gap-2 border-l p-3 print:hidden">
             {toolbar}
             {chips}
             <FiltersSection

@@ -2,6 +2,7 @@ import { Armchair, Banknote, MapPin, NotebookPen, Video, type LucideIcon } from 
 import type { ComponentProps, ReactNode } from "react";
 import { Link } from "react-router";
 import { classifyLocation } from "@shared/location";
+import { ukcpProfileAddress } from "@shared/query";
 import type { TherapistCard as Therapist } from "@shared/types";
 import { Portrait } from "@/components/Portrait";
 import { SkeletonText } from "@/components/SkeletonText";
@@ -73,6 +74,8 @@ export function TherapistCard({ therapist: t, sought, grouped = false, online = 
           {t.name}
         </Link>
       }
+      // Paper can't follow the link, so it gives UKCP's page for them, which outlasts this site's.
+      printed={ukcpProfileAddress(t.slug)}
       place={
         place && (
           <span className="flex gap-1.5">
@@ -101,7 +104,8 @@ export function TherapistCard({ therapist: t, sought, grouped = false, online = 
           <>
             <NotebookPen aria-hidden className="size-4 shrink-0 text-muted-foreground" />
             <span className="sr-only">Your notes: </span>
-            <span className="truncate">{noteLine}</span>
+            {/* Whole on paper, where nothing can show the rest. */}
+            <span className="truncate print:whitespace-normal">{noteLine}</span>
           </>
         )
       }
@@ -130,6 +134,8 @@ type LayoutProps = ComponentProps<typeof Card> & {
   /** Sized to the photo's place. */
   photo: ReactNode;
   name: ReactNode;
+  /** Under the name on paper alone. */
+  printed?: string;
   place?: ReactNode;
   meets?: ReactNode;
   fee?: ReactNode;
@@ -144,8 +150,8 @@ type LayoutProps = ComponentProps<typeof Card> & {
 };
 
 /** The card's layout, which the card and its skeleton share. */
-function CardLayout({ heading: Heading = "h2", photo, name, place, meets, fee, status, faded, action, track, note, summary, tags = [],
-  className, ...card }: LayoutProps) {
+function CardLayout({ heading: Heading = "h2", photo, name, printed, place, meets, fee, status, faded, action, track, note, summary,
+  tags = [], className, ...card }: LayoutProps) {
   return (
     // Isolated, so the parts raised over the card's link rise no further than the card, and a list's sticky bar stays above them.
     <Card className={cn("relative isolate", className)} {...card}>
@@ -153,7 +159,15 @@ function CardLayout({ heading: Heading = "h2", photo, name, place, meets, fee, s
         <div className="flex items-center gap-4">
           <div className={cn("size-24 shrink-0 transition-[opacity,filter]", faded && "opacity-60 grayscale")}>{photo}</div>
           <div className="min-w-0 flex-1 space-y-1.5">
-            <Heading className="font-heading text-lg leading-snug font-medium">{name}</Heading>
+            {/* Boxed with the name, as hidden on screen it would still count among space-y's children. */}
+            <div>
+              <Heading className="font-heading text-lg leading-snug font-medium">{name}</Heading>
+              {printed && (
+                <p translate="no" className="mt-1.5 hidden text-sm wrap-anywhere text-muted-foreground print:block">
+                  {printed}
+                </p>
+              )}
+            </div>
             {place && <p className="text-sm">{place}</p>}
             {meets && <p className="text-sm text-muted-foreground">{meets}</p>}
             {fee && <p className="text-sm text-muted-foreground">{fee}</p>}

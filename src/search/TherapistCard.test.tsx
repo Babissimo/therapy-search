@@ -61,6 +61,14 @@ describe("TherapistCard", () => {
     screen.getByText("Summary text.");
   });
 
+  it("gives UKCP's page for the therapist under their name on paper alone, as paper can't follow the link", () => {
+    renderCard(therapist());
+    const printed = screen.getByText("psychotherapy.org.uk/therapist/Test-Therapist-1-TESTID01");
+    expect([...printed.classList].filter((name) => /^(print:)?(hidden|block)$/.test(name))).toEqual(["hidden", "print:block"]);
+    expect(printed.getAttribute("translate")).toBe("no");
+    expect(printed.previousElementSibling?.textContent).toBe("Test Therapist 1");
+  });
+
   it("gives the fee of the office it names on a line of its own, and none it hasn't", () => {
     renderCard(therapist(), [], { fee: "From £60" });
     expect(screen.getByText("From £60").closest("p")?.textContent).toBe("Fees: From £60");
@@ -97,10 +105,11 @@ describe("TherapistCard", () => {
     expect(portrait()?.className).not.toMatch(/\bopacity-60\b/);
   });
 
-  it("gives the first line written of the visitor's note under the track, cut to the card's width", () => {
+  it("gives the first line written of the visitor's note under the track, cut to the card's width on screen alone", () => {
     renderCard(therapist(), [], { track: <div>Track</div>, note: "\n  Rang on Tuesday\nCall back Friday" });
     const text = screen.getByText("Rang on Tuesday");
     expect(text.className).toMatch(/\btruncate\b/);
+    expect(text.className).toMatch(/\bprint:whitespace-normal\b/);
     const line = text.closest("p")!;
     expect(line.textContent).toBe("Your notes: Rang on Tuesday");
     expect(line.querySelector("svg")).not.toBeNull();
