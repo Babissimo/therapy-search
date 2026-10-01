@@ -1,5 +1,5 @@
 import { SlidersHorizontal, X } from "lucide-react";
-import { useState, useSyncExternalStore, type ComponentProps, type ReactNode } from "react";
+import { useState, useSyncExternalStore, type ComponentProps, type ReactNode, type Ref } from "react";
 import type { SearchParams } from "@shared/query";
 import type { FilterGroup } from "@shared/types";
 import { IconButton } from "@/components/IconButton";
@@ -44,10 +44,10 @@ export function FiltersSection({
   );
 }
 
-export function MobileFilters(panel: PanelProps) {
+export function MobileFilters({ buttonRef, ...panel }: PanelProps & { buttonRef?: Ref<HTMLButtonElement> }) {
   return (
     <FiltersSheet phone {...panel}>
-      <FiltersSheetButton ticked={tickedFilters(useDraftFilters(panel.drafts))} />
+      <FiltersSheetButton ref={buttonRef} ticked={tickedFilters(useDraftFilters(panel.drafts))} />
     </FiltersSheet>
   );
 }
@@ -90,10 +90,10 @@ export function FiltersSheet({ phone, children, ...panel }: PanelProps & { phone
 }
 
 /** Opens the FiltersSheet it is within. */
-export function FiltersSheetButton({ ticked }: { ticked: number }) {
+export function FiltersSheetButton({ ticked, ref }: { ticked: number; ref?: Ref<HTMLButtonElement> }) {
   return (
     <SheetTrigger asChild>
-      <FiltersButton ticked={ticked} />
+      <FiltersButton ref={ref} ticked={ticked} />
     </SheetTrigger>
   );
 }

@@ -494,6 +494,103 @@ describe("SearchPage", () => {
     expect(screen.queryByRole("region", { name: "Refine your search" })).toBeNull();
   });
 
+  it("hands the keyboard back to the Filters button as they close, by their button or by Escape", async () => {
+    screenIs(true);
+    renderAt(SEARCH);
+    await loaded();
+    const open = screen.getByRole("button", { name: "Filters" });
+    const filters = () => screen.queryByRole("region", { name: "Refine your search" });
+    fireEvent.click(open);
+    const close = screen.getByRole("button", { name: "Close filters" });
+    act(() => close.focus());
+    fireEvent.click(close);
+    expect(filters()).toBeNull();
+    expect(document.activeElement).toBe(open);
+    fireEvent.click(open);
+    const inside = within(filters()!).getAllByRole("button")[1]!;
+    act(() => inside.focus());
+    fireEvent.keyDown(inside, { key: "Escape" });
+    expect(filters()).toBeNull();
+    expect(document.activeElement).toBe(open);
+    // From the place box, which keeps the keyboard, as the filters never had it.
+    fireEvent.click(open);
+    const place = screen.getByRole("textbox", { name: "Location" });
+    act(() => place.focus());
+    fireEvent.keyDown(place, { key: "Escape" });
+    expect(filters()).toBeNull();
+    expect(document.activeElement).toBe(place);
+  });
+
+  it("leaves the filters open when Escape empties a search box within them, and closes them where it doesn't", async () => {
+    screenIs(true);
+    renderAt(SEARCH);
+    await loaded();
+    fireEvent.click(screen.getByRole("button", { name: "Filters" }));
+    const filters = () => screen.queryByRole("region", { name: "Refine your search" });
+    fireEvent.click(within(filters()!).getByRole("button", { name: "Languages" }));
+    const search = within(filters()!).getByRole("searchbox", { name: /^Search languages$/i });
+    fireEvent.change(search, { target: { value: "pol" } });
+    // As Chrome and Safari answer it.
+    fireEvent.keyDown(search, { key: "Escape" });
+    fireEvent.change(search, { target: { value: "" } });
+    await act(() => new Promise((resolve) => setTimeout(resolve)));
+    expect(filters()).not.toBeNull();
+    // As a browser that leaves the box filled does.
+    fireEvent.change(search, { target: { value: "pol" } });
+    fireEvent.keyDown(search, { key: "Escape" });
+    await waitFor(() => expect(filters()).toBeNull());
+  });
+
+  it("skips the keyboard past the list to the search box, and to the list when it is put away", async () => {
+    screenIs(true);
+    renderAt(SEARCH);
+    await loaded();
+    await screen.findByTestId("map");
+    fireEvent.click(screen.getByRole("link", { name: "Skip to the search box" }));
+    expect(document.activeElement).toBe(screen.getByRole("textbox", { name: "Location" }));
+    fireEvent.click(screen.getByRole("button", { name: "Hide list" }));
+    expect(list().closest("[inert]")).not.toBeNull();
+    fireEvent.click(screen.getByRole("link", { name: "Skip to the results" }));
+    expect(list().closest("[inert]")).toBeNull();
+    await waitFor(() => expect(document.activeElement).toBe(within(results()).getByRole("tabpanel", { name: /^Results/ })));
+  });
+
+  it("brings the results' tab forward as it skips to them from the shortlist's", async () => {
+    screenIs(true);
+    renderAt(SEARCH);
+    await loaded();
+    fireEvent.mouseDown(screen.getByRole("tab", { name: /^Shortlist/ }));
+    expect(within(results()).getByRole("tabpanel", { name: /^Shortlist/ })).toBeTruthy();
+    fireEvent.click(screen.getByRole("link", { name: "Skip to the results" }));
+    await waitFor(() => expect(document.activeElement).toBe(within(results()).getByRole("tabpanel", { name: /^Results/ })));
+  });
+
+  it("brings the search box back from beside the shortlist as it skips to it", async () => {
+    screenIs(true);
+    renderAt(SEARCH);
+    await loaded();
+    fireEvent.mouseDown(screen.getByRole("tab", { name: /^Shortlist/ }));
+    expect(screen.queryByRole("textbox", { name: "Location" })).toBeNull();
+    fireEvent.click(screen.getByRole("link", { name: "Skip to the search box" }));
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("textbox", { name: "Location" })));
+    expect(within(results()).getByRole("tabpanel", { name: /^Results/ })).toBeTruthy();
+  });
+
+  it("skips past the prompt to the filters right of it on wide screens, bringing them back from beside the shortlist", async () => {
+    screenIs(true);
+    renderAt("/");
+    const filters = () => screen.getByRole("region", { name: "Refine your search" });
+    const first = () => within(filters()).getByRole("button", { name: /^Type of session/i });
+    const skip = screen.getByRole("link", { name: "Skip to the filters" });
+    fireEvent.click(skip);
+    expect(document.activeElement).toBe(first());
+    fireEvent.mouseDown(screen.getByRole("tab", { name: /^Shortlist/ }));
+    expect(screen.queryByRole("region", { name: "Refine your search" })).toBeNull();
+    fireEvent.click(skip);
+    await waitFor(() => expect(document.activeElement).toBe(first()));
+    expect(within(results()).getByRole("tabpanel", { name: /^Results/ })).toBeTruthy();
+  });
+
   it("keeps the filters open right of the prompt on wide screens, as they are set, until a search for a place puts them away", async () => {
     screenIs(true);
     renderAt("/");
@@ -1502,6 +1599,36 @@ describe("SearchPage online", () => {
     expect(api.search).toHaveBeenCalledOnce();
   });
 
+  it.each([
+    { screen: "wide", wide: true },
+    { screen: "narrow", wide: false },
+  ])("hands the keyboard to the first group of filters as the last chip goes, and the search with it, on $screen screens", async ({ wide }) => {
+    screenIs(wide);
+    renderAt(GREEK);
+    await loaded();
+    const chip = screen.getByRole("button", { name: "Remove Greek" });
+    chip.focus();
+    fireEvent.click(chip);
+    expect(prompt()).toBeTruthy();
+    // Right of the list, or on a phone beneath the prompt, where the filters go back to as the search ends.
+    const holder = wide ? filters() : screen.getByRole("tabpanel", { name: "Results" });
+    expect(document.activeElement).toBe(holder.querySelector('[data-slot="accordion-trigger"]'));
+  });
+
+  it("hands the keyboard to the filters beneath the prompt as a phone's filters sheet ends the search", async () => {
+    screenIs(false);
+    renderAt(GREEK);
+    await loaded();
+    fireEvent.click(screen.getByRole("button", { name: /^Filters/ }));
+    const sheet = await screen.findByRole("dialog", { name: "Refine your search" });
+    // Open already, as it holds a tick.
+    fireEvent.click(within(sheet).getByRole("checkbox", { name: "Greek" }));
+    fireEvent.click(within(sheet).getByRole("button", { name: "Show results" }));
+    expect(prompt()).toBeTruthy();
+    const panel = screen.getByRole("tabpanel", { name: "Results" });
+    expect(document.activeElement).toBe(panel.querySelector('[data-slot="accordion-trigger"]'));
+  });
+
   it("goes back to its prompt, asking UKCP nothing, when the last filter that narrows its search is unticked and the results updated", async () => {
     screenIs(true);
     renderAt(GREEK);
@@ -1663,9 +1790,24 @@ describe("SearchPage online", () => {
     fireEvent.click(within(panel).getByRole("button", { name: /^Languages/ }));
     fireEvent.click(within(panel).getByRole("checkbox", { name: "Greek" }));
     expect(url().toString()).toBe("");
+    act(() => show.focus());
     fireEvent.click(show);
     expect(url().toString()).toBe("TypesOfSession=Telephone+Therapy&Languages=Greek");
+    // Show results gives way to the results, handing the keyboard to their tab.
+    expect(document.activeElement).toBe(screen.getByRole("tab", { name: "Results" }));
     await loaded();
+  });
+
+  it("leaves focus be on wide screens as a search begins, Show results staying where it is", async () => {
+    screenIs(true);
+    renderAt(ONLINE);
+    fireEvent.click(within(filters()).getByRole("button", { name: /^Languages/ }));
+    fireEvent.click(within(filters()).getByRole("checkbox", { name: "Greek" }));
+    // As Safari leaves a clicked button unfocused.
+    act(() => (document.activeElement as HTMLElement).blur());
+    fireEvent.click(within(filters()).getByRole("button", { name: "Show results" }));
+    await loaded();
+    expect(document.activeElement).toBe(document.body);
   });
 
   it.each([
@@ -1751,6 +1893,23 @@ describe("SearchPage online", () => {
     pick(/^Results/);
     expect(screen.getByRole("link", { name: "Near me" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Remove Greek" })).toBeTruthy();
+  });
+
+  it("skips past the list to the filters on wide screens, bringing them back from beside the shortlist", async () => {
+    screenIs(true);
+    renderAt(GREEK);
+    await loaded();
+    const skip = screen.getByRole("link", { name: "Skip to the filters" });
+    const first = () => within(filters()).getByRole("button", { name: /^Type of session/i });
+    fireEvent.click(skip);
+    expect(document.activeElement).toBe(first());
+    const tab = screen.getByRole("tab", { name: /^Shortlist/ });
+    fireEvent.mouseDown(tab);
+    fireEvent.click(tab);
+    expect(screen.queryByRole("region", { name: "Refine your search" })).toBeNull();
+    fireEvent.click(skip);
+    await waitFor(() => expect(document.activeElement).toBe(first()));
+    expect(screen.getByRole("tabpanel", { name: "Results" })).toBeTruthy();
   });
 
   it("keeps the shortlist's scroll to itself beside the prompt", () => {

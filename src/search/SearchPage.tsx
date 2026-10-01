@@ -9,6 +9,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
 import { Masthead } from "@/layout/Masthead";
+import { focusOnceShown, SkipLinks, type Skip } from "@/layout/SkipLinks";
 import { useMediaQuery } from "@/lib/useMediaQuery";
 import { cn } from "@/lib/utils";
 import { LazyShortlistTab } from "@/shortlist/LazyShortlistTab";
@@ -35,7 +36,7 @@ import { Results } from "./Results";
 import { ResultsPanel } from "./ResultsPanel";
 import { ResultsStatus } from "./ResultsStatus";
 import { coverOf, ResultsSheet, type SheetPosition } from "./ResultsSheet";
-import { SearchBox } from "./SearchBox";
+import { SEARCH_BOX_ID, SearchBox } from "./SearchBox";
 import { placed, tickedFilters } from "./state";
 import { useResults } from "./useResults";
 import { useDraftFilters, useSearchDrafts, type SearchDrafts } from "./useSearchDrafts";
@@ -188,6 +189,40 @@ function SearchView({ params, onChange, wide }: ViewProps) {
     else pick();
   }
 
+  const aside = useRef<HTMLDivElement>(null);
+  // Past the list and the map's pins to the search box, which comes after them; and to the list, put away or not. Before a
+  // search on wide screens, past the prompt to the filters right of it, as online's start offers. Each brings the results'
+  // tab forward, as the toolbar stands aside for the shortlist's.
+  const skips: Skip[] = searching
+    ? [
+        {
+          label: "Skip to the search box",
+          onSkip: () => {
+            if (tab !== "results") pickTab("results");
+            focusOnceShown(() => document.getElementById(SEARCH_BOX_ID));
+          },
+        },
+        {
+          label: "Skip to the results",
+          onSkip: () => {
+            if (tab !== "results") pickTab("results");
+            if (wide) setPanelOpen(true);
+            else if (sheet === "peek") setSheet("half");
+            // The results' panel, which ListPanels draws first.
+            focusOnceShown(() => scroll.ref.current?.querySelector<HTMLElement>('[role="tabpanel"]'));
+          },
+        },
+      ]
+    : [
+        {
+          label: "Skip to the filters",
+          onSkip: () => {
+            if (tab !== "results") pickTab("results");
+            focusOnceShown(() => aside.current?.querySelector<HTMLElement>('[data-slot="accordion-trigger"]'));
+          },
+        },
+      ];
+
   const selectedKey = selected?.key;
   // After the render that opens the panel or raises the sheet, so the list is there to scroll. The entry is the open
   // tab's, as the results keep theirs, hidden, while the shortlist shows.
@@ -293,6 +328,7 @@ function SearchView({ params, onChange, wide }: ViewProps) {
       {/* The tabs' root spans the page, around wherever their list and panels sit. */}
       <Tabs.Root value={tab} onValueChange={pickTab} asChild>
         <div className="group/tabs flex min-h-0 flex-1">
+          {(searching || wide) && <SkipLinks skips={skips} />}
           {/* Apart from the list, which goes inert as it is put away over the map, and stays put as it moves between the side
               bar and the sheet. There before a search starts, as a live region is heard only once it is there. */}
           <ResultsStatus params={params} results={results} searching={searching} />
@@ -318,7 +354,11 @@ function SearchView({ params, onChange, wide }: ViewProps) {
           )}
           {(searching || wide) && (
             // Before a search it holds the toolbar alone, so it goes with it, leaving the shortlist the page.
-            <div hidden={!searching && shortlistOpen} className={cn("relative", searching ? "min-w-0 flex-1" : "w-96 shrink-0 border-l")}>
+            <div
+              ref={aside}
+              hidden={!searching && shortlistOpen}
+              className={cn("relative", searching ? "min-w-0 flex-1" : "w-96 shrink-0 border-l")}
+            >
               {searching && (
                 <MapSlot>
                   <MapPane
@@ -402,12 +442,15 @@ function Toolbar({
 }) {
   const filtersId = useId();
   const ticked = tickedFilters(useDraftFilters(drafts));
-  // Put away, the filters over the map search what was ticked in them.
+  const overMap = placement === "map";
+  const filtersButton = useRef<HTMLButtonElement>(null);
+  // Put away, the filters over the map search what was ticked in them, and take the keyboard with them when it is in them,
+  // so it goes back to the button that opens them.
   const closeFilters = () => {
+    if (document.getElementById(filtersId)?.contains(document.activeElement)) filtersButton.current?.focus();
     if (drafts.pending()) drafts.apply();
     onFiltersOpenChange(false);
   };
-  const overMap = placement === "map";
   // Fades in only on coming back, rather than as it first appears with the map.
   const [faded, setFaded] = useState(hidden);
   if (hidden && !faded) setFaded(true);
@@ -430,6 +473,18 @@ function Toolbar({
           overMap && "lg:right-auto lg:w-[calc(24rem-1.5rem-1px)]",
           besideToggle && "left-14",
         )}
+        // Escape anywhere in the toolbar puts away the filters open over the map, unless it has just closed something open
+        // within it, such as help, or cleared a search box, which says nothing of it.
+        onKeyDown={(event) => {
+          if (!(wide && overMap && filtersOpen) || event.key !== "Escape" || event.defaultPrevented) return;
+          const box = event.target;
+          if (box instanceof HTMLInputElement && box.type === "search" && box.value !== "") {
+            // Chrome and Safari empty the box as Escape's own work, after this; a browser that leaves it filled closes them.
+            setTimeout(() => box.value !== "" && closeFilters());
+            return;
+          }
+          closeFilters();
+        }}
       >
         <Morph name="toolbar">
           <div className={cn("pointer-events-auto flex w-full flex-col gap-2 rounded-xl border bg-background p-2", overMap && "shadow-md")}>
@@ -449,13 +504,14 @@ function Toolbar({
                 </Morph>
                 {wide ? (
                   <FiltersButton
+                    ref={filtersButton}
                     ticked={ticked}
                     aria-expanded={filtersOpen}
                     aria-controls={filtersOpen ? filtersId : undefined}
                     onClick={() => (filtersOpen ? closeFilters() : onFiltersOpenChange(true))}
                   />
                 ) : (
-                  <FiltersSheetButton ticked={ticked} />
+                  <FiltersSheetButton ref={filtersButton} ticked={ticked} />
                 )}
               </div>
             )}
@@ -464,6 +520,8 @@ function Toolbar({
         <FilterChips
           params={params}
           onRemove={drafts.applyWithout}
+          // The button opening the filters, or where there is none, the place box.
+          onEmptied={() => (filtersButton.current ?? document.getElementById(SEARCH_BOX_ID))?.focus()}
           // Only as wide as its chips, up to the toolbar's width, so it covers no more of the map than they do.
           className={cn("pointer-events-auto", !wide && "max-w-full flex-nowrap overflow-x-auto [&>li]:shrink-0")}
         />
