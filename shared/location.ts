@@ -78,9 +78,6 @@ export function settlementRank(type: string | undefined): number {
 /** The postcode nearest the visitor, for a search from where they are. */
 export type NearestLookup = { found: true; postcode: string } | { found: false };
 
-/** The postcode of a therapist's office in the district their card gives, where their profile has one. */
-export type OfficePostcode = { found: true; postcode: string } | { found: false };
-
 /** The one query string for a nearest-postcode lookup, rounded to about 100 metres: near enough to place a postcode, not to pinpoint a home. */
 export function nearestQuery(lat: number, lng: number): string {
   // Math.round turns a small negative into -0, which prints without its sign, so each point has one spelling.

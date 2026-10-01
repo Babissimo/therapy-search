@@ -2,7 +2,8 @@ import { parseContact } from "@shared/ukcp/parseContact";
 import { parseProfile } from "@shared/ukcp/parseProfile";
 import { parseListings, type Listings } from "@shared/ukcp/parseResults";
 import { ParseError } from "@shared/ukcp/text";
-import { nearestQuery, placeQuery, type NearestLookup, type OfficePostcode, type PlaceLookup, type PlaceOptions } from "@shared/location";
+import { nearestQuery, placeQuery, type NearestLookup, type PlaceLookup, type PlaceOptions } from "@shared/location";
+import type { OfficeDetails } from "@shared/office";
 import { limitConcurrency } from "./limit";
 
 export const UNREADABLE = "UKCP's pages have changed, so this site can't read them yet. Search on UKCP directly.";
@@ -69,6 +70,6 @@ export const api = {
   contact: (id: string) => request("/api/contact", parseContact, post({ id })),
   place: (text: string, options: PlaceOptions = {}) => json<PlaceLookup>("/api/place", post(placeQuery(text, options))),
   nearest: (lat: number, lng: number) => json<NearestLookup>("/api/nearest", post(nearestQuery(lat, lng))),
-  office: (slug: string, outcode: string, signal?: AbortSignal) =>
-    officeTurns(() => json<OfficePostcode>("/api/office", { ...post({ slug, outcode }), signal }), signal),
+  office: (slug: string, location: string, signal?: AbortSignal) =>
+    officeTurns(() => json<OfficeDetails>("/api/office", { ...post({ slug, location }), signal }), signal),
 };

@@ -3,18 +3,16 @@ import { bodyLimit } from "hono/body-limit";
 import {
   LOCATION_MAX_LENGTH,
   canonicalLocation,
-  classifyLocation,
   nearestQuery,
   placeQuery,
   type NearestLookup,
-  type OfficePostcode,
   type PlaceLookup,
   type PlaceOptions,
 } from "../shared/location";
 import { ALLOWED } from "../shared/options";
 import { InvalidParam, asksWhole, readParams, toQuery } from "../shared/query";
 import { UpstreamError, type SessionStore, type UkcpClient } from "./ukcp/client";
-import { officePostcode } from "./ukcp/offices";
+import { officeDetails } from "./ukcp/offices";
 
 export type RateLimit = { limit(options: { key: string }): Promise<{ success: boolean }> };
 export type Assets = { fetch(url: string): Promise<Response> };
@@ -45,8 +43,9 @@ const PROFILE_MAX_AGE = 60 * 60;
 // Places don't move; a miss is kept shorter in case the geocoders learn it.
 const PLACE_FOUND_MAX_AGE = 30 * 24 * 60 * 60;
 const PLACE_MISSING_MAX_AGE = 24 * 60 * 60;
-// Offices rarely move, and the card asking, kept far less long, still decides who is listed and in which district. No
-// postcode is kept for less, in case the therapist adds one or UKCP served the page without its offices.
+// Offices rarely move and fees rarely change, and the card asking, kept far less long, still decides who is listed and at
+// which office. An office giving neither is kept for less, in case the therapist adds them or UKCP served the page
+// without its offices.
 const OFFICE_FOUND_MAX_AGE = 30 * 24 * 60 * 60;
 const OFFICE_MISSING_MAX_AGE = 7 * 24 * 60 * 60;
 /** The date of the last change to what an office lookup answers, which retires its cached answers as LOOKUP_VERSION does places'. */
@@ -117,10 +116,11 @@ export function createGateway(cachedFor: (c: Ctx) => Cached) {
     const form = await formOf(c);
     const slug = form.get("slug") ?? "";
     if (!SLUG.test(slug)) return c.json({ error: "That isn't a UKCP profile address." }, 400);
-    // Read as a card's location is, so the district asked for is the one the browser took from the card.
-    const district = classifyLocation(form.get("outcode") ?? "");
-    if (district.kind !== "outcode" || district.rest !== "") throw new InvalidParam("outcode", "outcode must be a UK postcode district");
-    return forward(c, `/api/office/${encodeURIComponent(slug)}?${new URLSearchParams({ outcode: district.outcode, v: OFFICE_VERSION })}`);
+    const location = canonicalLocation(form.get("location") ?? "");
+    if (location.length === 0 || location.length > LOCATION_MAX_LENGTH) {
+      throw new InvalidParam("location", `location must be 1 to ${LOCATION_MAX_LENGTH} characters`);
+    }
+    return forward(c, `/api/office/${encodeURIComponent(slug)}?${new URLSearchParams({ location, v: OFFICE_VERSION })}`);
   });
 
   // Only a page loaded from an older deploy asks by URL; reloading brings one that doesn't.
@@ -218,9 +218,9 @@ export function createCache(clientFor: (env: Env) => UkcpClient, placesFor: (env
     if (!(await allow(c, c.env.OFFICE_LIMIT))) return c.json({ error: TOO_MANY }, 429);
     const html = await clientFor(c.env).profile(c.req.param("slug"));
     if (html === null) return c.json({ error: NO_PROFILE }, 404);
-    const postcode = officePostcode(expectPage(html, "therapist-header"), new URL(c.req.url).searchParams.get("outcode") ?? "");
-    const answer: OfficePostcode = postcode === undefined ? { found: false } : { found: true, postcode };
-    return c.json(answer, 200, { "Cache-Control": `public, max-age=${answer.found ? OFFICE_FOUND_MAX_AGE : OFFICE_MISSING_MAX_AGE}` });
+    const answer = officeDetails(expectPage(html, "therapist-header"), new URL(c.req.url).searchParams.get("location") ?? "");
+    const found = answer.postcode !== undefined || answer.cost !== undefined;
+    return c.json(answer, 200, { "Cache-Control": `public, max-age=${found ? OFFICE_FOUND_MAX_AGE : OFFICE_MISSING_MAX_AGE}` });
   });
 
   app.notFound((c) => c.json({ error: "Not found" }, 404));

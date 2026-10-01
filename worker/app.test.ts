@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { LOOKUP_VERSION, type PlaceLookup } from "../shared/location";
+import { LOCATION_MAX_LENGTH, LOOKUP_VERSION, type PlaceLookup } from "../shared/location";
 import {
   createCache,
   createGateway,
@@ -228,27 +228,39 @@ describe("POST /api/contact", () => {
 
 describe("POST /api/office", () => {
   const PROFILE = `<div class="therapist-header"><h1>Jo Bloggs</h1></div>
-<div class="profile-locations"><section><h3>Hove</h3><address>2 Church Road<br>Hove BN3 2FL</address></section></div>`;
-  const office = `/api/office/Jo-Bloggs-ABCDEFGH?outcode=BN3&v=${OFFICE_VERSION}`;
+<div class="profile-locations"><section><h3>Hove</h3><address>2 Church Road<br>Hove BN3 2FL</address><h4>Cost:</h4><span>£70</span></section></div>
+<div class="profile-locations"><section><h3>Brighton</h3><address>Brighton BN1</address><h4>Cost:</h4><span>£60</span></section></div>
+<div class="profile-locations"><section><h3>Lewes</h3><address>Lewes BN7</address></section></div>`;
+  const office = `/api/office/Jo-Bloggs-ABCDEFGH?location=HOVE+BN3&v=${OFFICE_VERSION}`;
+  const officeIn = (location: string) => `/api/office/Jo-Bloggs-ABCDEFGH?${new URLSearchParams({ location, v: OFFICE_VERSION })}`;
 
-  it("asks the cache by slug, district and version, and answers the office's postcode, which the edge may keep for 30 days", async () => {
+  it("asks the cache by slug, card location and version, and answers the office's postcode and fee, which the edge may keep for 30 days", async () => {
     const { post, cached, asked, stub } = setup({ client: { profile: vi.fn(async () => PROFILE) } });
-    const res = await post("/api/office", "slug=Jo-Bloggs-ABCDEFGH&outcode=bn3");
-    expect([res.status, await res.json()]).toEqual([200, { found: true, postcode: "BN3 2FL" }]);
+    const res = await post("/api/office", "slug=Jo-Bloggs-ABCDEFGH&location=hove++bn3+");
+    expect([res.status, await res.json()]).toEqual([200, { postcode: "BN3 2FL", cost: "£70" }]);
     expect(asked()).toEqual([office]);
     expect(stub.profile).toHaveBeenCalledWith("Jo-Bloggs-ABCDEFGH");
     expect((await cached(office)).headers.get("Cache-Control")).toBe("public, max-age=2592000");
   });
 
-  it("answers no postcode, kept for a week, when the profile gives none in the district", async () => {
+  it("keeps a fee without a postcode for 30 days too", async () => {
     const { cached } = setup({ client: { profile: vi.fn(async () => PROFILE) } });
-    const res = await cached(`/api/office/Jo-Bloggs-ABCDEFGH?outcode=BN1&v=${OFFICE_VERSION}`);
-    expect([res.status, await res.json(), res.headers.get("Cache-Control")]).toEqual([200, { found: false }, "public, max-age=604800"]);
+    const res = await cached(officeIn("BRIGHTON BN1"));
+    expect([res.status, await res.json(), res.headers.get("Cache-Control")]).toEqual([200, { cost: "£60" }, "public, max-age=2592000"]);
   });
 
-  it("rejects a slug or district it can't use without asking the cache", async () => {
+  it("answers nothing, kept for a week, when the office gives neither or no office is the card's", async () => {
+    const { cached } = setup({ client: { profile: vi.fn(async () => PROFILE) } });
+    for (const location of ["LEWES BN7", "LONDON E8"]) {
+      const res = await cached(officeIn(location));
+      expect([res.status, await res.json(), res.headers.get("Cache-Control")]).toEqual([200, {}, "public, max-age=604800"]);
+    }
+  });
+
+  it("rejects a slug or location it can't use without asking the cache", async () => {
     const { post, forwarded } = setup();
-    for (const body of ["slug=../../admin&outcode=BN3", "slug=Jo-Bloggs-ABCDEFGH&outcode=BN3 2FL", "slug=Jo-Bloggs-ABCDEFGH&outcode=BRIGHTON", "slug=Jo-Bloggs-ABCDEFGH"]) {
+    const long = "B".repeat(LOCATION_MAX_LENGTH + 1);
+    for (const body of ["slug=../../admin&location=BN3", "slug=Jo-Bloggs-ABCDEFGH&location=+", `slug=Jo-Bloggs-ABCDEFGH&location=${long}`, "slug=Jo-Bloggs-ABCDEFGH"]) {
       expect((await post("/api/office", body)).status).toBe(400);
     }
     expect(forwarded).not.toHaveBeenCalled();
@@ -256,7 +268,7 @@ describe("POST /api/office", () => {
 
   it("counts a miss against the office allowance alone, and refuses one past it", async () => {
     const { post, limit, officeLimit } = setup({ allowOffices: false, client: { profile: vi.fn(async () => PROFILE) } });
-    const res = await post("/api/office", "slug=Jo-Bloggs-ABCDEFGH&outcode=BN3");
+    const res = await post("/api/office", "slug=Jo-Bloggs-ABCDEFGH&location=Hove+BN3");
     expect([res.status, await res.json()]).toEqual([429, { error: TOO_MANY }]);
     expect(officeLimit).toHaveBeenCalledWith({ key: "203.0.113.9" });
     expect(limit).not.toHaveBeenCalled();
@@ -264,7 +276,7 @@ describe("POST /api/office", () => {
 
   it("returns 404, which the edge never keeps, when UKCP has no such profile", async () => {
     const { cached } = setup({ client: { profile: vi.fn(async () => null) } });
-    const res = await cached(`/api/office/Nobody-ZZZZZZZZ?outcode=BN3&v=${OFFICE_VERSION}`);
+    const res = await cached(`/api/office/Nobody-ZZZZZZZZ?location=HOVE+BN3&v=${OFFICE_VERSION}`);
     expect([res.status, res.headers.get("Cache-Control")]).toEqual([404, "no-store"]);
   });
 

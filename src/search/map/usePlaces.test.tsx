@@ -3,7 +3,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { OfficePostcode, PlaceLookup } from "@shared/location";
+import type { PlaceLookup } from "@shared/location";
+import type { OfficeDetails } from "@shared/office";
 import type { TherapistCard } from "@shared/types";
 import { api, ApiError } from "@/lib/api";
 import type { Pin } from "./pins";
@@ -105,40 +106,26 @@ describe("usePins", () => {
 
   it("pins a card at its district at once, and moves it to its office's postcode once that is placed", async () => {
     places({ "BRIGHTON BN1": at("outcode", DISTRICT), "BN1 1EL": at("postcode", OFFICE) });
-    let answer = (_: OfficePostcode) => {};
+    let answer = (_: OfficeDetails) => {};
     const office = vi.spyOn(api, "office").mockReturnValue(new Promise((resolve) => (answer = resolve)));
     const therapists = [card("jo", "Brighton BN1")];
     const { result } = renderHook(() => usePins(therapists, CENTRE, false), { wrapper: withClient() });
     await waitFor(() => expect(laidOut(result.current.pins)).toEqual([[DISTRICT, ["jo"]]]));
     // The office's postcode holds back no frame, only a keyboard waiting to move on.
     expect([result.current.placing, result.current.moving]).toEqual([false, true]);
-    expect(office).toHaveBeenCalledWith("jo", "BN1", expect.any(AbortSignal));
-    answer({ found: true, postcode: "BN1 1EL" });
+    expect(office).toHaveBeenCalledWith("jo", "BRIGHTON BN1", expect.any(AbortSignal));
+    answer({ postcode: "BN1 1EL", cost: "£70" });
     await waitFor(() => expect(laidOut(result.current.pins)).toEqual([[OFFICE, ["jo"]]]));
     expect(result.current.pins[0]).toMatchObject({ kind: "postcode", offices: { jo: "BN1 1EL" } });
     expect(result.current.moving).toBe(false);
   });
 
-  it("stops asking for an office's postcode once nothing shows its card", async () => {
-    places({ "BRIGHTON BN1": at("outcode", DISTRICT) });
-    let signal: AbortSignal | undefined;
-    vi.spyOn(api, "office").mockImplementation((_slug, _outcode, given) => {
-      signal = given;
-      return new Promise(() => {});
-    });
-    const therapists = [card("jo", "Brighton BN1")];
-    const { unmount } = renderHook(() => usePins(therapists, CENTRE, false), { wrapper: withClient() });
-    await waitFor(() => expect(signal).toBeDefined());
-    unmount();
-    await waitFor(() => expect(signal?.aborted).toBe(true));
-  });
-
   it("leaves a pin at its district when the profile gives no postcode there, or a lookup fails", async () => {
     const place = places({ "BRIGHTON BN1": at("outcode", DISTRICT), "BN1 9ZZ": new ApiError(502, "Couldn't look up that place just now.") });
     const office = vi.spyOn(api, "office").mockImplementation(async (slug) => {
-      if (slug === "none") return { found: false };
+      if (slug === "none") return { cost: "£70" };
       if (slug === "failed") throw new ApiError(502, "UKCP's search isn't responding.");
-      return { found: true, postcode: "BN1 9ZZ" };
+      return { postcode: "BN1 9ZZ" };
     });
     const therapists = ["none", "failed", "unplaceable"].map((slug) => card(slug, "Brighton BN1"));
     const { result } = renderHook(() => usePins(therapists, CENTRE, false), { wrapper: withClient() });
@@ -147,13 +134,31 @@ describe("usePins", () => {
     expect(laidOut(result.current.pins)).toEqual([[DISTRICT, ["none", "failed", "unplaceable"]]]);
   });
 
-  it("asks nothing of a card giving a full postcode, a town or nothing, nor of any in a search outside the UK", async () => {
-    places({ "BN3 2FL": at("postcode", OFFICE), BRIGHTON: at("outcode", DISTRICT), "BRIGHTON BN1": at("outcode", DISTRICT) });
+  it("leaves a pin at its district when the office's postcode lies in another", async () => {
+    const place = places({ "BRIGHTON BN1": at("outcode", DISTRICT), "BN3 2FL": at("postcode", OFFICE) });
+    const office = vi.spyOn(api, "office").mockResolvedValue({ postcode: "BN3 2FL" });
+    const { result } = renderHook(() => usePins([card("jo", "Brighton BN1")], CENTRE, false), { wrapper: withClient() });
+    await waitFor(() => expect(office).toHaveBeenCalled());
+    await waitFor(() => expect(result.current.moving).toBe(false));
+    expect(laidOut(result.current.pins)).toEqual([[DISTRICT, ["jo"]]]);
+    expect(place).not.toHaveBeenCalledWith("BN3 2FL", expect.anything());
+  });
+
+  it("moves only a card giving no more than a district, and waits on no other card's office", async () => {
+    const place = places({ "BN3 2FL": at("postcode", OFFICE), BRIGHTON: at("outcode", DISTRICT), "BN1 9ZZ": at("postcode", OFFICE) });
+    vi.spyOn(api, "office").mockImplementation(async (slug) => (slug === "b" ? { postcode: "BN1 9ZZ" } : new Promise(() => {})));
+    const therapists = [card("a", "BN3 2FL"), card("b", "Brighton")];
+    const { result } = renderHook(() => usePins(therapists, CENTRE, false), { wrapper: withClient() });
+    await waitFor(() => expect(laidOut(result.current.pins)).toEqual([[OFFICE, ["a"]], [DISTRICT, ["b"]]]));
+    expect([result.current.placing, result.current.moving]).toEqual([false, false]);
+    expect(place).not.toHaveBeenCalledWith("BN1 9ZZ", expect.anything());
+  });
+
+  it("asks nothing in a search outside the UK", async () => {
+    places({ "BRIGHTON BN1": at("outcode", DISTRICT) });
     const office = vi.spyOn(api, "office");
-    const wrapper = withClient();
-    const home = renderHook(() => usePins([card("a", "BN3 2FL"), card("b", "Brighton"), card("c")], CENTRE, false), { wrapper });
-    const abroad = renderHook(() => usePins([card("d", "Brighton BN1")], CENTRE, true), { wrapper });
-    await waitFor(() => expect([home.result.current.placing, abroad.result.current.placing]).toEqual([false, false]));
+    const { result } = renderHook(() => usePins([card("d", "Brighton BN1")], CENTRE, true), { wrapper: withClient() });
+    await waitFor(() => expect(result.current.placing).toBe(false));
     expect(office).not.toHaveBeenCalled();
   });
 });

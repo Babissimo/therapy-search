@@ -34,18 +34,18 @@ describe("api", () => {
     ]);
   });
 
-  it("asks for an office's postcode by body, four at most at a time", async () => {
+  it("asks about a card's office by body, four at most at a time", async () => {
     const pending: (() => void)[] = [];
     vi.stubGlobal(
       "fetch",
-      vi.fn(() => new Promise<Response>((resolve) => pending.push(() => resolve(new Response(JSON.stringify({ found: true, postcode: "BN3 2FL" })))))),
+      vi.fn(() => new Promise<Response>((resolve) => pending.push(() => resolve(new Response(JSON.stringify({ postcode: "BN3 2FL", cost: "£70" })))))),
     );
-    const answers = ["a", "b", "c", "d", "e"].map((slug) => api.office(`Jo-Bloggs-${slug}`, "BN3"));
+    const answers = ["a", "b", "c", "d", "e"].map((slug) => api.office(`Jo-Bloggs-${slug}`, "HOVE BN3"));
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(sent()).toHaveLength(4);
-    expect(sent()[0]).toEqual(["/api/office", "POST", "slug=Jo-Bloggs-a&outcode=BN3"]);
+    expect(sent()[0]).toEqual(["/api/office", "POST", "slug=Jo-Bloggs-a&location=HOVE+BN3"]);
     pending.shift()?.();
-    await expect(answers[0]).resolves.toEqual({ found: true, postcode: "BN3 2FL" });
+    await expect(answers[0]).resolves.toEqual({ postcode: "BN3 2FL", cost: "£70" });
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(sent()).toHaveLength(5);
     for (const answer of pending) answer();

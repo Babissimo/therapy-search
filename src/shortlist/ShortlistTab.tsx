@@ -16,8 +16,10 @@ import { Bookmark, ChevronRight, GripVertical } from "lucide-react";
 import { useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { IconButton } from "@/components/IconButton";
 import { cn } from "@/lib/utils";
+import { feeText } from "@/search/fee";
 import { pinsBySlug, type Pin } from "@/search/map/pins";
 import { TherapistCard } from "@/search/TherapistCard";
+import { useOffices } from "@/search/useOffices";
 import { CountBadge } from "./CountBadge";
 import { useClosedGroups } from "./groups";
 import { ShortlistButton } from "./ShortlistButton";
@@ -50,6 +52,8 @@ export function ShortlistTab({ sought, online = false, pins = [], unplaced = 0, 
   const shortlist = useShortlist();
   const shown = useShown(shortlist);
   const [closed, toggle] = useClosedGroups();
+  // A shortlist gathers therapists from any search, so their offices are asked about whatever this one is, while their cards show.
+  const { officeOf } = useOffices(shown.filter((entry) => !closed.has(statusOf(entry))).map((entry) => entry.card), true);
   // The group a drag began in, whose therapists alone it can be dropped among.
   const [dragging, setDragging] = useState<Status>();
   const [announcement, setAnnouncement] = useState("");
@@ -149,6 +153,7 @@ export function ShortlistTab({ sought, online = false, pins = [], unplaced = 0, 
                       listed={listed.has(card.slug)}
                       sought={sought}
                       online={online}
+                      fee={feeText(officeOf(card)?.cost)}
                       pinKey={pinKey}
                       marked={pinKey !== undefined && pinKey === selected?.key}
                       onHighlight={onHighlight}
@@ -207,6 +212,7 @@ type EntryProps = {
   listed: boolean;
   sought: ReadonlySet<string>;
   online: boolean;
+  fee?: string;
   pinKey?: string;
   /** At the pin selected on the map. */
   marked: boolean;
@@ -218,7 +224,7 @@ type EntryProps = {
 };
 
 /** A card with a handle to move it by; a therapist removed here can't be moved until they are added back. */
-function SortableEntry({ card, listed, sought, online, pinKey, marked, onHighlight, onChosen, onRemoved }: EntryProps) {
+function SortableEntry({ card, listed, sought, online, fee, pinKey, marked, onHighlight, onChosen, onRemoved }: EntryProps) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
     id: card.slug,
     disabled: { draggable: !listed },
@@ -261,6 +267,7 @@ function SortableEntry({ card, listed, sought, online, pinKey, marked, onHighlig
           sought={sought}
           online={online}
           heading="h3"
+          fee={fee}
           action={
             <>
               <StatusMenu therapist={card} onChosen={onChosen} onRemoved={onRemoved} />
