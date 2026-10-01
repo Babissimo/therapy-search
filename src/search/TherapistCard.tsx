@@ -31,10 +31,13 @@ type Props = {
   fee?: string;
   /** Where the visitor stands with a shortlisted therapist; "To contact" goes unsaid, the filled bookmark saying as much. */
   status?: Status;
+  /** Fades the portrait as "Set aside" does, for a therapist taken off the shortlist whose card stays to add them back. */
+  faded?: boolean;
   onHighlight?: (on: boolean) => void;
 };
 
-export function TherapistCard({ therapist: t, sought, grouped = false, online = false, heading, action, track, fee, status, onHighlight }: Props) {
+export function TherapistCard({ therapist: t, sought, grouped = false, online = false, heading, action, track, fee, status, faded,
+  onHighlight }: Props) {
   const profile = useProfileLink();
   const where = grouped || online ? undefined : placeOf(t);
   // UKCP's "0.2 miles from E8 3DQ" repeats the searched place, which the list already names.
@@ -78,8 +81,8 @@ export function TherapistCard({ therapist: t, sought, grouped = false, online = 
         )
       }
       status={status && status !== "toContact" && <StatusLine status={status} />}
-      // Only the portrait fades: the card stays live in every later search, and faded text would fall below AA contrast.
-      faded={status === "setAside"}
+      // Only the portrait fades: the card stays live wherever it shows, and faded text would fall below AA contrast.
+      faded={faded || status === "setAside"}
       action={action}
       track={track}
       summary={t.summary}
@@ -111,7 +114,7 @@ type LayoutProps = ComponentProps<typeof Card> & {
   meets?: ReactNode;
   fee?: ReactNode;
   status?: ReactNode;
-  /** Fades the photo, for a therapist the visitor has set aside. */
+  /** Fades the photo, for a therapist set aside or taken off the shortlist. */
   faded?: boolean;
   action?: ReactNode;
   track?: ReactNode;

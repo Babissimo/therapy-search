@@ -114,10 +114,11 @@ describe("StatusTrack", () => {
     screen.getByText("Waiting list", { selector: "p" });
   });
 
-  it("shows where a therapist taken off the shortlist stood, with nothing to change it", () => {
+  it("shows where a therapist taken off the shortlist stood, saying they were removed, with nothing to change it", () => {
     renderTrack("contacted", { listed: false });
     expect(currentStep()).toBe("Contacted");
     screen.getByText("Contacted", { selector: "p" });
+    screen.getByText("Removed from your shortlist", { selector: "p" });
     expect(screen.queryAllByRole("button")).toEqual([]);
   });
 });

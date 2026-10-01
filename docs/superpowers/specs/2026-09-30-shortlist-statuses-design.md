@@ -82,7 +82,7 @@ type ShortlistEntry = { addedAt: number; rank?: number; status?: Status; note?: 
 - The shortlist's map shows the list and, while it is open, the "Set aside" section, so closing it takes those pins off the map, and the "not on the map" count follows.
 - The tab's count leaves out those set aside.
 - The empty state adds that each therapist can be marked as the visitor contacts them.
-- A therapist removed from the shortlist stays in place, faded, until the tab is left, as now. Their track stays, faded with the card, without its next-step button or menu, and the bookmark adds them back as they were (§3).
+- A therapist removed from the shortlist stays in place until the tab is left, as now. Only their portrait fades, as a set-aside result's does (§4.4), since the card stays live: the bookmark adds them back as they were (§3). Their track stays, with "Removed from your shortlist" in place of its next-step button and menu.
 
 ### 4.2 The status track
 
@@ -125,7 +125,7 @@ type ShortlistEntry = { addedAt: number; rank?: number; status?: Status; note?: 
 
 - **Store:** entries read with and without the new fields; an unknown status and a wrongly typed note; choosing "To contact" clears the status; adding back returns status and note; the note's limit; another tab's changes carry the new fields.
 - **Tab:** one list in the shortlist's order with those set aside at its foot; "Set aside" starts closed, and its pins leave the map while it is; the tab's count leaves out those set aside; dragging within the list and within "Set aside"; a therapist set aside and brought back returns to their old place; focus and the announcement after a change by menu and by next step; removing and adding back.
-- **Track:** the steps, label and next-step button for each status, the paused step and the grey track; focus once the next-step button goes.
+- **Track:** the steps, label and next-step button for each status, the paused step and the grey track; a removed therapist's track saying so in place of its controls; focus once the next-step button goes.
 - **Result cards:** the status line, nothing for "To contact", and the faded portrait when set aside.
 - **Profile:** the track after the header; the contact offer after phone and email but not a website; "Yes" for a therapist not yet shortlisted adds them as "Contacted".
 - **Map:** `pinIcon`'s badge and accessible name for each status, and none on a stacked pin.

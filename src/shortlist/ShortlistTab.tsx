@@ -246,8 +246,7 @@ function SortableEntry({ entry, heading, listed, sought, online, fee, pinKey, ma
       aria-current={marked || undefined}
       style={{ transform: CSS.Translate.toString(transform), transition }}
       className={cn(
-        "flex items-center gap-1 transition-opacity",
-        !listed && "opacity-60",
+        "flex items-center gap-1",
         // Carried over its neighbours, lifted off the list.
         isDragging && "relative z-10 [&_[data-slot=card]]:shadow-lg",
       )}
@@ -273,6 +272,7 @@ function SortableEntry({ entry, heading, listed, sought, online, fee, pinKey, ma
           online={online}
           heading={heading}
           fee={fee}
+          faded={!listed}
           action={<ShortlistButton therapist={card} kept={entry} />}
           track={<StatusTrack therapist={card} status={status} listed={listed} onChosen={onChosen} onRemoved={onRemoved} />}
           onHighlight={(on) => {
