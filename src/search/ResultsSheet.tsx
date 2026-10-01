@@ -1,14 +1,18 @@
 import { useRef, useState, type MouseEvent, type PointerEvent, type ReactNode, type Ref } from "react";
 import { Morph } from "@/components/Morph";
 import { Button } from "@/components/ui/button";
+import { useMediaQuery } from "@/lib/useMediaQuery";
 import { cn } from "@/lib/utils";
 
 export type SheetPosition = "peek" | "half" | "full";
 
-// In rem: peek shows the header alone; full leaves the search box and a strip of map above the sheet.
+// In rem: peek shows the header alone; full leaves the search box, its filter chips and a strip of map above the sheet,
+// more on touch screens, where Use my location is named beneath the box.
 const PEEK_REM = 3.5;
 const FULL_GAP_REM = 10.5;
-const HEIGHT: Record<SheetPosition, string> = { peek: `${PEEK_REM}rem`, half: "50%", full: `calc(100% - ${FULL_GAP_REM}rem)` };
+const TOUCH_FULL_GAP_REM = 12.5;
+const TOUCH = "(pointer: coarse)";
+const heightAt = (position: SheetPosition, gap: number) => ({ peek: `${PEEK_REM}rem`, half: "50%", full: `calc(100% - ${gap}rem)` })[position];
 
 type Props = {
   position: SheetPosition;
@@ -32,6 +36,7 @@ export function ResultsSheet({ position, onPositionChange, tabs, scrollRef, onSc
   // The state draws the sheet; the ref is what a pointerup reads, as the last move may not have rendered yet.
   const [dragHeight, setDragHeight] = useState<number | null>(null);
   const liveHeight = useRef<number | null>(null);
+  const gap = useMediaQuery(TOUCH) ? TOUCH_FULL_GAP_REM : FULL_GAP_REM;
 
   function start(event: PointerEvent<HTMLDivElement>) {
     // The header's buttons, tabs among them, keep their clicks.
@@ -43,7 +48,7 @@ export function ResultsSheet({ position, onPositionChange, tabs, scrollRef, onSc
   function move(event: PointerEvent<HTMLDivElement>) {
     const container = sheet.current?.parentElement;
     if (!drag.current || !container) return;
-    const { peek, full } = heights(container.clientHeight);
+    const { peek, full } = heights(container.clientHeight, gap);
     liveHeight.current = Math.min(full, Math.max(peek, drag.current.startHeight - (event.clientY - drag.current.startY)));
     setDragHeight(liveHeight.current);
   }
@@ -56,7 +61,7 @@ export function ResultsSheet({ position, onPositionChange, tabs, scrollRef, onSc
   function end() {
     const container = sheet.current?.parentElement;
     const height = liveHeight.current;
-    if (drag.current && height !== null && container) onPositionChange(nearest(height, heights(container.clientHeight)));
+    if (drag.current && height !== null && container) onPositionChange(nearest(height, heights(container.clientHeight, gap)));
     drag.current = null;
     liveHeight.current = null;
     setDragHeight(null);
@@ -68,7 +73,7 @@ export function ResultsSheet({ position, onPositionChange, tabs, scrollRef, onSc
         ref={sheet}
         aria-label="Results and shortlist"
         data-position={position}
-        style={{ height: dragHeight === null ? HEIGHT[position] : `${dragHeight}px` }}
+        style={{ height: dragHeight === null ? heightAt(position, gap) : `${dragHeight}px` }}
         className={cn(
           // Clipped, so the footer never shows below a sheet lowered to its header.
           "absolute inset-x-0 bottom-0 z-20 flex flex-col overflow-hidden rounded-t-2xl border-t bg-background shadow-lg",
@@ -117,10 +122,10 @@ export function coverOf(position: SheetPosition, height: number): number {
 
 type Heights = Record<SheetPosition, number>;
 
-/** Each position's height in pixels, within the map area, `total` pixels tall, that the sheet sits in. */
-function heights(total: number): Heights {
+/** Each position's height in pixels, within the map area, `total` pixels tall, that the sheet sits in, `gap` rem short of it at full. */
+function heights(total: number, gap = FULL_GAP_REM): Heights {
   const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
-  return { peek: PEEK_REM * rem, half: total / 2, full: total - FULL_GAP_REM * rem };
+  return { peek: PEEK_REM * rem, half: total / 2, full: total - gap * rem };
 }
 
 function nearest(height: number, positions: Heights): SheetPosition {

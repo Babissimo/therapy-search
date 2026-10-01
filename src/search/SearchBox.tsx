@@ -79,11 +79,12 @@ export function SearchBox({ params, drafts, onPlaceSearch, onFocus, hold, classN
               setPlaceWanted(undefined);
               here.dismiss();
             }}
-            className={cn(here.supported && "pr-9")}
+            className={cn(here.supported && "pr-9 pointer-coarse:pr-2.5")}
           />
           {here.supported && (
             <IconButton
               label="Use my location"
+              touchLabel
               variant="ghost"
               size="icon-sm"
               // Not disabled while locating, which would drop focus; a second press is ignored.
@@ -92,7 +93,12 @@ export function SearchBox({ params, drafts, onPlaceSearch, onFocus, hold, classN
                 setPlaceWanted(undefined);
                 here.locate();
               }}
-              className="absolute top-0.5 right-0.5 text-muted-foreground aria-disabled:opacity-50"
+              // In the box's end, or beneath the box on touch screens, where it is named on screen. Positioned either way, so
+              // anything placed against the button stays on it rather than spreading over the box.
+              className={cn(
+                "absolute top-0.5 right-0.5 text-muted-foreground aria-disabled:opacity-50",
+                "pointer-coarse:relative pointer-coarse:inset-auto pointer-coarse:mt-1",
+              )}
             >
               {here.locating ? <Loader2 aria-hidden className="motion-safe:animate-spin" /> : <LocateFixed aria-hidden />}
             </IconButton>
