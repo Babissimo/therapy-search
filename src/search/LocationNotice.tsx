@@ -7,19 +7,10 @@ export function locationFellBack(typed: string, searched: string | undefined): b
 }
 
 export function LocationNotice({ typed, searched }: { typed: string; searched?: string }) {
-  if (locationFellBack(typed, searched)) {
-    return (
-      <Alert>
-        <AlertDescription>
-          UKCP didn't recognise "{typed.trim()}", so these results are from across the UK. Try a town or a postcode.
-        </AlertDescription>
-      </Alert>
-    );
-  }
-  if (!searched) return null;
+  if (!locationFellBack(typed, searched)) return null;
   return (
-    <p className="text-sm">
-      Location searched: <strong>{searched}</strong>
-    </p>
+    <Alert>
+      <AlertDescription>UKCP didn't recognise "{typed.trim()}", so these results are from across the UK. Try a town or a postcode.</AlertDescription>
+    </Alert>
   );
 }

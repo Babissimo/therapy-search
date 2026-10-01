@@ -106,37 +106,52 @@ describe("Results", () => {
     expect(screen.queryAllByRole("alert")).toEqual([]);
   });
 
-  it("heads the list with how many a searched place has within its area", async () => {
+  it("heads a searched place's list with how many have loaded and how far out they reach, over the place", async () => {
     answerBatches();
     renderResults(leeds);
-    expect(await screen.findByRole("heading", { name: "30 results within your area" })).toBeTruthy();
+    const heading = await screen.findByRole("heading", { name: "12 results within 0.1 miles" });
+    expect(heading.nextElementSibling?.textContent).toBe("Leeds");
+    expect(screen.getByText(/^Nearest first/).textContent).toBe(
+      "Nearest first, measured from the centre of the place searched. Pins show the postcode or area each therapist lists.",
+    );
   });
 
-  it("says once, and only once, that a search found no one", async () => {
+  it("leaves out UKCP's word that it lists a location search at random, keeping its other notices", async () => {
+    const random = "Location searches are grouped by distance from the centre point of the search. Results are displayed in a random order.";
+    const fewer = "This search returns more than 24 results. You may wish to try narrowing your search by specifying additional filters.";
+    const therapists = [{ slug: "a", name: "Therapist a", initials: "T", tags: [], distance: "0.1 miles from Leeds" }];
+    vi.spyOn(api, "search").mockResolvedValue(listed({ total: 1, from: 1, to: 1, notices: [random, fewer], therapists, locationSearched: "Leeds" }));
+    renderResults(leeds);
+    await screen.findByRole("heading", { name: "1 result within 0.1 miles" });
+    expect(screen.getAllByRole("alert").map((alert) => alert.textContent)).toEqual([fewer]);
+  });
+
+  it("says once, and only once, that a search found no one, and where", async () => {
     answerBatches({ total: 0 });
     renderResults(leeds);
-    await screen.findByRole("heading", { name: "No results within your area" });
+    const heading = await screen.findByRole("heading", { name: "No results within your area" });
+    expect(heading.nextElementSibling?.textContent).toBe("Leeds");
     expect(screen.queryByText("No results")).toBeNull();
-    expect(screen.queryByText(/^Pins show/)).toBeNull();
+    expect(screen.queryByText(/Pins show/)).toBeNull();
   });
 
   it("shows the nearest page, and adds the next with Load more", async () => {
     answerBatches();
     renderResults(leeds);
-    await screen.findByText("Nearest 12 of 30, up to 0.1 miles away");
+    await screen.findByRole("heading", { name: "12 results within 0.1 miles" });
     fireEvent.click(screen.getByRole("button", { name: "Load more" }));
-    await screen.findByText("Nearest 24 of 30, up to 0.2 miles away");
+    await screen.findByRole("heading", { name: "24 results within 0.2 miles" });
     expect(cards()).toHaveLength(24);
   });
 
   it("shows the next twelve from the batch in hand without asking UKCP again", async () => {
     const search = answerBatches({ size: BATCH_SIZE });
     renderResults(leeds);
-    await screen.findByText("Nearest 12 of 30, up to 0.1 miles away");
+    await screen.findByRole("heading", { name: "12 results within 0.1 miles" });
     fireEvent.click(screen.getByRole("button", { name: "Load more" }));
-    await screen.findByText(/^Nearest 24 of 30/);
+    await screen.findByRole("heading", { name: /^24 results/ });
     fireEvent.click(screen.getByRole("button", { name: "Load more" }));
-    await screen.findByText(/^Nearest 30 of 30/);
+    await screen.findByRole("heading", { name: /^30 results/ });
     expect(search).toHaveBeenCalledOnce();
   });
 
@@ -144,21 +159,21 @@ describe("Results", () => {
     const search = answerBatches({ size: 24 });
     renderResults(leeds);
     fireEvent.click(await screen.findByRole("button", { name: "Load more" }));
-    await screen.findByText(/^Nearest 24 of 30/);
+    await screen.findByRole("heading", { name: /^24 results/ });
     expect(search).toHaveBeenCalledOnce();
     fireEvent.click(screen.getByRole("button", { name: "Load more" }));
-    await screen.findByText(/^Nearest 30 of 30/);
+    await screen.findByRole("heading", { name: /^30 results/ });
     expect(search.mock.calls.map(([query]) => new URLSearchParams(query).get("page"))).toEqual([null, "2"]);
   });
 
   it("steps by the batches UKCP gives when it answers fewer than asked for", async () => {
     answerBatches({ size: 18 });
     renderResults(leeds);
-    await screen.findByText(/^Nearest 12 of 30/);
+    await screen.findByRole("heading", { name: /^12 results/ });
     fireEvent.click(screen.getByRole("button", { name: "Load more" }));
-    await screen.findByText(/^Nearest 18 of 30/);
+    await screen.findByRole("heading", { name: /^18 results/ });
     fireEvent.click(screen.getByRole("button", { name: "Load more" }));
-    await screen.findByText(/^Nearest 30 of 30/);
+    await screen.findByRole("heading", { name: /^30 results/ });
     expect(cards()).toHaveLength(30);
   });
 
@@ -184,7 +199,7 @@ describe("Results", () => {
     fireEvent.click(more);
     expect(search).toHaveBeenCalledTimes(2);
     await act(async () => release());
-    await screen.findByText(/^Nearest 24 of 30/);
+    await screen.findByRole("heading", { name: /^24 results/ });
     expect(status.textContent).toBe("");
   });
 
@@ -192,9 +207,9 @@ describe("Results", () => {
     answerBatches();
     renderResults(leeds);
     fireEvent.click(await screen.findByRole("button", { name: "Load more" }));
-    await screen.findByText(/^Nearest 24 of 30/);
+    await screen.findByRole("heading", { name: /^24 results/ });
     fireEvent.click(screen.getByRole("button", { name: "Load more" }));
-    await screen.findByText(/^Nearest 30 of 30/);
+    await screen.findByRole("heading", { name: /^30 results/ });
     expect(screen.queryByRole("button", { name: "Load more" })).toBeNull();
   });
 
@@ -204,10 +219,10 @@ describe("Results", () => {
     const more = await screen.findByRole("button", { name: "Load more" });
     act(() => more.focus());
     fireEvent.click(more);
-    await screen.findByText(/^Nearest 24 of 30/);
+    await screen.findByRole("heading", { name: /^24 results/ });
     expect(document.activeElement).toBe(more);
     fireEvent.click(more);
-    await screen.findByText(/^Nearest 30 of 30/);
+    await screen.findByRole("heading", { name: /^30 results/ });
     expect(document.activeElement).toBe(screen.getByRole("link", { name: "Therapist 3-0" }));
   });
 
@@ -218,7 +233,7 @@ describe("Results", () => {
     view.rerender(leeds, { placing: true });
     act(() => more.focus());
     fireEvent.click(more);
-    await screen.findByText(/^Nearest 24 of 24/);
+    await screen.findByRole("heading", { name: /^24 results/ });
     expect(document.activeElement).toBe(document.body);
     const card = (slug: string) => ({ slug, name: `Therapist ${slug.slice(1)}`, initials: "T", tags: [] });
     const pin = (...slugs: string[]): Pin => ({ key: slugs.join(), point: { lat: 53.8, lng: -1.55 }, therapists: slugs.map(card), kind: "outcode" });
@@ -231,9 +246,9 @@ describe("Results", () => {
     answerBatches();
     renderResults(leeds);
     fireEvent.click(await screen.findByRole("button", { name: "Load more" }));
-    await screen.findByText(/^Nearest 24 of 30/);
+    await screen.findByRole("heading", { name: /^24 results/ });
     fireEvent.click(screen.getByRole("button", { name: "Load more" }));
-    await screen.findByText(/^Nearest 30 of 30/);
+    await screen.findByRole("heading", { name: /^30 results/ });
     expect(document.activeElement).toBe(document.body);
   });
 
@@ -253,7 +268,7 @@ describe("Results", () => {
     act(() => elsewhere.focus());
     await waitFor(() => expect(search).toHaveBeenCalledTimes(2));
     await act(async () => release());
-    await screen.findByText(/^Nearest 24 of 24/);
+    await screen.findByRole("heading", { name: /^24 results/ });
     expect(document.activeElement).toBe(elsewhere);
   });
 
@@ -332,7 +347,7 @@ describe("Results", () => {
     fireEvent.click(more);
     expect(await screen.findByRole("button", { name: "Try again" })).toBe(more);
     fireEvent.click(more);
-    await screen.findByText(/^Nearest 24 of 30/);
+    await screen.findByRole("heading", { name: /^24 results/ });
     expect(screen.getByRole("button", { name: "Load more" })).toBe(more);
     expect(document.activeElement).toBe(more);
   });
@@ -345,7 +360,7 @@ describe("Results", () => {
     act(() => more.focus());
     fireEvent.click(more);
     fireEvent.click(await screen.findByRole("button", { name: "Try again" }));
-    await screen.findByText(/^Nearest 24 of 24/);
+    await screen.findByRole("heading", { name: /^24 results/ });
     expect(document.activeElement).toBe(screen.getByRole("link", { name: "Therapist 2-0" }));
   });
 
@@ -361,9 +376,9 @@ describe("Results", () => {
     answerBatches();
     const { rerender } = renderResults(leeds);
     fireEvent.click(await screen.findByRole("button", { name: "Load more" }));
-    await screen.findByText(/^Nearest 24 of 30/);
+    await screen.findByRole("heading", { name: /^24 results/ });
     rerender(withText(emptyParams(), "Location", "York"));
-    await screen.findByText(/^Nearest 12 of 30/);
+    await screen.findByRole("heading", { name: /^12 results/ });
     expect(cards()).toHaveLength(12);
   });
 });

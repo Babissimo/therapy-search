@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TherapistCard } from "@shared/types";
-import { parseMiles, reachLine, reachMiles, resultCount } from "./reach";
+import { parseMiles, reachMiles, resultCount, resultsHeading } from "./reach";
 
 const card = (slug: string, extra: Partial<TherapistCard> = {}): TherapistCard => ({ slug, name: slug, initials: "T", tags: [], ...extra });
 
@@ -22,18 +22,20 @@ describe("reachMiles", () => {
   });
 });
 
-describe("reachLine", () => {
+describe("resultsHeading", () => {
   const near = [card("a", { distance: "0.2 miles from Brighton" }), card("b", { distance: "0.6 miles from Brighton" })];
 
-  it("says how far a location search has reached", () => {
-    expect(reachLine(near, 257, true)).toBe("Nearest 2 of 257, up to 0.6 miles away");
-    expect(reachLine([card("a", { distance: "1 mile from Hove" })], 9, true)).toBe("Nearest 1 of 9, up to 1 mile away");
-    expect(reachLine([card("a")], 9, true)).toBe("Nearest 1 of 9");
+  it("counts what a location search has loaded and how far out it reaches", () => {
+    expect(resultsHeading(near, 257, true)).toBe("2 results within 0.6 miles");
+    expect(resultsHeading([card("a", { distance: "1 mile from Hove" })], 9, true)).toBe("1 result within 1 mile");
+    expect(resultsHeading([card("a", { distance: "0 miles from Hove" })], 9, true)).toBe("1 result within 0.1 miles");
+    expect(resultsHeading([card("a")], 9, true)).toBe("1 result");
+    expect(resultsHeading([], 0, true)).toBe("No results within your area");
   });
 
-  it("counts plainly without a location, and says when there is nothing", () => {
-    expect(reachLine(near, 257, false)).toBe("2 of 257");
-    expect(reachLine([], 0, true)).toBe("No results");
+  it("counts the whole search without a location", () => {
+    expect(resultsHeading(near, 257, false)).toBe("257 results");
+    expect(resultsHeading([], undefined, true)).toBe("Results");
   });
 });
 

@@ -12,13 +12,16 @@ export function reachMiles(loaded: TherapistCard[]): number | undefined {
   return miles.length === 0 ? undefined : Math.max(...miles);
 }
 
-/** How much of the search is loaded and, for a location search, how far out it reaches. */
-export function reachLine(loaded: TherapistCard[], total: number, located: boolean): string {
-  if (total === 0) return "No results";
-  if (!located) return `${loaded.length} of ${total}`;
+/** The list's heading: for a location search, how many are loaded and how far out they reach; otherwise how many there are. */
+export function resultsHeading(loaded: TherapistCard[], total: number | undefined, located: boolean): string {
+  if (!located || total === undefined) return resultCount(total);
+  if (total === 0) return "No results within your area";
+  const count = resultCount(loaded.length);
   const furthest = reachMiles(loaded);
-  if (furthest === undefined) return `Nearest ${loaded.length} of ${total}`;
-  return `Nearest ${loaded.length} of ${total}, up to ${furthest} ${furthest === 1 ? "mile" : "miles"} away`;
+  if (furthest === undefined) return count;
+  // UKCP rounds miles to a tenth, so its 0 means under a tenth.
+  const miles = Math.max(furthest, 0.1);
+  return `${count} within ${miles} ${miles === 1 ? "mile" : "miles"}`;
 }
 
 export function resultCount(total: number | undefined): string {
