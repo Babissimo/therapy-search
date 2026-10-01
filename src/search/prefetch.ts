@@ -1,9 +1,9 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { matchPath, parsePath } from "react-router";
-import { narrowsOnline, ONLINE_PATH, onlineSearch } from "./online";
+import { narrowsOnline, ONLINE_PATH } from "./online";
 import { placed } from "./state";
 import { prefetchResults } from "./useResults";
-import { readSearch } from "./useSearchState";
+import { viewSearch } from "./useSearchState";
 
 /** The map's code, in a chunk of its own: Leaflet is large, and a visit that never searches near a place never needs it. */
 export const loadMap = () => import("./map/MapPane");
@@ -22,7 +22,7 @@ export function prefetchSearchAt(client: QueryClient, hash: string): void {
   const path = pathname.startsWith("/") ? pathname : `/${pathname}`;
   let params;
   try {
-    params = readSearch(search);
+    params = viewSearch(path, search);
   } catch {
     // The page meets a search it can't read itself, and says so.
     return;
@@ -31,6 +31,6 @@ export function prefetchSearchAt(client: QueryClient, hash: string): void {
     prefetchResults(client, params);
     warmMap();
   } else if (matchPath(ONLINE_PATH, path) && narrowsOnline(params)) {
-    prefetchResults(client, onlineSearch(params));
+    prefetchResults(client, params);
   }
 }

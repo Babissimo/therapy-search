@@ -1,7 +1,8 @@
 import { useCallback, useMemo } from "react";
-import { useSearchParams } from "react-router";
+import { matchPath, useSearchParams } from "react-router";
 import { ALLOWED } from "@shared/options";
 import { InvalidParam, readParams, toQuery, type SearchParams } from "@shared/query";
+import { ONLINE_PATH, onlineSearch } from "./online";
 
 /** The search lives in the query string after the page's `#`, in UKCP's own parameter names. */
 export function useSearchState() {
@@ -30,4 +31,10 @@ export function useSearchState() {
 /** The search a query string asks for. Results grow with "Load more" rather than by page, so a page named in it is ignored. */
 export function readSearch(query: string): SearchParams {
   return { ...readParams(new URLSearchParams(query), ALLOWED), page: 1 };
+}
+
+/** The search the view at `pathname` shows for a query string, which online keeps to the sessions had remotely. */
+export function viewSearch(pathname: string, query: string): SearchParams {
+  const params = readSearch(query);
+  return matchPath(ONLINE_PATH, pathname) ? onlineSearch(params) : params;
 }
