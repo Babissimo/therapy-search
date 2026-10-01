@@ -21,6 +21,11 @@ export function withPage(params: SearchParams, page: number): SearchParams {
   return { ...params, page };
 }
 
+/** Whether `params` have a place to search near. */
+export function placed(params: SearchParams): boolean {
+  return params.text.Location !== "";
+}
+
 /** UKCP's filter panel mixes multi-value groups and single true/false flags; the field's name says which. */
 export function withField(params: SearchParams, field: FilterField, on: boolean): SearchParams {
   if (isMulti(field.name)) return withMulti(params, field.name, field.value, on);

@@ -32,7 +32,7 @@ import { Results } from "./Results";
 import { ResultsPanel } from "./ResultsPanel";
 import { coverOf, ResultsSheet, type SheetPosition } from "./ResultsSheet";
 import { SearchBox } from "./SearchBox";
-import { tickedFilters } from "./state";
+import { placed, tickedFilters } from "./state";
 import { useResults } from "./useResults";
 import { useSearchDrafts, type SearchDrafts } from "./useSearchDrafts";
 import { useSearchState } from "./useSearchState";
@@ -295,11 +295,6 @@ function SearchView({ params, onChange, wide }: ViewProps) {
       </Tabs.Root>
     </FiltersSheet>
   );
-}
-
-/** Whether `params` have a place to search near. */
-function placed(params: SearchParams): boolean {
-  return params.text.Location !== "";
 }
 
 /** Whether a location is `postcode`, whatever its case or spacing. */
