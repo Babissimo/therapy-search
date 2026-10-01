@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { Monitor, Moon, Sun } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { applyTheme, storedTheme, storeTheme, type ThemeChoice } from "./theme";
+import { useMediaQuery } from "@/lib/useMediaQuery";
+import { applyTheme, chooseTheme, useThemeChoice } from "./theme";
 
 const CHOICES = [
   { value: "light", label: "Light", Icon: Sun },
@@ -11,16 +12,9 @@ const CHOICES = [
 
 /** Native radios, so the group is one tab stop and the arrow keys move between choices. */
 export function ThemeSwitch() {
-  const [choice, setChoice] = useState<ThemeChoice>(() => storedTheme());
-
-  useEffect(() => {
-    const system = window.matchMedia("(prefers-color-scheme: dark)");
-    const apply = () => applyTheme(choice, system.matches);
-    apply();
-    if (choice !== "system") return;
-    system.addEventListener("change", apply);
-    return () => system.removeEventListener("change", apply);
-  }, [choice]);
+  const choice = useThemeChoice();
+  const systemDark = useMediaQuery("(prefers-color-scheme: dark)");
+  useEffect(() => applyTheme(choice, systemDark), [choice, systemDark]);
 
   return (
     <fieldset className="flex rounded-lg border p-0.5">
@@ -34,14 +28,13 @@ export function ThemeSwitch() {
                 name="theme"
                 value={value}
                 checked={choice === value}
-                onChange={() => {
-                  storeTheme(value);
+                onChange={() =>
                   // Applied here rather than left to the effect, which would change the page before the fade captures it.
                   crossFade(() => {
-                    applyTheme(value, window.matchMedia("(prefers-color-scheme: dark)").matches);
-                    setChoice(value);
-                  });
-                }}
+                    applyTheme(value, systemDark);
+                    chooseTheme(value);
+                  })
+                }
                 className="sr-only"
               />
               <Icon aria-hidden className="size-4" />

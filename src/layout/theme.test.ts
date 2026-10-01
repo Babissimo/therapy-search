@@ -23,6 +23,11 @@ describe("storedTheme", () => {
     expect(storedTheme(memory("sepia"))).toBe("system");
     expect(storedTheme(null)).toBe("system");
   });
+
+  it("follows the system when storage refuses reads", () => {
+    const refusing = { ...memory("dark"), getItem: () => { throw new Error("corrupt"); } };
+    expect(storedTheme(refusing)).toBe("system");
+  });
 });
 
 describe("storeTheme", () => {
