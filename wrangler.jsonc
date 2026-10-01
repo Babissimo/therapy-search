@@ -11,7 +11,8 @@
   "ratelimits": [
     { "name": "UPSTREAM_LIMIT", "namespace_id": "1001", "simple": { "limit": 20, "period": 60 } },
     { "name": "PLACE_LIMIT", "namespace_id": "1002", "simple": { "limit": 60, "period": 60 } },
-    { "name": "OFFICE_LIMIT", "namespace_id": "1003", "simple": { "limit": 60, "period": 60 } }
+    { "name": "OFFICE_LIMIT", "namespace_id": "1003", "simple": { "limit": 60, "period": 60 } },
+    { "name": "EARLY_LIMIT", "namespace_id": "1004", "simple": { "limit": 20, "period": 60 } }
   ],
   // UKCP's anti-forgery session, shared by every isolate.
   "kv_namespaces": [{ "binding": "UKCP_SESSION", "id": "0d58d3e6b9c14526b49ed5b8c371b6a1" }],

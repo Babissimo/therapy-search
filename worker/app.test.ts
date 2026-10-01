@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { LOCATION_MAX_LENGTH, LOOKUP_VERSION, type PlaceLookup } from "../shared/location";
+import { EARLY_SIZE } from "../shared/query";
 import {
   createCache,
   createGateway,
@@ -29,6 +30,7 @@ function setup({
   allow = true,
   allowPlaces = true,
   allowOffices = true,
+  allowEarly = true,
   client = {} as Partial<UkcpClient>,
   places = {} as Partial<PlaceFinder>,
   asset = SCRIPT as () => Response,
@@ -36,6 +38,7 @@ function setup({
   const limit = vi.fn(async () => ({ success: allow }));
   const placeLimit = vi.fn(async () => ({ success: allowPlaces }));
   const officeLimit = vi.fn(async () => ({ success: allowOffices }));
+  const earlyLimit = vi.fn(async () => ({ success: allowEarly }));
   // The routes are given a client, so the session store is never reached.
   const store = { get: async () => null, put: async () => {} };
   const assets = { fetch: vi.fn(async (_url: string) => asset()) };
@@ -44,6 +47,7 @@ function setup({
     UPSTREAM_LIMIT: { limit },
     PLACE_LIMIT: { limit: placeLimit },
     OFFICE_LIMIT: { limit: officeLimit },
+    EARLY_LIMIT: { limit: earlyLimit },
     UKCP_SESSION: store,
     SITE_URL: "https://example.test",
   };
@@ -62,7 +66,7 @@ function setup({
   const post = (path: string, body: string, headers?: Record<string, string>) => request(path, { method: "POST", body, headers: { "Content-Type": "application/x-www-form-urlencoded", ...headers } });
   /** The cached entrypoint answering the gateway directly, to read what the edge may keep. */
   const cached = (path: string) => cache.request(path, { headers: { [RATE_KEY]: "203.0.113.9" } }, env);
-  return { request, post, cached, asked, forwarded, stub, limit, placeLimit, officeLimit, finder, assets };
+  return { request, post, cached, asked, forwarded, stub, limit, placeLimit, officeLimit, earlyLimit, finder, assets };
 }
 
 describe("the gateway", () => {
@@ -157,6 +161,42 @@ describe("POST /api/search", () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     const res = await post("/api/search", "Location=Leeds");
     expect([res.status, (await res.json()).error]).toEqual([502, UPSTREAM_DOWN]);
+  });
+});
+
+describe("POST /api/search/early", () => {
+  it("asks UKCP for a location search's nearest few, by the search's canonical URL, which the edge keeps for 15 minutes", async () => {
+    const { post, asked, cached, stub } = setup();
+    const res = await post("/api/search/early", "Location=Leeds&Languages=Spanish&Languages=French&page=3");
+    expect([res.status, res.headers.get("Content-Type"), await res.text()]).toEqual([200, "text/plain; charset=utf-8", RESULTS]);
+    expect(asked()).toEqual(["/api/search/early?Location=Leeds&Languages=French&Languages=Spanish"]);
+    expect(stub.search).toHaveBeenCalledWith(expect.objectContaining({ page: 1, text: expect.objectContaining({ Location: "Leeds" }) }), EARLY_SIZE);
+    expect((await cached("/api/search/early?Location=Leeds")).headers.get("Cache-Control")).toBe("public, max-age=900");
+  });
+
+  it("counts against an allowance of its own, so it never spends a search's", async () => {
+    const { post, stub, limit, earlyLimit } = setup({ allowEarly: false });
+    const res = await post("/api/search/early", "Location=Leeds");
+    expect([res.status, (await res.json()).error]).toEqual([429, TOO_MANY]);
+    expect(earlyLimit).toHaveBeenCalledWith({ key: "203.0.113.9" });
+    expect(limit).not.toHaveBeenCalled();
+    expect(stub.search).not.toHaveBeenCalled();
+  });
+
+  it("refuses a search without a location, which is asked for whole, without asking the cache", async () => {
+    const { post, forwarded, cached, stub } = setup();
+    const res = await post("/api/search/early", "TypesOfSession=Online+Therapy");
+    expect([res.status, res.headers.get("Cache-Control"), (await res.json()).param]).toEqual([400, "no-store", "Location"]);
+    expect(forwarded).not.toHaveBeenCalled();
+    expect((await cached("/api/search/early?TypesOfSession=Online+Therapy")).status).toBe(400);
+    expect(stub.search).not.toHaveBeenCalled();
+  });
+
+  it("answers 502, which the edge never keeps, when UKCP sends a page that isn't search results", async () => {
+    const { cached } = setup({ client: { search: vi.fn(async () => bytes("<p>Down for maintenance</p>")) } });
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const res = await cached("/api/search/early?Location=Leeds");
+    expect([res.status, res.headers.get("Cache-Control")]).toEqual([502, "no-store"]);
   });
 });
 
