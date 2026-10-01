@@ -51,6 +51,11 @@ const PLACE_MISSING_MAX_AGE = 24 * 60 * 60;
 // without its offices.
 const OFFICE_FOUND_MAX_AGE = 30 * 24 * 60 * 60;
 const OFFICE_MISSING_MAX_AGE = 7 * 24 * 60 * 60;
+/**
+ * The date of the last change to what a place or nearest-postcode lookup answers. Cached answers outlive a deploy, so
+ * only a new value reaches past them; a date is never reused, as its entries may still hold another build's answers.
+ */
+export const LOOKUP_VERSION = "2026-09-29";
 /** The date of the last change to what an office lookup answers, which retires its cached answers as LOOKUP_VERSION does places'. */
 export const OFFICE_VERSION = "2026-10-01";
 // Vite names each built file by a hash of its content, so a browser can keep one for good.
@@ -110,13 +115,13 @@ export function createGateway(cachedFor: (c: Ctx) => Cached) {
 
   app.post("/api/place", async (c) => {
     const { text, options } = placeOf(await formOf(c));
-    return forward(c, `/api/place?${placeQuery(text, options)}`);
+    return forward(c, `/api/place?${placeQuery(text, options)}&v=${LOOKUP_VERSION}`);
   });
 
   app.post("/api/nearest", async (c) => {
     const { lat, lng } = pointOf(await formOf(c));
     // Rounded before it reaches the cache, so a finer point is never looked up or kept.
-    return forward(c, `/api/nearest?${nearestQuery(lat, lng)}`);
+    return forward(c, `/api/nearest?${nearestQuery(lat, lng)}&v=${LOOKUP_VERSION}`);
   });
 
   app.post("/api/office", async (c) => {

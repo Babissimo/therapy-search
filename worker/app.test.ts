@@ -1,9 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import { LOCATION_MAX_LENGTH, LOOKUP_VERSION, type PlaceLookup } from "../shared/location";
+import { LOCATION_MAX_LENGTH, type PlaceLookup } from "../shared/location";
 import { EARLY_SIZE } from "../shared/query";
 import {
   createCache,
   createGateway,
+  LOOKUP_VERSION,
   NEAREST_DOWN,
   OFFICE_VERSION,
   PLACE_DOWN,
@@ -357,7 +358,8 @@ describe("POST /api/place", () => {
   it("asks the cache by the lookup's canonical URL, at the current version", async () => {
     const { post, asked } = setup();
     expect((await post("/api/place", "centre=false&q=brighton%20%20bn3&v=2000-01-01")).status).toBe(200);
-    expect(asked()).toEqual([`/api/place?q=BRIGHTON+BN3&${v}`]);
+    expect((await post("/api/place", "v=2000-01-01&country=FR&outsideUK=true&centre=true&q=paris")).status).toBe(200);
+    expect(asked()).toEqual([`/api/place?q=BRIGHTON+BN3&${v}`, `/api/place?q=PARIS&centre=true&outsideUK=true&country=fr&${v}`]);
   });
 
   it("passes the centre and outside-UK flags on", async () => {
@@ -398,9 +400,9 @@ describe("POST /api/place", () => {
 });
 
 describe("POST /api/nearest", () => {
-  it("answers the postcode nearest a point, asked of the cache rounded to about 100 metres", async () => {
+  it("answers the postcode nearest a point, asked of the cache rounded to about 100 metres, at the current version", async () => {
     const { post, asked, finder, placeLimit } = setup();
-    const res = await post("/api/nearest", "lat=50.82614&lng=-0.15987");
+    const res = await post("/api/nearest", "v=2000-01-01&lng=-0.15987&lat=50.82614");
     expect([res.status, await res.json()]).toEqual([200, { found: true, postcode: "BN3 1FG" }]);
     expect(asked()).toEqual([`/api/nearest?lat=50.826&lng=-0.160&${v}`]);
     expect(finder.nearest).toHaveBeenCalledWith(50.826, -0.16);
