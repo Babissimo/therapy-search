@@ -116,14 +116,14 @@ describe("Results", () => {
     );
   });
 
-  it("leaves out UKCP's word that it lists a location search at random, keeping its other notices", async () => {
+  it("leaves out UKCP's notices about its own pages, keeping its others", async () => {
     const random = "Location searches are grouped by distance from the centre point of the search. Results are displayed in a random order.";
     const fewer = "This search returns more than 24 results. You may wish to try narrowing your search by specifying additional filters.";
-    const therapists = [{ slug: "a", name: "Therapist a", initials: "T", tags: [], distance: "0.1 miles from Leeds" }];
-    vi.spyOn(api, "search").mockResolvedValue(listed({ total: 1, from: 1, to: 1, notices: [random, fewer], therapists, locationSearched: "Leeds" }));
+    const none = "No therapists can be found matching your exact query. Why not try using fewer search terms or filters?";
+    vi.spyOn(api, "search").mockResolvedValue(listed({ total: 0, from: 0, to: 0, notices: [random, fewer, none], therapists: [], locationSearched: "Leeds" }));
     renderResults(leeds);
-    await screen.findByRole("heading", { name: "1 result within 0.1 miles" });
-    expect(screen.getAllByRole("alert").map((alert) => alert.textContent)).toEqual([fewer]);
+    await screen.findByRole("heading", { name: "No results within your area" });
+    expect(screen.getAllByRole("alert").map((alert) => alert.textContent)).toEqual([none]);
   });
 
   it("says once, and only once, that a search found no one, and where", async () => {
@@ -310,12 +310,6 @@ describe("Results", () => {
     renderResults(withFlag(withText(emptyParams(), "Location", "Paris"), "LocationSearchOutsideUK", true));
     await screen.findByRole("link", { name: "Therapist a" });
     expect(office).not.toHaveBeenCalled();
-  });
-
-  it("counts plainly when the search has no location", async () => {
-    answerBatches();
-    renderResults(emptyParams());
-    expect(await screen.findByText("12 of 30")).toBeTruthy();
   });
 
   it("keeps what loaded when the next page fails, and tries again", async () => {
