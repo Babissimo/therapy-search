@@ -29,6 +29,7 @@ export function canonicalLocation(text: string): string {
   return text.trim().replace(/\s+/g, " ").toUpperCase();
 }
 
+/** Place and office lookups answer by this, so a change to what it answers needs LOOKUP_VERSION and OFFICE_VERSION (worker/app.ts) bumped. */
 export function classifyLocation(text: string): LocationText {
   const canonical = canonicalLocation(text);
   const coded = canonical.replace(LAST_COUNTRY, "");
@@ -49,19 +50,12 @@ function placeName(text: string): string {
   return /[A-Z]/.test(name) ? name : "";
 }
 
-/**
- * The date of the last change to what a place or nearest-postcode lookup answers. Cached answers outlive a deploy, so
- * only a new value reaches past them; a date is never reused, as its entries may still hold another build's answers.
- */
-export const LOOKUP_VERSION = "2026-09-29";
-
 /** The one query string for a lookup: fixed key order, flags only when set. */
 export function placeQuery(text: string, { centre = false, outsideUK = false, country }: PlaceOptions = {}): string {
   const query = new URLSearchParams({ q: canonicalLocation(text) });
   if (centre) query.set("centre", "true");
   if (outsideUK) query.set("outsideUK", "true");
   if (country) query.set("country", country.toLowerCase());
-  query.set("v", LOOKUP_VERSION);
   return query.toString();
 }
 
@@ -82,5 +76,5 @@ export type NearestLookup = { found: true; postcode: string } | { found: false }
 export function nearestQuery(lat: number, lng: number): string {
   // Math.round turns a small negative into -0, which prints without its sign, so each point has one spelling.
   const rounded = (degrees: number) => (Math.round(degrees * 1000) / 1000).toFixed(3);
-  return new URLSearchParams({ lat: rounded(lat), lng: rounded(lng), v: LOOKUP_VERSION }).toString();
+  return new URLSearchParams({ lat: rounded(lat), lng: rounded(lng) }).toString();
 }

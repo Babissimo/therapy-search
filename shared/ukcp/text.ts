@@ -17,12 +17,17 @@ export function oneLine(text: string | null | undefined): string {
   return (text ?? "").replace(SPACES, " ").trim();
 }
 
-/** Text of an element with <br> as line breaks; lines are tidied and blank runs collapsed to one. */
+/** Text of an element with <br> as line breaks, tidied as `tidyLines` tidies it. */
 export function multiLine(el: Element | null | undefined): string {
   if (!el) return "";
   const copy = el.cloneNode(true) as Element;
   for (const br of copy.querySelectorAll("br")) br.replaceWith("\n");
-  return (copy.textContent ?? "")
+  return tidyLines(copy.textContent ?? "");
+}
+
+/** Each line collapsed as `oneLine` collapses it, and blank runs collapsed to one. */
+export function tidyLines(text: string): string {
+  return text
     .split("\n")
     .map((line) => oneLine(line))
     .join("\n")

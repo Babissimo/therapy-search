@@ -1,11 +1,11 @@
 import type { Office, Profile, ProfileSection } from "../types";
+import { PROFILE_HEADER } from "./markers";
 import { ParseError, initialsOf, multiLine, oneLine, optional, readHtml, safeUrl } from "./text";
 
 export function parseProfile(html: string, slug: string): Profile {
   const doc = readHtml(html);
-  // The header is what marks a profile page: a therapist may have written no biography at all.
-  const name = oneLine(doc.querySelector(".therapist-header h1")?.textContent);
-  if (!name) throw new ParseError("profile: no .therapist-header h1");
+  const name = oneLine(doc.querySelector(`.${PROFILE_HEADER} h1`)?.textContent);
+  if (!name) throw new ParseError(`profile: no .${PROFILE_HEADER} h1`);
 
   const details = doc.querySelector(".therapist-contacts-details");
   const mailto = [...doc.querySelectorAll(".therapist-contacts a")]
@@ -73,7 +73,6 @@ function parseSection(section: Element): ProfileSection {
 
 function parseOffice(section: Element): Office {
   const heading = section.querySelector("h3");
-  const costHeading = [...section.querySelectorAll("h4")].find((h) => /cost/i.test(h.textContent ?? ""));
   const address = multiLine(section.querySelector("address")).split("\n").filter(Boolean);
   return {
     name: oneLine(heading?.textContent),
@@ -81,6 +80,15 @@ function parseOffice(section: Element): Office {
     address,
     // UKCP links an office with no address to a map search for ", , ".
     mapUrl: address.length > 0 ? safeUrl(section.querySelector("a.mini-cta")?.getAttribute("href")) : undefined,
-    cost: optional(multiLine(costHeading?.nextElementSibling)),
+    cost: optional(costOf(section)),
   };
+}
+
+/** What follows an office's "Cost:" heading, up to any heading after it: the stretch the Worker reads a card's fee from. */
+function costOf(section: Element): string {
+  const heading = [...section.querySelectorAll("h4")].find((h) => /cost/i.test(h.textContent ?? ""));
+  if (!heading) return "";
+  const cost = section.ownerDocument.createElement("div");
+  for (let node = heading.nextSibling; node && node.nodeName !== "H4"; node = node.nextSibling) cost.append(node.cloneNode(true));
+  return multiLine(cost);
 }

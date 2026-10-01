@@ -1,7 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { LOOKUP_VERSION, canonicalLocation, classifyLocation, nearestQuery, placeQuery, settlementRank } from "./location";
-
-const v = `v=${LOOKUP_VERSION}`;
+import { canonicalLocation, classifyLocation, nearestQuery, placeQuery, settlementRank } from "./location";
 
 describe("canonicalLocation", () => {
   it("trims, collapses spaces and upper-cases", () => {
@@ -36,10 +34,10 @@ describe("classifyLocation", () => {
 
 describe("placeQuery", () => {
   it("builds one query string per lookup, flags only when set", () => {
-    expect(placeQuery(" Brighton  bn3")).toBe(`q=BRIGHTON+BN3&${v}`);
-    expect(placeQuery("Paris", { centre: true, outsideUK: true })).toBe(`q=PARIS&centre=true&outsideUK=true&${v}`);
-    expect(placeQuery("Leeds", { centre: false, outsideUK: false })).toBe(`q=LEEDS&${v}`);
-    expect(placeQuery("Berlin 12689", { centre: true, country: "DE" })).toBe(`q=BERLIN+12689&centre=true&country=de&${v}`);
+    expect(placeQuery(" Brighton  bn3")).toBe("q=BRIGHTON+BN3");
+    expect(placeQuery("Paris", { centre: true, outsideUK: true })).toBe("q=PARIS&centre=true&outsideUK=true");
+    expect(placeQuery("Leeds", { centre: false, outsideUK: false })).toBe("q=LEEDS");
+    expect(placeQuery("Berlin 12689", { centre: true, country: "DE" })).toBe("q=BERLIN+12689&centre=true&country=de");
   });
 });
 
@@ -55,7 +53,7 @@ describe("settlementRank", () => {
 
 describe("nearestQuery", () => {
   it("rounds a point to three places, spelling each rounded point one way", () => {
-    expect(nearestQuery(50.82614, -0.15987)).toBe(`lat=50.826&lng=-0.160&${v}`);
-    expect(nearestQuery(-0.0004, 0)).toBe(`lat=0.000&lng=0.000&${v}`);
+    expect(nearestQuery(50.82614, -0.15987)).toBe("lat=50.826&lng=-0.160");
+    expect(nearestQuery(-0.0004, 0)).toBe("lat=0.000&lng=0.000");
   });
 });

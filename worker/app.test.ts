@@ -1,9 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import { LOCATION_MAX_LENGTH, LOOKUP_VERSION, type PlaceLookup } from "../shared/location";
+import { LOCATION_MAX_LENGTH, type PlaceLookup } from "../shared/location";
 import { EARLY_SIZE } from "../shared/query";
 import {
   createCache,
   createGateway,
+  LOOKUP_VERSION,
   NEAREST_DOWN,
   OFFICE_VERSION,
   PLACE_DOWN,
@@ -220,7 +221,10 @@ describe("POST /api/therapist", () => {
 
   it("rejects slugs that could not be UKCP's without asking the cache", async () => {
     const { post, forwarded } = setup();
-    for (const slug of ["../../admin", "...", ""]) expect((await post("/api/therapist", new URLSearchParams({ slug }).toString())).status).toBe(400);
+    for (const slug of ["../../admin", "...", ""]) {
+      const res = await post("/api/therapist", new URLSearchParams({ slug }).toString());
+      expect([res.status, res.headers.get("Cache-Control"), await res.json()]).toEqual([400, "no-store", { error: "That isn't a UKCP profile address.", param: "slug" }]);
+    }
     expect(forwarded).not.toHaveBeenCalled();
   });
 
@@ -300,8 +304,15 @@ describe("POST /api/office", () => {
   it("rejects a slug or location it can't use without asking the cache", async () => {
     const { post, forwarded } = setup();
     const long = "B".repeat(LOCATION_MAX_LENGTH + 1);
-    for (const body of ["slug=../../admin&location=BN3", "slug=Jo-Bloggs-ABCDEFGH&location=+", `slug=Jo-Bloggs-ABCDEFGH&location=${long}`, "slug=Jo-Bloggs-ABCDEFGH"]) {
-      expect((await post("/api/office", body)).status).toBe(400);
+    const refused: [body: string, param: string][] = [
+      ["slug=../../admin&location=BN3", "slug"],
+      ["slug=Jo-Bloggs-ABCDEFGH&location=+", "location"],
+      [`slug=Jo-Bloggs-ABCDEFGH&location=${long}`, "location"],
+      ["slug=Jo-Bloggs-ABCDEFGH", "location"],
+    ];
+    for (const [body, param] of refused) {
+      const res = await post("/api/office", body);
+      expect([res.status, (await res.json()).param]).toEqual([400, param]);
     }
     expect(forwarded).not.toHaveBeenCalled();
   });
@@ -357,7 +368,8 @@ describe("POST /api/place", () => {
   it("asks the cache by the lookup's canonical URL, at the current version", async () => {
     const { post, asked } = setup();
     expect((await post("/api/place", "centre=false&q=brighton%20%20bn3&v=2000-01-01")).status).toBe(200);
-    expect(asked()).toEqual([`/api/place?q=BRIGHTON+BN3&${v}`]);
+    expect((await post("/api/place", "v=2000-01-01&country=FR&outsideUK=true&centre=true&q=paris")).status).toBe(200);
+    expect(asked()).toEqual([`/api/place?q=BRIGHTON+BN3&${v}`, `/api/place?q=PARIS&centre=true&outsideUK=true&country=fr&${v}`]);
   });
 
   it("passes the centre and outside-UK flags on", async () => {
@@ -398,9 +410,9 @@ describe("POST /api/place", () => {
 });
 
 describe("POST /api/nearest", () => {
-  it("answers the postcode nearest a point, asked of the cache rounded to about 100 metres", async () => {
+  it("answers the postcode nearest a point, asked of the cache rounded to about 100 metres, at the current version", async () => {
     const { post, asked, finder, placeLimit } = setup();
-    const res = await post("/api/nearest", "lat=50.82614&lng=-0.15987");
+    const res = await post("/api/nearest", "v=2000-01-01&lng=-0.15987&lat=50.82614");
     expect([res.status, await res.json()]).toEqual([200, { found: true, postcode: "BN3 1FG" }]);
     expect(asked()).toEqual([`/api/nearest?lat=50.826&lng=-0.160&${v}`]);
     expect(finder.nearest).toHaveBeenCalledWith(50.826, -0.16);

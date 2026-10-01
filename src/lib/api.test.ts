@@ -1,6 +1,5 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { LOOKUP_VERSION } from "@shared/location";
 import { api, UNREADABLE } from "./api";
 
 const RESULTS = `<span class="results-no">1-1 of 1 results</span><div class="profile-listing"><a href="therapist/Jo-Bloggs-ABCDEFGH"><h2>Jo Bloggs</h2></a></div>`;
@@ -75,13 +74,13 @@ describe("api", () => {
   it("looks a place up by its canonical query, sent as the body", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => Response.json({ found: false, reason: "not-found" })));
     await expect(api.place(" Brighton bn3", { centre: true })).resolves.toEqual({ found: false, reason: "not-found" });
-    expect(sent()).toEqual([["/api/place", "POST", `q=BRIGHTON+BN3&centre=true&v=${LOOKUP_VERSION}`]]);
+    expect(sent()).toEqual([["/api/place", "POST", "q=BRIGHTON+BN3&centre=true"]]);
   });
 
   it("asks for the postcode nearest a point rounded to about 100 metres, sent as the body", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => Response.json({ found: true, postcode: "BN3 1FG" })));
     await expect(api.nearest(50.82614, -0.15987)).resolves.toEqual({ found: true, postcode: "BN3 1FG" });
-    expect(sent()).toEqual([["/api/nearest", "POST", `lat=50.826&lng=-0.160&v=${LOOKUP_VERSION}`]]);
+    expect(sent()).toEqual([["/api/nearest", "POST", "lat=50.826&lng=-0.160"]]);
   });
 
   it("passes on the Worker's error for a place lookup", async () => {

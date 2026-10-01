@@ -11,6 +11,7 @@ import {
 } from "../shared/location";
 import { ALLOWED } from "../shared/options";
 import { EARLY_SIZE, InvalidParam, asksWhole, batchSize, readParams, toQuery, type SearchParams } from "../shared/query";
+import { CONTACT_DETAIL, PROFILE_HEADER, RESULTS_COUNT, RESULTS_NOTICE } from "../shared/ukcp/markers";
 import { UpstreamError, type SessionStore, type UkcpClient } from "./ukcp/client";
 import { officeDetails } from "./ukcp/offices";
 
@@ -50,6 +51,11 @@ const PLACE_MISSING_MAX_AGE = 24 * 60 * 60;
 // without its offices.
 const OFFICE_FOUND_MAX_AGE = 30 * 24 * 60 * 60;
 const OFFICE_MISSING_MAX_AGE = 7 * 24 * 60 * 60;
+/**
+ * The date of the last change to what a place or nearest-postcode lookup answers. Cached answers outlive a deploy, so
+ * only a new value reaches past them; a date is never reused, as its entries may still hold another build's answers.
+ */
+export const LOOKUP_VERSION = "2026-09-29";
 /** The date of the last change to what an office lookup answers, which retires its cached answers as LOOKUP_VERSION does places'. */
 export const OFFICE_VERSION = "2026-10-01";
 // Vite names each built file by a hash of its content, so a browser can keep one for good.
@@ -93,8 +99,7 @@ export function createGateway(cachedFor: (c: Ctx) => Cached) {
   });
 
   app.post("/api/therapist", async (c) => {
-    const slug = (await formOf(c)).get("slug") ?? "";
-    if (!SLUG.test(slug)) return c.json({ error: "That isn't a UKCP profile address." }, 400);
+    const slug = slugOf(await formOf(c));
     return forward(c, `/api/therapist/${encodeURIComponent(slug)}`);
   });
 
@@ -109,23 +114,19 @@ export function createGateway(cachedFor: (c: Ctx) => Cached) {
 
   app.post("/api/place", async (c) => {
     const { text, options } = placeOf(await formOf(c));
-    return forward(c, `/api/place?${placeQuery(text, options)}`);
+    return forward(c, `/api/place?${placeQuery(text, options)}&v=${LOOKUP_VERSION}`);
   });
 
   app.post("/api/nearest", async (c) => {
     const { lat, lng } = pointOf(await formOf(c));
     // Rounded before it reaches the cache, so a finer point is never looked up or kept.
-    return forward(c, `/api/nearest?${nearestQuery(lat, lng)}`);
+    return forward(c, `/api/nearest?${nearestQuery(lat, lng)}&v=${LOOKUP_VERSION}`);
   });
 
   app.post("/api/office", async (c) => {
     const form = await formOf(c);
-    const slug = form.get("slug") ?? "";
-    if (!SLUG.test(slug)) return c.json({ error: "That isn't a UKCP profile address." }, 400);
-    const location = canonicalLocation(form.get("location") ?? "");
-    if (location.length === 0 || location.length > LOCATION_MAX_LENGTH) {
-      throw new InvalidParam("location", `location must be 1 to ${LOCATION_MAX_LENGTH} characters`);
-    }
+    const slug = slugOf(form);
+    const location = locationOf(form, "location");
     return forward(c, `/api/office/${encodeURIComponent(slug)}?${new URLSearchParams({ location, v: OFFICE_VERSION })}`);
   });
 
@@ -182,7 +183,7 @@ export function createCache(clientFor: (env: Env) => UkcpClient, placesFor: (env
   /** UKCP's results for a search, `pageSize` at a time, counted against `limiter`. */
   async function results(c: Ctx, limiter: RateLimit, params: SearchParams, pageSize: number, maxAge: number): Promise<Response> {
     if (!(await allow(c, limiter))) return c.json({ error: TOO_MANY }, 429);
-    const body = expectOpening(await clientFor(c.env).search(params, pageSize), "results-no", "fat-search-alert");
+    const body = expectOpening(await clientFor(c.env).search(params, pageSize), RESULTS_COUNT, RESULTS_NOTICE);
     return upstreamHtml(c, body, `public, max-age=${maxAge}`);
   }
 
@@ -191,55 +192,52 @@ export function createCache(clientFor: (env: Env) => UkcpClient, placesFor: (env
     const slug = c.req.param("slug");
     const html = await clientFor(c.env).profile(slug);
     if (html === null) return c.json({ error: NO_PROFILE }, 404);
-    return upstreamHtml(c, expectPage(html, "therapist-header"), `public, max-age=${PROFILE_MAX_AGE}`);
+    return upstreamHtml(c, expectPage(html, PROFILE_HEADER), `public, max-age=${PROFILE_MAX_AGE}`);
   });
 
   app.get("/api/contact/:id", async (c) => {
     if (!(await allow(c, c.env.UPSTREAM_LIMIT))) return c.json({ error: TOO_MANY }, 429);
     const html = await clientFor(c.env).contact(c.req.param("id"));
     // UKCP answers an unknown id with an empty page, which is passed on but not kept, as is any page without details.
-    return upstreamHtml(c, html, html.includes("therapist-contacts-details-") ? `public, max-age=${PROFILE_MAX_AGE}` : "no-store");
+    return upstreamHtml(c, html, html.includes(CONTACT_DETAIL) ? `public, max-age=${PROFILE_MAX_AGE}` : "no-store");
   });
 
-  app.get("/api/place", async (c) => {
-    const { text, options } = placeOf(new URL(c.req.url).searchParams);
-    if (!(await allow(c, c.env.PLACE_LIMIT))) return c.json({ error: TOO_MANY }, 429);
-    let lookup: PlaceLookup;
-    try {
-      lookup = await placesFor(c.env).lookup(text, options);
-    } catch (error) {
-      // The message names the service and status, never the text looked up.
-      console.error(error instanceof Error ? `${error.name}: ${error.message}` : "place lookup failed");
-      return c.json({ error: PLACE_DOWN }, 502);
-    }
-    return c.json(lookup, 200, { "Cache-Control": `public, max-age=${lookup.found ? PLACE_FOUND_MAX_AGE : PLACE_MISSING_MAX_AGE}` });
-  });
-
-  app.get("/api/nearest", async (c) => {
-    const { lat, lng } = pointOf(new URL(c.req.url).searchParams);
-    if (!(await allow(c, c.env.PLACE_LIMIT))) return c.json({ error: TOO_MANY }, 429);
-    let nearest: NearestLookup;
-    try {
-      nearest = await placesFor(c.env).nearest(lat, lng);
-    } catch (error) {
-      // The message names the service and status, never the point looked up.
-      console.error(error instanceof Error ? `${error.name}: ${error.message}` : "nearest lookup failed");
-      return c.json({ error: NEAREST_DOWN }, 502);
-    }
-    return c.json(nearest, 200, { "Cache-Control": `public, max-age=${nearest.found ? PLACE_FOUND_MAX_AGE : PLACE_MISSING_MAX_AGE}` });
-  });
+  app.get("/api/place", lookupRoute("place", PLACE_DOWN, placeOf, (places, { text, options }) => places.lookup(text, options)));
+  app.get("/api/nearest", lookupRoute("nearest", NEAREST_DOWN, pointOf, (places, { lat, lng }) => places.nearest(lat, lng)));
 
   app.get("/api/office/:slug", async (c) => {
     if (!(await allow(c, c.env.OFFICE_LIMIT))) return c.json({ error: TOO_MANY }, 429);
     const html = await clientFor(c.env).profile(c.req.param("slug"));
     if (html === null) return c.json({ error: NO_PROFILE }, 404);
-    const answer = officeDetails(expectPage(html, "therapist-header"), new URL(c.req.url).searchParams.get("location") ?? "");
+    const answer = officeDetails(expectPage(html, PROFILE_HEADER), new URL(c.req.url).searchParams.get("location") ?? "");
     const found = answer.postcode !== undefined || answer.cost !== undefined;
     return c.json(answer, 200, { "Cache-Control": `public, max-age=${found ? OFFICE_FOUND_MAX_AGE : OFFICE_MISSING_MAX_AGE}` });
   });
 
   app.notFound((c) => c.json({ error: "Not found" }, 404));
   app.onError(answerError);
+
+  /** A route asking the place finder. Its query is read before the allowance is counted, so a malformed one costs none. */
+  function lookupRoute<Q, A extends PlaceLookup | NearestLookup>(
+    name: string,
+    down: string,
+    read: (query: URLSearchParams) => Q,
+    find: (places: PlaceFinder, asked: Q) => Promise<A>,
+  ) {
+    return async (c: Ctx) => {
+      const asked = read(new URL(c.req.url).searchParams);
+      if (!(await allow(c, c.env.PLACE_LIMIT))) return c.json({ error: TOO_MANY }, 429);
+      let answer: A;
+      try {
+        answer = await find(placesFor(c.env), asked);
+      } catch (error) {
+        // The message names the service and status, never what was looked up.
+        console.error(error instanceof Error ? `${error.name}: ${error.message}` : `${name} lookup failed`);
+        return c.json({ error: down }, 502);
+      }
+      return c.json(answer, 200, { "Cache-Control": `public, max-age=${answer.found ? PLACE_FOUND_MAX_AGE : PLACE_MISSING_MAX_AGE}` });
+    };
+  }
 
   return app;
 }
@@ -266,10 +264,25 @@ function earlyParams(query: URLSearchParams): SearchParams {
   return { ...params, page: 1 };
 }
 
+/** A profile's slug, refused unless UKCP could have made it. */
+function slugOf(form: URLSearchParams): string {
+  const slug = form.get("slug") ?? "";
+  if (!SLUG.test(slug)) throw new InvalidParam("slug", "That isn't a UKCP profile address.");
+  return slug;
+}
+
+/** Location text in its canonical form, refused when empty or too long. */
+function locationOf(query: URLSearchParams, param: string): string {
+  const location = canonicalLocation(query.get(param) ?? "");
+  if (location.length === 0 || location.length > LOCATION_MAX_LENGTH) {
+    throw new InvalidParam(param, `${param} must be 1 to ${LOCATION_MAX_LENGTH} characters`);
+  }
+  return location;
+}
+
 /** The text and options of a place lookup, in their canonical form. */
 function placeOf(query: URLSearchParams): { text: string; options: PlaceOptions } {
-  const text = canonicalLocation(query.get("q") ?? "");
-  if (text.length === 0 || text.length > LOCATION_MAX_LENGTH) throw new InvalidParam("q", `q must be 1 to ${LOCATION_MAX_LENGTH} characters`);
+  const text = locationOf(query, "q");
   const country = query.get("country");
   if (country !== null && !/^[a-z]{2}$/i.test(country)) throw new InvalidParam("country", "country must be a two-letter country code");
   const options: PlaceOptions = {
