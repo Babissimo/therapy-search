@@ -1,5 +1,6 @@
 import { cleanup, screen } from "@testing-library/react";
 import { afterEach } from "vitest";
+import { forgetViews } from "@/search/viewMemory";
 
 // Radix measures elements with ResizeObserver, which jsdom lacks.
 globalThis.ResizeObserver ??= class {
@@ -23,6 +24,9 @@ globalThis.IntersectionObserver ??= class {
 };
 
 afterEach(() => cleanup());
+
+// Each test's first history entry is keyed "default", as a page load's is, so none may find what the last left there.
+afterEach(() => forgetViews());
 
 if (typeof window !== "undefined") {
   // jsdom has no matchMedia: pages see a narrow screen without hover unless a test stubs its own.

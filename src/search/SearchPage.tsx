@@ -39,7 +39,7 @@ import { placed, tickedFilters } from "./state";
 import { useResults } from "./useResults";
 import { useDraftFilters, useSearchDrafts, type SearchDrafts } from "./useSearchDrafts";
 import { useSearchState } from "./useSearchState";
-import { useRememberedScroll } from "./viewMemory";
+import { useRememberedScroll, useRememberedTab } from "./viewMemory";
 
 // Fetched as the place box takes focus, so it is usually here by the time a first search's results are.
 const MapPane = lazy(loadMap);
@@ -94,7 +94,7 @@ function SearchView({ params, onChange, wide }: ViewProps) {
   // Beginning or clearing a search sets the page out afresh, its pieces gliding to their new places.
   const change = (next: SearchParams) => (placed(next) === searching ? onChange(next) : startMorph(() => onChange(next)));
   const drafts = useSearchDrafts(params, change);
-  // The search, which a selection belongs to.
+  // The search, which the map's framings, and the selections on them, belong to.
   const fitKey = searching ? toQuery(params) : "";
   const results = useResults(params, searching);
   useShortlistRefresh(results.therapists);
@@ -103,8 +103,8 @@ function SearchView({ params, onChange, wide }: ViewProps) {
   // search loads, the results, and so the place, are still the last search's.
   const centreSettled = centre.settled && !results.loading && !results.stale;
   const { pins, unplaced, placing, moving } = usePins(results.therapists, centre, params.flags.LocationSearchOutsideUK);
-  // The toolbar and the map's search stand aside while the shortlist is open, so a new search always begins on the results.
-  const [tab, setTab] = useState<ListTab>("results");
+  // A new search replaces the history entry, so it begins on the results.
+  const [tab, setTab] = useRememberedTab(entry);
   const shortlistOpen = tab === "shortlist";
   // Beside a search, the map shows whichever list is open, framing each afresh as its tab opens.
   const mapsShortlist = searching && shortlistOpen;
@@ -119,9 +119,9 @@ function SearchView({ params, onChange, wide }: ViewProps) {
   const mapView: MapView = mapsShortlist
     ? { label: "Map of your shortlist", fitKey: `${fitKey} shortlist`, centreSettled: true, pins: shortlistPins.pins, placing: shortlistPins.placing }
     : { label: "Map of results", fitKey, centre: centre.point, centreSettled, pins, marksShortlist: true, placing };
-  // Kept by key, so the selection follows its pin as Load more adds to it; a new search clears it.
+  // Kept by key, so the selection follows its pin as Load more adds to it; a new search, or the other list, clears it.
   const [selection, setSelection] = useState<{ fitKey: string; pinKey: string }>();
-  const selected = selection?.fitKey === fitKey ? mapView.pins.find((pin) => pin.key === selection.pinKey) : undefined;
+  const selected = selection?.fitKey === mapView.fitKey ? mapView.pins.find((pin) => pin.key === selection.pinKey) : undefined;
   const [highlight] = useState(createHighlight);
   // A new search's list can replace a hovered card without a pointerleave or blur, so the highlight ends with the search.
   useEffect(() => {
@@ -169,7 +169,7 @@ function SearchView({ params, onChange, wide }: ViewProps) {
       setSelection(undefined);
       return;
     }
-    setSelection({ fitKey, pinKey: pin.key });
+    setSelection({ fitKey: mapView.fitKey, pinKey: pin.key });
     listShowing.current = wide ? panelOpen : sheet !== "peek";
     if (wide) setPanelOpen(true);
     else if (sheet === "peek") setSheet("half");
@@ -178,7 +178,7 @@ function SearchView({ params, onChange, wide }: ViewProps) {
   function pickTab(value: string) {
     const pick = () => {
       setTab(value as ListTab);
-      // A selected pin belongs to the list the map was showing.
+      // A selected pin belongs to the list the map was showing, which lets it go.
       setSelection(undefined);
     };
     // Beside or above the prompt, the toolbar comes and goes with the shortlist, so the list glides into its place. Over

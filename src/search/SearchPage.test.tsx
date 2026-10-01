@@ -159,6 +159,15 @@ function Url() {
   );
 }
 
+/** Moves through the page's history by `delta` entries, as the browser's buttons and history menu do. */
+let travel: (delta: number) => void;
+
+function Travel() {
+  const navigate = useNavigate();
+  travel = (delta) => act(() => void navigate(delta));
+  return null;
+}
+
 /**
  * The page's shortlist, empty at each test's start, and its "Set aside" section as a page load starts it. Each addition is newer
  * than the last, as a visitor's clicks are.
@@ -181,6 +190,7 @@ function renderPage(url: string, client = new QueryClient({ defaultOptions: { qu
     <>
       <SearchPage />
       <Url />
+      <Travel />
     </>
   );
   render(
@@ -1081,6 +1091,46 @@ describe("SearchPage", () => {
     expect(list().scrollTop).toBe(400);
   });
 
+  it.each([
+    { screen: "wide", wide: true },
+    { screen: "narrow", wide: false },
+  ])("returns to the shortlist at its own place after Back from a profile opened from it on $screen screens", async ({ wide }) => {
+    screenIs(wide);
+    shortlist.add(therapist("a"));
+    renderAt(SEARCH);
+    await loaded();
+    pick(/^Shortlist/);
+    list().scrollTop = 400;
+    fireEvent.scroll(list());
+    fireEvent.click(screen.getByRole("link", { name: "Therapist a" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Back" }));
+    expect(await screen.findByRole("tab", { name: /^Shortlist/, selected: true })).toBeTruthy();
+    expect(list().scrollTop).toBe(400);
+  });
+
+  it("opens each search near a place on its own tab as the browser jumps between them, leaving a pin selected on the other list", async () => {
+    screenIs(true);
+    placeByDistrict();
+    shortlist.add(therapist("c", "Hove BN3"));
+    renderAt(SEARCH, [therapist("a", "Hove BN3")]);
+    await within(results()).findByRole("link", { name: "Therapist a" });
+    fireEvent.click(screen.getByRole("link", { name: "Online" }));
+    fireEvent.click(screen.getByRole("link", { name: "Near me" }));
+    await within(results()).findByRole("link", { name: "Therapist a" });
+    await within(map()).findByRole("button", { name: `Pin ${key(HOVE)}` });
+    pick(/^Shortlist/);
+    fireEvent.click(await within(map()).findByRole("button", { name: `Pin ${key(HOVE)}` }));
+    expect(map().dataset.selected).toBe(key(HOVE));
+    // As from the browser's history menu: past Online to the first search, then on to the second, the view staying mounted.
+    travel(-2);
+    expect(screen.getByRole("tab", { name: "Results", selected: true })).toBeTruthy();
+    // The results have a pin there too, which is not the one selected.
+    expect(within(map()).getByRole("button", { name: `Pin ${key(HOVE)}` })).toBeTruthy();
+    expect(map().dataset.selected).toBe("");
+    travel(2);
+    expect(screen.getByRole("tab", { name: /^Shortlist/, selected: true })).toBeTruthy();
+  });
+
   it("puts the search away while the shortlist is open, bringing it back as it was left", async () => {
     screenIs(true);
     renderAt("/?Location=Leeds&Languages=French");
@@ -1591,6 +1641,36 @@ describe("SearchPage online", () => {
     fireEvent.click(screen.getByRole("link", { name: "Therapist p1-3" }));
     fireEvent.click(await screen.findByRole("button", { name: "Back" }));
     await loaded();
+    expect(list().scrollTop).toBe(400);
+  });
+
+  it("returns to the shortlist at its own place after Back from a profile opened from it", async () => {
+    screenIs(true);
+    shortlist.add(therapist("a"));
+    renderAt(GREEK);
+    await loaded();
+    pick(/^Shortlist/);
+    list().scrollTop = 400;
+    fireEvent.scroll(list());
+    fireEvent.click(screen.getByRole("link", { name: "Therapist a" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Back" }));
+    expect(await screen.findByRole("tab", { name: /^Shortlist/, selected: true })).toBeTruthy();
+    expect(list().scrollTop).toBe(400);
+  });
+
+  it("returns to the shortlist at its own place as the browser goes Forward to it from Near me", async () => {
+    screenIs(true);
+    shortlist.add(therapist("a"));
+    renderAt(SEARCH);
+    await loaded();
+    fireEvent.click(screen.getByRole("link", { name: "Online" }));
+    pick(/^Shortlist/);
+    list().scrollTop = 400;
+    fireEvent.scroll(list());
+    travel(-1);
+    await loaded();
+    travel(1);
+    expect(screen.getByRole("tab", { name: /^Shortlist/, selected: true })).toBeTruthy();
     expect(list().scrollTop).toBe(400);
   });
 
