@@ -22,8 +22,8 @@ export function FilterChips({ params, onChange, className }: Props) {
               {...props}
               className="fade-in-0 fade-out-0 zoom-in-90 zoom-out-90 motion-safe:data-entering:animate-in motion-safe:data-leaving:animate-out"
             >
+              {/* Filled, as a choice that is on. The secondary slate is the map tiles' own tint, light and dark, and sinks into them. */}
               <Button
-                variant="secondary"
                 size="xs"
                 className="h-auto min-h-6 rounded-full py-1 text-left whitespace-normal"
                 aria-label={`Remove ${filter.label}`}
