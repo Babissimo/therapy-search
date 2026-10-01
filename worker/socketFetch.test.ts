@@ -1,7 +1,13 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { socketFetch, type Connect } from "./socketFetch";
 
 const bytes = (text: string) => new TextEncoder().encode(text);
+
+/** `reply` cut into reads of `size` characters. */
+const reads = (reply: string, size: number) => Array.from({ length: Math.ceil(reply.length / size) }, (_, i) => reply.slice(i * size, (i + 1) * size));
+
+/** `body` as chunks of `size` characters, up to and including the last chunk. */
+const chunked = (body: string, size: number) => `${reads(body, size).map((chunk) => `${chunk.length.toString(16)}\r\n${chunk}\r\n`).join("")}0\r\n\r\n`;
 
 /** A server that answers any request with `reply`, in the pieces given, then closes; `open` leaves it hanging instead. */
 function server(reply: (string | Uint8Array)[], { open = false } = {}) {
@@ -19,6 +25,8 @@ function server(reply: (string | Uint8Array)[], { open = false } = {}) {
   }));
   return { fetch: socketFetch(connect), connect, sent, close };
 }
+
+afterEach(() => vi.restoreAllMocks());
 
 describe("socketFetch", () => {
   it("asks for the path and query over TLS on port 443, with the caller's headers, for the connection to close", async () => {
@@ -38,6 +46,33 @@ describe("socketFetch", () => {
     expect(res.headers.get("Content-Type")).toBe("application/json");
     await expect(res.json()).resolves.toEqual([{ a: 1 }]);
     expect(close).toHaveBeenCalled();
+  });
+
+  it.each([
+    ["a length", "HTTP/1.1 103 Early Hints\r\nLink: </a.css>\r\n\r\nHTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: 13\r\n\r\n<h1>Name</h1>"],
+    ["chunks", "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nTransfer-Encoding: chunked\r\n\r\n6\r\n<h1>Na\r\n7;x=y\r\nme</h1>\r\n0\r\nX-Trailer: t\r\n\r\n"],
+  ])("reads a body framed by %s whole, wherever the reads split it", async (_, reply) => {
+    const splits = [reads(reply, 1), ...Array.from({ length: reply.length - 1 }, (_, at) => [reply.slice(0, at + 1), reply.slice(at + 1)])];
+    for (const pieces of splits) {
+      const { fetch } = server(pieces, { open: true });
+      const res = await fetch("https://www.psychotherapy.org.uk/therapist/Jo-Bloggs-ABCDEFGH");
+      expect([res.status, res.headers.get("Content-Type"), await res.text()]).toEqual([200, "text/html", "<h1>Name</h1>"]);
+    }
+  });
+
+  it.each([
+    ["a length", (body: string) => `HTTP/1.1 200 OK\r\nContent-Length: ${body.length}\r\n\r\n${body}`],
+    ["chunks", (body: string) => `HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n${chunked(body, 4096)}`],
+  ])("copies a body framed by %s a bounded number of times, however many reads bring it", async (_, reply) => {
+    const body = "x".repeat(150_000);
+    const { fetch } = server(reads(reply(body), 1024).map(bytes));
+    const copy = vi.spyOn(Uint8Array.prototype, "set");
+    const res = await fetch("https://www.psychotherapy.org.uk/therapist/Jo-Bloggs-ABCDEFGH");
+    const copied = copy.mock.calls.reduce((total, [from]) => total + (from as ArrayLike<number>).length, 0);
+    // Joining the body copies it once and Response copies it again; rejoining every read so far as each arrives would
+    // copy it about 75 times.
+    expect(copied).toBeLessThan(3 * body.length);
+    await expect(res.text()).resolves.toBe(body);
   });
 
   it("joins a chunked body, dropping its trailers", async () => {

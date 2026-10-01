@@ -37,35 +37,18 @@ async function exchange(socket: Socket, target: URL, headers: Headers): Promise<
   const writer = socket.writable.getWriter();
   await writer.write(new TextEncoder().encode(`${head.join("\r\n")}\r\n\r\n`));
   writer.releaseLock();
-  const reader = socket.readable.getReader();
-  let bytes = new Uint8Array(0);
-  for (;;) {
-    const { value, done } = await reader.read();
-    if (value) bytes = concat([bytes, value]);
-    // A server may keep the connection open after all, so the response ends where its framing says.
-    const response = readResponse(bytes, target.host, done);
-    if (response) return response;
-  }
+  return readResponse(new Incoming(socket.readable), target.host);
 }
 
-/** The response `bytes` hold, or null while more is to come; once the server has `ended`, anything short rejects. */
-function readResponse(bytes: Uint8Array<ArrayBuffer>, host: string, ended: boolean): Response | null {
-  const unreadable = (what: string) => new TypeError(`${host} sent ${what}`);
-  const cutOff = (what: string) => {
-    if (ended) throw unreadable(what);
-    return null;
-  };
-  const headEnd = indexOf(bytes, HEAD_END);
-  if (headEnd < 0) return cutOff("no complete response head");
-  const rest = bytes.subarray(headEnd + HEAD_END.length);
-  // Header bytes are Latin-1 as far as Headers is concerned, so each byte is one character.
-  const [statusLine = "", ...fields] = Array.from(bytes.subarray(0, headEnd), (byte) => String.fromCharCode(byte))
-    .join("")
-    .split("\r\n");
-  const status = Number(/^HTTP\/1\.[01] ([1-5]\d\d)/.exec(statusLine)?.[1]);
-  if (!status) throw unreadable("no status");
+type Unreadable = (what: string) => TypeError;
+
+/** The response a server sends, which rejects if the server closes before it's whole. */
+async function readResponse(incoming: Incoming, host: string): Promise<Response> {
+  const unreadable: Unreadable = (what) => new TypeError(`${host} sent ${what}`);
+  let head = await readHead(incoming, unreadable);
   // An interim response, such as 103 Early Hints, comes before the one that counts.
-  if (status < 200) return readResponse(rest, host, ended);
+  while (head.status < 200) head = await readHead(incoming, unreadable);
+  const { status, fields } = head;
   const headers = new Headers();
   for (const field of fields) {
     const colon = field.indexOf(":");
@@ -75,48 +58,125 @@ function readResponse(bytes: Uint8Array<ArrayBuffer>, host: string, ended: boole
   if ([204, 205, 304].includes(status)) return new Response(null, { status, headers });
   const coding = headers.get("Content-Encoding");
   if (coding && coding !== "identity") throw unreadable(`a body encoded as ${coding}`);
-  let body: Uint8Array<ArrayBuffer> = rest;
+  // A server may keep the connection open after all, so the body ends where its framing says.
+  let body: Uint8Array<ArrayBuffer>;
   if (headers.get("Transfer-Encoding")?.toLowerCase().includes("chunked")) {
-    const content = dechunk(rest, host);
-    if (content === null) return cutOff("a cut-off body");
-    body = content;
+    body = await readChunked(incoming, unreadable);
     headers.delete("Transfer-Encoding");
   } else if (headers.has("Content-Length")) {
     const length = Number(headers.get("Content-Length"));
     if (!Number.isInteger(length) || length < 0) throw unreadable("a malformed length");
-    if (rest.length < length) return cutOff("a cut-off body");
-    body = rest.subarray(0, length);
-  } else if (!ended) {
-    return null;
+    const content = await incoming.take(length);
+    if (!content) throw unreadable("a cut-off body");
+    body = concat(content);
+  } else {
+    body = concat(await incoming.rest());
   }
   return new Response(body, { status, headers });
 }
 
-/** A chunked body's content, or null when it stops before its last chunk. Trailers are dropped. */
-function dechunk(body: Uint8Array<ArrayBuffer>, host: string): Uint8Array<ArrayBuffer> | null {
-  const chunks: Uint8Array[] = [];
-  let at = 0;
+/** The status and header lines of the next response head. */
+async function readHead(incoming: Incoming, unreadable: Unreadable): Promise<{ status: number; fields: string[] }> {
+  const head = await incoming.through(HEAD_END);
+  if (!head) throw unreadable("no complete response head");
+  // Header bytes are Latin-1 as far as Headers is concerned, so each byte is one character.
+  const [statusLine = "", ...fields] = latin1(head.subarray(0, -HEAD_END.length)).split("\r\n");
+  const status = Number(/^HTTP\/1\.[01] ([1-5]\d\d)/.exec(statusLine)?.[1]);
+  if (!status) throw unreadable("no status");
+  return { status, fields };
+}
+
+/** A chunked body's content, read up to its last chunk. Trailers are dropped. */
+async function readChunked(incoming: Incoming, unreadable: Unreadable): Promise<Uint8Array<ArrayBuffer>> {
+  const chunks: Uint8Array[][] = [];
   for (;;) {
-    const lineEnd = indexOf(body, LINE_END, at);
-    if (lineEnd < 0) return null;
+    const line = await incoming.through(LINE_END);
+    if (!line) throw unreadable("a cut-off body");
     // Hex digits, then any extensions after a semicolon.
-    const digits = /^[0-9a-f]+/i.exec(new TextDecoder().decode(body.subarray(at, lineEnd)))?.[0];
-    if (digits === undefined) throw new TypeError(`${host} sent a malformed chunk`);
+    const digits = /^[0-9a-f]+/i.exec(latin1(line))?.[0];
+    if (digits === undefined) throw unreadable("a malformed chunk");
     const size = parseInt(digits, 16);
-    if (size === 0) return concat(chunks);
-    at = lineEnd + LINE_END.length;
-    if (at + size + LINE_END.length > body.length) return null;
-    chunks.push(body.subarray(at, at + size));
-    at += size + LINE_END.length;
+    if (size === 0) return concat(chunks.flat());
+    const chunk = await incoming.take(size);
+    // The line end after a chunk's data goes unchecked.
+    if (!chunk || !(await incoming.take(LINE_END.length))) throw unreadable("a cut-off body");
+    chunks.push(chunk);
   }
 }
 
-function indexOf(bytes: Uint8Array, pattern: number[], from = 0): number {
-  search: for (let i = from; i <= bytes.length - pattern.length; i++) {
-    for (let j = 0; j < pattern.length; j++) if (bytes[i + j] !== pattern[j]) continue search;
-    return i;
+/**
+ * A socket's incoming bytes, taken in order as each part of a response is read. A part that ends partway through a
+ * read leaves the rest for the next, and a body comes in the pieces it arrived in, to be joined once, so reading a
+ * response takes time in proportion to its size.
+ */
+class Incoming {
+  readonly #reader: ReadableStreamDefaultReader<Uint8Array>;
+  #left: Uint8Array = new Uint8Array(0);
+
+  constructor(readable: ReadableStream<Uint8Array>) {
+    this.#reader = readable.getReader();
   }
-  return -1;
+
+  /** The bytes up to and including the next `delimiter`, or null if the server closes first. */
+  async through(delimiter: number[]): Promise<Uint8Array<ArrayBuffer> | null> {
+    const pieces: Uint8Array[] = [];
+    // How much of the delimiter the bytes so far end with, so one split across reads is still found.
+    let matched = 0;
+    while (matched < delimiter.length) {
+      const bytes = await this.#next();
+      if (!bytes) return null;
+      let at = 0;
+      while (at < bytes.length && matched < delimiter.length) {
+        const byte = bytes[at++];
+        // For CRLF and CRLFCRLF, a match can only restart at the byte that broke the last one.
+        matched = byte === delimiter[matched] ? matched + 1 : byte === delimiter[0] ? 1 : 0;
+      }
+      pieces.push(bytes.subarray(0, at));
+      this.#left = bytes.subarray(at);
+    }
+    return concat(pieces);
+  }
+
+  /** The next `length` bytes, in the pieces they came in, or null if the server closes first. */
+  async take(length: number): Promise<Uint8Array[] | null> {
+    const pieces: Uint8Array[] = [];
+    for (let wanted = length; wanted > 0; ) {
+      const bytes = await this.#next();
+      if (!bytes) return null;
+      const piece = bytes.subarray(0, wanted);
+      pieces.push(piece);
+      this.#left = bytes.subarray(piece.length);
+      wanted -= piece.length;
+    }
+    return pieces;
+  }
+
+  /** Everything up to the close, in the pieces it came in. */
+  async rest(): Promise<Uint8Array[]> {
+    const pieces: Uint8Array[] = [];
+    for (;;) {
+      const bytes = await this.#next();
+      if (!bytes) return pieces;
+      pieces.push(bytes);
+    }
+  }
+
+  /** What the last read left over, or else the next read, or null once the server has closed. */
+  async #next(): Promise<Uint8Array | null> {
+    const left = this.#left;
+    if (left.length) {
+      this.#left = new Uint8Array(0);
+      return left;
+    }
+    const { value, done } = await this.#reader.read();
+    return done ? null : value;
+  }
+}
+
+function latin1(bytes: Uint8Array): string {
+  let text = "";
+  for (const byte of bytes) text += String.fromCharCode(byte);
+  return text;
 }
 
 function concat(chunks: Uint8Array[]): Uint8Array<ArrayBuffer> {
