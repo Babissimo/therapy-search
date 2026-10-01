@@ -10,7 +10,7 @@ import { Masthead } from "@/layout/Masthead";
 import { useMediaQuery } from "@/lib/useMediaQuery";
 import { cn } from "@/lib/utils";
 import { useClosedGroups } from "@/shortlist/groups";
-import { ShortlistTab } from "@/shortlist/ShortlistTab";
+import { LazyShortlistTab } from "@/shortlist/LazyShortlistTab";
 import { statusOf } from "@/shortlist/store";
 import { useShortlistIf, useShortlistRefresh } from "@/shortlist/useShortlist";
 import { soughtTerms } from "./activeFilters";
@@ -196,7 +196,7 @@ function SearchView({ params, onChange, wide }: ViewProps) {
       tab={tab}
       results={searching ? list : <NearPrompt wide={wide} />}
       shortlist={
-        <ShortlistTab
+        <LazyShortlistTab
           sought={soughtTerms(params)}
           pins={shortlistPins.pins}
           unplaced={shortlistPins.unplaced.length}

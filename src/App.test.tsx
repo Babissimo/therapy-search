@@ -14,6 +14,12 @@ import { App, AppRoutes } from "./App";
 // Leaflet draws nothing under jsdom; the map is tested on its own.
 vi.mock("@/search/map/MapPane", () => ({ default: () => null }));
 
+// The shortlist's chunk is here at once, so opening its tab shows it in the same step (see LazyShortlistTab.test.tsx).
+vi.mock("@/shortlist/LazyShortlistTab", async () => ({
+  LazyShortlistTab: (await import("@/shortlist/ShortlistTab")).ShortlistTab,
+  usePreloadShortlistTab: () => {},
+}));
+
 const PROFILE: Profile = { slug: "Jo-ABCDEFGH", name: "Jo Bloggs", initials: "JB", languages: [], emailInContact: false, social: [], about: [], practical: [], offices: [] };
 
 function Url() {
