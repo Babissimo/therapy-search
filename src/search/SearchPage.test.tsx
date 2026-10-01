@@ -324,6 +324,21 @@ describe("SearchPage", () => {
     await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("button", { name: "Show list" })));
   });
 
+  it("tells a screen reader what a search found with the list put away, and keeps saying so as the screen narrows", async () => {
+    // Apart from the URL's <output>, which is a status too.
+    const resultsStatus = () => screen.getAllByRole("status").find((el) => el.tagName === "P")!;
+    const resize = screenIs(true);
+    renderAt(SEARCH);
+    await loaded();
+    fireEvent.click(screen.getByRole("button", { name: "Hide list" }));
+    const status = resultsStatus();
+    await waitFor(() => expect(status.textContent).toBe("30 therapists near Leeds."));
+    expect(status.closest("[inert]")).toBeNull();
+    resize(false);
+    expect(resultsStatus()).toBe(status);
+    expect(status.closest("[inert]")).toBeNull();
+  });
+
   it("asks for a search in place of the results, with no map, when there is nothing to search for", async () => {
     screenIs(true);
     renderAt("/");
@@ -755,6 +770,17 @@ describe("SearchPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "Filters, 1 ticked" }));
     fireEvent.click(screen.getByRole("button", { name: "Update results" }));
     expect(url().toString()).toBe("Location=Leeds&Languages=French");
+  });
+
+  it("tells a screen reader what the first search found, from a live region in place before it", async () => {
+    screenIs(false);
+    renderAt("/");
+    const status = screen.getAllByRole("status").find((el) => el.tagName === "P");
+    expect(status?.textContent).toBe("");
+    fireEvent.change(screen.getByRole("searchbox", { name: "Keyword search" }), { target: { value: "grief" } });
+    fireEvent.change(screen.getByRole("textbox", { name: "Location" }), { target: { value: "York" } });
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+    await waitFor(() => expect(status?.textContent).toBe("30 therapists near York."));
   });
 
   it("leaves the outside-UK tick out of the Filters count, as Clear all keeps it", async () => {
@@ -1485,6 +1511,32 @@ describe("SearchPage online", () => {
     expect(url().toString()).toBe("");
     expect(prompt()).toBeTruthy();
     expect(api.search).toHaveBeenCalledOnce();
+  });
+
+  it("tells a screen reader what the first search found, from a live region in place before it", async () => {
+    screenIs(false);
+    renderAt(ONLINE);
+    const status = screen.getAllByRole("status").find((el) => el.tagName === "P");
+    expect(status?.textContent).toBe("");
+    const panel = screen.getByRole("tabpanel", { name: "Results" });
+    fireEvent.click(within(panel).getByRole("button", { name: /^Languages/ }));
+    fireEvent.click(within(panel).getByRole("checkbox", { name: "Greek" }));
+    fireEvent.click(within(panel).getByRole("button", { name: "Show results" }));
+    await waitFor(() => expect(status?.textContent).toBe("30 therapists working online or by phone."));
+  });
+
+  it("tells a screen reader what a search found though the shortlist's tab opened while it ran", async () => {
+    screenIs(true);
+    renderAt(ONLINE);
+    const status = screen.getAllByRole("status").find((el) => el.tagName === "P");
+    fireEvent.click(within(filters()).getByRole("button", { name: /^Languages/ }));
+    fireEvent.click(within(filters()).getByRole("checkbox", { name: "Greek" }));
+    fireEvent.click(within(filters()).getByRole("button", { name: "Show results" }));
+    const tab = screen.getByRole("tab", { name: /^Shortlist/ });
+    fireEvent.mouseDown(tab);
+    fireEvent.click(tab);
+    await waitFor(() => expect(status?.textContent).toBe("30 therapists working online or by phone."));
+    expect(status?.closest("[hidden]")).toBeNull();
   });
 
   it("asks for no place, nor wheelchair access or a session type needing one, that a link carries", async () => {

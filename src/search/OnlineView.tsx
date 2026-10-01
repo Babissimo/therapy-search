@@ -18,6 +18,7 @@ import { ModeSwitch } from "./ModeSwitch";
 import { narrowsOnline, onlineSearch } from "./online";
 import { Prompt } from "./Prompt";
 import { Results } from "./Results";
+import { ResultsStatus } from "./ResultsStatus";
 import { useResults } from "./useResults";
 import { useSearchDrafts } from "./useSearchDrafts";
 import { useRememberedScroll, useRememberedTab } from "./viewMemory";
@@ -93,6 +94,9 @@ export function OnlineView({ params, onChange, wide }: Props) {
       asChild
     >
       <div className="group/tabs flex min-h-0 flex-1">
+        {/* Apart from the results' panel, which is hidden while the shortlist's shows. There before a search starts, as a live
+            region is heard only once it is there. */}
+        <ResultsStatus params={search} results={results} online searching={searching} />
         <ListColumn
           wide={wide}
           tabs={<ListTabs />}
