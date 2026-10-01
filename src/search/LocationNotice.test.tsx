@@ -23,14 +23,8 @@ describe("LocationNotice", () => {
     expect(alert.querySelector("svg")?.classList.contains("lucide-info")).toBe(true);
   });
 
-  it("names the place UKCP searched otherwise", () => {
-    render(<LocationNotice typed="brighton" searched="Brighton" />);
-    expect(screen.getByText("Brighton").tagName).toBe("STRONG");
-    expect(screen.queryByRole("alert")).toBeNull();
-  });
-
-  it("says nothing for a search without a location", () => {
-    const { container } = render(<LocationNotice typed="" />);
-    expect(container.textContent).toBe("");
+  it("says nothing when UKCP knew the place, or there was none", () => {
+    expect(render(<LocationNotice typed="brighton" searched="Brighton" />).container.textContent).toBe("");
+    expect(render(<LocationNotice typed="" />).container.textContent).toBe("");
   });
 });

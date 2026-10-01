@@ -10,7 +10,7 @@ import { soughtTerms } from "./activeFilters";
 import { feeText } from "./fee";
 import { LocationNotice } from "./LocationNotice";
 import { listEntries, pinLabel, type Pin } from "./map/pins";
-import { reachLine, resultCount } from "./reach";
+import { resultsHeading } from "./reach";
 import { ResultsError } from "./ResultsError";
 import { TherapistCard, TherapistCardSkeleton } from "./TherapistCard";
 import { useOffices } from "./useOffices";
@@ -34,6 +34,9 @@ type Props = {
 // How long a search runs before the list says why.
 const SLOW_MS = 2000;
 
+// UKCP's word that it lists a location search in a random order, which this list's own order and note replace.
+const UKCP_ORDER = /^Location searches are grouped by distance/;
+
 export function Results(props: Props) {
   const { query } = props.results;
   // Outside the list, which is marked busy and dimmed while it loads, so the line is announced and read as it comes.
@@ -51,21 +54,13 @@ function ResultsList({ params, results, listRef, pins = [], unplaced = [], selec
   if (query.isPending) {
     return (
       <div className="space-y-4" aria-busy>
-        <div aria-hidden className="space-y-4">
-          <Summary title={<SkeletonText className="w-48" />} reach={<SkeletonText className="w-56" />} note={<SkeletonText className="w-64" />} />
-          {/* A search near a place names the place, and UKCP notes how it orders the results around it. */}
-          {!online && (
-            <>
-              <p className="text-sm">
-                <SkeletonText className="w-52" />
-              </p>
-              <Alert>
-                <AlertDescription>
-                  <SkeletonText lines={3} className="w-2/5" />
-                </AlertDescription>
-              </Alert>
-            </>
-          )}
+        <div aria-hidden>
+          {/* A search near a place says how its list is ordered as well as what its pins show, which takes two lines. */}
+          <Summary
+            title={<SkeletonText className="w-48" />}
+            sub={<SkeletonText className="w-56" />}
+            note={<SkeletonText lines={online ? 1 : 2} className={online ? "w-64" : "w-1/2"} />}
+          />
         </div>
         {Array.from({ length: 4 }, (_, i) => (
           <TherapistCardSkeleton key={i} online={online} />
@@ -76,8 +71,7 @@ function ResultsList({ params, results, listRef, pins = [], unplaced = [], selec
   if (query.isLoadingError) return <ResultsError error={query.error} params={params} />;
 
   const count = first?.total;
-  const title = searchedPlace === undefined || count === undefined ? resultCount(count) : `${resultCount(count)} within your area`;
-  const reach = reachLine(therapists, count ?? 0, searchedPlace !== undefined);
+  const located = searchedPlace !== undefined;
   const highlight = (slug: string) => (on: boolean) => onHighlight?.(on ? slug : undefined);
   const sought = soughtTerms(params);
   const feeOf = (t: Therapist) => feeText(officeOf(t)?.cost);
@@ -88,17 +82,14 @@ function ResultsList({ params, results, listRef, pins = [], unplaced = [], selec
       {/* The heading and each entry fade in as they replace their skeleton or arrive, and again as their tab is shown,
           which starts their animations afresh. Side by side rather than one within another, so no fade dims another. */}
       <div className="space-y-4 fade-in-0 motion-safe:animate-in">
-        {/* With no one found, the heading has said so. */}
+        {/* With no one found, the heading has said so, and the place still says where. */}
         <Summary
-          title={title}
-          reach={therapists.length > 0 && (unplaced.length > 0 ? `${reach} · ${unplaced.length} not on the map` : reach)}
-          note={
-            therapists.length > 0 &&
-            (online ? "Only therapists who say they work online or by phone." : "Pins show the postcode or area each therapist lists.")
-          }
+          title={resultsHeading(therapists, count, located)}
+          sub={searchedPlace ?? (therapists.length > 0 && `${therapists.length} of ${count}`)}
+          note={therapists.length > 0 && listNote(online, located, unplaced.length)}
         />
         <LocationNotice typed={params.text.Location} searched={first?.locationSearched} />
-        {first?.notices.map((notice) => (
+        {first?.notices.filter((notice) => !UKCP_ORDER.test(notice)).map((notice) => (
           <Alert key={notice}>
             <AlertDescription>{notice}</AlertDescription>
           </Alert>
@@ -137,14 +128,21 @@ function ResultsList({ params, results, listRef, pins = [], unplaced = [], selec
 }
 
 /** The list's heading and the lines under it, shared by the list and its skeleton. */
-function Summary({ title, reach, note }: { title: ReactNode; reach?: ReactNode; note?: ReactNode }) {
+function Summary({ title, sub, note }: { title: ReactNode; sub?: ReactNode; note?: ReactNode }) {
   return (
     <div className="space-y-1">
       <h2 className="font-heading text-xl font-medium">{title}</h2>
-      {reach && <p className="text-sm text-muted-foreground">{reach}</p>}
+      {sub && <p className="text-sm text-muted-foreground">{sub}</p>}
       {note && <p className="text-xs text-muted-foreground">{note}</p>}
     </div>
   );
+}
+
+/** How the list is ordered and what its pins show. UKCP measures each distance to the therapist's address. */
+function listNote(online: boolean, located: boolean, unplaced: number): string {
+  if (online) return "Only therapists who say they work online or by phone.";
+  const order = located ? "Nearest first, measured from the centre of the place searched. " : "";
+  return `${order}Pins show the postcode or area each therapist lists${unplaced > 0 ? ` · ${unplaced} not on the map` : ""}.`;
 }
 
 /**

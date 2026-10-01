@@ -391,10 +391,11 @@ describe("SearchPage", () => {
     expect(list().contains(more)).toBe(false);
   });
 
-  it("says a searched place's results are within its area", async () => {
+  it("names the searched place under the list's heading", async () => {
     screenIs(true);
     vi.spyOn(api, "place").mockResolvedValue({ found: true, kind: "place", candidates: [{ lat: 53.8, lng: -1.55 }] });
-    vi.spyOn(api, "search").mockResolvedValue(listed({ total: 1, from: 1, to: 1, notices: [], therapists: [therapist("a")], locationSearched: "Leeds, UK" }));
+    const therapists = [{ ...therapist("a"), distance: "0.4 miles from Leeds" }];
+    vi.spyOn(api, "search").mockResolvedValue(listed({ total: 1, from: 1, to: 1, notices: [], therapists, locationSearched: "Leeds, UK" }));
     render(
       <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
         <TooltipProvider>
@@ -404,7 +405,8 @@ describe("SearchPage", () => {
         </TooltipProvider>
       </QueryClientProvider>,
     );
-    expect(await screen.findByRole("heading", { name: "1 result within your area" })).toBeTruthy();
+    const heading = await screen.findByRole("heading", { name: "1 result within 0.4 miles" });
+    expect(heading.nextElementSibling?.textContent).toBe("Leeds, UK");
   });
 
   it("lays the results over the map on narrow screens, starting on the list", async () => {
@@ -677,8 +679,8 @@ describe("SearchPage", () => {
       text.includes("NOWHERE") ? { found: false, reason: "not-found" } : { found: true, kind: "outcode", candidates: [{ lat: 50.83, lng: -0.15 }] },
     );
     renderAt(SEARCH, [therapist("a", "BRIGHTON BN3"), therapist("b", " BN"), therapist("c", "NOWHERE")]);
-    expect(await within(results()).findByText("3 of 3 · 2 not on the map")).toBeTruthy();
-    expect(within(results()).getByText("Pins show the postcode or area each therapist lists.")).toBeTruthy();
+    expect(await within(results()).findByText("Pins show the postcode or area each therapist lists · 2 not on the map.")).toBeTruthy();
+    expect(within(results()).getByText("3 of 3")).toBeTruthy();
   });
 
   it("gathers everyone at a pin under the place they list, where the first of them comes", async () => {
@@ -983,7 +985,7 @@ describe("SearchPage", () => {
     shortlist.add(therapist("c", "Inverness"));
     renderPage(SEARCH);
     // Too far from the search's centre to be where its therapist is.
-    expect(await within(results()).findByText("Nearest 1 of 1 · 1 not on the map")).toBeTruthy();
+    expect(await within(results()).findByText(/each therapist lists · 1 not on the map\.$/)).toBeTruthy();
     pick(/^Shortlist/);
     await waitFor(() => expect(mapPins()).toEqual([`Pin ${key(INVERNESS)}: c`]));
   });
