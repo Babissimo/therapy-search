@@ -322,6 +322,15 @@ describe("SearchPage", () => {
     expect(screen.queryByText(/^Type a town, city or postcode/)).toBeNull();
   });
 
+  it("says where to turn for help today beneath the prompt, near a place or online", () => {
+    screenIs(true);
+    renderAt("/");
+    expect(within(results()).getByText(/^Need help now\?/).querySelector("a[href='tel:116123']")).toBeTruthy();
+    cleanup();
+    renderAt("/online");
+    expect(within(results()).getByText(/^Need help now\?/).querySelector("a[href='tel:116123']")).toBeTruthy();
+  });
+
   it("lets the map leave the UK only for a search outside it", async () => {
     screenIs(true);
     renderAt(SEARCH);
