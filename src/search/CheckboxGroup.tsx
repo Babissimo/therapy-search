@@ -20,12 +20,15 @@ type Props = {
   group: FilterGroup;
   searchable: boolean;
   isChecked: (field: FilterField) => boolean;
+  /** Whether a box's tick differs from the search on show, waiting for the next search. */
+  isChanged?: (field: FilterField) => boolean;
   onToggle: (field: FilterField, on: boolean) => void;
 };
 
-export function CheckboxGroup({ group, searchable, isChecked, onToggle }: Props) {
+export function CheckboxGroup({ group, searchable, isChecked, isChanged, onToggle }: Props) {
   // The panel can be mounted twice (sidebar and mobile sheet), so element ids must be per instance.
   const baseId = useId();
+  const unsearchedId = `${baseId}unsearched`;
   const [filter, setFilter] = useState("");
   const sections = useMemo(() => sectionsOf(group), [group]);
   // Headings holding a tick start open, as the panel's groups do, and a heading opens when a box under it is ticked.
@@ -57,12 +60,19 @@ export function CheckboxGroup({ group, searchable, isChecked, onToggle }: Props)
 
   const item = (field: FilterField) => {
     const id = `${baseId}${group.fields.indexOf(field)}`;
+    const changed = isChanged?.(field) ?? false;
     return (
       <li key={`${field.name}=${field.value}`} className="flex items-center gap-2">
-        <Checkbox id={id} checked={isChecked(field)} onCheckedChange={(checked) => tick(field, checked === true)} />
+        <Checkbox
+          id={id}
+          checked={isChecked(field)}
+          aria-describedby={changed ? unsearchedId : undefined}
+          onCheckedChange={(checked) => tick(field, checked === true)}
+        />
         <label htmlFor={id} className="text-sm">
           {field.label}
         </label>
+        {changed && <span data-unsearched aria-hidden className="size-1.5 shrink-0 rounded-full bg-highlight forced-color-adjust-none" />}
       </li>
     );
   };
@@ -70,6 +80,9 @@ export function CheckboxGroup({ group, searchable, isChecked, onToggle }: Props)
 
   return (
     <div className="space-y-3">
+      <span id={unsearchedId} hidden>
+        Not yet searched
+      </span>
       {searchable && (
         <Input type="search" aria-label={`Search ${group.label}`} placeholder="Search this list" value={filter} onChange={(e) => setFilter(e.target.value)} />
       )}

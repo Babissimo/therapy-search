@@ -9,7 +9,7 @@ import { useShortlistRefresh } from "@/shortlist/useShortlist";
 import { soughtTerms } from "./activeFilters";
 import { FilterChips } from "./FilterChips";
 import { ONLINE_FILTER_GROUPS } from "./filterGroups";
-import { FiltersSection, MobileFilters } from "./Filters";
+import { FiltersSection, MobileFilters, UpdateResults } from "./Filters";
 import { ListColumn } from "./ListColumn";
 import { ListPanels, ListTabs, type ListTab } from "./ListTabs";
 import { LoadMore } from "./LoadMore";
@@ -17,7 +17,6 @@ import { ModeSwitch } from "./ModeSwitch";
 import { narrowsOnline, onlineSearch } from "./online";
 import { FiltersIcon, Prompt } from "./Prompt";
 import { Results } from "./Results";
-import { tickedFilters } from "./state";
 import { useResults } from "./useResults";
 import { useSearchDrafts } from "./useSearchDrafts";
 import { useRememberedScroll } from "./viewMemory";
@@ -32,6 +31,8 @@ export function OnlineView({ params, onChange, wide }: Props) {
   // As Near me waits for a place, this waits for a filter, asking UKCP for nothing until then.
   const searching = narrowsOnline(params);
   const results = useResults(search, searching);
+  // Ticks begin a search only once they narrow it; once one shows, any change goes, back to the prompt if need be.
+  const firstSearch = searching ? undefined : narrowsOnline;
   useShortlistRefresh(results.therapists);
   const filtersId = useId();
   // Kept by search, so a new one shows its results whichever tab was open.
@@ -45,18 +46,18 @@ export function OnlineView({ params, onChange, wide }: Props) {
   const toolbar = (
     <Morph name="toolbar">
       <div className="flex flex-col gap-2 rounded-xl border bg-background p-2">
-        <ModeSwitch online params={params} />
+        <ModeSwitch online params={params} drafts={drafts} />
         <div className="flex items-center gap-2">
           <Morph name="place">
             {/* As tall as Near me's search box, so the one gives way to the other in a toolbar of one size. */}
             <p className="flex min-h-8 min-w-0 flex-1 items-center px-1 text-sm">Online or by phone, wherever you are</p>
           </Morph>
-          {!wide && <MobileFilters params={params} drafts={drafts} groups={ONLINE_FILTER_GROUPS} ticked={tickedFilters(params)} />}
+          {!wide && <MobileFilters params={params} drafts={drafts} groups={ONLINE_FILTER_GROUPS} ready={firstSearch} />}
         </div>
       </div>
     </Morph>
   );
-  const chips = <FilterChips params={params} onChange={onChange} className={cn(!wide && "flex-nowrap overflow-x-auto [&>li]:shrink-0")} />;
+  const chips = <FilterChips params={params} onRemove={drafts.applyWithout} className={cn(!wide && "flex-nowrap overflow-x-auto [&>li]:shrink-0")} />;
   const lists = (
     <ListPanels
       tab={tab}
@@ -96,7 +97,13 @@ export function OnlineView({ params, onChange, wide }: Props) {
           <div className="flex w-96 shrink-0 flex-col gap-2 border-l p-3">
             {toolbar}
             {chips}
-            <FiltersSection id={filtersId} params={params} drafts={drafts} groups={ONLINE_FILTER_GROUPS} />
+            <FiltersSection
+              id={filtersId}
+              params={params}
+              drafts={drafts}
+              groups={ONLINE_FILTER_GROUPS}
+              footer={<UpdateResults drafts={drafts} label={searching ? undefined : "Show results"} ready={firstSearch} />}
+            />
           </div>
         )}
       </div>
@@ -116,7 +123,7 @@ function OnlinePrompt({ wide }: { wide: boolean }) {
           Open Filters <FiltersIcon /> and choose one
         </>
       )}
-      , such as what they help with, how they work or the languages they speak, to see who fits. Type of Session alone won't narrow them enough.
+      , such as what they help with, how they work or the languages they speak, then show who fits. Type of Session alone won't narrow them enough.
     </Prompt>
   );
 }

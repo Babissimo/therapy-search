@@ -4,6 +4,7 @@ import { Link, useNavigate, type To } from "react-router";
 import { toQuery, type SearchParams } from "@shared/query";
 import { startMorph } from "@/components/Morph";
 import { nearMeParams, ONLINE_PATH, onlineParams, rememberPlace } from "./online";
+import { useDraftSearch, type SearchDrafts } from "./useSearchDrafts";
 
 // As the side bar's tabs look, full width, the page showing marked as the open tab.
 const OPTION =
@@ -12,12 +13,17 @@ const OPTION =
 // Set as the switch is used, so the switch the new page draws takes over the keyboard from the one it replaced.
 let switching = false;
 
-type Props = { online: boolean; params: SearchParams };
+type Props = { online: boolean; params: SearchParams; drafts: SearchDrafts };
 
-/** Between the map of therapists near a place and the list of those working online or by phone, either taking the search's filters to the other. */
-export function ModeSwitch({ online, params }: Props) {
-  const near = online ? nearMeParams(params) : params;
-  const remote = online ? params : onlineParams(params);
+/**
+ * Between the map of therapists near a place and the list of those working online or by phone, either taking the
+ * search's filters to the other, with any ticks and keyword still waiting in its draft.
+ */
+export function ModeSwitch({ online, params, drafts }: Props) {
+  // The other view takes the draft; neither reads its typed place. This one's link stays the search on show.
+  const draft = useDraftSearch(drafts);
+  const near = online ? nearMeParams(draft) : params;
+  const remote = online ? params : onlineParams(draft);
   const current = useRef<HTMLAnchorElement>(null);
   const navigate = useNavigate();
   useEffect(() => {

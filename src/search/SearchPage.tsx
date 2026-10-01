@@ -16,7 +16,7 @@ import { statusOf } from "@/shortlist/store";
 import { useShortlistIf, useShortlistRefresh } from "@/shortlist/useShortlist";
 import { soughtTerms } from "./activeFilters";
 import { FilterChips } from "./FilterChips";
-import { FiltersButton, FiltersSection, FiltersSheet, FiltersSheetButton } from "./Filters";
+import { FiltersButton, FiltersSection, FiltersSheet, FiltersSheetButton, UpdateResults } from "./Filters";
 import { ListColumn } from "./ListColumn";
 import { ListPanels, ListTabs, type ListTab } from "./ListTabs";
 import { createHighlight } from "./map/highlight";
@@ -35,7 +35,7 @@ import { coverOf, ResultsSheet, type SheetPosition } from "./ResultsSheet";
 import { SearchBox } from "./SearchBox";
 import { placed, tickedFilters } from "./state";
 import { useResults } from "./useResults";
-import { useSearchDrafts, type SearchDrafts } from "./useSearchDrafts";
+import { useDraftFilters, useSearchDrafts, type SearchDrafts } from "./useSearchDrafts";
 import { useSearchState } from "./useSearchState";
 import { useRememberedScroll } from "./viewMemory";
 
@@ -87,7 +87,7 @@ type ViewProps = { params: SearchParams; onChange: (next: SearchParams) => void;
 function SearchView({ params, onChange, wide }: ViewProps) {
   const { key: entry } = useLocation();
   // Only a place makes a search here: without one UKCP would list everyone matching in a random order, which answers no
-  // one looking nearby. Ticks and the keyword wait in the URL for one.
+  // one looking nearby. Ticks and the keyword wait for one.
   const searching = placed(params);
   // Beginning or clearing a search sets the page out afresh, its pieces gliding to their new places.
   const change = (next: SearchParams) => (placed(next) === searching ? onChange(next) : startMorph(() => onChange(next)));
@@ -127,7 +127,7 @@ function SearchView({ params, onChange, wide }: ViewProps) {
   }, [highlight, fitKey]);
   const [panelOpen, setPanelOpen] = useState(true);
   // Whether the filters are open beneath the search box over the map. Right of the prompt on wide screens they show
-  // regardless, and stay open over the map when a tick or the keyword starts a search; a search for a place puts them away.
+  // regardless, and stay open over the map when the keyword starts a search; a search for a place puts them away.
   const [filtersOpen, setFiltersOpen] = useState(!searching && wide);
   const [sheet, setSheet] = useState<SheetPosition>("full");
   const layout = searching ? "search" : wide ? "prompt beside filters" : "prompt";
@@ -223,7 +223,6 @@ function SearchView({ params, onChange, wide }: ViewProps) {
     <Toolbar
       placement={placement}
       params={params}
-      onChange={change}
       drafts={drafts}
       wide={wide}
       // The side bar's toggle, left over the top left as the side bar hides, moves the toolbar aside.
@@ -237,7 +236,7 @@ function SearchView({ params, onChange, wide }: ViewProps) {
   // a phone; a search gives the page to the map, the list beside or over it. On wide screens the toolbar keeps its place in
   // the tree as it moves over the map, so what is typed, open or in focus in it stays; on a phone its filters' sheet does.
   return (
-    <FiltersSheet phone={!wide} params={params} drafts={drafts}>
+    <FiltersSheet phone={!wide} params={params} drafts={drafts} searches={searching}>
       {/* The tabs' root spans the page, around wherever their list and panels sit. */}
       <Tabs.Root value={tab} onValueChange={pickTab} asChild>
         <div className="group/tabs flex min-h-0 flex-1">
@@ -274,7 +273,7 @@ function SearchView({ params, onChange, wide }: ViewProps) {
                     onDeselect={() => setSelection(undefined)}
                     onSearchArea={(postcode) => {
                       if (samePostcode(postcode, params.text.Location)) return false;
-                      drafts.submitAt(params, postcode);
+                      drafts.applyAt(postcode);
                       setFiltersOpen(false);
                       return true;
                     }}
@@ -324,13 +323,12 @@ type Placement = "map" | "aside" | "list";
 function Toolbar({
   placement,
   params,
-  onChange,
   drafts,
   wide,
   besideToggle,
   filtersOpen,
   onFiltersOpenChange,
-}: ViewProps & {
+}: Omit<ViewProps, "onChange"> & {
   placement: Placement;
   drafts: SearchDrafts;
   besideToggle: boolean;
@@ -338,7 +336,12 @@ function Toolbar({
   onFiltersOpenChange: (open: boolean) => void;
 }) {
   const filtersId = useId();
-  const ticked = tickedFilters(params);
+  const ticked = tickedFilters(useDraftFilters(drafts));
+  // Put away, the filters over the map search what was ticked in them.
+  const closeFilters = () => {
+    if (drafts.pending()) drafts.apply();
+    onFiltersOpenChange(false);
+  };
   const overMap = placement === "map";
   return (
     <Collapsible open={wide && (placement === "aside" || filtersOpen)} asChild>
@@ -357,7 +360,7 @@ function Toolbar({
       >
         <Morph name="toolbar">
           <div className={cn("pointer-events-auto flex w-full flex-col gap-2 rounded-xl border bg-background p-2", overMap && "shadow-md")}>
-            <ModeSwitch online={false} params={params} />
+            <ModeSwitch online={false} params={params} drafts={drafts} />
             <div className="flex items-start gap-2">
               {/* A search for a place puts the filters away to show where it is; ticks and the keyword leave them open for more. */}
               <Morph name="place">
@@ -375,7 +378,7 @@ function Toolbar({
                     ticked={ticked}
                     aria-expanded={filtersOpen}
                     aria-controls={filtersOpen ? filtersId : undefined}
-                    onClick={() => onFiltersOpenChange(!filtersOpen)}
+                    onClick={() => (filtersOpen ? closeFilters() : onFiltersOpenChange(true))}
                   />
                 )
               ) : (
@@ -386,7 +389,7 @@ function Toolbar({
         </Morph>
         <FilterChips
           params={params}
-          onChange={onChange}
+          onRemove={drafts.applyWithout}
           // Only as wide as its chips, up to the toolbar's width, so it covers no more of the map than they do.
           className={cn("pointer-events-auto", !wide && "max-w-full flex-nowrap overflow-x-auto [&>li]:shrink-0")}
         />
@@ -396,7 +399,8 @@ function Toolbar({
             id={filtersId}
             params={params}
             drafts={drafts}
-            onClose={overMap ? () => onFiltersOpenChange(false) : undefined}
+            onClose={overMap ? closeFilters : undefined}
+            footer={overMap && <UpdateResults drafts={drafts} />}
             className="pointer-events-auto"
           />
         </CollapsibleContent>

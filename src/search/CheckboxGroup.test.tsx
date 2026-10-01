@@ -25,6 +25,16 @@ describe("CheckboxGroup", () => {
     expect(onToggle).toHaveBeenCalledWith(group.fields[2], true);
   });
 
+  it("marks a box whose tick is not yet searched, saying so to screen readers", () => {
+    const { container } = render(
+      <CheckboxGroup group={group} searchable={false} isChecked={(f) => f.value === "Polish"} isChanged={(f) => f.value === "Polish"} onToggle={() => {}} />,
+    );
+    const describedBy = screen.getByRole("checkbox", { name: "Polish" }).getAttribute("aria-describedby");
+    expect(document.getElementById(describedBy ?? "")?.textContent).toBe("Not yet searched");
+    expect(screen.getByRole("checkbox", { name: "French" }).hasAttribute("aria-describedby")).toBe(false);
+    expect(container.querySelectorAll("[data-unsearched]")).toHaveLength(1);
+  });
+
   it("warns that ticks narrow once one is ticked, for lists whose values UKCP combines", () => {
     const hint = /each extra tick narrows/;
     const { rerender } = render(<CheckboxGroup group={group} searchable={false} isChecked={() => false} onToggle={() => {}} />);
