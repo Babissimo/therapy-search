@@ -29,11 +29,23 @@ function renderCard(t: Therapist, sought: string[] = [], { grouped, action, onli
   );
 }
 
+/** The line holding `where`, which a browser translating the page leaves as it is, and the distance after it. */
+function placeLine(where: string) {
+  const place = screen.getByText(where);
+  expect(place.getAttribute("translate")).toBe("no");
+  // One element beside the pin's icon, so place and distance wrap as one line.
+  const line = place.parentElement!;
+  expect(line.previousElementSibling?.classList.contains("lucide-map-pin")).toBe(true);
+  return line.textContent;
+}
+
 describe("TherapistCard", () => {
   it("links to the profile and says where the therapist is from the searched place", () => {
     renderCard(therapist());
-    expect(screen.getByRole("link", { name: "Test Therapist 1" }).getAttribute("href")).toBe("/therapist/Test-Therapist-1-TESTID01");
-    screen.getByText("E8 (0.2 miles away)");
+    const name = screen.getByRole("link", { name: "Test Therapist 1" });
+    expect(name.getAttribute("href")).toBe("/therapist/Test-Therapist-1-TESTID01");
+    expect(name.getAttribute("translate")).toBe("no");
+    expect(placeLine("E8")).toBe("E8 (0.2 miles away)");
     screen.getByText("In-person");
     screen.getByText("Remote");
     screen.getByText("Summary text.");
@@ -77,17 +89,17 @@ describe("TherapistCard", () => {
 
   it("keeps a full postcode without its town", () => {
     renderCard(therapist({ location: "Hackney E8 3DQ", distance: "1 mile from E8 3DQ" }));
-    screen.getByText("E8 3DQ (1 mile away)");
+    expect(placeLine("E8 3DQ")).toBe("E8 3DQ (1 mile away)");
   });
 
   it("keeps a location with no postcode in it", () => {
     renderCard(therapist({ location: "St Albans", distance: "18 miles from E8 3DQ" }));
-    screen.getByText("St Albans (18 miles away)");
+    expect(placeLine("St Albans")).toBe("St Albans (18 miles away)");
   });
 
   it("keeps a distance whose wording it does not know", () => {
     renderCard(therapist({ distance: "under a mile from E8 3DQ" }));
-    screen.getByText("E8 (under a mile away)");
+    expect(placeLine("E8")).toBe("E8 (under a mile away)");
   });
 
   it("leaves the place to the heading of its pin's box, keeping the distance", () => {

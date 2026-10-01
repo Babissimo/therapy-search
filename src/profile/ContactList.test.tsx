@@ -28,8 +28,8 @@ describe("ContactList", () => {
 
     expect((await screen.findByRole("link", { name: "Telephone: 01234 567890" })).getAttribute("href")).toBe("tel:01234567890");
     expect(href("Email: jo@example.com")).toBe("mailto:jo@example.com");
-    expect(href("Website: example.invalid/practice")).toBe("https://www.example.invalid/practice/");
-    expect(href("View on UKCP")).toBe("https://www.psychotherapy.org.uk/therapist/Jo-ABCDEFGH");
+    expect(href("Website: example.invalid/practice (opens in a new tab)")).toBe("https://www.example.invalid/practice/");
+    expect(href("View on UKCP (opens in a new tab)")).toBe("https://www.psychotherapy.org.uk/therapist/Jo-ABCDEFGH");
   });
 
   it("shows the profile's own email while the rest loads, and asks nothing when UKCP holds nothing back", () => {
@@ -50,16 +50,16 @@ describe("ContactList", () => {
   it("names social links by where they go, leaving out one that is the website", async () => {
     vi.spyOn(api, "contact").mockResolvedValue({ website: "https://www.facebook.com/jo" });
     renderList({ contactId: "9239", social: ["https://www.facebook.com/jo", "https://uk.linkedin.com/in/jo"] });
-    await screen.findByRole("link", { name: "Website: facebook.com/jo" });
-    expect(screen.queryByRole("link", { name: "Facebook" })).toBeNull();
-    screen.getByRole("link", { name: "LinkedIn" });
+    await screen.findByRole("link", { name: "Website: facebook.com/jo (opens in a new tab)" });
+    expect(screen.queryByRole("link", { name: /^Facebook/ })).toBeNull();
+    screen.getByRole("link", { name: "LinkedIn (opens in a new tab)" });
   });
 
   it("names social links by where they go", () => {
     renderList({ social: ["https://uk.linkedin.com/in/jo", "https://threads.net/@jo", "https://www.psychologytoday.com/jo"] });
-    expect(href("LinkedIn")).toBe("https://uk.linkedin.com/in/jo");
-    screen.getByRole("link", { name: "Threads" });
-    screen.getByRole("link", { name: "psychologytoday.com" });
+    expect(href("LinkedIn (opens in a new tab)")).toBe("https://uk.linkedin.com/in/jo");
+    screen.getByRole("link", { name: "Threads (opens in a new tab)" });
+    screen.getByRole("link", { name: "psychologytoday.com (opens in a new tab)" });
   });
 
   it("says why the details couldn't be fetched", async () => {

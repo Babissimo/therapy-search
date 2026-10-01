@@ -1,6 +1,7 @@
 import { ExternalLink } from "lucide-react";
 import { ukcpSearchUrl, type SearchParams } from "@shared/query";
 import { FailedAlert } from "@/components/FailedAlert";
+import { NEW_TAB } from "@/lib/newTab";
 
 type Props = { error: Error; params: SearchParams; retrying: boolean; onRetry: () => void };
 
@@ -10,7 +11,8 @@ export function ResultsError({ error, params, retrying, onRetry }: Props) {
     <FailedAlert error={error} retrying={retrying} onRetry={onRetry}>
       <a className="inline-flex items-center gap-1 underline" href={ukcpSearchUrl(params)} target="_blank" rel="noreferrer">
         Search on UKCP
-        <ExternalLink aria-hidden className="size-3.5" />
+        <ExternalLink aria-hidden className="size-3.5" />{" "}
+        <span className="sr-only">{NEW_TAB}</span>
       </a>
     </FailedAlert>
   );

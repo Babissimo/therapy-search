@@ -76,7 +76,9 @@ export function StatusTrack({ therapist, status, listed = true, onChosen, onRemo
               <Button variant="outline" size="sm" onClick={() => step(next.status)}>
                 {next.label}
                 {/* Each card has one, so the name tells them apart. */}
-                <span className="sr-only">, {therapist.name}</span>
+                <span className="sr-only">
+                  , <span translate="no">{therapist.name}</span>
+                </span>
               </Button>
             )}
             <StatusMenu therapist={therapist} onChosen={onChosen} onRemoved={onRemoved} />

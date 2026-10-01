@@ -7,6 +7,28 @@ const OUTSIDE_UK: FilterField = { name: "LocationSearchOutsideUK", value: "true"
 const OUTSIDE_UK_HELP = 'Tick "Search locations outside the UK" to look for the place you type anywhere in the world, not just in the UK.';
 const ONLINE_ADDITIONAL_HELP = "Use this filter to narrow down your results to only therapists who have added a picture to their profile.";
 
+// UKCP's names for its groups, which stay their keys, as the page shows them: in sentence case, and as questions where
+// UKCP's own read as labels.
+const GROUP_NAMES: Record<string, string> = {
+  "Type of Session": "Type of session",
+  "I Want Help With": "What you want help with",
+  "Works With": "Who they work with",
+  "Type of Therapy": "Type of therapy",
+  "Additional Filters": "More filters",
+  "UKCP Colleges": "UKCP colleges",
+};
+
+/** A group's name as the page shows it. */
+export function groupName(group: FilterGroup): string {
+  return GROUP_NAMES[group.label] ?? group.label;
+}
+
+/** A group's name within a sentence, lower-cased unless it starts with a capitalised abbreviation such as UKCP. */
+export function groupNameInSentence(group: FilterGroup): string {
+  const name = groupName(group);
+  return /^[A-Z][a-z]/.test(name) ? name[0]!.toLowerCase() + name.slice(1) : name;
+}
+
 /**
  * UKCP's groups as the filter panel lists them. UKCP sets its outside-UK tick beside the location box; here it joins the
  * additional filters, or a group of that name of its own should UKCP's options ever lack one.
