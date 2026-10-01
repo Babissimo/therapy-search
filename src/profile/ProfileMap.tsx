@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import type { Profile } from "@shared/types";
 import { Map, MapMarker, MapTileLayer } from "@/components/ui/map";
 import type { Point } from "@/search/map/geo";
@@ -7,8 +8,9 @@ type Props = { profile: Profile; point: Point; zoom: number };
 
 /** A still map around one of the therapist's offices, with their pin as the search's map draws it. */
 export default function ProfileMap({ profile, point, zoom }: Props) {
-  const centre: [number, number] = [point.lat, point.lng];
-  const pin = pinIcon([{ slug: profile.slug, name: profile.name, initials: profile.initials, photoUrl: profile.photoUrl, tags: [] }]);
+  const centre = useMemo<[number, number]>(() => [point.lat, point.lng], [point.lat, point.lng]);
+  // Built again only for a changed profile, as the marker redraws its pin, photo and all, for each new icon.
+  const pin = useMemo(() => pinIcon([profile]), [profile]);
   return (
     <Map
       center={centre}

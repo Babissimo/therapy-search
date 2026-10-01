@@ -111,7 +111,7 @@ function placedBy(location: string, kind: PlacedKind): string {
 }
 
 /** A remote-only therapist's location says nothing about travel. */
-export function isRemoteOnly(therapist: TherapistCard): boolean {
+export function isRemoteOnly(therapist: Pick<TherapistCard, "sessionTypes">): boolean {
   const types = therapist.sessionTypes ?? "";
   return /remote/i.test(types) && !/in-person/i.test(types);
 }
