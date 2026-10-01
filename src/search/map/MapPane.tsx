@@ -29,7 +29,7 @@ export type MapPaneProps = {
   /** The pin whose place the results list marks. */
   selected?: Pin;
   onSelect: (pin: Pin) => void;
-  /** Lets the selected pin go, as the map is clicked away from any pin. */
+  /** Lets the selected pin go, as the map is clicked away from any pin or, where the pointer can hover, the pointer leaves the pin. */
   onDeselect: () => void;
   /** Searches at the postcode nearest the middle of the map, answering false when it is the one already searched. */
   onSearchArea: (postcode: string) => boolean;
@@ -80,7 +80,7 @@ export default function MapPane({
         {/* Above the therapists' pins, which often share its point, but beneath one hovered (index.css raises it above
             every marker) or marked (PinsLayer raises it 1000); it lets clicks through to them. */}
         {centre && <MapMarker position={[centre.lat, centre.lng]} icon={centrePin} interactive={false} keyboard={false} zIndexOffset={200} />}
-        <PinsLayer pins={pins} highlight={highlight} selected={selected} onSelect={onSelect} marksShortlist={marksShortlist} />
+        <PinsLayer pins={pins} highlight={highlight} selected={selected} onSelect={onSelect} onDeselect={onDeselect} marksShortlist={marksShortlist} />
         <FitView
           fitKey={fitKey}
           centre={centre}

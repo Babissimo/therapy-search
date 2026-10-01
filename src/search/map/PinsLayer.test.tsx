@@ -56,7 +56,19 @@ function watchAdded() {
 /** The accessible name pinIcon gave a marker's icon. */
 const iconName = (marker: L.Marker) => ((marker.options.icon as L.DivIcon).options.html as HTMLElement).getAttribute("aria-label");
 
-afterEach(() => vi.restoreAllMocks());
+function pointerCanHover(hover: boolean) {
+  vi.stubGlobal("matchMedia", (query: string) => ({
+    matches: hover && query === "(hover: hover)",
+    media: query,
+    addEventListener() {},
+    removeEventListener() {},
+  }));
+}
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
 
 describe("PinsLayer", () => {
   it("keeps its markers in place when the page re-renders", () => {
@@ -95,6 +107,43 @@ describe("PinsLayer", () => {
     rerender(onMap(<PinsLayer pins={pins} highlight={store} onSelect={() => {}} />));
     expect(shown.element.classList.contains("pin-selected")).toBe(false);
     expect(shown.setZIndexOffset).toHaveBeenLastCalledWith(0);
+  });
+
+  it("lets the selected pin go as the pointer leaves it, or as zooming out gathers it into a cluster, where the pointer can hover", async () => {
+    pointerCanHover(true);
+    const added = watchAdded();
+    const onAdd = vi.spyOn(L.MarkerClusterGroup.prototype, "onAdd");
+    const pins = [pin(BRIGHTON, "a"), pin(HOVE, "b", "c")];
+    const onDeselect = vi.fn();
+    render(onMap(<PinsLayer pins={pins} highlight={highlight} selected={pins[1]} onSelect={() => {}} onDeselect={onDeselect} />));
+    await waitFor(() => expect(added.markers()).toHaveLength(2));
+    const marker = (name: string) => added.markers().find((m) => iconName(m) === name)!;
+    const stack = marker("2 therapists here");
+    marker("Therapist a").fire("mouseout");
+    expect(onDeselect).not.toHaveBeenCalled();
+    stack.fire("mouseout");
+    expect(onDeselect).toHaveBeenCalledTimes(1);
+    // jsdom lays nothing out, so the group is told what shows the stack: itself, then a cluster.
+    const group = onAdd.mock.contexts[0] as L.MarkerClusterGroup;
+    const map = onAdd.mock.calls[0]?.[0] as L.Map;
+    const parent = vi.spyOn(L.MarkerClusterGroup.prototype, "getVisibleParent").mockReturnValue(stack);
+    act(() => group.fire("animationend"));
+    act(() => map.fire("moveend"));
+    expect(onDeselect).toHaveBeenCalledTimes(1);
+    parent.mockReturnValue({ getElement: () => undefined } as unknown as L.Marker);
+    act(() => group.fire("animationend"));
+    expect(onDeselect).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps a pin selected on a touch screen, whose tap elsewhere ends a hover it only pretended", async () => {
+    pointerCanHover(false);
+    const added = watchAdded();
+    const pins = [pin(HOVE, "b", "c")];
+    const onDeselect = vi.fn();
+    render(onMap(<PinsLayer pins={pins} highlight={highlight} selected={pins[0]} onSelect={() => {}} onDeselect={onDeselect} />));
+    await waitFor(() => expect(added.markers()).toHaveLength(1));
+    added.markers()[0]!.fire("mouseout");
+    expect(onDeselect).not.toHaveBeenCalled();
   });
 
   it("leaves a pin's name to its icon, so hovering shows the tooltip alone", async () => {
