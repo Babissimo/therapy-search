@@ -14,6 +14,8 @@ type Props = {
   highlight: Highlight;
   selected?: Pin;
   onSelect: (pin: Pin) => void;
+  /** Lets the selected pin go, as the pointer leaves it. */
+  onDeselect?: () => void;
   /** Badges and raises the pins of shortlisted therapists, which a map of the shortlist alone has no need to. */
   marksShortlist?: boolean;
 };
@@ -30,7 +32,7 @@ function who(pin: Pin): string {
  * Therapists' pins, merged into clusters as the map zooms out. A highlighted therapist's pin, or the cluster holding it,
  * is ringed and raised; so is the selected pin, with a halo.
  */
-export function PinsLayer({ pins, highlight, selected, onSelect, marksShortlist = false }: Props) {
+export function PinsLayer({ pins, highlight, selected, onSelect, onDeselect, marksShortlist = false }: Props) {
   const cluster = useRef<L.MarkerClusterGroup>(null);
   const markers = useRef(new Map<string, L.Marker>());
   const slug = useSyncExternalStore(highlight.subscribe, highlight.get);
@@ -39,6 +41,7 @@ export function PinsLayer({ pins, highlight, selected, onSelect, marksShortlist 
   useRedrawnClusters(cluster, markers.current, shortlisted);
   useMarkedPin(cluster, markers.current, slug, "pin-highlight", pins, shortlisted);
   useMarkedPin(cluster, markers.current, selected?.therapists[0]?.slug, "pin-selected", pins, shortlisted);
+  useHeldWhileHovered(cluster, markers.current, selected?.therapists[0]?.slug, pins, onDeselect);
   return (
     <MapMarkerClusterGroup
       ref={cluster}
@@ -119,6 +122,39 @@ function useMarkedPin(
   }, [cluster, markers, map, slug, className, pins, shortlisted]);
 }
 
+/**
+ * Where the pointer can hover, a pin stays selected only while the pointer is on it: moving off it, or zooming out until a
+ * cluster gathers it in, lets it go. A touch screen's tap elsewhere ends a hover it only pretended, so there it stays.
+ */
+function useHeldWhileHovered(
+  cluster: RefObject<L.MarkerClusterGroup | null>,
+  markers: Map<string, L.Marker>,
+  slug: string | undefined,
+  pins: Pin[],
+  onDeselect: (() => void) | undefined,
+) {
+  const map = useMap();
+  useEffect(() => {
+    const group = cluster.current;
+    const marker = slug === undefined ? undefined : markers.get(slug);
+    if (!group || !marker || !onDeselect || !canHover()) return;
+    const leave = () => onDeselect();
+    const gathered = () => {
+      if (group.getVisibleParent(marker) !== marker) onDeselect();
+    };
+    marker.on("mouseout", leave);
+    group.on("animationend", gathered);
+    map.on("moveend", gathered);
+    return () => {
+      marker.off("mouseout", leave);
+      group.off("animationend", gathered);
+      map.off("moveend", gathered);
+    };
+  }, [cluster, markers, map, slug, pins, onDeselect]);
+}
+
+const canHover = () => window.matchMedia("(hover: hover)").matches;
+
 type TherapistPinProps = { pin: Pin; shortlisted: ReadonlySet<string>; markers: Map<string, L.Marker>; onSelect: (pin: Pin) => void };
 
 function TherapistPin({ pin, shortlisted, markers, onSelect }: TherapistPinProps) {
@@ -143,7 +179,7 @@ function TherapistPin({ pin, shortlisted, markers, onSelect }: TherapistPinProps
     // The second click of a double-click, which would clear the selection its first click made.
     if (event.originalEvent.detail > 1) return;
     // Where the pointer can hover, the tooltip has already said who this is.
-    if (only && window.matchMedia("(hover: hover)").matches) {
+    if (only && canHover()) {
       const { to, state } = profile(only.slug);
       navigate(to, { state });
     } else onSelect(pin);
