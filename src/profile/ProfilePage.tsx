@@ -1,8 +1,9 @@
-import { Fragment, lazy, Suspense, useEffect, type ReactNode } from "react";
+import { Fragment, lazy, useEffect, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, ChevronLeft, Diamond, ExternalLink, MapPin } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router";
 import type { Office, Profile, ProfileSection } from "@shared/types";
+import { MapSlot } from "@/components/MapSlot";
 import { Portrait } from "@/components/Portrait";
 import { SkeletonText } from "@/components/SkeletonText";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -512,13 +513,12 @@ function OfficeCard({ office, profile, distance }: { office: Office; profile: Pr
 function OfficeMap({ office, profile }: { office: Office; profile: Profile }) {
   const place = useOfficePlace(office, profile.location);
   if (!place) return null;
-  const fallback = <div className="size-full bg-muted" />;
   return (
     <div role="region" aria-label={`Map of ${office.name || "the office"}`} className="isolate mt-auto h-40 overflow-hidden rounded-lg border">
-      <Suspense fallback={fallback}>
+      <MapSlot>
         {/* Leaflet takes its centre only once, so a new place makes a new map. */}
         <ProfileMap key={`${place.point.lat},${place.point.lng}`} profile={profile} point={place.point} zoom={place.zoom} />
-      </Suspense>
+      </MapSlot>
     </div>
   );
 }

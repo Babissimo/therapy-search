@@ -1,8 +1,9 @@
 import { Tabs } from "radix-ui";
-import { lazy, Suspense, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { lazy, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { Link, useLocation, useMatch } from "react-router";
 import { canonicalLocation } from "@shared/location";
 import { toQuery, type SearchParams } from "@shared/query";
+import { MapSlot } from "@/components/MapSlot";
 import { Morph, startMorph } from "@/components/Morph";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
@@ -263,7 +264,7 @@ function SearchView({ params, onChange, wide }: ViewProps) {
           {(searching || wide) && (
             <div className={cn("relative", searching ? "min-w-0 flex-1" : "w-96 shrink-0 border-l")}>
               {searching && (
-                <Suspense fallback={<div className="size-full bg-muted" />}>
+                <MapSlot>
                   <MapPane
                     {...mapView}
                     entry={entry}
@@ -280,7 +281,7 @@ function SearchView({ params, onChange, wide }: ViewProps) {
                     outsideUK={params.flags.LocationSearchOutsideUK}
                     coveredBelow={wide ? undefined : (height) => coverOf(sheet, height)}
                   />
-                </Suspense>
+                </MapSlot>
               )}
               {toolbar(searching ? "map" : "aside")}
               {!wide && searching && (

@@ -37,8 +37,12 @@ vi.mock("./prefetch", async (importOriginal) => {
   return { ...prefetch, warmMap: vi.fn(prefetch.warmMap) };
 });
 
+/** Set by a test whose map's code can't be fetched. */
+const mapChunk = vi.hoisted(() => ({ fails: false }));
+
 // The map pane is tested on its own; here it shows what the page passed it, with a button for each pin, one for a click on
-// the map away from them, and one that finds BN3 1FG in the middle of the map.
+// the map away from them, and one that finds BN3 1FG in the middle of the map. Once its code can't be fetched, it throws
+// where it would draw, as React does with a lazy component whose import failed.
 vi.mock("./map/MapPane", async () => {
   const { createElement, useSyncExternalStore } = await import("react");
   type Props = {
@@ -70,6 +74,7 @@ vi.mock("./map/MapPane", async () => {
       outsideUK,
       coveredBelow,
     }: Props) => {
+      if (mapChunk.fails) throw new TypeError("Failed to fetch dynamically imported module");
       const slug = useSyncExternalStore(highlight.subscribe, highlight.get);
       return createElement(
         "div",
@@ -221,6 +226,7 @@ afterEach(() => {
   vi.useRealTimers();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+  mapChunk.fails = false;
 });
 
 describe("SearchPage", () => {
@@ -380,6 +386,28 @@ describe("SearchPage", () => {
     await loaded();
     expect(list().scrollTop).toBe(400);
     expect(api.search).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    ["wide", true],
+    ["narrow", false],
+  ])("keeps the results and their searches going on %s screens, with a note in the map's place, when its code can't be fetched", async (_, wide) => {
+    // React reports the error it caught to the console.
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    mapChunk.fails = true;
+    screenIs(wide);
+    renderAt(SEARCH);
+    await loaded();
+    expect(await screen.findByText("The map couldn't load.")).toBeTruthy();
+    expect(screen.queryByTestId("map")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Load more" }));
+    expect(await within(results()).findByText(/^24 of 30/)).toBeTruthy();
+    fireEvent.change(screen.getByRole("textbox", { name: "Location" }), { target: { value: "York" } });
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+    expect(url().get("Location")).toBe("York");
+    expect(await within(results()).findByText(/^12 of 30/)).toBeTruthy();
+    expect(vi.mocked(api.search).mock.lastCall?.[0]).toBe("Location=York");
+    expect(screen.getByText("The map couldn't load.")).toBeTruthy();
   });
 
   it("keeps Load more beneath the list rather than at its end", async () => {
