@@ -1,4 +1,4 @@
-import { useId, useMemo, useState } from "react";
+import { startTransition, useEffect, useId, useMemo, useRef, useState } from "react";
 import { ChevronRight, Info } from "lucide-react";
 import { sectionsOf } from "@shared/sections";
 import type { FilterField, FilterGroup } from "@shared/types";
@@ -13,6 +13,8 @@ import { TickedCount } from "./TickedCount";
 // A long list scrolls within its group. The padding holds the checkboxes' enlarged hit areas, which otherwise overhang the
 // last row and let a list that fits scroll a little; the margin takes it back out of the layout.
 const SCROLL_BOX = "-mb-1.5 max-h-64 overflow-y-auto pr-1 pb-1.5";
+// A flat list first mounts a few more boxes than its scroll box shows, and the rest once still, so mounting can't eat its opening.
+const FIRST_BOXES = 12;
 
 type Props = {
   group: FilterGroup;
@@ -34,6 +36,9 @@ export function CheckboxGroup({ group, searchable, isChecked, onToggle }: Props)
   const matches = (f: FilterField) => f.label.toLowerCase().includes(needle);
   const inView = (fields: FilterField[]) => fields.filter(matches).sort((a, b) => Number(first.has(b)) - Number(first.has(a)));
   const shown = inView(group.fields);
+  const listRef = useRef<HTMLUListElement>(null);
+  const [whole, setWhole] = useState(sections !== undefined || group.fields.length <= FIRST_BOXES);
+  useEffect(() => (whole || !listRef.current ? undefined : whenStill(listRef.current, () => startTransition(() => setWhole(true)))), [whole]);
   // UKCP ANDs a list's values, where a list of boxes reads as "any of these", except the session types, which it ORs.
   const narrows = group.fields.every((f) => isMulti(f.name) && f.name !== "TypesOfSession") && group.fields.some(isChecked);
 
@@ -106,11 +111,28 @@ export function CheckboxGroup({ group, searchable, isChecked, onToggle }: Props)
           {nothing}
         </ul>
       ) : (
-        <ul className={cn("space-y-2", SCROLL_BOX)}>
-          {shown.map(item)}
+        <ul ref={listRef} className={cn("space-y-2", SCROLL_BOX)}>
+          {(whole ? shown : shown.slice(0, FIRST_BOXES)).map(item)}
           {nothing}
         </ul>
       )}
     </div>
   );
+}
+
+/** Runs `run` once no finite animation plays on `el` or an element around it. A group closed first unmounts before then. */
+function whenStill(el: Element, run: () => void): () => void {
+  let live = true;
+  const wait = () => {
+    if (!live) return;
+    const moving = (document.getAnimations?.() ?? []).filter(
+      (a) => a.playState === "running" && a.effect?.getComputedTiming().endTime !== Infinity && (a.effect as KeyframeEffect | null)?.target?.contains(el),
+    );
+    if (moving.length === 0) run();
+    else void Promise.allSettled(moving.map((a) => a.finished)).then(wait);
+  };
+  wait();
+  return () => {
+    live = false;
+  };
 }
