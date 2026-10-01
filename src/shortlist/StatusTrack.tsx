@@ -62,7 +62,7 @@ export function StatusTrack({ therapist, status, listed = true, onChosen, onRemo
             {status === "waiting" && i === current ? (
               <Pause aria-hidden className="size-3 fill-current text-primary" />
             ) : (
-              <span aria-hidden className={cn("size-2.5 rounded-full", i <= current ? "bg-primary" : "border-[1.5px] border-muted-foreground/50")} />
+              <span aria-hidden className={cn("size-2.5 rounded-full", i <= current ? "bg-primary" : "border-[1.5px] border-control")} />
             )}
             {i < STEPS.length - 1 && <span aria-hidden className={cn("mx-1 h-0.5 flex-1 rounded-full", i < current ? "bg-primary" : "bg-border")} />}
           </li>
