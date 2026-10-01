@@ -4,7 +4,7 @@ import { useLocation } from "react-router";
 import { toQuery, type SearchParams } from "@shared/query";
 import { Morph } from "@/components/Morph";
 import { cn } from "@/lib/utils";
-import { ShortlistTab } from "@/shortlist/ShortlistTab";
+import { LazyShortlistTab } from "@/shortlist/LazyShortlistTab";
 import { useShortlistRefresh } from "@/shortlist/useShortlist";
 import { soughtTerms } from "./activeFilters";
 import { FilterChips } from "./FilterChips";
@@ -60,7 +60,7 @@ export function OnlineView({ params, onChange, wide }: Props) {
   const lists = (
     <ListPanels
       tab={tab}
-      shortlist={<ShortlistTab sought={soughtTerms(search)} online />}
+      shortlist={<LazyShortlistTab sought={soughtTerms(search)} online />}
       results={
         searching ? (
           <>

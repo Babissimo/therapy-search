@@ -24,6 +24,12 @@ vi.mock("./map/pins", async (importOriginal) => {
   return { ...pins, layoutPins: vi.fn(pins.layoutPins) };
 });
 
+// The shortlist's chunk is here at once, so opening its tab shows it in the same step (see LazyShortlistTab.test.tsx).
+vi.mock("@/shortlist/LazyShortlistTab", async () => ({
+  LazyShortlistTab: (await import("@/shortlist/ShortlistTab")).ShortlistTab,
+  usePreloadShortlistTab: () => {},
+}));
+
 // The map pane is tested on its own; here it shows what the page passed it, with a button for each pin, one for a click on
 // the map away from them, and one that finds BN3 1FG in the middle of the map.
 vi.mock("./map/MapPane", async () => {

@@ -3,6 +3,7 @@ import type { ReactNode, Ref } from "react";
 import { Morph } from "@/components/Morph";
 import { TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CountBadge } from "@/shortlist/CountBadge";
+import { usePreloadShortlistTab } from "@/shortlist/LazyShortlistTab";
 import { statusOf } from "@/shortlist/store";
 import { useShortlist } from "@/shortlist/useShortlist";
 
@@ -14,6 +15,7 @@ export type ListTab = "results" | "shortlist";
  */
 export function ListTabs({ ref }: { ref?: Ref<HTMLDivElement> }) {
   const count = useShortlist().filter((entry) => statusOf(entry) !== "setAside").length;
+  usePreloadShortlistTab();
   return (
     <Morph name="list-tabs">
       <TabsList ref={ref}>
