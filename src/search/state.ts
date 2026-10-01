@@ -2,19 +2,17 @@ import { OPTIONS } from "@shared/options";
 import { FLAG_PARAMS, MULTI_PARAMS, type FlagParam, type MultiParam, type SearchParams, type TextParam } from "@shared/query";
 import type { FilterField, FilterGroup } from "@shared/types";
 
-// Every change returns to page 1, as UKCP's form does; only paging keeps the page.
-
 export function withText(params: SearchParams, name: TextParam, value: string): SearchParams {
-  return { ...params, page: 1, text: { ...params.text, [name]: value.trim() } };
+  return { ...params, text: { ...params.text, [name]: value.trim() } };
 }
 
 export function withFlag(params: SearchParams, name: FlagParam, on: boolean): SearchParams {
-  return { ...params, page: 1, flags: { ...params.flags, [name]: on } };
+  return { ...params, flags: { ...params.flags, [name]: on } };
 }
 
 export function withMulti(params: SearchParams, name: MultiParam, value: string, on: boolean): SearchParams {
   const others = params.multi[name].filter((v) => v !== value);
-  return { ...params, page: 1, multi: { ...params.multi, [name]: on ? [...others, value] : others } };
+  return { ...params, multi: { ...params.multi, [name]: on ? [...others, value] : others } };
 }
 
 export function withPage(params: SearchParams, page: number): SearchParams {
