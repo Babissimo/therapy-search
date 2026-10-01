@@ -41,8 +41,8 @@ vi.mock("./prefetch", async (importOriginal) => {
 const mapChunk = vi.hoisted(() => ({ fails: false }));
 
 // The map pane is tested on its own; here it shows what the page passed it, with a button for each pin, one for a click on
-// the map away from them, and one that finds BN3 1FG in the middle of the map. Once its code can't be fetched, it throws
-// where it would draw, as React does with a lazy component whose import failed.
+// the map away from them, and one that finds BN3 1FG in the middle of the map where it offers a search there. Once its code
+// can't be fetched, it throws where it would draw, as React does with a lazy component whose import failed.
 vi.mock("./map/MapPane", async () => {
   const { createElement, useSyncExternalStore } = await import("react");
   type Props = {
@@ -55,7 +55,7 @@ vi.mock("./map/MapPane", async () => {
     selected?: Pin;
     onSelect: (pin: Pin) => void;
     onDeselect: () => void;
-    onSearchArea: (postcode: string) => boolean;
+    onSearchArea?: (postcode: string) => boolean;
     outsideUK?: boolean;
     coveredBelow?: (height: number) => number;
   };
@@ -99,11 +99,12 @@ vi.mock("./map/MapPane", async () => {
           ),
         ),
         createElement("button", { type: "button", onClick: onDeselect }, "Map away from the pins"),
-        createElement(
-          "button",
-          { type: "button", onClick: (event: { currentTarget: HTMLElement }) => (event.currentTarget.dataset.searched = String(onSearchArea("BN3 1FG"))) },
-          "Search this area",
-        ),
+        onSearchArea &&
+          createElement(
+            "button",
+            { type: "button", onClick: (event: { currentTarget: HTMLElement }) => (event.currentTarget.dataset.searched = String(onSearchArea("BN3 1FG"))) },
+            "Search this area",
+          ),
       );
     },
   };
@@ -682,6 +683,8 @@ describe("SearchPage", () => {
     expect(screen.getAllByRole("heading", { level: 1, name: "Find a UKCP therapist" })).toHaveLength(1);
     pick(/^Shortlist/);
     expect(within(screen.getByRole("tabpanel", { name: /^Shortlist/ })).getByRole("link", { name: "Therapist a" })).toBeTruthy();
+    // The switch above the tabs belongs to the search, which the shortlist has no use for.
+    expect(screen.queryByRole("link", { name: "Near me" })).toBeNull();
     pick("Results");
     fireEvent.click(within(panel).getByRole("button", { name: /^Languages/ }));
     fireEvent.click(within(panel).getByRole("checkbox", { name: "French" }));
@@ -1078,15 +1081,53 @@ describe("SearchPage", () => {
     expect(list().scrollTop).toBe(400);
   });
 
-  it("goes back to the results for a new search", async () => {
+  it("puts the search away while the shortlist is open, bringing it back as it was left", async () => {
     screenIs(true);
-    renderAt(SEARCH);
+    renderAt("/?Location=Leeds&Languages=French");
     await loaded();
-    pick(/^Shortlist/);
+    await screen.findByTestId("map");
+    fireEvent.click(screen.getByRole("button", { name: "Filters, 1 ticked" }));
     fireEvent.change(screen.getByRole("textbox", { name: "Location" }), { target: { value: "York" } });
-    fireEvent.click(screen.getByRole("button", { name: "Search" }));
-    expect(screen.getByRole("tab", { name: "Results" }).getAttribute("aria-selected")).toBe("true");
+    pick(/^Shortlist/);
+    expect(screen.queryByRole("link", { name: "Near me" })).toBeNull();
+    expect(screen.queryByRole("textbox", { name: "Location" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Remove French" })).toBeNull();
+    expect(screen.queryByRole("region", { name: "Refine your search" })).toBeNull();
+    expect(within(map()).queryByRole("button", { name: "Search this area" })).toBeNull();
+    pick("Results");
+    expect(screen.getByRole<HTMLInputElement>("textbox", { name: "Location" }).value).toBe("York");
+    expect(screen.getByRole("button", { name: "Remove French" })).toBeTruthy();
+    expect(screen.getByRole("region", { name: "Refine your search" })).toBeTruthy();
+    expect(within(map()).getByRole("button", { name: "Search this area" })).toBeTruthy();
+  });
+
+  it("puts the search over the map away on a phone while the shortlist is open", async () => {
+    screenIs(false);
+    renderAt("/?Location=Leeds&Languages=French");
     await loaded();
+    await screen.findByTestId("map");
+    pick(/^Shortlist/);
+    expect(screen.queryByRole("textbox", { name: "Location" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Filters/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Remove French" })).toBeNull();
+    expect(within(map()).queryByRole("button", { name: "Search this area" })).toBeNull();
+    pick("Results");
+    expect(screen.getByRole("textbox", { name: "Location" })).toBeTruthy();
+    expect(within(map()).getByRole("button", { name: "Search this area" })).toBeTruthy();
+  });
+
+  it("gives the shortlist the page before a search on wide screens, the filters beside the prompt standing aside", () => {
+    screenIs(true);
+    shortlist.add(therapist("a"));
+    renderAt("/");
+    pick(/^Shortlist/);
+    expect(screen.queryByRole("region", { name: "Refine your search" })).toBeNull();
+    // Their column goes with them, rather than standing empty beside the list.
+    const box = screen.getByRole("textbox", { name: "Location", hidden: true });
+    const asides = [...document.querySelectorAll("[hidden]")].filter((hidden) => hidden.contains(box));
+    expect(asides.some((aside) => aside.parentElement?.contains(results()))).toBe(true);
+    pick("Results");
+    expect(screen.getByRole("region", { name: "Refine your search" })).toBeTruthy();
   });
 
   it("maps the shortlist alone while its tab is open, framed apart from the results", async () => {
@@ -1569,6 +1610,28 @@ describe("SearchPage online", () => {
     expect(within(screen.getByRole("tabpanel", { name: /^Shortlist/ })).getByRole("link", { name: "Therapist a" })).toBeTruthy();
   });
 
+  it.each([
+    { screen: "wide", wide: true },
+    { screen: "narrow", wide: false },
+  ])("puts its toolbar and filters away while the shortlist is open on $screen screens", async ({ wide }) => {
+    screenIs(wide);
+    renderAt(GREEK);
+    await loaded();
+    const pick = (name: RegExp) => {
+      const tab = screen.getByRole("tab", { name });
+      fireEvent.mouseDown(tab);
+      fireEvent.click(tab);
+    };
+    pick(/^Shortlist/);
+    expect(screen.queryByRole("link", { name: "Near me" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Remove Greek" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Filters/ })).toBeNull();
+    expect(screen.queryByRole("region", { name: "Refine your search" })).toBeNull();
+    pick(/^Results/);
+    expect(screen.getByRole("link", { name: "Near me" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Remove Greek" })).toBeTruthy();
+  });
+
   it("keeps the shortlist's scroll to itself beside the prompt", () => {
     screenIs(true);
     shortlist.add(therapist("a"));
@@ -1684,5 +1747,39 @@ describe("SearchPage's view transitions", () => {
     fireEvent.click(screen.getByRole("button", { name: "Close filters" }));
     expect(screen.getByText(/^Tick anything that matters to you/)).toBeTruthy();
     expect(started).toEqual([["morph"], ["morph"]]);
+  });
+
+  it.each([
+    { view: "before a search near a place", address: "/", screen: "wide", wide: true },
+    { view: "before a search near a place", address: "/", screen: "narrow", wide: false },
+    { view: "online", address: "/online", screen: "wide", wide: true },
+    { view: "online", address: "/online", screen: "narrow", wide: false },
+  ])("animates the list moving into the toolbar's place as the shortlist opens $view on $screen screens, and back as it closes", async ({ address, wide }) => {
+    screenIs(wide);
+    shortlist.add(therapist("a"));
+    renderAt(address);
+    const pick = (name: RegExp) => {
+      const tab = screen.getByRole("tab", { name });
+      fireEvent.mouseDown(tab);
+      fireEvent.click(tab);
+    };
+    pick(/^Shortlist/);
+    await waitFor(() => expect(started).toEqual([["morph"]]));
+    pick(/^Results/);
+    await waitFor(() => expect(started).toEqual([["morph"], ["morph"]]));
+  });
+
+  it.each([
+    { screen: "wide", wide: true },
+    { screen: "narrow", wide: false },
+  ])("leaves the tabs unanimated over the map on $screen screens, as nothing moves", async ({ wide }) => {
+    screenIs(wide);
+    renderAt(SEARCH);
+    await loaded();
+    const tab = screen.getByRole("tab", { name: /^Shortlist/ });
+    fireEvent.mouseDown(tab);
+    fireEvent.click(tab);
+    expect(screen.getByRole("tab", { name: /^Shortlist/ }).getAttribute("aria-selected")).toBe("true");
+    expect(started).toEqual([]);
   });
 });

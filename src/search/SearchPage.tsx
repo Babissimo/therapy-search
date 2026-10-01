@@ -94,7 +94,7 @@ function SearchView({ params, onChange, wide }: ViewProps) {
   // Beginning or clearing a search sets the page out afresh, its pieces gliding to their new places.
   const change = (next: SearchParams) => (placed(next) === searching ? onChange(next) : startMorph(() => onChange(next)));
   const drafts = useSearchDrafts(params, change);
-  // The search, which the tab chosen and a selection belong to.
+  // The search, which a selection belongs to.
   const fitKey = searching ? toQuery(params) : "";
   const results = useResults(params, searching);
   useShortlistRefresh(results.therapists);
@@ -103,11 +103,11 @@ function SearchView({ params, onChange, wide }: ViewProps) {
   // search loads, the results, and so the place, are still the last search's.
   const centreSettled = centre.settled && !results.loading && !results.stale;
   const { pins, unplaced, placing, moving } = usePins(results.therapists, centre, params.flags.LocationSearchOutsideUK);
-  // Kept by key, so a new search shows its results whichever tab was open.
-  const [tabChoice, setTabChoice] = useState<{ fitKey: string; tab: ListTab }>();
-  const tab = tabChoice?.fitKey === fitKey ? tabChoice.tab : "results";
+  // The toolbar and the map's search stand aside while the shortlist is open, so a new search always begins on the results.
+  const [tab, setTab] = useState<ListTab>("results");
+  const shortlistOpen = tab === "shortlist";
   // Beside a search, the map shows whichever list is open, framing each afresh as its tab opens.
-  const mapsShortlist = searching && tab === "shortlist";
+  const mapsShortlist = searching && shortlistOpen;
   const [setAsideOpen] = useSetAsideOpen();
   // As the tab lists them, the map shows those set aside only while their section is open.
   const shortlisted = useShortlistIf(mapsShortlist)
@@ -147,7 +147,7 @@ function SearchView({ params, onChange, wide }: ViewProps) {
     } else setFiltersOpen(wide);
   }
   // The shortlist keeps its place apart from the results', under a key of its own.
-  const scroll = useRememberedScroll(tab === "results" ? entry : `${entry} shortlist`, tab === "shortlist" || !searching || !results.loading);
+  const scroll = useRememberedScroll(shortlistOpen ? `${entry} shortlist` : entry, shortlistOpen || !searching || !results.loading);
   const listRef = useRef<HTMLUListElement>(null);
   const panelToggleRef = useRef<HTMLButtonElement>(null);
   // Whether the list was showing when a pin was selected, so it can glide to the pin's entry rather than jump.
@@ -176,9 +176,15 @@ function SearchView({ params, onChange, wide }: ViewProps) {
   }
 
   function pickTab(value: string) {
-    setTabChoice({ fitKey, tab: value as ListTab });
-    // A selected pin belongs to the list the map was showing.
-    setSelection(undefined);
+    const pick = () => {
+      setTab(value as ListTab);
+      // A selected pin belongs to the list the map was showing.
+      setSelection(undefined);
+    };
+    // Beside or above the prompt, the toolbar comes and goes with the shortlist, so the list glides into its place. Over
+    // the map, nothing moves.
+    if (!searching) startMorph(pick);
+    else pick();
   }
 
   const selectedKey = selected?.key;
@@ -270,6 +276,8 @@ function SearchView({ params, onChange, wide }: ViewProps) {
       wide={wide}
       // The side bar's toggle, left over the top left as the side bar hides, moves the toolbar aside.
       besideToggle={wide && searching && !panelOpen}
+      // Nothing in it acts on the shortlist. Hidden rather than unmounted, it keeps what is typed or open in it for the results.
+      hidden={shortlistOpen}
       filtersOpen={filtersOpen}
       onFiltersOpenChange={setFiltersOpen}
       placeStep={placement === "aside" ? placeStep : undefined}
@@ -285,7 +293,7 @@ function SearchView({ params, onChange, wide }: ViewProps) {
       <Tabs.Root value={tab} onValueChange={pickTab} asChild>
         <div className="group/tabs flex min-h-0 flex-1">
           {!searching ? (
-            <ListColumn wide={wide} tabs={tabs} top={!wide && toolbar("list")} scroll={scroll}>
+            <ListColumn wide={wide} tabs={tabs} top={!wide && toolbar("list")} topHidden={shortlistOpen} scroll={scroll}>
               {lists}
             </ListColumn>
           ) : (
@@ -305,7 +313,8 @@ function SearchView({ params, onChange, wide }: ViewProps) {
             )
           )}
           {(searching || wide) && (
-            <div className={cn("relative", searching ? "min-w-0 flex-1" : "w-96 shrink-0 border-l")}>
+            // Before a search it holds the toolbar alone, so it goes with it, leaving the shortlist the page.
+            <div hidden={!searching && shortlistOpen} className={cn("relative", searching ? "min-w-0 flex-1" : "w-96 shrink-0 border-l")}>
               {searching && (
                 <MapSlot>
                   <MapPane
@@ -315,12 +324,16 @@ function SearchView({ params, onChange, wide }: ViewProps) {
                     selected={selected}
                     onSelect={select}
                     onDeselect={() => setSelection(undefined)}
-                    onSearchArea={(postcode) => {
-                      if (samePostcode(postcode, params.text.Location)) return false;
-                      drafts.applyAt(postcode);
-                      setFiltersOpen(false);
-                      return true;
-                    }}
+                    onSearchArea={
+                      mapsShortlist
+                        ? undefined
+                        : (postcode) => {
+                            if (samePostcode(postcode, params.text.Location)) return false;
+                            drafts.applyAt(postcode);
+                            setFiltersOpen(false);
+                            return true;
+                          }
+                    }
                     outsideUK={params.flags.LocationSearchOutsideUK}
                     coveredBelow={wide ? undefined : (height) => coverOf(sheet, height)}
                   />
@@ -370,6 +383,7 @@ function Toolbar({
   drafts,
   wide,
   besideToggle,
+  hidden,
   filtersOpen,
   onFiltersOpenChange,
   placeStep,
@@ -377,6 +391,7 @@ function Toolbar({
   placement: Placement;
   drafts: SearchDrafts;
   besideToggle: boolean;
+  hidden: boolean;
   filtersOpen: boolean;
   onFiltersOpenChange: (open: boolean) => void;
   placeStep?: ReactNode;
@@ -389,15 +404,23 @@ function Toolbar({
     onFiltersOpenChange(false);
   };
   const overMap = placement === "map";
+  // Fades in only on coming back, rather than as it first appears with the map.
+  const [faded, setFaded] = useState(hidden);
+  if (hidden && !faded) setFaded(true);
   return (
     <Collapsible open={wide && (placement === "aside" || filtersOpen)} asChild>
       <div
+        hidden={hidden}
+        // Out of reach while it fades.
+        inert={hidden}
         className={cn(
           "flex flex-col items-start gap-2",
           placement !== "list" && "absolute inset-3 z-10",
           // Only the toolbar's own controls take the pointer; the map shows through the rest of it. It steps aside for the
-          // side bar's toggle as the side bar slides, and in time with it.
-          overMap && "pointer-events-none motion-safe:transition-[left] motion-safe:duration-200",
+          // side bar's toggle as the side bar slides, and in time with it. Coming and going in place, it fades.
+          overMap &&
+            "pointer-events-none motion-safe:transition-[left,opacity,display] motion-safe:transition-discrete motion-safe:duration-200 [&[hidden]]:opacity-0",
+          overMap && faded && "starting:opacity-0",
           // As wide as beside the list (a w-96 column less its border and p-3), so nothing in it shifts as it moves onto the
           // map and back.
           overMap && "lg:right-auto lg:w-[calc(24rem-1.5rem-1px)]",
