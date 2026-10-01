@@ -1,25 +1,25 @@
 import { useMemo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "react-router";
-import { InvalidParam, readParams, type SearchParams } from "@shared/query";
+import { InvalidParam, type SearchParams } from "@shared/query";
 import type { Profile, TherapistCard } from "@shared/types";
 import { soughtTerms } from "@/search/activeFilters";
 import { shownCard } from "@/search/useResults";
+import { viewSearch } from "@/search/useSearchState";
 import { backgroundOf } from "./profileLink";
 
-function readSearch(search: string): SearchParams | undefined {
-  try {
-    return readParams(new URLSearchParams(search));
-  } catch (error) {
-    if (error instanceof InvalidParam) return undefined;
-    throw error;
-  }
-}
-
-/** The search a profile was opened from, if it was. */
+/** The search a profile was opened from, as the view beneath it shows it, if it was opened from one. */
 function useOpeningSearch(): SearchParams | undefined {
-  const search = backgroundOf(useLocation())?.search;
-  return useMemo(() => (search === undefined ? undefined : readSearch(search)), [search]);
+  const { pathname, search } = backgroundOf(useLocation()) ?? {};
+  return useMemo(() => {
+    if (pathname === undefined || search === undefined) return undefined;
+    try {
+      return viewSearch(pathname, search);
+    } catch (error) {
+      if (error instanceof InvalidParam) return undefined;
+      throw error;
+    }
+  }, [pathname, search]);
 }
 
 /** Whether a tag is one the visitor searched for, as the result cards judge it; nothing is, on a profile not opened from a search. */
