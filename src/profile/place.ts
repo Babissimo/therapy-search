@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
-import { LOCATION_MAX_LENGTH, canonicalLocation, classifyLocation, type PlaceLookup, type PlaceOptions } from "@shared/location";
+import { LOCATION_MAX_LENGTH, canonicalLocation, classifyLocation, type PlaceLookup } from "@shared/location";
 import type { Office } from "@shared/types";
-import { api } from "@/lib/api";
+import { firstFoundLookup, placeLookup } from "@/lib/placeLookup";
 import { choosePoint, type Point } from "@/search/map/geo";
 import { lookupText } from "@/search/map/pins";
 
@@ -77,29 +77,14 @@ export function officeLookup(office: Office, listed: string | undefined): Office
   return text ? { texts: [text] } : undefined;
 }
 
-/** The answer for the first of the texts that is found, else the last one's. */
-async function firstFound(texts: string[], options: PlaceOptions): Promise<PlaceLookup> {
-  let answer: PlaceLookup = { found: false, reason: "not-found" };
-  for (const text of texts) {
-    answer = await api.place(text, options);
-    if (answer.found) break;
-  }
-  return answer;
-}
-
-/** Where an office is, and how far in to show it. Places don't move, so answers last the session. */
+/** Where an office is, and how far in to show it. */
 export function useOfficePlace(office: Office, listed: string | undefined): { point: Point; zoom: number } | undefined {
   const lookup = officeLookup(office, listed);
-  // Abroad, each text takes Nominatim's single best answer in the country, as a search centre does. At home, the one
-  // text is keyed as the search keys a card's, so a place it already placed is not asked for again.
-  const options: PlaceOptions = lookup?.country ? { centre: true, country: lookup.country } : { outsideUK: false };
-  const query = useQuery({
-    queryKey: ["place", lookup?.country ? { texts: lookup.texts, ...options } : { text: lookup?.texts[0], ...options }],
-    queryFn: () => firstFound(lookup?.texts ?? [], options),
-    enabled: lookup !== undefined,
-    staleTime: Infinity,
-    gcTime: Infinity,
-  });
+  // Abroad, each text in turn takes Nominatim's single best answer in the country, as a search centre does. At home, the
+  // one text is looked up as the search looks up a card's, so a place it already placed is not asked for again.
+  const query = useQuery(
+    lookup?.country ? firstFoundLookup(lookup.texts, { centre: true, country: lookup.country }) : placeLookup(lookup?.texts[0], { outsideUK: false }),
+  );
   const answer = query.data;
   const point = answer?.found ? choosePoint(answer) : undefined;
   return answer?.found && point ? { point, zoom: ZOOM[answer.kind] } : undefined;
