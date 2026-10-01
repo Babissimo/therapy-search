@@ -1,5 +1,6 @@
 import { X } from "lucide-react";
 import type { SearchParams } from "@shared/query";
+import { GlidingList } from "@/components/GlidingList";
 import { Morph } from "@/components/Morph";
 import { Button } from "@/components/ui/button";
 import { useLeaving } from "@/lib/useLeaving";
@@ -15,7 +16,7 @@ export function FilterChips({ params, onChange, className }: Props) {
   return (
     <Morph name="chips">
       {chips.length > 0 && (
-        <ul aria-label="Active filters" className={cn("flex flex-wrap gap-2", className)}>
+        <GlidingList aria-label="Active filters" className={cn("flex flex-wrap gap-2", className)}>
           {chips.map(({ key, item: filter, props }) => (
             <li
               key={key}
@@ -34,7 +35,7 @@ export function FilterChips({ params, onChange, className }: Props) {
               </Button>
             </li>
           ))}
-        </ul>
+        </GlidingList>
       )}
     </Morph>
   );
