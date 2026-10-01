@@ -1,11 +1,12 @@
 import { Tabs } from "radix-ui";
-import { lazy, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { lazy, useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { Link, useLocation, useMatch } from "react-router";
 import { canonicalLocation } from "@shared/location";
 import { toQuery, type SearchParams } from "@shared/query";
 import { MapSlot } from "@/components/MapSlot";
 import { Morph, startMorph } from "@/components/Morph";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
 import { Masthead } from "@/layout/Masthead";
 import { useMediaQuery } from "@/lib/useMediaQuery";
@@ -14,8 +15,9 @@ import { LazyShortlistTab } from "@/shortlist/LazyShortlistTab";
 import { useSetAsideOpen } from "@/shortlist/setAside";
 import { statusOf } from "@/shortlist/store";
 import { useShortlistIf, useShortlistRefresh } from "@/shortlist/useShortlist";
-import { soughtTerms } from "./activeFilters";
+import { activeFilters, soughtTerms } from "./activeFilters";
 import { FilterChips } from "./FilterChips";
+import { FilterPanel } from "./FilterPanel";
 import { FiltersButton, FiltersSection, FiltersSheet, FiltersSheetButton, UpdateResults } from "./Filters";
 import { ListColumn } from "./ListColumn";
 import { ListPanels, ListTabs, type ListTab } from "./ListTabs";
@@ -28,7 +30,7 @@ import { ModeSwitch } from "./ModeSwitch";
 import { ONLINE_PATH, onlineParams } from "./online";
 import { OnlineView } from "./OnlineView";
 import { loadMap, warmMap } from "./prefetch";
-import { FiltersIcon, Prompt } from "./Prompt";
+import { Prompt } from "./Prompt";
 import { Results } from "./Results";
 import { ResultsPanel } from "./ResultsPanel";
 import { coverOf, ResultsSheet, type SheetPosition } from "./ResultsSheet";
@@ -130,13 +132,19 @@ function SearchView({ params, onChange, wide }: ViewProps) {
   // regardless, and stay open over the map when the keyword starts a search; a search for a place puts them away.
   const [filtersOpen, setFiltersOpen] = useState(!searching && wide);
   const [sheet, setSheet] = useState<SheetPosition>("full");
+  // The place a search from the start was held back for while the page asks for a filter first, and whether the visitor
+  // chose to search one without, which stops the asking for as long as Near me stays open.
+  const [heldAt, setHeldAt] = useState<string>();
+  const [unfiltered, setUnfiltered] = useState(false);
   const layout = searching ? "search" : wide ? "prompt beside filters" : "prompt";
   const [laidOutFor, setLaidOutFor] = useState(layout);
   if (laidOutFor !== layout) {
     setLaidOutFor(layout);
     // A search opens on its list.
-    if (searching) setSheet("full");
-    else setFiltersOpen(wide);
+    if (searching) {
+      setSheet("full");
+      setHeldAt(undefined);
+    } else setFiltersOpen(wide);
   }
   // The shortlist keeps its place apart from the results', under a key of its own.
   const scroll = useRememberedScroll(tab === "results" ? entry : `${entry} shortlist`, tab === "shortlist" || !searching || !results.loading);
@@ -193,10 +201,45 @@ function SearchView({ params, onChange, wide }: ViewProps) {
       onHighlight={highlight.set}
     />
   );
+  // A place searched from the start with nothing that would make a chip waits for a filter, unless the visitor says not to.
+  const hold = (place: string) => {
+    if (unfiltered || activeFilters(drafts.search()).length > 0) return false;
+    setHeldAt(place);
+    return true;
+  };
+  const placeStep = (
+    <PlaceStep
+      params={params}
+      drafts={drafts}
+      hold={hold}
+      onPlaceSearch={() => setFiltersOpen(false)}
+      onUnfiltered={
+        heldAt === undefined
+          ? undefined
+          : () => {
+              setUnfiltered(true);
+              drafts.applyAt(drafts.get("location").trim() || heldAt);
+              setFiltersOpen(false);
+            }
+      }
+    />
+  );
+  // Before a search, the filters come first and the place last: beside the prompt on wide screens, beneath it on a phone.
+  const start = (
+    <div className="space-y-8">
+      {heldAt === undefined ? <NearPrompt wide={wide} /> : <FiltersFirst place={heldAt} wide={wide} />}
+      {!wide && (
+        <div className="space-y-6">
+          <FilterPanel params={params} drafts={drafts} />
+          {placeStep}
+        </div>
+      )}
+    </div>
+  );
   const lists = (
     <ListPanels
       tab={tab}
-      results={searching ? list : <NearPrompt wide={wide} />}
+      results={searching ? list : start}
       shortlist={
         <LazyShortlistTab
           sought={soughtTerms(params)}
@@ -229,6 +272,7 @@ function SearchView({ params, onChange, wide }: ViewProps) {
       besideToggle={wide && searching && !panelOpen}
       filtersOpen={filtersOpen}
       onFiltersOpenChange={setFiltersOpen}
+      placeStep={placement === "aside" ? placeStep : undefined}
     />
   );
 
@@ -236,7 +280,7 @@ function SearchView({ params, onChange, wide }: ViewProps) {
   // a phone; a search gives the page to the map, the list beside or over it. On wide screens the toolbar keeps its place in
   // the tree as it moves over the map, so what is typed, open or in focus in it stays; on a phone its filters' sheet does.
   return (
-    <FiltersSheet phone={!wide} params={params} drafts={drafts} searches={searching}>
+    <FiltersSheet phone={!wide} params={params} drafts={drafts}>
       {/* The tabs' root spans the page, around wherever their list and panels sit. */}
       <Tabs.Root value={tab} onValueChange={pickTab} asChild>
         <div className="group/tabs flex min-h-0 flex-1">
@@ -318,7 +362,7 @@ type Placement = "map" | "aside" | "list";
 /**
  * The switch to online, search box, filters and active-filter chips. Over the map, the buttons the map offers once moved,
  * to search there or recentre, are placed to keep clear of it, so a change to its inset, width or height moves them too.
- * Beside the list the filters stay open, as online's do.
+ * Beside the list the filters stay open, as online's do, with the place box, given as `placeStep`, at their foot.
  */
 function Toolbar({
   placement,
@@ -328,12 +372,14 @@ function Toolbar({
   besideToggle,
   filtersOpen,
   onFiltersOpenChange,
+  placeStep,
 }: Omit<ViewProps, "onChange"> & {
   placement: Placement;
   drafts: SearchDrafts;
   besideToggle: boolean;
   filtersOpen: boolean;
   onFiltersOpenChange: (open: boolean) => void;
+  placeStep?: ReactNode;
 }) {
   const filtersId = useId();
   const ticked = tickedFilters(useDraftFilters(drafts));
@@ -361,30 +407,31 @@ function Toolbar({
         <Morph name="toolbar">
           <div className={cn("pointer-events-auto flex w-full flex-col gap-2 rounded-xl border bg-background p-2", overMap && "shadow-md")}>
             <ModeSwitch online={false} params={params} drafts={drafts} />
-            <div className="flex items-start gap-2">
-              {/* A search for a place puts the filters away to show where it is; ticks and the keyword leave them open for more. */}
-              <Morph name="place">
-                <SearchBox
-                  params={params}
-                  drafts={drafts}
-                  onPlaceSearch={() => onFiltersOpenChange(false)}
-                  onFocus={warmMap}
-                  className="min-w-0 flex-1"
-                />
-              </Morph>
-              {wide ? (
-                overMap && (
+            {/* Before a search the place box follows the filters instead. */}
+            {overMap && (
+              <div className="flex items-start gap-2">
+                {/* A search for a place puts the filters away to show where it is; ticks and the keyword leave them open for more. */}
+                <Morph name="place">
+                  <SearchBox
+                    params={params}
+                    drafts={drafts}
+                    onPlaceSearch={() => onFiltersOpenChange(false)}
+                    onFocus={warmMap}
+                    className="min-w-0 flex-1"
+                  />
+                </Morph>
+                {wide ? (
                   <FiltersButton
                     ticked={ticked}
                     aria-expanded={filtersOpen}
                     aria-controls={filtersOpen ? filtersId : undefined}
                     onClick={() => (filtersOpen ? closeFilters() : onFiltersOpenChange(true))}
                   />
-                )
-              ) : (
-                <FiltersSheetButton ticked={ticked} />
-              )}
-            </div>
+                ) : (
+                  <FiltersSheetButton ticked={ticked} />
+                )}
+              </div>
+            )}
           </div>
         </Morph>
         <FilterChips
@@ -400,7 +447,7 @@ function Toolbar({
             params={params}
             drafts={drafts}
             onClose={overMap ? closeFilters : undefined}
-            footer={overMap && <UpdateResults drafts={drafts} />}
+            footer={overMap ? <UpdateResults drafts={drafts} /> : placeStep}
             className="pointer-events-auto"
           />
         </CollapsibleContent>
@@ -409,18 +456,53 @@ function Toolbar({
   );
 }
 
-/** In place of the results until there is a place to search. */
+/** In place of the results until there is a place to search, asking for what matters before where. */
 function NearPrompt({ wide }: { wide: boolean }) {
   return (
-    <Prompt ask="Start with where you are." className="py-10 sm:py-16">
-      {wide ? (
-        "Type a town, city or postcode in the box to the right to see the UKCP therapists nearest to it. The filters beneath"
-      ) : (
-        <>
-          Type a town, city or postcode to see the UKCP therapists nearest to it. Filters <FiltersIcon />
-        </>
-      )}{" "}
-      then narrow the list by what they help with, how they work, the languages they speak and more.
+    <Prompt ask="Start with what matters to you." className={wide ? "py-10 sm:py-16" : "pt-6"}>
+      Tick anything that matters to you {wide ? "in the filters to the right" : "below"}, then type a town, city or postcode
+      {wide && " beneath them"} to see the UKCP therapists nearest to it.
     </Prompt>
+  );
+}
+
+/** In place of the prompt while a place searched with nothing ticked waits for a filter. It takes the keyboard, so it is read out. */
+function FiltersFirst({ place, wide }: { place: string; wide: boolean }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => ref.current?.focus(), [place]);
+  return (
+    <div ref={ref} tabIndex={-1} className="outline-none">
+      <Prompt ask={`Before we search near ${place}`} className={wide ? "py-10 sm:py-16" : "pt-6"}>
+        A tick or two {wide ? "to the right" : "below"} keeps the list to people who suit you.
+      </Prompt>
+    </div>
+  );
+}
+
+type PlaceStepProps = {
+  params: SearchParams;
+  drafts: SearchDrafts;
+  hold: (place: string) => boolean;
+  onPlaceSearch: () => void;
+  /** Searches the place in the box with no filters, offered while a place is held back and nothing is ticked since. */
+  onUnfiltered?: () => void;
+};
+
+/**
+ * The place box at the foot of the filters before a first search. Unlike the toolbar's box over the map it has no Morph:
+ * paired, the switch to online would glide it into that view's toolbar.
+ */
+function PlaceStep({ params, drafts, hold, onPlaceSearch, onUnfiltered }: PlaceStepProps) {
+  const filtered = useSyncExternalStore(drafts.subscribe, () => activeFilters(drafts.search()).length > 0);
+  return (
+    <div className="space-y-2">
+      <p className="text-sm font-medium">Where are you?</p>
+      <SearchBox params={params} drafts={drafts} hold={hold} onPlaceSearch={onPlaceSearch} onFocus={warmMap} />
+      {onUnfiltered && !filtered && (
+        <Button type="button" variant="link" size="sm" className="h-auto px-0" onClick={onUnfiltered}>
+          Search without filters
+        </Button>
+      )}
+    </div>
   );
 }

@@ -44,9 +44,9 @@ export function FiltersSection({
   );
 }
 
-export function MobileFilters({ ready, ...panel }: PanelProps & { ready?: (draft: SearchParams) => boolean }) {
+export function MobileFilters(panel: PanelProps) {
   return (
-    <FiltersSheet phone ready={ready} {...panel}>
+    <FiltersSheet phone {...panel}>
       <FiltersSheetButton ticked={tickedFilters(useDraftFilters(panel.drafts))} />
     </FiltersSheet>
   );
@@ -55,21 +55,15 @@ export function MobileFilters({ ready, ...panel }: PanelProps & { ready?: (draft
 /**
  * The filters in a sheet from the right on a phone, opened by a FiltersSheetButton anywhere within it. The sheet keeps its
  * place in the tree however far its button moves about the page, so it stays open, and in use, as the button moves. It
- * covers the list, so where there is a search to show it searches what was ticked in it as it is put away, by its button
- * or otherwise, once `ready` allows; until then the ticks wait for whatever searches next.
+ * covers the list, so it searches what was ticked in it as it is put away, by its button or otherwise. A view offers it only
+ * once there is a search to show; before then its filters sit in the list.
  */
-export function FiltersSheet({
-  phone,
-  searches = true,
-  ready,
-  children,
-  ...panel
-}: PanelProps & { phone: boolean; searches?: boolean; ready?: (draft: SearchParams) => boolean; children: ReactNode }) {
+export function FiltersSheet({ phone, children, ...panel }: PanelProps & { phone: boolean; children: ReactNode }) {
   const [open, setOpen] = useState(false);
   // Wide screens have no sheet, so widening puts it away, leaving its ticks waiting for the filters there.
   if (open && !phone) setOpen(false);
   const openChange = (next: boolean) => {
-    if (!next && searches && panel.drafts.pending() && (ready?.(panel.drafts.search()) ?? true)) panel.drafts.apply();
+    if (!next && panel.drafts.pending()) panel.drafts.apply();
     setOpen(next);
   };
   return (
@@ -86,7 +80,7 @@ export function FiltersSheet({
           </div>
           <SheetFooter className="border-t">
             <Button type="button" onClick={() => openChange(false)}>
-              {searches ? "Show results" : "Done"}
+              Show results
             </Button>
           </SheetFooter>
         </SheetContent>

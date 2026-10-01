@@ -16,16 +16,21 @@ type Props = {
   onPlaceSearch?: () => void;
   /** Hears the box, or the button that locates, taking focus: a sign a search for a place may follow. */
   onFocus?: () => void;
+  /** Hears a place about to be searched, holding the search back, with the place in the box, when it answers true. */
+  hold?: (place: string) => boolean;
   className?: string;
 };
 
 /**
  * The location search, which can search the visitor's nearest postcode; either way it takes the typed keyword and the
- * ticks waiting in the draft with it.
- * With the box empty it asks for a place rather than searching everywhere.
+ * ticks waiting in the draft with it. With the box empty it asks for a place rather than searching everywhere.
  */
-export function SearchBox({ params, drafts, onPlaceSearch, onFocus, className }: Props) {
+export function SearchBox({ params, drafts, onPlaceSearch, onFocus, hold, className }: Props) {
   const here = useLocate((postcode) => {
+    if (hold?.(postcode)) {
+      drafts.set("location", postcode);
+      return;
+    }
     drafts.applyAt(postcode);
     onPlaceSearch?.();
   });
@@ -50,6 +55,7 @@ export function SearchBox({ params, drafts, onPlaceSearch, onFocus, className }:
             input.current?.focus();
             return;
           }
+          if (hold?.(location.trim())) return;
           drafts.apply();
           onPlaceSearch?.();
         }}
