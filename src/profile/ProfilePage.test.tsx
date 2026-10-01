@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, fireEvent, render, renderHook, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, renderHook, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, type Location } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { emptyParams, readParams } from "@shared/query";
@@ -12,6 +12,22 @@ import { useResults } from "@/search/useResults";
 import { createShortlistStore, type ShortlistStore } from "@/shortlist/store";
 import { ShortlistContext } from "@/shortlist/useShortlist";
 import { ProfilePage } from "./ProfilePage";
+
+/** Set by a test whose office maps' code can't be fetched. */
+const mapChunk = vi.hoisted(() => ({ fails: false }));
+
+// An office's map as it is, until its code can't be fetched; then it throws where it would draw, as React does with a lazy
+// component whose import failed.
+vi.mock("./ProfileMap", async (importOriginal) => {
+  const { createElement } = await import("react");
+  const { default: ProfileMap } = await importOriginal<typeof import("./ProfileMap")>();
+  return {
+    default: (props: Parameters<typeof ProfileMap>[0]) => {
+      if (mapChunk.fails) throw new TypeError("Failed to fetch dynamically imported module");
+      return createElement(ProfileMap, props);
+    },
+  };
+});
 
 const PROFILE: Profile = { slug: "Test-ABCDEFGH", name: "Test Therapist", initials: "TT", languages: [], emailInContact: false, social: [], about: [], practical: [], offices: [] };
 
@@ -44,6 +60,7 @@ function renderAt(entries: (string | Partial<Location>)[], result: Profile | Api
 afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+  mapChunk.fails = false;
 });
 
 describe("ProfilePage's way back", () => {
@@ -224,6 +241,18 @@ describe("ProfilePage's content", () => {
     renderAt(["/therapist/Test-ABCDEFGH"], { ...PROFILE, practical: [section("UKCP College", [college])] });
     // jsdom lays nothing out, so this checks the tag gives up the badge's single line rather than measuring it.
     expect((await screen.findByText(college)).className).toContain("whitespace-normal");
+  });
+
+  it("leaves a note in an office's map, and the rest of its card, when the map's code can't be fetched", async () => {
+    // React reports the error it caught to the console.
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    mapChunk.fails = true;
+    vi.spyOn(api, "place").mockResolvedValue({ found: true, kind: "place", candidates: [{ lat: 51.52, lng: -0.15 }] });
+    const london = { ...office("London Office", "£90 per session"), address: ["10 Harley Street", "London W1G 9PF"] };
+    renderAt(["/therapist/Test-ABCDEFGH"], { ...PROFILE, offices: [london] });
+    const map = await screen.findByRole("region", { name: "Map of London Office" });
+    expect(await within(map).findByText("The map couldn't load.")).toBeTruthy();
+    expect(map.closest("[data-slot=card]")?.textContent).toContain("£90 per session");
   });
 
   it("links each office's name to its map", async () => {
