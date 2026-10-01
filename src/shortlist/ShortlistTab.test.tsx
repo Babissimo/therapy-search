@@ -3,13 +3,13 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { ComponentProps } from "react";
 import { MemoryRouter } from "react-router";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { api } from "@/lib/api";
 import type { Pin } from "@/search/map/pins";
 import { createSetAsideView, SetAsideContext } from "./setAside";
 import { ShortlistTab } from "./ShortlistTab";
-import { createShortlistStore, type ShortlistCard, type Status } from "./store";
+import { createShortlistStore, SHORTLIST_KEY, type ShortlistCard, type ShortlistStore, type Status } from "./store";
 import { ShortlistContext } from "./useShortlist";
 
 const card = (slug: string, name: string): ShortlistCard => ({
@@ -21,12 +21,12 @@ const card = (slug: string, name: string): ShortlistCard => ({
   tags: ["Anxiety", "Grief"],
 });
 
-type Props = Omit<ComponentProps<typeof ShortlistTab>, "sought"> & { sought?: string[]; statuses?: Record<string, Status> };
+type Props = Omit<ComponentProps<typeof ShortlistTab>, "sought"> & { sought?: string[]; statuses?: Record<string, Status>; store?: ShortlistStore };
 
 /** The tab over a shortlist of `cards`, each newer than the last, with `statuses` by slug before it draws. */
-function renderTab({ sought = [], statuses = {}, ...props }: Props, ...cards: ShortlistCard[]) {
+function renderTab({ sought = [], statuses = {}, store: given, ...props }: Props, ...cards: ShortlistCard[]) {
   let t = 1000;
-  const store = createShortlistStore(null, () => t++);
+  const store = given ?? createShortlistStore(null, () => t++);
   for (const c of cards) store.add(c);
   for (const [slug, status] of Object.entries(statuses)) store.setStatus(slug, status);
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -244,6 +244,74 @@ describe("ShortlistTab", () => {
     fireEvent.click(screen.getByRole("button", { name: "Remove Ann from your shortlist" }));
     expect(names()).toEqual(["Ann"]);
     screen.getByText("Kept in this browser only.");
+  });
+
+  it("still offers to clear the shortlist once everyone on it is removed, as their cards still show where the visitor stood", () => {
+    const store = renderTab({ statuses: { "Ann-AAAAAAAA": "seeing" } }, card("Ann-AAAAAAAA", "Ann"));
+    fireEvent.click(screen.getByRole("button", { name: "Remove Ann from your shortlist" }));
+    expect(names()).toEqual(["Ann"]);
+    fireEvent.click(screen.getByRole("button", { name: "Clear shortlist" }));
+    screen.getByText("This forgets the 1 therapist you removed, and where you stood with them, so they can't be put back as they were.");
+    fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Clear shortlist" }));
+    expect(screen.queryAllByRole("heading")).toEqual([]);
+    expect(screen.queryByRole("button", { name: "Clear shortlist" })).toBeNull();
+    expect(store.clears()).toBe(1);
+  });
+
+  it("clears everyone once the visitor confirms, naming how many will go, and gives focus to the empty tab's note", async () => {
+    const store = renderTab({}, card("Ann-AAAAAAAA", "Ann"), card("Bo-BBBBBBBB", "Bo"), card("Cy-CCCCCCCC", "Cy"));
+    act(() => store.setStatus("Ann-AAAAAAAA", "seeing"));
+    // Bo, removed already, is kept in place to be added back until the list is cleared.
+    fireEvent.click(screen.getByRole("button", { name: "Remove Bo from your shortlist" }));
+    fireEvent.click(screen.getByRole("button", { name: "Clear shortlist" }));
+    const dialog = screen.getByRole("alertdialog", { name: "Clear your shortlist?" });
+    const description = screen.getByText("This removes 2 therapists, and where you stand with them, from this browser. It can't be undone.");
+    expect(dialog.getAttribute("aria-describedby")).toBe(description.id);
+    // The safer choice has focus as the dialog opens.
+    expect(document.activeElement).toBe(within(dialog).getByRole("button", { name: "Cancel" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Clear shortlist" }));
+    expect(store.get()).toEqual([]);
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    expect(screen.queryAllByRole("heading")).toEqual([]);
+    const note = screen.getByText(/^Bookmark anyone who might suit you/).parentElement;
+    expect(document.activeElement).toBe(note);
+    // The dialog hands focus back once it has gone, which must not take it from the note.
+    await act(() => new Promise((resolve) => setTimeout(resolve)));
+    expect(document.activeElement).toBe(note);
+  });
+
+  it("lets everyone go when another tab clears the list, giving focus to the note if what had it went with them", () => {
+    onTestFinished(() => localStorage.clear());
+    const inBrowser = createShortlistStore(localStorage, Date.now, window);
+    renderTab({ store: inBrowser }, card("Ann-AAAAAAAA", "Ann"), card("Bo-BBBBBBBB", "Bo"));
+    fireEvent.click(screen.getByRole("button", { name: "Remove Bo from your shortlist" }));
+    act(() => screen.getByRole("button", { name: /^Status of Ann:/ }).focus());
+    // Another tab's clear, as this one hears it.
+    localStorage.removeItem(SHORTLIST_KEY);
+    act(() => void window.dispatchEvent(new StorageEvent("storage", { key: SHORTLIST_KEY, newValue: null })));
+    expect(screen.queryAllByRole("heading")).toEqual([]);
+    expect(document.activeElement).toBe(screen.getByText(/^Bookmark anyone who might suit you/).parentElement);
+  });
+
+  it("leaves focus alone when the list is cleared from under nothing that had it", () => {
+    const store = renderTab({}, card("Ann-AAAAAAAA", "Ann"));
+    const elsewhere = document.body.appendChild(document.createElement("button"));
+    onTestFinished(() => elsewhere.remove());
+    elsewhere.focus();
+    act(() => store.clear());
+    expect(document.activeElement).toBe(elsewhere);
+  });
+
+  it("leaves the shortlist as it was when the visitor cancels, with focus back on the button", async () => {
+    const store = renderTab({}, card("Ann-AAAAAAAA", "Ann"));
+    const before = store.get();
+    const button = screen.getByRole("button", { name: "Clear shortlist" });
+    fireEvent.click(button);
+    fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    expect(store.get()).toBe(before);
+    expect(names()).toEqual(["Ann"]);
+    await waitFor(() => expect(document.activeElement).toBe(button));
   });
 
   it("moves a therapist by their handle, saying where they are as they go", () => {

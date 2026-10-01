@@ -38,6 +38,12 @@ export function useShortlistEntry(slug: string): ShortlistEntry | undefined {
   return useSyncExternalStore(store.subscribe, () => store.get().find((entry) => entry.card.slug === slug));
 }
 
+/** How many times the shortlist has been cleared since the page loaded, for whatever keeps entries of its own to forget them. */
+export function useShortlistClears(): number {
+  const store = useShortlistStore();
+  return useSyncExternalStore(store.subscribe, store.clears);
+}
+
 export function therapistCount(n: number): string {
   return n === 1 ? "1 therapist" : `${n} therapists`;
 }

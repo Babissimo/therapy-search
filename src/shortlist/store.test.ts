@@ -8,6 +8,7 @@ function memory(initial?: unknown) {
   return {
     getItem: (k: string) => store.get(k) ?? null,
     setItem: (k: string, v: string) => void store.set(k, v),
+    removeItem: (k: string) => void store.delete(k),
     store,
   };
 }
@@ -131,6 +132,9 @@ describe("createShortlistStore", () => {
       setItem: () => {
         throw new Error("denied");
       },
+      removeItem: () => {
+        throw new Error("denied");
+      },
     };
     const store = createShortlistStore(refusing, clock());
     expect(() => store.add(card("a"))).not.toThrow();
@@ -225,7 +229,7 @@ describe("createShortlistStore", () => {
     createShortlistStore(storage, clock(5000)).add(card("elsewhere"));
     events.dispatchEvent(new StorageEvent("storage", { key: "theme" }));
     expect(onChange).not.toHaveBeenCalled();
-    events.dispatchEvent(new StorageEvent("storage", { key: SHORTLIST_KEY }));
+    events.dispatchEvent(new StorageEvent("storage", { key: SHORTLIST_KEY, newValue: storage.store.get(SHORTLIST_KEY) }));
     expect(onChange).toHaveBeenCalledOnce();
     expect(store.has("elsewhere")).toBe(true);
   });
@@ -283,6 +287,86 @@ describe("createShortlistStore", () => {
     expect(store.get()[0]).toEqual({ addedAt: 1001, status: "contacted", card: { ...card("b"), distance: undefined } });
   });
 
+  it("clears everyone, with their statuses and order, from storage as well as the page, counting the clear", () => {
+    const storage = memory();
+    const store = createShortlistStore(storage, clock());
+    for (const slug of ["a", "b"]) store.add(card(slug));
+    store.setStatus("a", "seeing");
+    store.move("a", { below: store.get()[0] });
+    const onChange = vi.fn();
+    store.subscribe(onChange);
+    expect(store.clears()).toBe(0);
+    store.clear();
+    expect(onChange).toHaveBeenCalledOnce();
+    expect(store.clears()).toBe(1);
+    expect(store.get()).toEqual([]);
+    expect(store.has("a")).toBe(false);
+    expect(storage.store.has(SHORTLIST_KEY)).toBe(false);
+    store.add(card("c"));
+    expect(createShortlistStore(storage).get().map((e) => e.card.slug)).toEqual(["c"]);
+  });
+
+  it("clears the list for the page load where the browser refuses storage", () => {
+    const refusing = {
+      getItem: () => null,
+      setItem: () => {
+        throw new Error("denied");
+      },
+      removeItem: () => {
+        throw new Error("denied");
+      },
+    };
+    const store = createShortlistStore(refusing, clock());
+    store.add(card("a"));
+    expect(() => store.clear()).not.toThrow();
+    expect(store.get()).toEqual([]);
+    store.add(card("b"));
+    expect(store.get().map((e) => e.card.slug)).toEqual(["b"]);
+  });
+
+  it("clears a therapist another tab added before this one has heard of it", () => {
+    const storage = memory();
+    const here = createShortlistStore(storage, clock());
+    here.add(card("here"));
+    createShortlistStore(storage, clock(5000)).add(card("elsewhere"));
+    here.clear();
+    expect(createShortlistStore(storage).get()).toEqual([]);
+  });
+
+  it("counts a clear made in another tab, as the list leaving storage, and no other change there", () => {
+    const storage = memory();
+    const events = new EventTarget();
+    const here = createShortlistStore(storage, clock(), events);
+    here.subscribe(() => {});
+    here.add(card("a"));
+    createShortlistStore(storage, clock(2000)).add(card("b"));
+    events.dispatchEvent(new StorageEvent("storage", { key: SHORTLIST_KEY, newValue: storage.store.get(SHORTLIST_KEY) }));
+    expect(here.clears()).toBe(0);
+    createShortlistStore(storage, clock(3000)).clear();
+    events.dispatchEvent(new StorageEvent("storage", { key: SHORTLIST_KEY, newValue: null }));
+    expect(here.get()).toEqual([]);
+    expect(here.clears()).toBe(1);
+    // Another tab clearing all of the site's storage clears the list too.
+    here.add(card("c"));
+    storage.store.clear();
+    events.dispatchEvent(new StorageEvent("storage", { key: null }));
+    expect(here.get()).toEqual([]);
+    expect(here.clears()).toBe(2);
+  });
+
+  it("keeps what this tab wrote after another tab's clear, but before it heard of it", () => {
+    const storage = memory();
+    const events = new EventTarget();
+    const here = createShortlistStore(storage, clock(), events);
+    here.subscribe(() => {});
+    here.add(card("a"));
+    createShortlistStore(storage, clock(3000)).clear();
+    here.add(card("b"));
+    events.dispatchEvent(new StorageEvent("storage", { key: SHORTLIST_KEY, newValue: null }));
+    expect(here.get().map((e) => e.card.slug)).toEqual(["b"]);
+    expect(here.clears()).toBe(1);
+  });
+
   it("changes nothing for a therapist who isn't shortlisted", () => {
     const store = createShortlistStore(memory(), clock());
     store.setStatus("a", "contacted");
@@ -305,7 +389,7 @@ describe("createShortlistStore", () => {
     store.add(card("a"));
     store.subscribe(() => {});
     createShortlistStore(storage).setStatus("a", "waiting");
-    events.dispatchEvent(new StorageEvent("storage", { key: SHORTLIST_KEY }));
+    events.dispatchEvent(new StorageEvent("storage", { key: SHORTLIST_KEY, newValue: storage.store.get(SHORTLIST_KEY) }));
     expect(statusOf(store.get()[0]!)).toBe("waiting");
   });
 });
