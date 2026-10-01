@@ -1,6 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import { fragmentAddress } from "./lib/address";
 import { queryClient } from "./lib/queryClient";
 import { prefetchSearchAt } from "./search/prefetch";
@@ -12,6 +13,8 @@ prefetchSearchAt(queryClient, window.location.hash);
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <App />
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
   </StrictMode>,
 );
