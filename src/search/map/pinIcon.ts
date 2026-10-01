@@ -27,12 +27,15 @@ export function centreIcon(): DivIcon {
   return elementIcon(pin, CENTRE, "tip");
 }
 
+/** What a pin shows of a therapist, which a profile has as well as a card. */
+type Face = Pick<TherapistCard, "slug" | "name" | "initials" | "photoUrl" | "sessionTypes">;
+
 /**
  * One therapist's photo or initials; a pin or cluster for several shows up to three, stacked, with the count. Anyone in
  * `shortlisted` is badged, and leads a stack.
  */
-export function pinIcon(therapists: TherapistCard[], shortlisted?: ReadonlySet<string>): DivIcon {
-  const onShortlist = (therapist: TherapistCard) => shortlisted?.has(therapist.slug) ?? false;
+export function pinIcon(therapists: Face[], shortlisted?: ReadonlySet<string>): DivIcon {
+  const onShortlist = (therapist: Face) => shortlisted?.has(therapist.slug) ?? false;
   const listed = therapists.filter(onShortlist);
   const [first] = therapists;
   if (therapists.length === 1 && first) {
@@ -70,7 +73,7 @@ function holder(avatars: HTMLElement[]): HTMLElement {
   return root;
 }
 
-function avatar(therapist: TherapistCard, size: string): HTMLElement {
+function avatar(therapist: Face, size: string): HTMLElement {
   // Initials without a photo stand on slate, as on the cards; with one, they stay muted beneath it while it loads.
   const colour = therapist.photoUrl ? "bg-muted text-muted-foreground" : "bg-primary font-heading text-primary-foreground";
   const circle = element(
