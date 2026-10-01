@@ -221,7 +221,10 @@ describe("POST /api/therapist", () => {
 
   it("rejects slugs that could not be UKCP's without asking the cache", async () => {
     const { post, forwarded } = setup();
-    for (const slug of ["../../admin", "...", ""]) expect((await post("/api/therapist", new URLSearchParams({ slug }).toString())).status).toBe(400);
+    for (const slug of ["../../admin", "...", ""]) {
+      const res = await post("/api/therapist", new URLSearchParams({ slug }).toString());
+      expect([res.status, res.headers.get("Cache-Control"), await res.json()]).toEqual([400, "no-store", { error: "That isn't a UKCP profile address.", param: "slug" }]);
+    }
     expect(forwarded).not.toHaveBeenCalled();
   });
 
@@ -301,8 +304,15 @@ describe("POST /api/office", () => {
   it("rejects a slug or location it can't use without asking the cache", async () => {
     const { post, forwarded } = setup();
     const long = "B".repeat(LOCATION_MAX_LENGTH + 1);
-    for (const body of ["slug=../../admin&location=BN3", "slug=Jo-Bloggs-ABCDEFGH&location=+", `slug=Jo-Bloggs-ABCDEFGH&location=${long}`, "slug=Jo-Bloggs-ABCDEFGH"]) {
-      expect((await post("/api/office", body)).status).toBe(400);
+    const refused: [body: string, param: string][] = [
+      ["slug=../../admin&location=BN3", "slug"],
+      ["slug=Jo-Bloggs-ABCDEFGH&location=+", "location"],
+      [`slug=Jo-Bloggs-ABCDEFGH&location=${long}`, "location"],
+      ["slug=Jo-Bloggs-ABCDEFGH", "location"],
+    ];
+    for (const [body, param] of refused) {
+      const res = await post("/api/office", body);
+      expect([res.status, (await res.json()).param]).toEqual([400, param]);
     }
     expect(forwarded).not.toHaveBeenCalled();
   });
