@@ -1,11 +1,11 @@
 import type { Office, Profile, ProfileSection } from "../types";
+import { PROFILE_HEADER } from "./markers";
 import { ParseError, initialsOf, multiLine, oneLine, optional, readHtml, safeUrl } from "./text";
 
 export function parseProfile(html: string, slug: string): Profile {
   const doc = readHtml(html);
-  // The header is what marks a profile page: a therapist may have written no biography at all.
-  const name = oneLine(doc.querySelector(".therapist-header h1")?.textContent);
-  if (!name) throw new ParseError("profile: no .therapist-header h1");
+  const name = oneLine(doc.querySelector(`.${PROFILE_HEADER} h1`)?.textContent);
+  if (!name) throw new ParseError(`profile: no .${PROFILE_HEADER} h1`);
 
   const details = doc.querySelector(".therapist-contacts-details");
   const mailto = [...doc.querySelectorAll(".therapist-contacts a")]

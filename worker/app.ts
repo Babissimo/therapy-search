@@ -11,6 +11,7 @@ import {
 } from "../shared/location";
 import { ALLOWED } from "../shared/options";
 import { EARLY_SIZE, InvalidParam, asksWhole, batchSize, readParams, toQuery, type SearchParams } from "../shared/query";
+import { CONTACT_DETAIL, PROFILE_HEADER, RESULTS_COUNT, RESULTS_NOTICE } from "../shared/ukcp/markers";
 import { UpstreamError, type SessionStore, type UkcpClient } from "./ukcp/client";
 import { officeDetails } from "./ukcp/offices";
 
@@ -182,7 +183,7 @@ export function createCache(clientFor: (env: Env) => UkcpClient, placesFor: (env
   /** UKCP's results for a search, `pageSize` at a time, counted against `limiter`. */
   async function results(c: Ctx, limiter: RateLimit, params: SearchParams, pageSize: number, maxAge: number): Promise<Response> {
     if (!(await allow(c, limiter))) return c.json({ error: TOO_MANY }, 429);
-    const body = expectOpening(await clientFor(c.env).search(params, pageSize), "results-no", "fat-search-alert");
+    const body = expectOpening(await clientFor(c.env).search(params, pageSize), RESULTS_COUNT, RESULTS_NOTICE);
     return upstreamHtml(c, body, `public, max-age=${maxAge}`);
   }
 
@@ -191,14 +192,14 @@ export function createCache(clientFor: (env: Env) => UkcpClient, placesFor: (env
     const slug = c.req.param("slug");
     const html = await clientFor(c.env).profile(slug);
     if (html === null) return c.json({ error: NO_PROFILE }, 404);
-    return upstreamHtml(c, expectPage(html, "therapist-header"), `public, max-age=${PROFILE_MAX_AGE}`);
+    return upstreamHtml(c, expectPage(html, PROFILE_HEADER), `public, max-age=${PROFILE_MAX_AGE}`);
   });
 
   app.get("/api/contact/:id", async (c) => {
     if (!(await allow(c, c.env.UPSTREAM_LIMIT))) return c.json({ error: TOO_MANY }, 429);
     const html = await clientFor(c.env).contact(c.req.param("id"));
     // UKCP answers an unknown id with an empty page, which is passed on but not kept, as is any page without details.
-    return upstreamHtml(c, html, html.includes("therapist-contacts-details-") ? `public, max-age=${PROFILE_MAX_AGE}` : "no-store");
+    return upstreamHtml(c, html, html.includes(CONTACT_DETAIL) ? `public, max-age=${PROFILE_MAX_AGE}` : "no-store");
   });
 
   app.get("/api/place", async (c) => {
@@ -233,7 +234,7 @@ export function createCache(clientFor: (env: Env) => UkcpClient, placesFor: (env
     if (!(await allow(c, c.env.OFFICE_LIMIT))) return c.json({ error: TOO_MANY }, 429);
     const html = await clientFor(c.env).profile(c.req.param("slug"));
     if (html === null) return c.json({ error: NO_PROFILE }, 404);
-    const answer = officeDetails(expectPage(html, "therapist-header"), new URL(c.req.url).searchParams.get("location") ?? "");
+    const answer = officeDetails(expectPage(html, PROFILE_HEADER), new URL(c.req.url).searchParams.get("location") ?? "");
     const found = answer.postcode !== undefined || answer.cost !== undefined;
     return c.json(answer, 200, { "Cache-Control": `public, max-age=${found ? OFFICE_FOUND_MAX_AGE : OFFICE_MISSING_MAX_AGE}` });
   });

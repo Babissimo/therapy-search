@@ -1,4 +1,5 @@
 import type { SearchResult, TherapistCard } from "../types";
+import { RESULTS_COUNT, RESULTS_NOTICE } from "./markers";
 import { ParseError, initialsOf, oneLine, optional, readHtml, safeUrl } from "./text";
 
 const RANGE = /(\d+)\s*-\s*(\d+)\s+of\s+(\d+)\s+results?/i;
@@ -16,16 +17,16 @@ export function parseResults(html: string): SearchResult {
 /** Reads a results page and what its cards are ordered by, leaving the rest, which costs the most to read, for the cards shown. */
 export function parseListings(html: string): Listings {
   const doc = readHtml(html);
-  const notices = [...doc.querySelectorAll(".fat-search-alert h6")].map((n) => oneLine(n.textContent)).filter(Boolean);
+  const notices = [...doc.querySelectorAll(`.${RESULTS_NOTICE} h6`)].map((n) => oneLine(n.textContent)).filter(Boolean);
   const locationSearched = optional(oneLine(doc.querySelector(".results-location strong")?.textContent));
   const listings = [...doc.querySelectorAll(".profile-listing > a")].map(listingOf);
-  const range = doc.querySelector(".results-no");
+  const range = doc.querySelector(`.${RESULTS_COUNT}`);
 
   if (!range) {
     if (listings.length === 0 && notices.length > 0) {
       return { total: 0, from: 0, to: 0, locationSearched, notices, listings };
     }
-    throw new ParseError("results: no .results-no and no notice");
+    throw new ParseError(`results: no .${RESULTS_COUNT} and no notice`);
   }
   const m = RANGE.exec(range.textContent ?? "");
   if (!m) throw new ParseError(`results: unreadable range "${oneLine(range.textContent)}"`);
