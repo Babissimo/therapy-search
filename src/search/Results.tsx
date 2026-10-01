@@ -48,7 +48,9 @@ export function Results({ params, results, listRef, pins = [], unplaced = [], se
       {slow}
     </p>
   );
-  if (failure.error) return <ResultsError error={failure.error} params={params} retrying={failure.retrying} onRetry={failure.retry} />;
+  if (failure.error) {
+    return <ResultsError error={failure.error} params={params} retrying={failure.retrying} retried={failure.retried} onRetry={failure.retry} />;
+  }
   if (loading) {
     return (
       <div className="space-y-4" aria-busy>

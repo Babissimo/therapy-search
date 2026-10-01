@@ -93,12 +93,15 @@ function SearchView({ params, onChange, wide }: ViewProps) {
   // Only a place makes a search here: without one UKCP would list everyone matching in a random order, which answers no
   // one looking nearby. Ticks and the keyword wait for one.
   const searching = placed(params);
-  // Beginning or clearing a search sets the page out afresh, its pieces gliding to their new places.
-  const change = (next: SearchParams) => (placed(next) === searching ? onChange(next) : startMorph(() => onChange(next)));
-  const drafts = useSearchDrafts(params, change);
+  const results = useResults(params, searching);
+  const drafts = useSearchDrafts(params, (next) => {
+    results.retrySame(next);
+    // Beginning or clearing a search sets the page out afresh, its pieces gliding to their new places.
+    if (placed(next) === searching) onChange(next);
+    else startMorph(() => onChange(next));
+  });
   // The search, which the map's framings, and the selections on them, belong to.
   const fitKey = searching ? toQuery(params) : "";
-  const results = useResults(params, searching);
   useShortlistRefresh(results.therapists);
   const centre = useCentre(results.searchedPlace, params.flags.LocationSearchOutsideUK);
   // The place searched comes with the results, so there is none until a first search's results arrive; while the next

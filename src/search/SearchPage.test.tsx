@@ -435,6 +435,35 @@ describe("SearchPage", () => {
     expect(api.search).toHaveBeenCalledOnce();
   });
 
+  it("tries a failed search again as it is searched again, as Try again does, keeping the keyboard in the box", async () => {
+    screenIs(true);
+    answer([]);
+    vi.mocked(api.search).mockRejectedValueOnce(new Error("UKCP answered 503."));
+    renderAt(SEARCH);
+    await screen.findByRole("button", { name: "Try again" });
+    const box = screen.getByRole("textbox", { name: "Location" });
+    act(() => box.focus());
+    fireEvent.submit(box.closest("form")!);
+    await loaded();
+    expect(document.activeElement).toBe(box);
+    expect(url().toString()).toBe("Location=Leeds");
+    expect(api.search).toHaveBeenCalledTimes(2);
+  });
+
+  it("says it is trying a failed search again as it is searched again, and when it fails again", async () => {
+    screenIs(true);
+    answer([]);
+    vi.mocked(api.search).mockRejectedValueOnce(new Error("UKCP answered 503."));
+    renderAt(SEARCH);
+    await screen.findByRole("button", { name: "Try again" });
+    let fail = (_: Error) => {};
+    vi.mocked(api.search).mockImplementationOnce(() => new Promise((_, reject) => (fail = reject)));
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+    const said = await screen.findByText("Trying again");
+    act(() => fail(new Error("UKCP answered 504.")));
+    await waitFor(() => expect(said.textContent).toBe("UKCP answered 504."));
+  });
+
   it.each([
     ["wide", true],
     ["narrow", false],
@@ -1906,6 +1935,33 @@ describe("SearchPage online", () => {
     pick(/^Results/);
     expect(screen.getByRole("link", { name: "Near me" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Remove Greek" })).toBeTruthy();
+  });
+
+  it("tries a failed search again as its keyword is searched again", async () => {
+    screenIs(true);
+    answer([]);
+    vi.mocked(api.search).mockRejectedValueOnce(new Error("UKCP answered 503."));
+    renderAt(GREEK);
+    await screen.findByRole("button", { name: "Try again" });
+    fireEvent.submit(within(filters()).getByRole("searchbox", { name: "Keyword search" }).closest("form")!);
+    await loaded();
+    expect(api.search).toHaveBeenCalledTimes(2);
+  });
+
+  it("tries a failed search again when ticks change its link but not what it asks UKCP", async () => {
+    screenIs(true);
+    answer([]);
+    vi.mocked(api.search).mockRejectedValueOnce(new Error("UKCP answered 503."));
+    renderAt(GREEK);
+    await screen.findByRole("button", { name: "Try again" });
+    fireEvent.click(within(filters()).getByRole("button", { name: /^Type of session/ }));
+    fireEvent.click(within(filters()).getByRole("checkbox", { name: "Online Therapy" }));
+    fireEvent.click(within(filters()).getByRole("checkbox", { name: "Telephone Therapy" }));
+    fireEvent.click(within(filters()).getByRole("button", { name: "Update results" }));
+    await loaded();
+    expect(url().getAll("TypesOfSession")).toEqual(["Online Therapy", "Telephone Therapy"]);
+    expect(asked()).toBe(GREEK_ONLINE);
+    expect(api.search).toHaveBeenCalledTimes(2);
   });
 
   it("skips past the list to the filters on wide screens, bringing them back from beside the shortlist", async () => {
