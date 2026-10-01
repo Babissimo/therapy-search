@@ -218,7 +218,7 @@ function SectionSkeleton({ lines = 0, tags = 0 }: { lines?: number; tags?: numbe
       {tags > 0 && (
         <div className="flex flex-wrap gap-1.5">
           {Array.from({ length: tags }, (_, i) => (
-            <Badge key={i} variant="secondary" className={cn("animate-pulse", TAG_WIDTHS[i % TAG_WIDTHS.length])} />
+            <Badge key={i} variant="secondary" className={cn("motion-safe:animate-pulse", TAG_WIDTHS[i % TAG_WIDTHS.length])} />
           ))}
         </div>
       )}

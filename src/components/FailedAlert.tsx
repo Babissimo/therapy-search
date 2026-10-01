@@ -86,7 +86,7 @@ export function FailedAlert({ error, retrying, onRetry, children }: Props) {
                 onRetry();
               }}
             >
-              {retrying && <Loader2 className="animate-spin" aria-hidden />}
+              {retrying && <Loader2 className="motion-safe:animate-spin" aria-hidden />}
               Try again
             </Button>
             {children}

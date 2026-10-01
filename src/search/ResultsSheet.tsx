@@ -72,7 +72,7 @@ export function ResultsSheet({ position, onPositionChange, tabs, scrollRef, onSc
         className={cn(
           // Clipped, so the footer never shows below a sheet lowered to its header.
           "absolute inset-x-0 bottom-0 z-20 flex flex-col overflow-hidden rounded-t-2xl border-t bg-background shadow-lg",
-          dragHeight === null && "transition-[height] duration-200",
+          dragHeight === null && "motion-safe:transition-[height] motion-safe:duration-200",
         )}
       >
         <div
