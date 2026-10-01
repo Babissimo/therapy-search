@@ -5,7 +5,8 @@ import { useNavigate } from "react-router";
 import { MapMarker, MapMarkerClusterGroup, MapTooltip, markerData } from "@/components/ui/map";
 import { useStore } from "@/lib/store";
 import { useProfileLink } from "@/profile/profileLink";
-import { useShortlistedSlugs } from "@/shortlist/useShortlist";
+import type { Status } from "@/shortlist/store";
+import { useShortlistedSlugs, useShortlistStatuses } from "@/shortlist/useShortlist";
 import type { Highlight } from "./highlight";
 import { pinIcon } from "./pinIcon";
 import type { Pin } from "./pins";
@@ -19,6 +20,8 @@ type Props = {
   onDeselect?: () => void;
   /** Badges and raises the pins of shortlisted therapists not set aside, which a map of the shortlist alone has no need to. */
   marksShortlist?: boolean;
+  /** Badges each lone therapist's pin with their status, as a map of the shortlist alone does. */
+  showsStatuses?: boolean;
 };
 
 // Above other therapists' pins, but beneath the search's centre (MapPane) and a marked pin.
@@ -33,15 +36,16 @@ function who(pin: Pin): string {
  * Therapists' pins, merged into clusters as the map zooms out. A highlighted therapist's pin, or the cluster holding it,
  * is ringed and raised; so is the selected pin, with a halo.
  */
-export function PinsLayer({ pins, highlight, selected, onSelect, onDeselect, marksShortlist = false }: Props) {
+export function PinsLayer({ pins, highlight, selected, onSelect, onDeselect, marksShortlist = false, showsStatuses = false }: Props) {
   const cluster = useRef<L.MarkerClusterGroup>(null);
   const markers = useRef(new Map<string, L.Marker>());
   const slug = useStore(highlight);
   const shortlisted = useShortlistedSlugs(marksShortlist);
+  const statuses = useShortlistStatuses(showsStatuses);
   // Before the marks, which a redrawn icon has lost.
   useRedrawnClusters(cluster, markers.current, shortlisted);
-  useMarkedPin(cluster, markers.current, slug, "pin-highlight", pins, shortlisted);
-  useMarkedPin(cluster, markers.current, selected?.therapists[0]?.slug, "pin-selected", pins, shortlisted);
+  useMarkedPin(cluster, markers.current, slug, "pin-highlight", pins, shortlisted, statuses);
+  useMarkedPin(cluster, markers.current, selected?.therapists[0]?.slug, "pin-selected", pins, shortlisted, statuses);
   useHeldWhileHovered(cluster, markers.current, selected?.therapists[0]?.slug, pins, onDeselect);
   return (
     <MapMarkerClusterGroup
@@ -52,7 +56,14 @@ export function PinsLayer({ pins, highlight, selected, onSelect, onDeselect, mar
     >
       {pins.map((pin) => (
         // Leaflet reads a marker's title and data only when it is created, so a change of membership needs a fresh one.
-        <TherapistPin key={`${pin.key} ${who(pin)}`} pin={pin} shortlisted={shortlisted} markers={markers.current} onSelect={onSelect} />
+        <TherapistPin
+          key={`${pin.key} ${who(pin)}`}
+          pin={pin}
+          shortlisted={shortlisted}
+          statuses={statuses}
+          markers={markers.current}
+          onSelect={onSelect}
+        />
       ))}
     </MapMarkerClusterGroup>
   );
@@ -77,7 +88,10 @@ function restingZ(therapists: Pin["therapists"] | undefined, shortlisted: Readon
 
 const MARKS = ["pin-highlight", "pin-selected"] as const;
 
-/** Keeps `className` on whichever pin or cluster shows the marker for `slug`, as zooming and panning redraw them. */
+/**
+ * Keeps `className` on whichever pin or cluster shows the marker for `slug`, as zooming and panning redraw them, and as a
+ * change to `shortlisted` or `statuses` redraws their icons.
+ */
 function useMarkedPin(
   cluster: RefObject<L.MarkerClusterGroup | null>,
   markers: Map<string, L.Marker>,
@@ -85,6 +99,7 @@ function useMarkedPin(
   className: (typeof MARKS)[number],
   pins: Pin[],
   shortlisted: ReadonlySet<string>,
+  statuses: ReadonlyMap<string, Status>,
 ) {
   const map = useMap();
   useEffect(() => {
@@ -120,7 +135,7 @@ function useMarkedPin(
       map.off("moveend", mark);
       unmark();
     };
-  }, [cluster, markers, map, slug, className, pins, shortlisted]);
+  }, [cluster, markers, map, slug, className, pins, shortlisted, statuses]);
 }
 
 /**
@@ -156,18 +171,30 @@ function useHeldWhileHovered(
 
 const canHover = () => window.matchMedia("(hover: hover)").matches;
 
-type TherapistPinProps = { pin: Pin; shortlisted: ReadonlySet<string>; markers: Map<string, L.Marker>; onSelect: (pin: Pin) => void };
+type TherapistPinProps = {
+  pin: Pin;
+  shortlisted: ReadonlySet<string>;
+  statuses: ReadonlyMap<string, Status>;
+  markers: Map<string, L.Marker>;
+  onSelect: (pin: Pin) => void;
+};
 
-function TherapistPin({ pin, shortlisted, markers, onSelect }: TherapistPinProps) {
+function TherapistPin({ pin, shortlisted, statuses, markers, onSelect }: TherapistPinProps) {
   const navigate = useNavigate();
   const profile = useProfileLink();
   // Fresh only for the life of this marker (the key above remounts it for any change of place or membership), so
   // re-renders, such as another card being hovered, keep Leaflet's marker, icon and position rather than re-clustering it.
   const [position] = useState<[number, number]>(() => [pin.point.lat, pin.point.lng]);
   const [therapists] = useState(pin.therapists);
-  // Drawn afresh, and swapped in by Leaflet, only as this pin's own therapists join or leave those picked out.
+  // Drawn afresh, and swapped in by Leaflet, only as this pin's own therapists join or leave those picked out, or as a
+  // lone therapist's status changes: a stack shows none.
   const listed = therapists.filter((t) => shortlisted.has(t.slug)).map((t) => t.slug).join(" ");
-  const icon = useMemo(() => pinIcon(therapists, new Set(listed.split(" "))), [therapists, listed]);
+  const [lone] = therapists.length === 1 ? therapists : [];
+  const status = lone && statuses.get(lone.slug);
+  const icon = useMemo(
+    () => pinIcon(therapists, new Set(listed.split(" ")), lone && status && new Map([[lone.slug, status]])),
+    [therapists, listed, lone, status],
+  );
   const only = pin.therapists.length === 1 ? pin.therapists[0] : undefined;
   const register = (marker: L.Marker | null) => {
     if (!marker) return;

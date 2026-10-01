@@ -242,4 +242,70 @@ describe("PinsLayer", () => {
     act(() => shortlist.add(therapist("a")));
     await waitFor(() => expect(shown.element.classList.contains("pin-highlight")).toBe(true));
   });
+
+  it("badges a lone therapist's status where it shows statuses, redrawing a pin in place only as its own status changes", async () => {
+    const shortlist = createShortlistStore(null);
+    shortlist.add(therapist("a"), { status: "contacted" });
+    shortlist.add(therapist("b"), { status: "seeing" });
+    shortlist.add(therapist("c"));
+    const added = watchAdded();
+    render(onMap(<PinsLayer pins={[pin(BRIGHTON, "a"), pin(HOVE, "b", "c")]} highlight={highlight} showsStatuses onSelect={() => {}} />, shortlist));
+    await waitFor(() => expect(added.markers()).toHaveLength(2));
+    // A stack's avatars overlap too closely for a badge each, so its therapists' cards say where they stand.
+    const [a, stack] = ["Therapist a, contacted", "2 therapists here"].map((name) => added.markers().find((m) => iconName(m) === name));
+    expect(a).toBeDefined();
+    expect(stack).toBeDefined();
+    added.forget();
+    const redrawn = vi.spyOn(L.Marker.prototype, "setIcon");
+    act(() => shortlist.setStatus("a", "consultation"));
+    expect(a && iconName(a)).toBe("Therapist a, consultation");
+    expect(redrawn.mock.contexts).toEqual([a]);
+    // Neither a reorder nor a change within the stack redraws a pin.
+    act(() => shortlist.move("c", {}));
+    act(() => shortlist.setStatus("c", "waiting"));
+    expect(redrawn).toHaveBeenCalledTimes(1);
+    act(() => shortlist.setStatus("a", "toContact"));
+    expect(a && iconName(a)).toBe("Therapist a");
+    // Redrawn in place, rather than added to the map again.
+    await new Promise((resolve) => setTimeout(resolve));
+    expect(added.markers()).toHaveLength(0);
+  });
+
+  it("keeps each therapist's status their own, whatever their slug holds", async () => {
+    const shortlist = createShortlistStore(null);
+    shortlist.add(therapist("a b"), { status: "contacted" });
+    shortlist.add(therapist("a"), { status: "seeing" });
+    const added = watchAdded();
+    render(onMap(<PinsLayer pins={[pin(BRIGHTON, "a b"), pin(HOVE, "a")]} highlight={highlight} showsStatuses onSelect={() => {}} />, shortlist));
+    await waitFor(() => expect(added.markers()).toHaveLength(2));
+    expect(added.markers().map(iconName).sort()).toEqual(["Therapist a b, contacted", "Therapist a, seeing them"]);
+  });
+
+  it("badges no status where it doesn't show statuses", async () => {
+    const shortlist = createShortlistStore(null);
+    shortlist.add(therapist("a"), { status: "contacted" });
+    const added = watchAdded();
+    render(onMap(<PinsLayer pins={[pin(BRIGHTON, "a")]} highlight={highlight} marksShortlist onSelect={() => {}} />, shortlist));
+    await waitFor(() => expect(added.markers()).toHaveLength(1));
+    expect(added.markers().map(iconName)).toEqual(["Therapist a, on your shortlist"]);
+  });
+
+  it("marks a pin again once a change of status redraws it", async () => {
+    const shown = { element: document.createElement("div"), setZIndexOffset: vi.fn() };
+    vi.spyOn(L.MarkerClusterGroup.prototype, "getVisibleParent").mockReturnValue({
+      options: {},
+      getElement: () => shown.element,
+      setZIndexOffset: shown.setZIndexOffset,
+    } as unknown as L.Marker);
+    const shortlist = createShortlistStore(null);
+    shortlist.add(therapist("a"));
+    const store = createHighlight();
+    store.set("a");
+    render(onMap(<PinsLayer pins={[pin(BRIGHTON, "a")]} highlight={store} showsStatuses onSelect={() => {}} />, shortlist));
+    await waitFor(() => expect(shown.element.classList.contains("pin-highlight")).toBe(true));
+    // As Leaflet's setIcon leaves the element it reuses.
+    shown.element.className = "";
+    act(() => shortlist.setStatus("a", "contacted"));
+    await waitFor(() => expect(shown.element.classList.contains("pin-highlight")).toBe(true));
+  });
 });

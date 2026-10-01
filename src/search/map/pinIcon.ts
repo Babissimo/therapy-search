@@ -1,6 +1,8 @@
 import type { DivIcon } from "leaflet";
 import type { TherapistCard } from "@shared/types";
 import { elementIcon } from "@/components/ui/map";
+import { STATUS_LABEL } from "@/shortlist/status";
+import type { Status } from "@/shortlist/store";
 import { isRemoteOnly } from "./pins";
 
 const SINGLE = 40;
@@ -8,11 +10,25 @@ const STACKED = 32;
 // Each further avatar in a stack shows this much of itself: 32 px wide, overlapping by 12 (-space-x-3).
 const STEP = 20;
 // lucide's "video" icon, inlined because pin icons are built outside React.
-const VIDEO_SVG =
-  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m16 13 5.223 3.482a.5.5 0 0 0 .777-.416V7.87a.5.5 0 0 0-.752-.432L16 10.5"/><rect x="2" y="6" width="14" height="12" rx="2"/></svg>';
+const VIDEO_SVG = outline('<path d="m16 13 5.223 3.482a.5.5 0 0 0 .777-.416V7.87a.5.5 0 0 0-.752-.432L16 10.5"/><rect x="2" y="6" width="14" height="12" rx="2"/>');
 // lucide's "bookmark", filled as the shortlist button's is once someone is on it.
 const BOOKMARK_SVG =
   '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3a2 2 0 0 1 2 2v15a1 1 0 0 1-1.496.868l-4.512-2.578a2 2 0 0 0-1.984 0l-4.512 2.578A1 1 0 0 1 5 20V5a2 2 0 0 1 2-2z"/></svg>';
+
+/** A status a pin is badged with: any but "To contact", which a shortlisted therapist is until marked otherwise. */
+type Marked = Exclude<Status, "toContact">;
+// lucide's icons for the statuses (STATUS_ICON), inlined as the ones above are.
+const STATUS_SVG: Record<Marked, string> = {
+  contacted: outline(
+    '<path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"/><path d="m21.854 2.147-10.94 10.939"/>',
+  ),
+  waiting: outline(
+    '<path d="M5 22h14"/><path d="M5 2h14"/><path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22"/><path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2"/>',
+  ),
+  consultation: outline('<path d="M8 2v3"/><path d="M16 2v3"/><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="m9 15 2 2 4-4"/>'),
+  seeing: outline('<circle cx="12" cy="12" r="10"/><path d="m16 9-5.5 5.5L8 12"/>'),
+  setAside: outline('<rect width="20" height="5" x="2" y="3" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/>'),
+};
 
 const CENTRE: [number, number] = [27, 33];
 // lucide's "map-pin", filled and ringed, in a view cropped to it so its tip meets the bottom edge.
@@ -32,18 +48,23 @@ type Face = Pick<TherapistCard, "slug" | "name" | "initials" | "photoUrl" | "ses
 
 /**
  * One therapist's photo or initials; a pin or cluster for several shows up to three, stacked, with the count. Anyone in
- * `shortlisted` is badged, and leads a stack.
+ * `shortlisted` is badged, and leads a stack. A lone therapist's status in `statuses` is badged too; a stack's avatars
+ * overlap too closely for a badge each.
  */
-export function pinIcon(therapists: Face[], shortlisted?: ReadonlySet<string>): DivIcon {
+export function pinIcon(therapists: Face[], shortlisted?: ReadonlySet<string>, statuses?: ReadonlyMap<string, Status>): DivIcon {
   const onShortlist = (therapist: Face) => shortlisted?.has(therapist.slug) ?? false;
   const listed = therapists.filter(onShortlist);
   const [first] = therapists;
   if (therapists.length === 1 && first) {
+    const status = statuses?.get(first.slug);
+    const marked = status === "toContact" ? undefined : status;
     const face = avatar(first, "size-10 text-sm");
     if (isRemoteOnly(first)) face.append(remoteBadge());
     if (listed.length > 0) face.append(shortlistBadge("-top-1 -left-1"));
+    if (marked) face.append(statusBadge(marked));
     const pin = holder([face]);
-    label(pin, first.name + (isRemoteOnly(first) ? ", remote sessions only" : "") + (listed.length > 0 ? ", on your shortlist" : ""));
+    const notes = [isRemoteOnly(first) && "remote sessions only", listed.length > 0 && "on your shortlist", marked && STATUS_LABEL[marked].toLowerCase()];
+    label(pin, [first.name, ...notes].filter(Boolean).join(", "));
     return elementIcon(pin, [SINGLE, SINGLE]);
   }
   const shown = [...listed, ...therapists.filter((therapist) => !onShortlist(therapist))].slice(0, 3);
@@ -102,12 +123,22 @@ function shortlistBadge(place: string): HTMLElement {
   return badge(`${place} text-primary`, "On your shortlist", BOOKMARK_SVG);
 }
 
+/** At the bottom left, clear of the remote badge at the bottom right. */
+function statusBadge(status: Marked): HTMLElement {
+  return badge("-bottom-1 -left-1 text-foreground", STATUS_LABEL[status], STATUS_SVG[status]);
+}
+
 /** A small disc on a pin's rim holding an icon; `look` places and colours it. */
 function badge(look: string, title: string, svg: string): HTMLElement {
   const disc = element("span", `absolute ${look} flex size-5 items-center justify-center rounded-full bg-background shadow ring-1 ring-border [&>svg]:size-3`);
   disc.title = title;
   disc.innerHTML = svg;
   return disc;
+}
+
+/** A lucide outline icon from its shapes, drawn as lucide's own components draw it. */
+function outline(shapes: string): string {
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${shapes}</svg>`;
 }
 
 function element<K extends keyof HTMLElementTagNameMap>(tag: K, className: string): HTMLElementTagNameMap[K] {

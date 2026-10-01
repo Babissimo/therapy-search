@@ -40,6 +40,22 @@ export function useShortlistedSlugs(wanted: boolean): ReadonlySet<string> {
   return useMemo(() => (members ? new Set(members.split(" ")) : NO_SLUGS), [members]);
 }
 
+const NO_STATUSES: ReadonlyMap<string, Status> = new Map();
+
+/**
+ * Where the visitor stands with each shortlisted therapist past "To contact", while `wanted`, as a map that changes only as
+ * one of those statuses does, not as the list is reordered.
+ */
+export function useShortlistStatuses(wanted: boolean): ReadonlyMap<string, Status> {
+  const marked = JSON.stringify(
+    useShortlistIf(wanted)
+      .filter((entry) => statusOf(entry) !== "toContact")
+      .map((entry) => [entry.card.slug, statusOf(entry)])
+      .sort(),
+  );
+  return useMemo(() => (marked === "[]" ? NO_STATUSES : new Map(JSON.parse(marked) as [string, Status][])), [marked]);
+}
+
 export function useShortlistEntry(slug: string): ShortlistEntry | undefined {
   const store = useShortlistStore();
   return useSyncExternalStore(store.subscribe, () => store.get().find((entry) => entry.card.slug === slug));
