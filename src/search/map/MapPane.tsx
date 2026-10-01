@@ -29,6 +29,8 @@ export type MapPaneProps = {
   /** The pin whose place the results list marks. */
   selected?: Pin;
   onSelect: (pin: Pin) => void;
+  /** Lets the selected pin go, as the map is clicked away from any pin. */
+  onDeselect: () => void;
   /** Searches at the postcode nearest the middle of the map, answering false when it is the one already searched. */
   onSearchArea: (postcode: string) => boolean;
   /** The search reads its location as a place anywhere in the world, so the map isn't kept to the UK. */
@@ -50,6 +52,7 @@ export default function MapPane({
   highlight,
   selected,
   onSelect,
+  onDeselect,
   onSearchArea,
   outsideUK,
   coveredBelow,
@@ -104,6 +107,7 @@ export default function MapPane({
           onRecentre={centre || pins.length > 0 ? recentre : undefined}
         />
         <RememberView entry={entry} fitKey={fitKey} placed={placed} />
+        <ClickOff onClick={onDeselect} />
       </Map>
     </div>
   );
@@ -116,5 +120,11 @@ function RememberView({ entry, fitKey, placed }: { entry: string; fitKey: string
       saveView(entry, { map: { fitKey, placed, centre: [lat, lng], zoom: map.getZoom() } });
     },
   });
+  return null;
+}
+
+/** Hears clicks on the map itself, which pins and controls keep to themselves, and none ending a drag. */
+function ClickOff({ onClick }: { onClick: () => void }) {
+  useMapEvents({ click: onClick });
   return null;
 }

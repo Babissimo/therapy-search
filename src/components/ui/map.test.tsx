@@ -88,6 +88,29 @@ describe("Map", () => {
     expect(map.current?.getZoom()).toBe(11);
   });
 
+  it("keeps clicks on its controls, and on a marker that takes them, off the map beneath", () => {
+    const clicked = vi.fn();
+    function Clicks() {
+      useMapEvents({ click: clicked });
+      return null;
+    }
+    const pin = document.createElement("span");
+    const pinClicked = vi.fn();
+    const { container } = render(
+      <Map center={[51.5, -0.1]} zoom={10} style={{ height: 400, width: 400 }}>
+        <MapZoomControl />
+        <MapMarker position={[51.5, -0.1]} icon={elementIcon(pin, [40, 40])} eventHandlers={{ click: pinClicked }} />
+        <Clicks />
+      </Map>,
+    );
+    fireEvent.click(pin);
+    expect(pinClicked).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole("button", { name: "Zoom in" }));
+    expect(clicked).not.toHaveBeenCalled();
+    fireEvent.click(container.querySelector(".leaflet-container")!);
+    expect(clicked).toHaveBeenCalledTimes(1);
+  });
+
   it("credits the map's data alone, with no tiles drawn yet", () => {
     const { container } = render(<Map center={[51.5, -0.1]} zoom={10} style={{ height: 400, width: 400 }} />);
     expect(container.querySelector(".leaflet-control-attribution")?.textContent).not.toContain("Leaflet");

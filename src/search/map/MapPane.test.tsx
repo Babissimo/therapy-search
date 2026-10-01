@@ -104,10 +104,11 @@ vi.mock("./MovedMapButtons", async () => {
     },
   };
 });
-const moveend = vi.hoisted(() => ({ current: () => {} }));
+// The handlers the pane's parts last gave the map, by event.
+const mapEvents = vi.hoisted(() => ({ moveend: () => {}, click: () => {} }));
 vi.mock("react-leaflet", () => ({
-  useMapEvents: (handlers: { moveend: () => void }) => {
-    moveend.current = handlers.moveend;
+  useMapEvents: (handlers: Partial<typeof mapEvents>) => {
+    Object.assign(mapEvents, handlers);
     return { getCenter: () => ({ lat: 51.5, lng: -0.12 }), getZoom: () => 11 };
   },
   useMap: () => ({ on: () => {}, off: () => {} }),
@@ -134,6 +135,7 @@ function renderPane(props: Partial<MapPaneProps> = {}) {
         placing={false}
         highlight={createHighlight()}
         onSelect={() => {}}
+        onDeselect={() => {}}
         onSearchArea={() => true}
         {...props}
       />
@@ -213,7 +215,7 @@ describe("MapPane", () => {
     expect(screen.getByTestId("map").dataset.view).toBe("54.5,-3@5");
     // Counted by therapist, so a stack splitting into more pins frames nothing again.
     expect(screen.getByTestId("fit").dataset.placed).toBe("3");
-    moveend.current();
+    mapEvents.moveend();
     unmount();
     renderPane({ fitKey: "Location=Leeds", entry: "remembered" });
     expect(screen.getByTestId("map").dataset.view).toBe("51.5,-0.12@11");
@@ -286,5 +288,12 @@ describe("MapPane", () => {
     fireEvent.click(stack, { detail: 1 });
     fireEvent.click(stack, { detail: 2 });
     expect(onSelect).toHaveBeenCalledTimes(1);
+  });
+
+  it("lets the selected pin go as the map is clicked away from any pin", () => {
+    const onDeselect = vi.fn();
+    renderPane({ pins: [pin("a")], selected: pin("a"), onDeselect });
+    mapEvents.click();
+    expect(onDeselect).toHaveBeenCalledTimes(1);
   });
 });

@@ -24,8 +24,8 @@ vi.mock("./map/pins", async (importOriginal) => {
   return { ...pins, layoutPins: vi.fn(pins.layoutPins) };
 });
 
-// The map pane is tested on its own; here it shows what the page passed it, with a button for each pin and one that
-// finds BN3 1FG in the middle of the map.
+// The map pane is tested on its own; here it shows what the page passed it, with a button for each pin, one for a click on
+// the map away from them, and one that finds BN3 1FG in the middle of the map.
 vi.mock("./map/MapPane", async () => {
   const { createElement, useSyncExternalStore } = await import("react");
   type Props = {
@@ -37,12 +37,26 @@ vi.mock("./map/MapPane", async () => {
     highlight: Highlight;
     selected?: Pin;
     onSelect: (pin: Pin) => void;
+    onDeselect: () => void;
     onSearchArea: (postcode: string) => boolean;
     outsideUK?: boolean;
     coveredBelow?: (height: number) => number;
   };
   return {
-    default: ({ label, fitKey, centreSettled, pins, marksShortlist, highlight, selected, onSelect, onSearchArea, outsideUK, coveredBelow }: Props) => {
+    default: ({
+      label,
+      fitKey,
+      centreSettled,
+      pins,
+      marksShortlist,
+      highlight,
+      selected,
+      onSelect,
+      onDeselect,
+      onSearchArea,
+      outsideUK,
+      coveredBelow,
+    }: Props) => {
       const slug = useSyncExternalStore(highlight.subscribe, highlight.get);
       return createElement(
         "div",
@@ -66,6 +80,7 @@ vi.mock("./map/MapPane", async () => {
             `Pin ${pin.key}`,
           ),
         ),
+        createElement("button", { type: "button", onClick: onDeselect }, "Map away from the pins"),
         createElement(
           "button",
           { type: "button", onClick: (event: { currentTarget: HTMLElement }) => (event.currentTarget.dataset.searched = String(onSearchArea("BN3 1FG"))) },
@@ -628,7 +643,7 @@ describe("SearchPage", () => {
     expect(screen.getByTestId("map").dataset.covered).toBe("");
   });
 
-  it("marks a selected pin's place in the list until the pin is activated again, raising the sheet halfway", async () => {
+  it("marks a selected pin's place in the list until the pin is activated again or the map clicked off it, raising the sheet halfway", async () => {
     screenIs(false);
     placeByDistrict();
     renderAt(SEARCH, [therapist("a", "BRIGHTON BN3"), therapist("b", "BRIGHTON BN1"), therapist("c", "Hove BN3")]);
@@ -644,7 +659,11 @@ describe("SearchPage", () => {
     expect(screen.getByTestId("map").dataset.selected).toBe("");
     // A therapist on their own is marked just the same.
     fireEvent.click(screen.getByRole("button", { name: `Pin ${key(BRIGHTON)}` }));
-    expect(screen.getByRole("link", { name: "Therapist b" }).closest("li")?.getAttribute("aria-current")).toBe("true");
+    const alone = screen.getByRole("link", { name: "Therapist b" }).closest("li");
+    expect(alone?.getAttribute("aria-current")).toBe("true");
+    fireEvent.click(screen.getByRole("button", { name: "Map away from the pins" }));
+    expect(alone?.hasAttribute("aria-current")).toBe(false);
+    expect(screen.getByTestId("map").dataset.selected).toBe("");
   });
 
   it("scrolls a selected pin's place into view, unless it is in view already", async () => {

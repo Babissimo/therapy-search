@@ -258,6 +258,7 @@ function SearchView({ params, onChange, wide }: ViewProps) {
                     highlight={highlight}
                     selected={selected}
                     onSelect={select}
+                    onDeselect={() => setSelection(undefined)}
                     onSearchArea={(postcode) => {
                       if (samePostcode(postcode, params.text.Location)) return false;
                       drafts.submitAt(params, postcode);
