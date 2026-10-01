@@ -139,6 +139,7 @@ function SearchView({ params, onChange, wide }: ViewProps) {
   // The shortlist keeps its place apart from the results', under a key of its own.
   const scroll = useRememberedScroll(tab === "results" ? entry : `${entry} shortlist`, tab === "shortlist" || !searching || !results.query.isPending);
   const listRef = useRef<HTMLUListElement>(null);
+  const panelToggleRef = useRef<HTMLButtonElement>(null);
   // Whether the list was showing when a pin was selected, so it can glide to the pin's entry rather than jump.
   const listShowing = useRef(false);
   const tabsRef = useRef<HTMLDivElement>(null);
@@ -205,7 +206,16 @@ function SearchView({ params, onChange, wide }: ViewProps) {
       }
     />
   );
-  const footer = tab === "results" ? <LoadMore results={results} listRef={listRef} placing={placing || moving} /> : undefined;
+  const footer =
+    tab === "results" ? (
+      <LoadMore
+        results={results}
+        listRef={listRef}
+        placing={placing || moving}
+        folded={wide ? !panelOpen : undefined}
+        toggleRef={panelToggleRef}
+      />
+    ) : undefined;
   const tabs = <ListTabs ref={tabsRef} />;
   const toolbar = (placement: Placement) => (
     <Toolbar
@@ -238,6 +248,7 @@ function SearchView({ params, onChange, wide }: ViewProps) {
               <ResultsPanel
                 open={panelOpen}
                 onOpenChange={setPanelOpen}
+                toggleRef={panelToggleRef}
                 tabs={tabs}
                 masthead={<Masthead />}
                 scrollRef={scroll.ref}
