@@ -27,9 +27,16 @@ export function useShortlistIf(wanted: boolean): Shortlist {
 
 const NO_SLUGS: ReadonlySet<string> = new Set();
 
-/** Who is on the shortlist while `wanted`, as a set that changes only as someone joins or leaves, not as it is reordered. */
+/**
+ * Who the results map picks out while `wanted`: the shortlist less those set aside, as a set that changes only as someone
+ * joins or leaves it, not as the list is reordered or a status changes within it.
+ */
 export function useShortlistedSlugs(wanted: boolean): ReadonlySet<string> {
-  const members = useShortlistIf(wanted).map((entry) => entry.card.slug).sort().join(" ");
+  const members = useShortlistIf(wanted)
+    .filter((entry) => statusOf(entry) !== "setAside")
+    .map((entry) => entry.card.slug)
+    .sort()
+    .join(" ");
   return useMemo(() => (members ? new Set(members.split(" ")) : NO_SLUGS), [members]);
 }
 
