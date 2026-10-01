@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useSyncExternalStore } from "react";
 import type { TherapistCard } from "@shared/types";
 import { browserStorage } from "@/lib/storage";
-import { createShortlistStore, type Shortlist, type ShortlistEntry, type ShortlistStore } from "./store";
+import { createShortlistStore, statusOf, type Shortlist, type ShortlistEntry, type ShortlistStore, type Status } from "./store";
 
 /** The store the page's components share; left unset, it is the one kept in this browser. */
 export const ShortlistContext = createContext<ShortlistStore | null>(null);
@@ -36,6 +36,15 @@ export function useShortlistedSlugs(wanted: boolean): ReadonlySet<string> {
 export function useShortlistEntry(slug: string): ShortlistEntry | undefined {
   const store = useShortlistStore();
   return useSyncExternalStore(store.subscribe, () => store.get().find((entry) => entry.card.slug === slug));
+}
+
+/** Where the visitor stands with a therapist, or nothing while they aren't shortlisted; a reorder leaves it, and its readers, alone. */
+export function useShortlistStatus(slug: string): Status | undefined {
+  const store = useShortlistStore();
+  return useSyncExternalStore(store.subscribe, () => {
+    const entry = store.get().find((e) => e.card.slug === slug);
+    return entry && statusOf(entry);
+  });
 }
 
 export function therapistCount(n: number): string {

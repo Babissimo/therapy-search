@@ -10,6 +10,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { useProfileLink } from "@/profile/profileLink";
+import { STATUS_ICON, STATUS_LABEL } from "@/shortlist/status";
+import type { Status } from "@/shortlist/store";
 
 type Props = {
   therapist: Therapist;
@@ -27,10 +29,12 @@ type Props = {
   track?: ReactNode;
   /** The fee at the office the card names, once the therapist's profile has been read. */
   fee?: string;
+  /** Where the visitor stands with a shortlisted therapist; "To contact" goes unsaid, the filled bookmark saying as much. */
+  status?: Status;
   onHighlight?: (on: boolean) => void;
 };
 
-export function TherapistCard({ therapist: t, sought, grouped = false, online = false, heading, action, track, fee, onHighlight }: Props) {
+export function TherapistCard({ therapist: t, sought, grouped = false, online = false, heading, action, track, fee, status, onHighlight }: Props) {
   const profile = useProfileLink();
   const where = grouped || online ? undefined : placeOf(t);
   // UKCP's "0.2 miles from E8 3DQ" repeats the searched place, which the list already names.
@@ -73,6 +77,9 @@ export function TherapistCard({ therapist: t, sought, grouped = false, online = 
           </span>
         )
       }
+      status={status && status !== "toContact" && <StatusLine status={status} />}
+      // Only the portrait fades: the card stays live in every later search, and faded text would fall below AA contrast.
+      faded={status === "setAside"}
       action={action}
       track={track}
       summary={t.summary}
@@ -103,6 +110,9 @@ type LayoutProps = ComponentProps<typeof Card> & {
   place?: ReactNode;
   meets?: ReactNode;
   fee?: ReactNode;
+  status?: ReactNode;
+  /** Fades the photo, for a therapist the visitor has set aside. */
+  faded?: boolean;
   action?: ReactNode;
   track?: ReactNode;
   summary?: ReactNode;
@@ -110,18 +120,20 @@ type LayoutProps = ComponentProps<typeof Card> & {
 };
 
 /** The card's layout, which the card and its skeleton share. */
-function CardLayout({ heading: Heading = "h2", photo, name, place, meets, fee, action, track, summary, tags = [], className, ...card }: LayoutProps) {
+function CardLayout({ heading: Heading = "h2", photo, name, place, meets, fee, status, faded, action, track, summary, tags = [],
+  className, ...card }: LayoutProps) {
   return (
     // Isolated, so the parts raised over the card's link rise no further than the card, and a list's sticky bar stays above them.
     <Card className={cn("relative isolate", className)} {...card}>
       <CardContent className="space-y-3">
         <div className="flex items-center gap-4">
-          <div className="size-24 shrink-0">{photo}</div>
+          <div className={cn("size-24 shrink-0 transition-[opacity,filter]", faded && "opacity-60 grayscale")}>{photo}</div>
           <div className="min-w-0 flex-1 space-y-1.5">
             <Heading className="font-heading text-lg leading-snug font-medium">{name}</Heading>
             {place && <p className="text-sm">{place}</p>}
             {meets && <p className="text-sm text-muted-foreground">{meets}</p>}
             {fee && <p className="text-sm text-muted-foreground">{fee}</p>}
+            {status && <p className="text-sm text-muted-foreground">{status}</p>}
           </div>
           {/* Raised above the stretched link, which would otherwise take its clicks. */}
           {action && <div className="relative z-10 -mt-1 -mr-1 self-start">{action}</div>}
@@ -165,6 +177,18 @@ function Sessions({ text }: { text: string }) {
           </span>
         );
       })}
+    </span>
+  );
+}
+
+/** A status by its icon and label, as the status menu gives it. */
+function StatusLine({ status }: { status: Status }) {
+  const Icon = STATUS_ICON[status];
+  return (
+    <span className="flex items-center gap-1.5">
+      <Icon aria-hidden className="size-4 shrink-0" />
+      <span className="sr-only">Status: </span>
+      {STATUS_LABEL[status]}
     </span>
   );
 }

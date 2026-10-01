@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it } from "vitest";
 import type { TherapistCard as Therapist } from "@shared/types";
+import type { Status } from "@/shortlist/store";
 import { TherapistCard } from "./TherapistCard";
 
 const therapist = (extra: Partial<Therapist> = {}): Therapist => ({
@@ -18,12 +19,12 @@ const therapist = (extra: Partial<Therapist> = {}): Therapist => ({
   ...extra,
 });
 
-type Options = { grouped?: boolean; action?: ReactNode; online?: boolean; fee?: string };
+type Options = { grouped?: boolean; action?: ReactNode; online?: boolean; fee?: string; status?: Status };
 
-function renderCard(t: Therapist, sought: string[] = [], { grouped, action, online, fee }: Options = {}) {
+function renderCard(t: Therapist, sought: string[] = [], { grouped, action, online, fee, status }: Options = {}) {
   render(
     <MemoryRouter>
-      <TherapistCard therapist={t} sought={new Set(sought)} grouped={grouped} action={action} online={online} fee={fee} />
+      <TherapistCard therapist={t} sought={new Set(sought)} grouped={grouped} action={action} online={online} fee={fee} status={status} />
     </MemoryRouter>,
   );
 }
@@ -50,6 +51,28 @@ describe("TherapistCard", () => {
   it("gives the fee on its own among therapists met online", () => {
     renderCard(therapist({ sessionTypes: "Remote" }), [], { online: true, fee: "£70" });
     expect(screen.getByText("£70").closest("p")?.textContent).toBe("Fees: £70");
+  });
+
+  it("says where the visitor stands with a shortlisted therapist on a line after the fee, and nothing for To contact", () => {
+    renderCard(therapist(), [], { fee: "From £60", status: "consultation" });
+    const line = screen.getByText("Consultation").closest("p");
+    expect(line?.textContent).toBe("Status: Consultation");
+    expect(line?.querySelector("svg")).not.toBeNull();
+    expect(screen.getByText("From £60").closest("p")?.nextElementSibling).toBe(line);
+    cleanup();
+    renderCard(therapist(), [], { status: "toContact" });
+    expect(screen.queryByText(/Status/)).toBeNull();
+  });
+
+  it("fades the portrait of a therapist set aside, and none of the text", () => {
+    const portrait = () => screen.getByText("TT").closest("[data-slot=avatar]")?.parentElement;
+    renderCard(therapist(), [], { status: "setAside" });
+    expect(portrait()?.className).toMatch(/\bopacity-60\b/);
+    expect(screen.getByRole("link", { name: "Test Therapist 1" }).closest("[class*=opacity]")).toBeNull();
+    expect(screen.getByText("Set aside").closest("[class*=opacity]")).toBeNull();
+    cleanup();
+    renderCard(therapist(), [], { status: "contacted" });
+    expect(portrait()?.className).not.toMatch(/\bopacity-60\b/);
   });
 
   it("keeps a full postcode without its town", () => {

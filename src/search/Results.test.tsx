@@ -8,6 +8,8 @@ import { BATCH_SIZE, emptyParams, type SearchParams } from "@shared/query";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { api, ApiError } from "@/lib/api";
 import { listed } from "@/lib/listed.testing";
+import { createShortlistStore, type ShortlistStore } from "@/shortlist/store";
+import { ShortlistContext } from "@/shortlist/useShortlist";
 import { LoadMore } from "./LoadMore";
 import type { Pin } from "./map/pins";
 import { Results } from "./Results";
@@ -55,14 +57,16 @@ function Harness({ params, pins, placing }: { params: SearchParams } & Placing) 
   );
 }
 
-function renderResults(params: SearchParams) {
+function renderResults(params: SearchParams, shortlist: ShortlistStore = createShortlistStore(null)) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const ui = (next: SearchParams, placing: Placing = {}) => (
     <QueryClientProvider client={client}>
       <TooltipProvider>
-        <MemoryRouter>
-          <Harness params={next} {...placing} />
-        </MemoryRouter>
+        <ShortlistContext.Provider value={shortlist}>
+          <MemoryRouter>
+            <Harness params={next} {...placing} />
+          </MemoryRouter>
+        </ShortlistContext.Provider>
       </TooltipProvider>
     </QueryClientProvider>
   );
@@ -318,6 +322,36 @@ describe("Results", () => {
       ["b", "LEEDS LS2"],
       ["c", "LEEDS LS2"],
     ]);
+  });
+
+  it("says where the visitor stands with each shortlisted therapist, in a pin's box too, and fades those set aside in place", async () => {
+    const named = (slug: string) => ({ slug, name: `Therapist ${slug}`, initials: "T", tags: [] });
+    const therapists = ["a", "b", "c", "d"].map(named);
+    vi.spyOn(api, "search").mockResolvedValue(listed({ total: 4, from: 1, to: 4, notices: [], therapists }));
+    const shortlist = createShortlistStore(null);
+    shortlist.add(therapists[0]!, { status: "contacted" });
+    shortlist.add(therapists[1]!);
+    shortlist.add(therapists[3]!, { status: "setAside" });
+    const view = renderResults(leeds, shortlist);
+    await screen.findByRole("link", { name: "Therapist a" });
+    view.rerender(leeds, { pins: [{ key: "LS1", point: { lat: 53.8, lng: -1.55 }, therapists: therapists.slice(2), kind: "outcode" }] });
+    const card = (slug: string) => screen.getByRole("link", { name: `Therapist ${slug}` }).closest<HTMLElement>("[data-slot=card]")!;
+    const faded = (slug: string) => /\bopacity-60\b/.test(within(card(slug)).getByText("T").closest("[data-slot=avatar]")?.parentElement?.className ?? "");
+    expect(within(card("a")).getByText("Contacted").closest("p")?.textContent).toBe("Status: Contacted");
+    // "To contact" goes unsaid, as does anything for a therapist not shortlisted.
+    expect(within(card("b")).queryByText(/Status/)).toBeNull();
+    expect(within(card("c")).queryByText(/Status/)).toBeNull();
+    within(screen.getByRole("group")).getByText("Set aside");
+    expect(["a", "b", "c", "d"].map(faded)).toEqual([false, false, false, true]);
+    act(() => shortlist.setStatus("a", "setAside"));
+    within(card("a")).getByText("Set aside");
+    expect(faded("a")).toBe(true);
+    // Set aside, they keep their place among the results.
+    expect(cards().map((link) => link.textContent)).toEqual(["Therapist a", "Therapist b", "Therapist c", "Therapist d"]);
+    // Brought back, they are no longer faded.
+    act(() => shortlist.setStatus("a", "contacted"));
+    expect(within(card("a")).getByText("Contacted").closest("p")?.textContent).toBe("Status: Contacted");
+    expect(faded("a")).toBe(false);
   });
 
   it("asks nothing of profiles in a search outside the UK", async () => {
