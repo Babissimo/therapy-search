@@ -1,4 +1,4 @@
-import { ListPlus, Loader2, Plus, RotateCw } from "lucide-react";
+import { ListPlus, Loader2, RotateCw } from "lucide-react";
 import { useEffect, useRef, useState, type RefObject } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -43,8 +43,8 @@ export function LoadMore({ results: { query }, listRef, placing = false, atEnd =
   if (!query.hasNextPage || query.isPlaceholderData) return null;
   const docked = folded !== undefined;
   const label = query.isFetchNextPageError ? "Try again" : "Load more";
-  // Folded, a list beside the plus, so it reads apart from the map's zoom-in button.
-  const Icon = query.isFetchingNextPage ? Loader2 : query.isFetchNextPageError ? RotateCw : folded ? ListPlus : Plus;
+  // A list beside the plus, so folded over the map it reads apart from the map's zoom-in button.
+  const Icon = query.isFetchingNextPage ? Loader2 : query.isFetchNextPageError ? RotateCw : ListPlus;
   // One button loads and retries, so keyboard focus stays on it through a failure.
   const button = (
     <Button

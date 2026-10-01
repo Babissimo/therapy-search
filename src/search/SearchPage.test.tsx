@@ -231,7 +231,6 @@ describe("SearchPage", () => {
     renderAt(SEARCH);
     await loaded();
     const more = screen.getByRole("button", { name: "Load more" });
-    expect(more.querySelector("svg")?.classList.contains("lucide-plus")).toBe(true);
     fireEvent.click(screen.getByRole("button", { name: "Hide list" }));
     // The same button, so it shrinks to its icon rather than being swapped for another.
     expect(screen.getByRole("button", { name: "Load more" })).toBe(more);
@@ -242,7 +241,6 @@ describe("SearchPage", () => {
     expect(await within(results()).findByText(/^24 of 30/)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Show list" }));
     expect(more.className).not.toContain("w-8");
-    expect(more.querySelector("svg")?.classList.contains("lucide-plus")).toBe(true);
   });
 
   it("names Load more in a tooltip only while it is folded to its icon", async () => {
