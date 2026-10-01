@@ -17,11 +17,17 @@ export function resultsHeading(loaded: TherapistCard[], total: number | undefine
   if (!located || total === undefined) return resultCount(total);
   if (total === 0) return "No results within your area";
   const count = resultCount(loaded.length);
+  const within = reachWithin(loaded);
+  return within === undefined ? count : `${count} ${within}`;
+}
+
+/** How far out the loaded cards of a location search reach, such as "within 0.5 miles". */
+export function reachWithin(loaded: TherapistCard[]): string | undefined {
   const furthest = reachMiles(loaded);
-  if (furthest === undefined) return count;
+  if (furthest === undefined) return undefined;
   // UKCP rounds miles to a tenth, so its 0 means under a tenth.
   const miles = Math.max(furthest, 0.1);
-  return `${count} within ${miles} ${miles === 1 ? "mile" : "miles"}`;
+  return `within ${miles} ${miles === 1 ? "mile" : "miles"}`;
 }
 
 export function resultCount(total: number | undefined): string {

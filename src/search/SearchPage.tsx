@@ -33,6 +33,7 @@ import { loadMap, warmMap } from "./prefetch";
 import { Prompt } from "./Prompt";
 import { Results } from "./Results";
 import { ResultsPanel } from "./ResultsPanel";
+import { ResultsStatus } from "./ResultsStatus";
 import { coverOf, ResultsSheet, type SheetPosition } from "./ResultsSheet";
 import { SearchBox } from "./SearchBox";
 import { placed, tickedFilters } from "./state";
@@ -292,6 +293,9 @@ function SearchView({ params, onChange, wide }: ViewProps) {
       {/* The tabs' root spans the page, around wherever their list and panels sit. */}
       <Tabs.Root value={tab} onValueChange={pickTab} asChild>
         <div className="group/tabs flex min-h-0 flex-1">
+          {/* Apart from the list, which goes inert as it is put away over the map, and stays put as it moves between the side
+              bar and the sheet. There before a search starts, as a live region is heard only once it is there. */}
+          <ResultsStatus params={params} results={results} searching={searching} className="sr-only" />
           {!searching ? (
             <ListColumn wide={wide} tabs={tabs} top={!wide && toolbar("list")} topHidden={shortlistOpen} scroll={scroll}>
               {lists}
