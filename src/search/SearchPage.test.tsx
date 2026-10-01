@@ -206,6 +206,21 @@ describe("SearchPage", () => {
     expect(toolbar().className).not.toContain("left-14");
   });
 
+  it("tells a screen reader what a search found with the list put away, and keeps saying so as the screen narrows", async () => {
+    // Apart from the URL's <output>, which is a status too.
+    const resultsStatus = () => screen.getAllByRole("status").find((el) => el.tagName === "P")!;
+    const resize = screenIs(true);
+    renderAt(SEARCH);
+    await loaded();
+    fireEvent.click(screen.getByRole("button", { name: "Hide list" }));
+    const status = resultsStatus();
+    await waitFor(() => expect(status.textContent).toBe("30 therapists near Leeds."));
+    expect(status.closest("[inert]")).toBeNull();
+    resize(false);
+    expect(resultsStatus()).toBe(status);
+    expect(status.closest("[inert]")).toBeNull();
+  });
+
   it("asks for a search in place of the results, with no map, when there is nothing to search for", async () => {
     screenIs(true);
     renderAt("/");

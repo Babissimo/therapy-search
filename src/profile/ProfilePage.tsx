@@ -1,5 +1,5 @@
 import { Fragment, lazy, Suspense, useEffect, type ReactNode } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { queryOptions, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, ChevronLeft, Diamond, ExternalLink, MapPin } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router";
 import type { Office, Profile, ProfileSection } from "@shared/types";
@@ -13,6 +13,7 @@ import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api";
 import { useStuck } from "@/lib/useStuck";
+import { useTitle } from "@/lib/useTitle";
 import { cn } from "@/lib/utils";
 import { cachedCard } from "@/search/useResults";
 import { ShortlistButton } from "@/shortlist/ShortlistButton";
@@ -26,11 +27,17 @@ import { matchingTags, useOpeningCard, useSearchMatch } from "./searchedTerms";
 
 const ProfileMap = lazy(() => import("./ProfileMap"));
 
+/** A therapist's profile, read from UKCP once for the page or drawer that shows it and whatever names that. */
+export function profileQuery(slug: string) {
+  return queryOptions({ queryKey: ["profile", slug], queryFn: () => api.profile(slug) });
+}
+
 /** A profile as a page of its own, for a visitor who followed a link to it. */
 export function ProfilePage({ slug }: { slug: string }) {
   useEffect(() => {
     window.scrollTo({ top: 0 });
   }, [slug]);
+  useTitle(useQuery(profileQuery(slug)).data?.name);
   return <ProfileBody slug={slug} back={<BackButton />} />;
 }
 
@@ -64,7 +71,7 @@ type Exits = { back?: ReactNode; close?: ReactNode };
 
 /** A therapist's profile, laid out by the width it is given, whether a page's or a drawer's. */
 export function ProfileBody({ slug, back, close }: { slug: string } & Exits) {
-  const { data: profile, error, isPending } = useQuery({ queryKey: ["profile", slug], queryFn: () => api.profile(slug) });
+  const { data: profile, error, isPending } = useQuery(profileQuery(slug));
   const isMatch = useSearchMatch();
   const card = useOpeningCard(slug);
 

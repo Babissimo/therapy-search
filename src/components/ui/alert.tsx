@@ -19,7 +19,10 @@ const alertVariants = cva(
   }
 )
 
-/** Marked by its icon as a notice or, when destructive, an error. */
+/**
+ * Marked by its icon as a notice or, when destructive, an error. Only an error interrupts a screen reader; a notice is
+ * read in its place.
+ */
 function Alert({
   className,
   variant,
@@ -30,7 +33,7 @@ function Alert({
   return (
     <div
       data-slot="alert"
-      role="alert"
+      role={variant === "destructive" ? "alert" : undefined}
       className={cn(alertVariants({ variant }), className)}
       {...props}
     >

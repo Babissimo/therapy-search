@@ -1,6 +1,6 @@
 import { MapPin } from "lucide-react";
-import { useEffect, useId, useState, type ReactNode, type Ref } from "react";
-import { asksWhole, type SearchParams } from "@shared/query";
+import { useId, type ReactNode, type Ref } from "react";
+import type { SearchParams } from "@shared/query";
 import type { TherapistCard as Therapist } from "@shared/types";
 import { SkeletonText } from "@/components/SkeletonText";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -29,21 +29,8 @@ type Props = {
   online?: boolean;
 };
 
-// How long a search runs before the list says why.
-const SLOW_MS = 2000;
-
-export function Results(props: Props) {
-  const { query } = props.results;
-  // Outside the list, which is marked busy and dimmed while it loads, so the line is announced and read as it comes.
-  return (
-    <div className="space-y-4">
-      <SlowNote loading={query.isPending || query.isPlaceholderData} whole={asksWhole(props.params)} />
-      <ResultsList {...props} />
-    </div>
-  );
-}
-
-function ResultsList({ params, results, listRef, pins = [], unplaced = [], selected, onHighlight, online = false }: Props) {
+/** A search's list. Its ResultsStatus goes outside it, as the list is marked busy and dimmed while it loads. */
+export function Results({ params, results, listRef, pins = [], unplaced = [], selected, onHighlight, online = false }: Props) {
   const { query, first, therapists, searchedPlace } = results;
   if (query.isPending) {
     return (
@@ -133,28 +120,6 @@ function Summary({ title, reach, note }: { title: ReactNode; reach?: ReactNode; 
       {reach && <p className="text-sm text-muted-foreground">{reach}</p>}
       {note && <p className="text-xs text-muted-foreground">{note}</p>}
     </div>
-  );
-}
-
-/**
- * Says why a search asked of UKCP whole (`asksWhole`) is taking a while, once it has. Its status region is always there,
- * since a screen reader announces changes to a region it already knows.
- */
-function SlowNote({ loading, whole }: { loading: boolean; whole: boolean }) {
-  const [slow, setSlow] = useState(false);
-  const waiting = loading && whole;
-  useEffect(() => {
-    if (!waiting) return;
-    const timer = setTimeout(() => setSlow(true), SLOW_MS);
-    return () => {
-      clearTimeout(timer);
-      setSlow(false);
-    };
-  }, [waiting]);
-  return (
-    <p role="status" className={cn("text-sm text-muted-foreground", !(waiting && slow) && "sr-only")}>
-      {waiting && slow ? "Getting every result. The first time can take a few seconds." : ""}
-    </p>
   );
 }
 

@@ -11,6 +11,7 @@ import { listed } from "@/lib/listed.testing";
 import { LoadMore } from "./LoadMore";
 import type { Pin } from "./map/pins";
 import { Results } from "./Results";
+import { ResultsStatus } from "./ResultsStatus";
 import { withHelpWithTerms, withText } from "./state";
 import { useResults } from "./useResults";
 
@@ -49,6 +50,7 @@ function Harness({ params, pins, placing }: { params: SearchParams } & Placing) 
   const listRef = useRef<HTMLUListElement>(null);
   return (
     <>
+      <ResultsStatus params={params} results={results} />
       <Results params={params} results={results} listRef={listRef} pins={pins} />
       <LoadMore results={results} listRef={listRef} placing={placing} />
     </>
@@ -67,7 +69,7 @@ function renderResults(params: SearchParams) {
     </QueryClientProvider>
   );
   const view = render(ui(params));
-  return { rerender: (next: SearchParams, placing?: Placing) => view.rerender(ui(next, placing)) };
+  return { rerender: (next: SearchParams, placing?: Placing) => view.rerender(ui(next, placing)), unmount: view.unmount };
 }
 
 const leeds = withText(emptyParams(), "Location", "Leeds");
@@ -97,6 +99,52 @@ describe("Results", () => {
     renderResults(leeds);
     act(() => vi.advanceTimersByTime(5000));
     expect(screen.queryByText(SLOW)).toBeNull();
+  });
+
+  it("tells a screen reader what each search found, and names the page by it", async () => {
+    answerBatches();
+    const view = renderResults(leeds);
+    const status = screen.getByRole("status");
+    expect(status.textContent).toBe("");
+    await waitFor(() => expect(status.textContent).toBe("30 therapists near Leeds."));
+    expect(document.title).toBe("30 therapists near Leeds - Find a UKCP therapist (unofficial)");
+    answerBatches({ total: 1 });
+    view.rerender(withHelpWithTerms(leeds, ["Anxiety"]));
+    expect(status.textContent).toBe("");
+    await waitFor(() => expect(status.textContent).toBe("1 therapist near Leeds."));
+    expect(status.getAttribute("aria-live")).toBe("polite");
+  });
+
+  it("announces a search the cache answers even when it says what the last one said", async () => {
+    answerBatches();
+    const view = renderResults(leeds);
+    const status = screen.getByRole("status");
+    await waitFor(() => expect(status.textContent).toBe("30 therapists near Leeds."));
+    view.rerender(withHelpWithTerms(leeds, ["Anxiety"]));
+    await waitFor(() => expect(status.textContent).toBe("30 therapists near Leeds."));
+    view.rerender(leeds);
+    expect(status.textContent).toBe("30 therapists near Leeds. ");
+  });
+
+  it("says when a narrowed search found no one, and how to find more", async () => {
+    answerBatches({ total: 0 });
+    renderResults(withHelpWithTerms(leeds, ["Anxiety"]));
+    await waitFor(() => expect(screen.getByRole("status").textContent).toBe("No therapists near Leeds. Remove a filter to see more."));
+  });
+
+  it("says when UKCP searched the whole UK for a place it didn't know", async () => {
+    const therapists = [{ slug: "a", name: "Therapist a", initials: "T", tags: [] }];
+    vi.spyOn(api, "search").mockResolvedValue(listed({ total: 1, from: 1, to: 1, notices: [], therapists, locationSearched: "United Kingdom" }));
+    renderResults(withText(emptyParams(), "Location", "Leedz"));
+    await waitFor(() => expect(screen.getByRole("status").textContent).toBe(`1 therapist across the UK. UKCP didn't recognise "Leedz".`));
+  });
+
+  it("gives the page back its own title as the results go", async () => {
+    answerBatches();
+    const view = renderResults(leeds);
+    await waitFor(() => expect(document.title).toMatch(/^30 therapists/));
+    view.unmount();
+    expect(document.title).toBe("Find a UKCP therapist (unofficial)");
   });
 
   it("keeps the list's stand-in from screen readers while a search loads", () => {
@@ -274,6 +322,7 @@ describe("Results", () => {
     answerBatches();
     renderResults(emptyParams());
     expect(await screen.findByText("12 of 30")).toBeTruthy();
+    await waitFor(() => expect(screen.getByRole("status").textContent).toBe("30 therapists."));
   });
 
   it("keeps what loaded when the next page fails, and tries again", async () => {

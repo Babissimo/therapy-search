@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, useLocation } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Profile } from "@shared/types";
@@ -64,7 +64,7 @@ describe("AppRoutes", () => {
     const card = await screen.findByRole("link", { name: "Jo Bloggs" });
     card.focus();
     fireEvent.click(card);
-    const drawer = await screen.findByRole("dialog", { name: "Therapist profile" });
+    const drawer = await screen.findByRole("dialog", { name: "Jo Bloggs" });
     expect(await within(drawer).findByRole("heading", { name: "Jo Bloggs" })).toBeTruthy();
     expect(screen.getByTestId("url").textContent).toBe("/therapist/Jo-ABCDEFGH");
     // The search is still there beneath, not loaded again.
@@ -77,19 +77,38 @@ describe("AppRoutes", () => {
     await waitFor(() => expect(document.activeElement).toBe(card));
   });
 
+  it("names the drawer, and the page while it is open, after the therapist", async () => {
+    let answer = (_: Profile) => {};
+    vi.mocked(api.profile).mockImplementation(() => new Promise((resolve) => (answer = resolve)));
+    renderAt("/?Location=Leeds");
+    fireEvent.click(await screen.findByRole("link", { name: "Jo Bloggs" }));
+    await waitFor(() => expect(document.title).toBe("1 therapist near Leeds - Find a UKCP therapist (unofficial)"));
+    const drawer = await screen.findByRole("dialog", { name: "Therapist profile" });
+    act(() => answer(PROFILE));
+    await waitFor(() => expect(drawer.getAttribute("aria-labelledby") && document.getElementById(drawer.getAttribute("aria-labelledby")!)?.textContent).toBe("Jo Bloggs"));
+    expect(document.title).toBe("Jo Bloggs - Find a UKCP therapist (unofficial)");
+    fireEvent.click(within(drawer).getByRole("button", { name: "Close" }));
+    await waitFor(() => expect(document.title).toBe("1 therapist near Leeds - Find a UKCP therapist (unofficial)"));
+  });
+
+  it("names a profile's own page after the therapist", async () => {
+    renderAt("/therapist/Jo-ABCDEFGH");
+    await waitFor(() => expect(document.title).toBe("Jo Bloggs - Find a UKCP therapist (unofficial)"));
+  });
+
   it("hands the keyboard back to whatever opened a profile, opened before from elsewhere or not", async () => {
     renderAt("/?Location=Leeds");
     const card = await screen.findByRole("link", { name: "Jo Bloggs" });
     card.focus();
     fireEvent.click(card);
-    fireEvent.click(within(await screen.findByRole("dialog", { name: "Therapist profile" })).getByRole("button", { name: "Close" }));
+    fireEvent.click(within(await screen.findByRole("dialog", { name: "Jo Bloggs" })).getByRole("button", { name: "Close" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     fireEvent.click(screen.getByRole("button", { name: "Add Jo Bloggs to your shortlist" }));
     fireEvent.mouseDown(screen.getByRole("tab", { name: "Shortlist, 1 therapist" }));
     const entry = within(screen.getByRole("tabpanel", { name: /^Shortlist/ })).getByRole("link", { name: "Jo Bloggs" });
     entry.focus();
     fireEvent.click(entry);
-    fireEvent.click(within(await screen.findByRole("dialog", { name: "Therapist profile" })).getByRole("button", { name: "Close" }));
+    fireEvent.click(within(await screen.findByRole("dialog", { name: "Jo Bloggs" })).getByRole("button", { name: "Close" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     await waitFor(() => expect(document.activeElement).toBe(entry));
   });
@@ -98,7 +117,7 @@ describe("AppRoutes", () => {
     renderAt("/online?Languages=Greek");
     expect(screen.getByRole("link", { name: "Online" }).getAttribute("aria-current")).toBe("page");
     fireEvent.click(await screen.findByRole("link", { name: "Jo Bloggs" }));
-    const drawer = await screen.findByRole("dialog", { name: "Therapist profile" });
+    const drawer = await screen.findByRole("dialog", { name: "Jo Bloggs" });
     fireEvent.click(within(drawer).getByRole("button", { name: "Close" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(screen.getByTestId("url").textContent).toBe("/online?Languages=Greek");
@@ -117,7 +136,7 @@ describe("AppRoutes", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Add Jo Bloggs to your shortlist" }));
     fireEvent.mouseDown(screen.getByRole("tab", { name: "Shortlist, 1 therapist" }));
     fireEvent.click(within(screen.getByRole("tabpanel", { name: /^Shortlist/ })).getByRole("link", { name: "Jo Bloggs" }));
-    const drawer = await screen.findByRole("dialog", { name: "Therapist profile" });
+    const drawer = await screen.findByRole("dialog", { name: "Jo Bloggs" });
     // The profile's header carries the bookmark too, beside the drawer's close button.
     const header = (await within(drawer).findByRole("heading", { name: "Jo Bloggs" })).closest("header")!;
     within(header).getByRole("button", { name: "Remove Jo Bloggs from your shortlist" });

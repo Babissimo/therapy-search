@@ -17,6 +17,7 @@ import { ModeSwitch } from "./ModeSwitch";
 import { narrowsOnline, onlineSearch } from "./online";
 import { FiltersIcon, Prompt } from "./Prompt";
 import { Results } from "./Results";
+import { ResultsStatus } from "./ResultsStatus";
 import { tickedFilters } from "./state";
 import { useResults } from "./useResults";
 import { useSearchDrafts } from "./useSearchDrafts";
@@ -64,7 +65,10 @@ export function OnlineView({ params, onChange, wide }: Props) {
       results={
         searching ? (
           <>
-            <Results params={search} results={results} listRef={listRef} online />
+            <div className="space-y-4">
+              <ResultsStatus params={search} results={results} online />
+              <Results params={search} results={results} listRef={listRef} online />
+            </div>
             {/* The list is the page here, so the button comes at its end rather than holding a strip beneath it. */}
             <LoadMore results={results} listRef={listRef} atEnd />
           </>

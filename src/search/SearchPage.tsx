@@ -27,6 +27,7 @@ import { OnlineView } from "./OnlineView";
 import { FiltersIcon, Prompt } from "./Prompt";
 import { Results } from "./Results";
 import { ResultsPanel } from "./ResultsPanel";
+import { ResultsStatus } from "./ResultsStatus";
 import { coverOf, ResultsSheet, type SheetPosition } from "./ResultsSheet";
 import { SearchBox } from "./SearchBox";
 import { tickedFilters } from "./state";
@@ -223,6 +224,9 @@ function SearchView({ params, onChange, wide }: ViewProps) {
       {/* The tabs' root spans the page, around wherever their list and panels sit. */}
       <Tabs.Root value={tab} onValueChange={pickTab} asChild>
         <div className="group/tabs flex min-h-0 flex-1">
+          {/* Apart from the list, which goes inert as it is put away over the map, and stays put as it moves between the side
+              bar and the sheet. */}
+          {searching && <ResultsStatus params={params} results={results} className="sr-only" />}
           {!searching ? (
             <ListColumn wide={wide} tabs={tabs} top={!wide && toolbar("list")} scroll={scroll}>
               {lists}
