@@ -1,11 +1,17 @@
 // @vitest-environment jsdom
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import type { TherapistCard } from "@shared/types";
+import { STATUS_ICON, STATUS_LABEL } from "@/shortlist/status";
+import type { Status } from "@/shortlist/store";
 import { centreIcon, pinIcon } from "./pinIcon";
 
 const card = (slug: string, extra: Partial<TherapistCard> = {}): TherapistCard => ({ slug, name: slug, initials: slug.toUpperCase(), tags: [], ...extra });
 const html = (therapists: TherapistCard[], shortlisted?: string[]) => pinIcon(therapists, new Set(shortlisted)).options.html as HTMLElement;
 const badged = (root: HTMLElement) => root.querySelector('[title="On your shortlist"]') !== null;
+const marked = (therapists: TherapistCard[], statuses: [string, Status][]) => pinIcon(therapists, undefined, new Map(statuses)).options.html as HTMLElement;
+const classes = (element: Element | null | undefined) => element?.className.split(" ") ?? [];
 
 describe("pinIcon", () => {
   it("shows one therapist's photo over their initials", () => {
@@ -70,6 +76,49 @@ describe("pinIcon", () => {
     expect(badged(root)).toBe(true);
     expect(root.getAttribute("aria-label")).toBe("4 therapists here, 2 on your shortlist");
     expect(badged(html(["ab", "cd"].map((slug) => card(slug))))).toBe(false);
+  });
+
+  it.each([
+    ["contacted", "Contacted", "contacted"],
+    ["waiting", "Waiting list", "waiting list"],
+    ["consultation", "Consultation", "consultation"],
+    ["seeing", "Seeing them", "seeing them"],
+    ["setAside", "Set aside", "set aside"],
+  ] as const)("badges a therapist marked %s at the avatar's bottom left, and names the pin so", (status, title, said) => {
+    const root = marked([card("jo", { name: "Jo Cole" })], [["jo", status]]);
+    const badge = root.querySelector(`[title="${title}"]`);
+    expect(classes(badge)).toEqual(expect.arrayContaining(["-bottom-1", "-left-1"]));
+    expect(badge?.querySelector("svg")).not.toBeNull();
+    expect(root.getAttribute("aria-label")).toBe(`Jo Cole, ${said}`);
+  });
+
+  it.each(["contacted", "waiting", "consultation", "seeing", "setAside"] as const)("draws %s with the icon the cards show for it", (status) => {
+    const lucide = document.createElement("div");
+    lucide.innerHTML = renderToStaticMarkup(createElement(STATUS_ICON[status]));
+    const drawn = marked([card("jo")], [["jo", status]]).querySelector(`[title="${STATUS_LABEL[status]}"] svg`);
+    expect(drawn?.innerHTML).toBe(lucide.querySelector("svg")!.innerHTML);
+  });
+
+  it("badges no status for To contact, nor for a therapist the statuses don't name", () => {
+    const toContact = marked([card("jo", { name: "Jo Cole" })], [["jo", "toContact"]]);
+    expect(toContact.querySelectorAll("[title]")).toHaveLength(0);
+    expect(toContact.getAttribute("aria-label")).toBe("Jo Cole");
+    const other = marked([card("jo", { name: "Jo Cole" })], [["al", "contacted"]]);
+    expect(other.querySelectorAll("[title]")).toHaveLength(0);
+    expect(other.getAttribute("aria-label")).toBe("Jo Cole");
+  });
+
+  it("keeps the remote badge at the bottom right beside a status", () => {
+    const root = marked([card("jo", { name: "Jo Cole", sessionTypes: "Remote" })], [["jo", "contacted"]]);
+    expect(classes(root.querySelector('[title="Remote sessions only"]'))).toEqual(expect.arrayContaining(["-bottom-1", "-right-1"]));
+    expect(root.querySelector('[title="Contacted"]')).not.toBeNull();
+    expect(root.getAttribute("aria-label")).toBe("Jo Cole, remote sessions only, contacted");
+  });
+
+  it("badges no status on a stack, whose avatars overlap too closely for one each", () => {
+    const root = marked([card("ab"), card("cd")], [["ab", "contacted"], ["cd", "seeing"]]);
+    expect(root.querySelector('[title="Contacted"], [title="Seeing them"]')).toBeNull();
+    expect(root.getAttribute("aria-label")).toBe("2 therapists here");
   });
 });
 
