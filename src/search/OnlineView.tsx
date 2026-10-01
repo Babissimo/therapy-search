@@ -1,5 +1,5 @@
 import { Tabs } from "radix-ui";
-import { useId, useRef, useState } from "react";
+import { useId, useRef } from "react";
 import { useLocation } from "react-router";
 import type { SearchParams } from "@shared/query";
 import { Morph, startMorph } from "@/components/Morph";
@@ -20,7 +20,7 @@ import { Prompt } from "./Prompt";
 import { Results } from "./Results";
 import { useResults } from "./useResults";
 import { useSearchDrafts } from "./useSearchDrafts";
-import { useRememberedScroll } from "./viewMemory";
+import { useRememberedScroll, useRememberedTab } from "./viewMemory";
 
 type Props = { params: SearchParams; onChange: (next: SearchParams) => void; wide: boolean };
 
@@ -36,8 +36,8 @@ export function OnlineView({ params, onChange, wide }: Props) {
   const firstSearch = searching ? undefined : narrowsOnline;
   useShortlistRefresh(results.therapists);
   const filtersId = useId();
-  // The toolbar and filters stand aside while the shortlist is open, so a new search always begins on the results.
-  const [tab, setTab] = useState<ListTab>("results");
+  // A new search replaces the history entry, so it begins on the results.
+  const [tab, setTab] = useRememberedTab(entry);
   const shortlistOpen = tab === "shortlist";
   // The shortlist keeps its place apart from the results', under a key of its own.
   const scroll = useRememberedScroll(shortlistOpen ? `${entry} shortlist` : entry, shortlistOpen || !searching || !results.loading);

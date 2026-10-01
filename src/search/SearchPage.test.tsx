@@ -159,6 +159,15 @@ function Url() {
   );
 }
 
+/** Moves through the page's history by `delta` entries, as the browser's buttons and history menu do. */
+let travel: (delta: number) => void;
+
+function Travel() {
+  const navigate = useNavigate();
+  travel = (delta) => act(() => void navigate(delta));
+  return null;
+}
+
 /**
  * The page's shortlist, empty at each test's start, and its "Set aside" section as a page load starts it. Each addition is newer
  * than the last, as a visitor's clicks are.
@@ -181,6 +190,7 @@ function renderPage(url: string, client = new QueryClient({ defaultOptions: { qu
     <>
       <SearchPage />
       <Url />
+      <Travel />
     </>
   );
   render(
@@ -224,6 +234,13 @@ const mapPins = () => within(map()).queryAllByRole("button", { name: /^Pin / }).
 /** Places a location by its postal district alone: BN3 in Hove, anywhere else in Brighton. */
 function placeByDistrict() {
   vi.spyOn(api, "place").mockImplementation(async (text) => ({ found: true, kind: "outcode", candidates: [text.endsWith("BN3") ? HOVE : BRIGHTON] }));
+}
+
+// Radix tabs switch on the mousedown that begins a click.
+function pick(name: string | RegExp) {
+  const tab = screen.getByRole("tab", { name });
+  fireEvent.mouseDown(tab);
+  fireEvent.click(tab);
 }
 
 afterEach(() => {
@@ -1041,13 +1058,6 @@ describe("SearchPage", () => {
     expect(screen.getByTestId("map").dataset.highlighted).toBe("");
   });
 
-  // Radix tabs switch on the mousedown that begins a click.
-  function pick(name: string | RegExp) {
-    const tab = screen.getByRole("tab", { name });
-    fireEvent.mouseDown(tab);
-    fireEvent.click(tab);
-  }
-
   it("keeps the shortlist in a tab beside the results, counting who is on it", async () => {
     screenIs(true);
     renderAt(SEARCH);
@@ -1079,6 +1089,46 @@ describe("SearchPage", () => {
     expect(list().scrollTop).toBe(0);
     pick("Results");
     expect(list().scrollTop).toBe(400);
+  });
+
+  it.each([
+    { screen: "wide", wide: true },
+    { screen: "narrow", wide: false },
+  ])("returns to the shortlist at its own place after Back from a profile opened from it on $screen screens", async ({ wide }) => {
+    screenIs(wide);
+    shortlist.add(therapist("a"));
+    renderAt(SEARCH);
+    await loaded();
+    pick(/^Shortlist/);
+    list().scrollTop = 400;
+    fireEvent.scroll(list());
+    fireEvent.click(screen.getByRole("link", { name: "Therapist a" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Back" }));
+    expect(await screen.findByRole("tab", { name: /^Shortlist/, selected: true })).toBeTruthy();
+    expect(list().scrollTop).toBe(400);
+  });
+
+  it("opens each search near a place on its own tab as the browser jumps between them, leaving a pin selected on the other list", async () => {
+    screenIs(true);
+    placeByDistrict();
+    shortlist.add(therapist("c", "Hove BN3"));
+    renderAt(SEARCH, [therapist("a", "Hove BN3")]);
+    await within(results()).findByRole("link", { name: "Therapist a" });
+    fireEvent.click(screen.getByRole("link", { name: "Online" }));
+    fireEvent.click(screen.getByRole("link", { name: "Near me" }));
+    await within(results()).findByRole("link", { name: "Therapist a" });
+    await within(map()).findByRole("button", { name: `Pin ${key(HOVE)}` });
+    pick(/^Shortlist/);
+    fireEvent.click(await within(map()).findByRole("button", { name: `Pin ${key(HOVE)}` }));
+    expect(map().dataset.selected).toBe(key(HOVE));
+    // As from the browser's history menu: past Online to the first search, then on to the second, the view staying mounted.
+    travel(-2);
+    expect(screen.getByRole("tab", { name: "Results", selected: true })).toBeTruthy();
+    // The results have a pin there too, which is not the one selected.
+    expect(within(map()).getByRole("button", { name: `Pin ${key(HOVE)}` })).toBeTruthy();
+    expect(map().dataset.selected).toBe("");
+    travel(2);
+    expect(screen.getByRole("tab", { name: /^Shortlist/, selected: true })).toBeTruthy();
   });
 
   it("puts the search away while the shortlist is open, bringing it back as it was left", async () => {
@@ -1512,9 +1562,7 @@ describe("SearchPage online", () => {
     renderAt(GREEK, [{ ...therapist("a"), tags: ["Online Therapy"] }]);
     await within(results()).findByRole("heading", { name: "1 result" });
     const inResults = within(screen.getByRole("tabpanel", { name: "Results" })).getByText("Online Therapy").outerHTML;
-    const tab = screen.getByRole("tab", { name: /^Shortlist/ });
-    fireEvent.mouseDown(tab);
-    fireEvent.click(tab);
+    pick(/^Shortlist/);
     expect(within(screen.getByRole("tabpanel", { name: /^Shortlist/ })).getByText("Online Therapy").outerHTML).toBe(inResults);
   });
 
@@ -1580,9 +1628,7 @@ describe("SearchPage online", () => {
     expect(list().contains(more)).toBe(true);
     const last = within(results()).getAllByRole("link", { name: /^Therapist p/ }).at(-1)!;
     expect(last.compareDocumentPosition(more) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    const tab = screen.getByRole("tab", { name: /^Shortlist/ });
-    fireEvent.mouseDown(tab);
-    fireEvent.click(tab);
+    pick(/^Shortlist/);
     expect(screen.queryByRole("button", { name: "Load more" })).toBeNull();
   });
 
@@ -1598,15 +1644,43 @@ describe("SearchPage online", () => {
     expect(list().scrollTop).toBe(400);
   });
 
+  it("returns to the shortlist at its own place after Back from a profile opened from it", async () => {
+    screenIs(true);
+    shortlist.add(therapist("a"));
+    renderAt(GREEK);
+    await loaded();
+    pick(/^Shortlist/);
+    list().scrollTop = 400;
+    fireEvent.scroll(list());
+    fireEvent.click(screen.getByRole("link", { name: "Therapist a" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Back" }));
+    expect(await screen.findByRole("tab", { name: /^Shortlist/, selected: true })).toBeTruthy();
+    expect(list().scrollTop).toBe(400);
+  });
+
+  it("returns to the shortlist at its own place as the browser goes Forward to it from Near me", async () => {
+    screenIs(true);
+    shortlist.add(therapist("a"));
+    renderAt(SEARCH);
+    await loaded();
+    fireEvent.click(screen.getByRole("link", { name: "Online" }));
+    pick(/^Shortlist/);
+    list().scrollTop = 400;
+    fireEvent.scroll(list());
+    travel(-1);
+    await loaded();
+    travel(1);
+    expect(screen.getByRole("tab", { name: /^Shortlist/, selected: true })).toBeTruthy();
+    expect(list().scrollTop).toBe(400);
+  });
+
   it("keeps the shortlist in a tab beside the list, and beside the prompt before a search", async () => {
     screenIs(true);
     shortlist.add(therapist("a"));
     renderAt(ONLINE);
     expect(prompt()).toBeTruthy();
     expect(api.search).not.toHaveBeenCalled();
-    const tab = screen.getByRole("tab", { name: /^Shortlist/ });
-    fireEvent.mouseDown(tab);
-    fireEvent.click(tab);
+    pick(/^Shortlist/);
     expect(within(screen.getByRole("tabpanel", { name: /^Shortlist/ })).getByRole("link", { name: "Therapist a" })).toBeTruthy();
   });
 
@@ -1617,11 +1691,6 @@ describe("SearchPage online", () => {
     screenIs(wide);
     renderAt(GREEK);
     await loaded();
-    const pick = (name: RegExp) => {
-      const tab = screen.getByRole("tab", { name });
-      fireEvent.mouseDown(tab);
-      fireEvent.click(tab);
-    };
     pick(/^Shortlist/);
     expect(screen.queryByRole("link", { name: "Near me" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Remove Greek" })).toBeNull();
@@ -1636,11 +1705,6 @@ describe("SearchPage online", () => {
     screenIs(true);
     shortlist.add(therapist("a"));
     renderAt(ONLINE);
-    const pick = (name: RegExp) => {
-      const tab = screen.getByRole("tab", { name });
-      fireEvent.mouseDown(tab);
-      fireEvent.click(tab);
-    };
     const scrollTo = (top: number) => {
       list().scrollTop = top;
       fireEvent.scroll(list());
@@ -1664,9 +1728,7 @@ describe("SearchPage online", () => {
       expect(within(panel).queryByText(/In-person|Remote/)).toBeNull();
     };
     saysNeither(screen.getByRole("tabpanel", { name: "Results" }));
-    const tab = screen.getByRole("tab", { name: /^Shortlist/ });
-    fireEvent.mouseDown(tab);
-    fireEvent.click(tab);
+    pick(/^Shortlist/);
     saysNeither(screen.getByRole("tabpanel", { name: /^Shortlist/ }));
   });
 });
@@ -1758,11 +1820,6 @@ describe("SearchPage's view transitions", () => {
     screenIs(wide);
     shortlist.add(therapist("a"));
     renderAt(address);
-    const pick = (name: RegExp) => {
-      const tab = screen.getByRole("tab", { name });
-      fireEvent.mouseDown(tab);
-      fireEvent.click(tab);
-    };
     pick(/^Shortlist/);
     await waitFor(() => expect(started).toEqual([["morph"]]));
     pick(/^Results/);
@@ -1776,9 +1833,7 @@ describe("SearchPage's view transitions", () => {
     screenIs(wide);
     renderAt(SEARCH);
     await loaded();
-    const tab = screen.getByRole("tab", { name: /^Shortlist/ });
-    fireEvent.mouseDown(tab);
-    fireEvent.click(tab);
+    pick(/^Shortlist/);
     expect(screen.getByRole("tab", { name: /^Shortlist/ }).getAttribute("aria-selected")).toBe("true");
     expect(started).toEqual([]);
   });
