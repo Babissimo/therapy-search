@@ -5,7 +5,7 @@ import { IconButton } from "@/components/IconButton";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { useLocate } from "./useLocate";
-import type { SearchDrafts } from "./useSearchDrafts";
+import { useDraft, type SearchDrafts } from "./useSearchDrafts";
 
 export const NO_PLACE = "Type a town or postcode to search.";
 
@@ -33,6 +33,7 @@ export function SearchBox({ params, drafts, onPlaceSearch, className }: Props) {
   const problem = wanting ? NO_PLACE : here.problem;
   const problemId = useId();
   const input = useRef<HTMLInputElement>(null);
+  const location = useDraft(drafts, "location");
   return (
     <div className={cn("min-w-0", className)}>
       <form
@@ -40,7 +41,7 @@ export function SearchBox({ params, drafts, onPlaceSearch, className }: Props) {
         className="flex gap-2"
         onSubmit={(e) => {
           e.preventDefault();
-          if (drafts.location.trim() === "") {
+          if (location.trim() === "") {
             setPlaceWanted(search);
             input.current?.focus();
             return;
@@ -57,9 +58,9 @@ export function SearchBox({ params, drafts, onPlaceSearch, className }: Props) {
             aria-describedby={problem ? problemId : undefined}
             placeholder="Town or postcode"
             maxLength={TEXT_MAX_LENGTH}
-            value={drafts.location}
+            value={location}
             onChange={(e) => {
-              drafts.setLocation(e.target.value);
+              drafts.set("location", e.target.value);
               setPlaceWanted(undefined);
               here.dismiss();
             }}
