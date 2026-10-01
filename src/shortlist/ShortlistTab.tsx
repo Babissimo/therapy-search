@@ -21,11 +21,11 @@ import { pinsBySlug, type Pin } from "@/search/map/pins";
 import { TherapistCard } from "@/search/TherapistCard";
 import { useOffices } from "@/search/useOffices";
 import { CountBadge } from "./CountBadge";
-import { useClosedGroups } from "./groups";
+import { useSetAsideOpen } from "./setAside";
 import { ShortlistButton } from "./ShortlistButton";
 import { STATUS_ICON, STATUS_LABEL } from "./status";
-import { StatusMenu } from "./StatusMenu";
-import { byRank, STATUSES, statusOf, type Shortlist, type ShortlistCard, type Status } from "./store";
+import { StatusTrack } from "./StatusTrack";
+import { byRank, statusOf, type Shortlist, type ShortlistCard, type ShortlistEntry, type Status } from "./store";
 import { useShortlist, useShortlistStore } from "./useShortlist";
 
 type Props = {
@@ -43,19 +43,15 @@ type Props = {
   onHighlight?: (slug: string | undefined) => void;
 };
 
-/** Those shown with one status, in the shortlist's order. */
-type Group = { status: Status; entries: Shortlist };
-
-/** The shortlist beside the search's results, grouped by where the visitor stands with each therapist. */
+/** The shortlist beside the search's results, in the visitor's order, with those set aside gathered at its foot. */
 export function ShortlistTab({ sought, online = false, pins = [], unplaced = 0, selected, onHighlight }: Props) {
-  const store = useShortlistStore();
   const shortlist = useShortlist();
   const shown = useShown(shortlist);
-  const [closed, toggle] = useClosedGroups();
+  const [setAsideOpen, toggleSetAside] = useSetAsideOpen();
+  const list = shown.filter((entry) => statusOf(entry) !== "setAside");
+  const setAside = shown.filter((entry) => statusOf(entry) === "setAside");
   // A shortlist gathers therapists from any search, so their offices are asked about whatever this one is, while their cards show.
-  const { officeOf } = useOffices(shown.filter((entry) => !closed.has(statusOf(entry))).map((entry) => entry.card), true);
-  // The group a drag began in, whose therapists alone it can be dropped among.
-  const [dragging, setDragging] = useState<Status>();
+  const { officeOf } = useOffices((setAsideOpen ? [...list, ...setAside] : list).map((entry) => entry.card), true);
   const [announcement, setAnnouncement] = useState("");
   const root = useRef<HTMLDivElement>(null);
   // What takes focus once the list has redrawn, when what had it has moved or gone.
@@ -67,16 +63,6 @@ export function ShortlistTab({ sought, online = false, pins = [], unplaced = 0, 
   });
   const listed = new Set(shortlist.map((entry) => entry.card.slug));
   const pinOf = pinsBySlug(pins);
-  const groups: Group[] = STATUSES.map((status) => ({ status, entries: shown.filter((entry) => statusOf(entry) === status) })).filter(
-    (group) => group.entries.length > 0,
-  );
-  const groupOf = (id: UniqueIdentifier) => groups.find((group) => group.entries.some((entry) => entry.card.slug === id));
-  const announcements = useAnnouncements(groupOf);
-  const sensors = useSensors(
-    // A press on the handle that barely moves isn't a drag, so a stray click announces no pick-up and put-down.
-    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
-  );
   if (shown.length === 0) {
     return (
       <div className="flex gap-3 py-2 fade-in-0 motion-safe:animate-in">
@@ -89,26 +75,12 @@ export function ShortlistTab({ sought, online = false, pins = [], unplaced = 0, 
     );
   }
 
-  // The therapist goes beside their new neighbour in the group and in the shortlist's whole order alike, so they keep a
-  // place among everyone for when their status changes. A therapist removed here counts as a neighbour, keeping theirs.
-  function onDragEnd({ active, over }: DragEndEvent) {
-    setDragging(undefined);
-    const entries = groupOf(active.id)?.entries ?? [];
-    const slugs = entries.map((entry) => entry.card.slug);
-    const from = slugs.indexOf(String(active.id));
-    const to = over ? slugs.indexOf(String(over.id)) : -1;
-    if (to === -1 || to === from) return;
-    const order = arrayMove([...entries], from, to);
-    const others = shown.filter((entry) => entry.card.slug !== active.id);
-    const above = order[to - 1];
-    const below = order[to + 1];
-    store.move(String(active.id), above ? { above, below: others[others.indexOf(above) + 1] } : { above: others[others.indexOf(below!) - 1], below });
-  }
-
-  // Their row has left for another group, so focus follows it there, or to the group's heading while it is closed.
-  function movedTo(therapist: ShortlistCard, status: Status) {
-    refocus.current = closed.has(status) ? `[data-group-toggle="${status}"]` : `[data-status-menu="${window.CSS.escape(therapist.slug)}"]`;
-    setAnnouncement(`${therapist.name} moved to ${STATUS_LABEL[status]}.`);
+  // A card stays put unless it goes into or out of "Set aside", when focus follows it there, or to the section's
+  // heading while it is closed.
+  function changed(therapist: ShortlistCard, from: Status, to: Status) {
+    setAnnouncement(`${therapist.name}: ${STATUS_LABEL[to]}.`);
+    if ((from === "setAside") === (to === "setAside")) return;
+    refocus.current = to === "setAside" && !setAsideOpen ? "[data-set-aside-toggle]" : `[data-status-menu="${window.CSS.escape(therapist.slug)}"]`;
   }
 
   // Their menu went with them, so focus goes to the bookmark that can put them back.
@@ -116,57 +88,41 @@ export function ShortlistTab({ sought, online = false, pins = [], unplaced = 0, 
     refocus.current = `[data-bookmark="${window.CSS.escape(therapist.slug)}"]`;
   }
 
+  const cards = (entries: Shortlist, heading: "h2" | "h3") => (
+    <SortableList entries={entries} shown={shown}>
+      {entries.map((entry) => {
+        const { card } = entry;
+        const status = statusOf(entry);
+        const pinKey = pinOf.get(card.slug)?.key;
+        return (
+          <SortableEntry
+            key={card.slug}
+            entry={entry}
+            heading={heading}
+            listed={listed.has(card.slug)}
+            sought={sought}
+            online={online}
+            fee={feeText(officeOf(card)?.cost)}
+            pinKey={pinKey}
+            marked={pinKey !== undefined && pinKey === selected?.key}
+            onHighlight={onHighlight}
+            onChosen={(to) => changed(card, status, to)}
+            onRemoved={() => removed(card)}
+          />
+        );
+      })}
+    </SortableList>
+  );
+
   return (
     <div ref={root} className="space-y-4 fade-in-0 motion-safe:animate-in">
       <p className="text-sm text-muted-foreground">Kept in this browser only{unplaced > 0 && ` · ${unplaced} not on the map`}.</p>
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCenter}
-        modifiers={[upOrDown]}
-        onDragStart={({ active }) => setDragging(groupOf(active.id)?.status)}
-        onDragEnd={onDragEnd}
-        onDragCancel={() => setDragging(undefined)}
-        accessibility={{ announcements, screenReaderInstructions: { draggable: INSTRUCTIONS } }}
-      >
-        {groups.map(({ status, entries }) => (
-          <GroupSection
-            key={status}
-            status={status}
-            count={entries.filter((entry) => listed.has(entry.card.slug)).length}
-            open={!closed.has(status)}
-            onToggle={() => toggle(status)}
-          >
-            <SortableContext
-              id={status}
-              items={entries.map((entry) => entry.card.slug)}
-              strategy={verticalListSortingStrategy}
-              // Other groups take no drop, which keeps pointer and keyboard alike within the group a drag began in.
-              disabled={{ droppable: dragging !== undefined && dragging !== status }}
-            >
-              <ul className="space-y-4">
-                {entries.map(({ card }) => {
-                  const pinKey = pinOf.get(card.slug)?.key;
-                  return (
-                    <SortableEntry
-                      key={card.slug}
-                      card={card}
-                      listed={listed.has(card.slug)}
-                      sought={sought}
-                      online={online}
-                      fee={feeText(officeOf(card)?.cost)}
-                      pinKey={pinKey}
-                      marked={pinKey !== undefined && pinKey === selected?.key}
-                      onHighlight={onHighlight}
-                      onChosen={(chosen) => movedTo(card, chosen)}
-                      onRemoved={() => removed(card)}
-                    />
-                  );
-                })}
-              </ul>
-            </SortableContext>
-          </GroupSection>
-        ))}
-      </DndContext>
+      {list.length > 0 && cards(list, "h2")}
+      {setAside.length > 0 && (
+        <SetAsideSection count={setAside.filter((entry) => listed.has(entry.card.slug)).length} open={setAsideOpen} onToggle={toggleSetAside}>
+          {cards(setAside, "h3")}
+        </SetAsideSection>
+      )}
       <p aria-live="polite" className="sr-only">
         {announcement}
       </p>
@@ -174,19 +130,19 @@ export function ShortlistTab({ sought, online = false, pins = [], unplaced = 0, 
   );
 }
 
-type GroupProps = { status: Status; count: number; open: boolean; onToggle: () => void; children: ReactNode };
+type SectionProps = { count: number; open: boolean; onToggle: () => void; children: ReactNode };
 
-/** A status's therapists under a heading that opens and closes them. */
-function GroupSection({ status, count, open, onToggle, children }: GroupProps) {
+/** Those set aside, under a heading that opens and closes them. */
+function SetAsideSection({ count, open, onToggle, children }: SectionProps) {
   const listId = useId();
-  const Icon = STATUS_ICON[status];
+  const Icon = STATUS_ICON.setAside;
   return (
     <section className="space-y-2">
       <h2>
-        {/* Marked by status, for the list to give it focus when a therapist is sent to the group while it is closed. */}
+        {/* Marked for the list to give it focus when a therapist is set aside while it is closed. */}
         <button
           type="button"
-          data-group-toggle={status}
+          data-set-aside-toggle
           aria-expanded={open}
           aria-controls={listId}
           onClick={onToggle}
@@ -194,7 +150,7 @@ function GroupSection({ status, count, open, onToggle, children }: GroupProps) {
         >
           <ChevronRight aria-hidden className={cn("size-4 shrink-0 text-muted-foreground motion-safe:transition-transform", open && "rotate-90")} />
           <Icon aria-hidden className="size-4 shrink-0 text-muted-foreground" />
-          {STATUS_LABEL[status]}
+          {STATUS_LABEL.setAside}
           <CountBadge count={count} />
         </button>
       </h2>
@@ -207,8 +163,55 @@ function GroupSection({ status, count, open, onToggle, children }: GroupProps) {
   );
 }
 
+type ListProps = {
+  entries: Shortlist;
+  /** Everyone the tab shows, among whom a moved therapist takes their place. */
+  shown: Shortlist;
+  children: ReactNode;
+};
+
+/** Cards dragged by their handles among each other alone, by pointer or keyboard. */
+function SortableList({ entries, shown, children }: ListProps) {
+  const store = useShortlistStore();
+  const announcements = useAnnouncements(entries);
+  const sensors = useSensors(
+    // A press on the handle that barely moves isn't a drag, so a stray click announces no pick-up and put-down.
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  // The therapist goes beside their new neighbour here and in the shortlist's whole order alike, so they keep a place
+  // among everyone for when they go into or out of "Set aside". A therapist removed here counts as a neighbour, keeping theirs.
+  function onDragEnd({ active, over }: DragEndEvent) {
+    const slugs = entries.map((entry) => entry.card.slug);
+    const from = slugs.indexOf(String(active.id));
+    const to = over ? slugs.indexOf(String(over.id)) : -1;
+    if (to === -1 || to === from) return;
+    const order = arrayMove([...entries], from, to);
+    const others = shown.filter((entry) => entry.card.slug !== active.id);
+    const above = order[to - 1];
+    const below = order[to + 1];
+    store.move(String(active.id), above ? { above, below: others[others.indexOf(above) + 1] } : { above: others[others.indexOf(below!) - 1], below });
+  }
+
+  return (
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      modifiers={[upOrDown]}
+      onDragEnd={onDragEnd}
+      accessibility={{ announcements, screenReaderInstructions: { draggable: INSTRUCTIONS } }}
+    >
+      <SortableContext items={entries.map((entry) => entry.card.slug)} strategy={verticalListSortingStrategy}>
+        <ul className="space-y-4">{children}</ul>
+      </SortableContext>
+    </DndContext>
+  );
+}
+
 type EntryProps = {
-  card: ShortlistCard;
+  entry: ShortlistEntry;
+  heading: "h2" | "h3";
   listed: boolean;
   sought: ReadonlySet<string>;
   online: boolean;
@@ -217,14 +220,16 @@ type EntryProps = {
   /** At the pin selected on the map. */
   marked: boolean;
   onHighlight?: (slug: string | undefined) => void;
-  /** After the menu gives the therapist a new status. */
+  /** After the track gives the therapist a new status. */
   onChosen: (status: Status) => void;
-  /** After the menu takes the therapist off the shortlist. */
+  /** After the track's menu takes the therapist off the shortlist. */
   onRemoved: () => void;
 };
 
 /** A card with a handle to move it by; a therapist removed here can't be moved until they are added back. */
-function SortableEntry({ card, listed, sought, online, fee, pinKey, marked, onHighlight, onChosen, onRemoved }: EntryProps) {
+function SortableEntry({ entry, heading, listed, sought, online, fee, pinKey, marked, onHighlight, onChosen, onRemoved }: EntryProps) {
+  const { card } = entry;
+  const status = statusOf(entry);
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
     id: card.slug,
     disabled: { draggable: !listed },
@@ -266,14 +271,10 @@ function SortableEntry({ card, listed, sought, online, fee, pinKey, marked, onHi
           therapist={card}
           sought={sought}
           online={online}
-          heading="h3"
+          heading={heading}
           fee={fee}
-          action={
-            <>
-              <StatusMenu therapist={card} onChosen={onChosen} onRemoved={onRemoved} />
-              <ShortlistButton therapist={card} />
-            </>
-          }
+          action={<ShortlistButton therapist={card} kept={entry} />}
+          track={<StatusTrack therapist={card} status={status} listed={listed} onChosen={onChosen} onRemoved={onRemoved} />}
           onHighlight={(on) => {
             highlighting.current = on ? onHighlight : undefined;
             onHighlight?.(on ? card.slug : undefined);
@@ -287,14 +288,13 @@ function SortableEntry({ card, listed, sought, online, fee, pinKey, marked, onHi
 const upOrDown: Modifier = ({ transform }) => ({ ...transform, x: 0 });
 
 const INSTRUCTIONS =
-  "To move a therapist, press space or enter to pick them up, the up and down arrows to move them within their group, and space or enter again to put them down. Escape puts them back.";
+  "To move a therapist, press space or enter to pick them up, the up and down arrows to move them, and space or enter again to put them down. Escape puts them back.";
 
-/** What a screen reader hears as a therapist is moved, by name and by number within their group, where dnd-kit's own would read out the slug. */
-function useAnnouncements(groupOf: (id: UniqueIdentifier) => Group | undefined): Announcements {
+/** What a screen reader hears as a therapist is moved, by name and by number among those beside them, where dnd-kit's own would read out the slug. */
+function useAnnouncements(entries: Shortlist): Announcements {
   // A pick-up is at once over the therapist's own place, which the pick-up has announced already.
   const pickedUp = useRef(false);
   const find = (id: UniqueIdentifier) => {
-    const entries = groupOf(id)?.entries ?? [];
     const index = entries.findIndex((entry) => entry.card.slug === id);
     return { name: entries[index]?.card.name ?? "", place: `number ${index + 1} of ${entries.length}` };
   };

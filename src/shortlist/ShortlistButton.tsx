@@ -2,21 +2,23 @@ import { Bookmark } from "lucide-react";
 import { useState } from "react";
 import { IconButton } from "@/components/IconButton";
 import { cn } from "@/lib/utils";
-import type { ShortlistCard } from "./store";
+import type { ShortlistCard, ShortlistEntry } from "./store";
 import { useShortlistEntry, useShortlistStore } from "./useShortlist";
 
 type Props = {
   therapist: ShortlistCard;
+  /** The entry a list still shows for a therapist removed before this button mounted, so it can add them back as they were. */
+  kept?: ShortlistEntry;
   className?: string;
 };
 
 /** Named for the therapist, as UKCP's is, since a list of cards has one on each. */
-export function ShortlistButton({ therapist, className }: Props) {
+export function ShortlistButton({ therapist, kept, className }: Props) {
   const store = useShortlistStore();
   const entry = useShortlistEntry(therapist.slug);
-  // Kept once they are removed, so adding them back returns their place, status and card.
-  const [kept, setKept] = useState(entry);
-  if (entry && entry !== kept) setKept(entry);
+  // Held once they are removed, so adding them back returns their place, status and card.
+  const [last, setLast] = useState(entry ?? kept);
+  if (entry && entry !== last) setLast(entry);
   return (
     <IconButton
       label={entry ? `Remove ${therapist.name} from your shortlist` : `Add ${therapist.name} to your shortlist`}
@@ -25,7 +27,7 @@ export function ShortlistButton({ therapist, className }: Props) {
       className={className}
       // Marked by slug, for a list to give it focus once a menu has taken the therapist off.
       data-bookmark={therapist.slug}
-      onClick={() => (entry ? store.remove(therapist.slug) : store.add(kept?.card ?? therapist, kept))}
+      onClick={() => (entry ? store.remove(therapist.slug) : store.add(last?.card ?? therapist, last))}
     >
       <Bookmark aria-hidden className={cn(entry && "fill-current")} />
     </IconButton>
