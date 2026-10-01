@@ -41,6 +41,9 @@
         color: inherit;
         text-decoration: underline;
       }
+      .fallback a[href^="tel:"] {
+        white-space: nowrap;
+      }
       /* A slow connection can take a while to bring the script, so the way round waits before suggesting the browser can't run it. */
       .fallback .late {
         animation: fallback-late 0s 10s both;
@@ -72,6 +75,15 @@
           </p>
         </noscript>
         <p class="loading">Loading the search…</p>
+        <!-- HelpNow's words and numbers, which ErrorBoundary.test.tsx holds this copy to. Above the late note, as the space
+             that note keeps while hidden would part it from the rest. -->
+        <p>
+          Need help now? In the UK, call <a translate="no" href="tel:111">111</a> and choose the mental health option (in Northern
+          Ireland, <span translate="no">Lifeline</span> on <a translate="no" href="tel:08088088000">0808 808 8000</a>),
+          <span translate="no">Samaritans</span> on <a translate="no" href="tel:116123">116 123</a>, or text
+          <a translate="no" href="sms:85258?&amp;body=SHOUT">SHOUT to 85258</a>. In an emergency, call
+          <a translate="no" href="tel:999">999</a>.
+        </p>
         <p class="late">
           If the search doesn't load, the connection may be too slow or this browser too old for it. UKCP's own directory
           lists the same therapists:

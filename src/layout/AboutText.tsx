@@ -1,6 +1,7 @@
 import { CONTACT_URL } from "@/site";
+import { HelpNow } from "./HelpNow";
 
-/** What the site is and how it treats UKCP, the geocoders and visitors, shown from the site's name. */
+/** What the site is, where to turn for help today, and how it treats UKCP, the geocoders and visitors, shown from the site's name. */
 export function AboutText() {
   return (
     <>
@@ -11,6 +12,7 @@ export function AboutText() {
         </a>
         . It is not run by, affiliated with or endorsed by UKCP.
       </p>
+      <HelpNow />
       <p>
         Searches and profiles come from UKCP's site as needed, including profiles read for each card's office, to pin it and show its fee.
         Nothing is copied into a database here. To spare UKCP's servers, each visitor is rate-limited and answers are reused: searches for

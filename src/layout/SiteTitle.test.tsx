@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { SiteTitle } from "./SiteTitle";
 
@@ -72,6 +72,12 @@ describe("SiteTitle", () => {
     expect(about()).toBeTruthy();
     fireEvent.click(title());
     expect(about()).toBeNull();
+  });
+
+  it("says in the card where to turn for help today, from any page the title heads", () => {
+    render(<SiteTitle />);
+    fireEvent.click(title());
+    expect(within(about()!).getByText(/^Need help now\?/).querySelector("a[href='tel:116123']")).toBeTruthy();
   });
 
   it("keeps the card between the title and what follows it, so Tab leaves the card for the next control", () => {
