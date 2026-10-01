@@ -12,6 +12,7 @@ import { createShortlistStore, type ShortlistStore } from "@/shortlist/store";
 import { ShortlistContext } from "@/shortlist/useShortlist";
 import type { Highlight } from "./map/highlight";
 import { layoutPins, type Pin } from "./map/pins";
+import { prefetchSearchAt, warmMap } from "./prefetch";
 import { NO_PLACE } from "./SearchBox";
 import { SearchPage } from "./SearchPage";
 
@@ -29,6 +30,12 @@ vi.mock("@/shortlist/LazyShortlistTab", async () => ({
   LazyShortlistTab: (await import("@/shortlist/ShortlistTab")).ShortlistTab,
   usePreloadShortlistTab: () => {},
 }));
+
+// Counted, to see when the page starts fetching the map's code.
+vi.mock("./prefetch", async (importOriginal) => {
+  const prefetch = await importOriginal<typeof import("./prefetch")>();
+  return { ...prefetch, warmMap: vi.fn(prefetch.warmMap) };
+});
 
 // The map pane is tested on its own; here it shows what the page passed it, with a button for each pin, one for a click on
 // the map away from them, and one that finds BN3 1FG in the middle of the map.
@@ -160,7 +167,7 @@ function renderAt(url: string, ...pages: TherapistCard[][]) {
   renderPage(url);
 }
 
-function renderPage(url: string) {
+function renderPage(url: string, client = new QueryClient({ defaultOptions: { queries: { retry: false } } })) {
   const page = (
     <>
       <SearchPage />
@@ -168,7 +175,7 @@ function renderPage(url: string) {
     </>
   );
   render(
-    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+    <QueryClientProvider client={client}>
       <ShortlistContext.Provider value={shortlist}>
         <ClosedGroupsContext.Provider value={groups}>
           <TooltipProvider>
@@ -1336,6 +1343,29 @@ describe("SearchPage online", () => {
     fireEvent.mouseDown(tab);
     fireEvent.click(tab);
     saysNeither(screen.getByRole("tabpanel", { name: /^Shortlist/ }));
+  });
+});
+
+describe("SearchPage ahead of a search", () => {
+  it.each([
+    ["near a place", SEARCH],
+    ["online", "/online?KeywordFilter=grief"],
+  ])("shows the search an address opens on %s as the entry script asked for it, asking no more", async (_, address) => {
+    screenIs(true);
+    answer([[therapist("a")]]);
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    prefetchSearchAt(client, `#${address}`);
+    renderPage(address, client);
+    expect(await within(results()).findByRole("link", { name: "Therapist a" })).toBeTruthy();
+    expect(api.search).toHaveBeenCalledOnce();
+  });
+
+  it("fetches the map's code as the place box takes focus, before anything is searched", () => {
+    screenIs(true);
+    renderAt("/");
+    vi.mocked(warmMap).mockClear();
+    fireEvent.focus(screen.getByRole("textbox", { name: "Location" }));
+    expect(warmMap).toHaveBeenCalled();
   });
 });
 

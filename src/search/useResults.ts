@@ -1,4 +1,4 @@
-import { keepPreviousData, useInfiniteQuery, type InfiniteData, type QueryClient, type UseInfiniteQueryResult } from "@tanstack/react-query";
+import { infiniteQueryOptions, keepPreviousData, useInfiniteQuery, type InfiniteData, type QueryClient, type UseInfiniteQueryResult } from "@tanstack/react-query";
 import { PAGE_SIZE, toQuery, type SearchParams } from "@shared/query";
 import type { SearchResult, TherapistCard } from "@shared/types";
 import type { Listings } from "@shared/ukcp/parseResults";
@@ -28,17 +28,11 @@ export type SearchResults = {
  * of UKCP once. Nothing is asked for, or shown, until `enabled`.
  */
 export function useResults(params: SearchParams, enabled = true): SearchResults {
-  const batchQuery = (n: number) => toQuery(withPage(params, n));
-  // Spelt out because TypeScript otherwise fills in the page data's type before inferring the page parameter's.
-  const query = useInfiniteQuery<Page, Error, InfiniteData<Page, After>, readonly unknown[], After>({
-    queryKey: resultsKey(params),
-    queryFn: ({ pageParam }) => pageAfter(pageParam, (n) => batchInOrder(batchQuery(n))),
-    initialPageParam: { shown: 0 },
-    getNextPageParam: (last) => (last.therapists.length > 0 && last.to < last.total ? { shown: last.to, batch: last.batch, stride: last.stride } : undefined),
+  const query = useInfiniteQuery({
+    ...resultsQuery(params),
     enabled,
     // Without a search, the last one's results would linger in its place.
     placeholderData: enabled ? keepPreviousData : undefined,
-    gcTime: KEEP_FOR,
   });
   const pages = query.data?.pages ?? [];
   const first = pages[0];
@@ -49,6 +43,23 @@ export function useResults(params: SearchParams, enabled = true): SearchResults 
     therapists: distinct(pages),
     searchedPlace: searched !== undefined && !locationFellBack(params.text.Location, searched) ? searched : undefined,
   };
+}
+
+/** Asks for a search's first page ahead of the page that shows it, which then finds it on its way or already here. */
+export function prefetchResults(client: QueryClient, params: SearchParams): void {
+  void client.prefetchInfiniteQuery(resultsQuery(params));
+}
+
+function resultsQuery(params: SearchParams) {
+  const batchQuery = (n: number) => toQuery(withPage(params, n));
+  // Spelt out because TypeScript otherwise fills in the page data's type before inferring the page parameter's.
+  return infiniteQueryOptions<Page, Error, InfiniteData<Page, After>, readonly unknown[], After>({
+    queryKey: resultsKey(params),
+    queryFn: ({ pageParam }) => pageAfter(pageParam, (n) => batchInOrder(batchQuery(n))),
+    initialPageParam: { shown: 0 },
+    getNextPageParam: (last) => (last.therapists.length > 0 && last.to < last.total ? { shown: last.to, batch: last.batch, stride: last.stride } : undefined),
+    gcTime: KEEP_FOR,
+  });
 }
 
 /** The card a search still in `client`'s cache showed for this therapist, if one did. */

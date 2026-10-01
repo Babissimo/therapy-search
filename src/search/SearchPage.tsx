@@ -26,19 +26,20 @@ import { LoadMore } from "./LoadMore";
 import { ModeSwitch } from "./ModeSwitch";
 import { ONLINE_PATH, onlineParams } from "./online";
 import { OnlineView } from "./OnlineView";
+import { loadMap, warmMap } from "./prefetch";
 import { FiltersIcon, Prompt } from "./Prompt";
 import { Results } from "./Results";
 import { ResultsPanel } from "./ResultsPanel";
 import { coverOf, ResultsSheet, type SheetPosition } from "./ResultsSheet";
 import { SearchBox } from "./SearchBox";
-import { tickedFilters } from "./state";
+import { placed, tickedFilters } from "./state";
 import { useResults } from "./useResults";
 import { useSearchDrafts, type SearchDrafts } from "./useSearchDrafts";
 import { useSearchState } from "./useSearchState";
 import { useRememberedScroll } from "./viewMemory";
 
-// Leaflet comes in its own chunk, so the results never wait for it and a visit that searches nothing never loads it.
-const MapPane = lazy(() => import("./map/MapPane"));
+// Fetched as the place box takes focus, so it is usually here by the time a first search's results are.
+const MapPane = lazy(loadMap);
 
 /** Wide enough for the results to sit beside the map rather than over it. */
 const WIDE = "(min-width: 64rem)";
@@ -296,11 +297,6 @@ function SearchView({ params, onChange, wide }: ViewProps) {
   );
 }
 
-/** Whether `params` have a place to search near. */
-function placed(params: SearchParams): boolean {
-  return params.text.Location !== "";
-}
-
 /** Whether a location is `postcode`, whatever its case or spacing. */
 function samePostcode(postcode: string, location: string): boolean {
   const squeezed = (text: string) => canonicalLocation(text).replaceAll(" ", "");
@@ -364,7 +360,13 @@ function Toolbar({
             <div className="flex items-start gap-2">
               {/* A search for a place puts the filters away to show where it is; ticks and the keyword leave them open for more. */}
               <Morph name="place">
-                <SearchBox params={params} drafts={drafts} onPlaceSearch={() => onFiltersOpenChange(false)} className="min-w-0 flex-1" />
+                <SearchBox
+                  params={params}
+                  drafts={drafts}
+                  onPlaceSearch={() => onFiltersOpenChange(false)}
+                  onFocus={warmMap}
+                  className="min-w-0 flex-1"
+                />
               </Morph>
               {wide ? (
                 overMap && (

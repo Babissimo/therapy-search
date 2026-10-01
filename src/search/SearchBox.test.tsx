@@ -8,12 +8,14 @@ import { NO_PLACE, SearchBox } from "./SearchBox";
 import { NO_POSTCODE, REFUSED } from "./useLocate";
 import { useDraft, useSearchDrafts } from "./useSearchDrafts";
 
-function Harness({ params, onChange, onPlaceSearch }: { params: SearchParams; onChange: (next: SearchParams) => void; onPlaceSearch?: () => void }) {
+type HarnessProps = { params: SearchParams; onChange: (next: SearchParams) => void; onPlaceSearch?: () => void; onFocus?: () => void };
+
+function Harness({ params, onChange, onPlaceSearch, onFocus }: HarnessProps) {
   const drafts = useSearchDrafts(params, onChange);
   const keyword = useDraft(drafts, "keyword");
   return (
     <>
-      <SearchBox params={params} drafts={drafts} onPlaceSearch={onPlaceSearch} />
+      <SearchBox params={params} drafts={drafts} onPlaceSearch={onPlaceSearch} onFocus={onFocus} />
       <input aria-label="Keyword" value={keyword} onChange={(e) => drafts.set("keyword", e.target.value)} />
     </>
   );
@@ -135,5 +137,16 @@ describe("SearchBox", () => {
   it("offers no button where the browser can't locate", () => {
     renderBox();
     expect(screen.queryByRole("button", { name: "Use my location" })).toBeNull();
+  });
+
+  it("hears focus coming to the box", () => {
+    const onFocus = vi.fn();
+    render(
+      <TooltipProvider>
+        <Harness params={emptyParams()} onChange={vi.fn()} onFocus={onFocus} />
+      </TooltipProvider>,
+    );
+    fireEvent.focus(location());
+    expect(onFocus).toHaveBeenCalledOnce();
   });
 });

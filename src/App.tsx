@@ -1,18 +1,14 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
 import { HashRouter, Link, Route, Routes, useLocation, useParams } from "react-router";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SiteLayout } from "@/layout/SiteLayout";
+import { queryClient } from "@/lib/queryClient";
 import { ProfileDrawer } from "@/profile/ProfileDrawer";
 import { ProfilePage } from "@/profile/ProfilePage";
 import { backgroundOf } from "@/profile/profileLink";
 import { ONLINE_PATH } from "@/search/online";
 import { SearchPage } from "@/search/SearchPage";
-
-// Retrying would repeat requests to UKCP that already failed or were rate-limited.
-const queryClient = new QueryClient({
-  defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false, staleTime: 15 * 60 * 1000 } },
-});
 
 export function App() {
   return (
