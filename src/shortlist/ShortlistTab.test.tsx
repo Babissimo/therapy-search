@@ -49,6 +49,10 @@ function renderTab({ sought = [], statuses = {}, ...props }: Props, ...cards: Sh
 const pin = (key: string, ...cards: ShortlistCard[]): Pin => ({ key, point: { lat: 51, lng: 0 }, therapists: cards, kind: "outcode" });
 const entry = (name: string) => screen.getByRole("heading", { name }).closest("li");
 
+/** Whether a therapist's portrait is faded, by the box that holds it. */
+const faded = (name: string) =>
+  /\bopacity-60\b/.test(within(entry(name)!).getByText("XX").closest("[data-slot=avatar]")?.parentElement?.className ?? "");
+
 /** The cards shown, by the names their headings link. */
 const names = () =>
   screen
@@ -201,19 +205,24 @@ describe("ShortlistTab", () => {
     expect(store.get().map((e) => e.card.name)).toEqual(["Cy", "Bo", "Ann"]);
   });
 
-  it("keeps a removed therapist in place, dimmed, with where they stood but nothing to change it, until they are added back", () => {
+  it("keeps a removed therapist in place, their portrait faded, with where they stood but nothing to change it, until they are added back", () => {
     const store = renderTab({}, card("Ann-AAAAAAAA", "Ann"), card("Bo-BBBBBBBB", "Bo"), card("Cy-CCCCCCCC", "Cy"));
     fireEvent.click(screen.getByRole("button", { name: "Remove Bo from your shortlist" }));
     expect(store.has("Bo-BBBBBBBB")).toBe(false);
     expect(names()).toEqual(["Cy", "Bo", "Ann"]);
-    expect(entry("Bo")?.className).toMatch(/opacity-60/);
+    expect(faded("Bo")).toBe(true);
+    // Their name and where they stood keep their full strength.
+    expect(screen.getByRole("link", { name: "Bo" }).closest("[class*=opacity]")).toBeNull();
+    expect(within(entry("Bo")!).getByText("To contact", { selector: "p" }).closest("[class*=opacity]")).toBeNull();
+    within(entry("Bo")!).getByText("Removed from your shortlist");
     expect(stepOf("Bo")).toBe("To contact");
     expect(screen.queryByRole("button", { name: "Mark contacted, Bo" })).toBeNull();
     expect(screen.queryByRole("button", { name: /^Status of Bo:/ })).toBeNull();
     screen.getByText("Kept in this browser only.");
     fireEvent.click(screen.getByRole("button", { name: "Add Bo to your shortlist" }));
     expect(store.get().map((e) => e.card.name)).toEqual(["Cy", "Bo", "Ann"]);
-    expect(entry("Bo")?.className).not.toMatch(/opacity-60/);
+    expect(faded("Bo")).toBe(false);
+    expect(screen.queryByText("Removed from your shortlist")).toBeNull();
     screen.getByRole("button", { name: "Mark contacted, Bo" });
   });
 
@@ -226,14 +235,14 @@ describe("ShortlistTab", () => {
     );
     openSetAside();
     fireEvent.click(screen.getByRole("button", { name: "Remove Bo from your shortlist" }));
-    expect(entry("Bo")?.className).toMatch(/opacity-60/);
+    expect(faded("Bo")).toBe(true);
     screen.getByRole("button", { name: "Set aside, 0 therapists", expanded: true });
     fireEvent.click(screen.getByRole("button", { name: /^Set aside, / }));
     expect(names()).toEqual(["Cy", "Ann"]);
     openSetAside();
     fireEvent.click(screen.getByRole("button", { name: "Add Bo to your shortlist" }));
     expect(names()).toEqual(["Cy", "Ann", "Bo"]);
-    expect(entry("Bo")?.className).not.toMatch(/opacity-60/);
+    expect(faded("Bo")).toBe(false);
     within(entry("Bo")!).getByText("Set aside", { selector: "p" });
     screen.getByRole("button", { name: "Set aside, 1 therapist", expanded: true });
     expect(store.get().map((e) => e.card.name)).toEqual(["Cy", "Bo", "Ann"]);

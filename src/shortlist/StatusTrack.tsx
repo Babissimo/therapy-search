@@ -23,7 +23,7 @@ const NEXT_STEP: Record<Status, { label: string; status: Status } | undefined> =
 type Props = {
   therapist: ShortlistCard;
   status: Status;
-  /** Off the shortlist, the track shows where they stood, with nothing to change it until they are added back. */
+  /** Off the shortlist, the track shows where they stood and says they were removed, with nothing to change it until they are added back. */
   listed?: boolean;
   /** After the button or the menu gives the therapist a new status. */
   onChosen?: (status: Status) => void;
@@ -70,7 +70,7 @@ export function StatusTrack({ therapist, status, listed = true, onChosen, onRemo
       </ol>
       <div className="flex min-h-7 items-center justify-between gap-2">
         <p className="text-sm text-muted-foreground">{STATUS_LABEL[status]}</p>
-        {listed && (
+        {listed ? (
           <div className="flex items-center gap-1">
             {next && (
               <Button variant="outline" size="sm" onClick={() => step(next.status)}>
@@ -81,6 +81,8 @@ export function StatusTrack({ therapist, status, listed = true, onChosen, onRemo
             )}
             <StatusMenu therapist={therapist} onChosen={onChosen} onRemoved={onRemoved} />
           </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">Removed from your shortlist</p>
         )}
       </div>
     </div>
