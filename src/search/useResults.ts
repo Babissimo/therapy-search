@@ -12,12 +12,10 @@ import { asksWhole, PAGE_SIZE, toQuery, type SearchParams } from "@shared/query"
 import type { SearchResult, TherapistCard } from "@shared/types";
 import type { Listings } from "@shared/ukcp/parseResults";
 import { api } from "@/lib/api";
+import { FRESH_FOR } from "@/lib/queryClient";
 import { locationFellBack } from "./LocationNotice";
 import { inOrder, orderSeed, settled } from "./order";
 import { withPage } from "./state";
-
-// As long as results stay fresh, so Back from a profile finds every page still loaded.
-const KEEP_FOR = 15 * 60 * 1000;
 
 /** A page of results with the batch it was cut from, which the next page is cut from too while it lasts. */
 type Page = SearchResult & { batch: Listings; stride: number };
@@ -88,7 +86,7 @@ function earlyQuery(params: SearchParams) {
         .map((listing) => listing.read());
       return { ...aboutBatch(nearest), from: 1, to: therapists.length, therapists };
     },
-    gcTime: KEEP_FOR,
+    gcTime: FRESH_FOR,
   });
 }
 
@@ -100,7 +98,8 @@ function resultsQuery(params: SearchParams) {
     queryFn: ({ pageParam }) => pageAfter(pageParam, (n) => batchInOrder(batchQuery(n))),
     initialPageParam: { shown: 0 },
     getNextPageParam: (last) => (last.therapists.length > 0 && last.to < last.total ? { shown: last.to, batch: last.batch, stride: last.stride } : undefined),
-    gcTime: KEEP_FOR,
+    // As long as results stay fresh, so Back from a profile finds every page still loaded.
+    gcTime: FRESH_FOR,
   });
 }
 
