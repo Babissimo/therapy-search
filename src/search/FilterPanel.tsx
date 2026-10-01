@@ -8,7 +8,7 @@ import { CheckboxGroup } from "./CheckboxGroup";
 import { FILTER_GROUPS } from "./filterGroups";
 import { isChecked, tickedIn, withField } from "./state";
 import { TickedCount } from "./TickedCount";
-import type { SearchDrafts } from "./useSearchDrafts";
+import { useDraft, type SearchDrafts } from "./useSearchDrafts";
 
 /** The long lists that carry an in-list search box on UKCP. */
 const SEARCHABLE = new Set(["TypesOfTherapy", "Languages", "Colleges"]);
@@ -25,22 +25,7 @@ export function FilterPanel({ params, drafts, groups = FILTER_GROUPS, onSearch }
         <Button type="button" variant="link" size="sm" className="h-auto px-0" onClick={drafts.clear}>
           Clear all filters
         </Button>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            drafts.submit(params);
-            onSearch?.();
-          }}
-        >
-          <Input
-            type="search"
-            aria-label="Keyword search"
-            placeholder="Keyword search"
-            maxLength={TEXT_MAX_LENGTH}
-            value={drafts.keyword}
-            onChange={(e) => drafts.setKeyword(e.target.value)}
-          />
-        </form>
+        <KeywordSearch params={params} drafts={drafts} onSearch={onSearch} />
       </div>
 
       <Accordion type="multiple" defaultValue={openGroups}>
@@ -68,5 +53,28 @@ export function FilterPanel({ params, drafts, groups = FILTER_GROUPS, onSearch }
         ))}
       </Accordion>
     </div>
+  );
+}
+
+/** The keyword box, on its own so typing in it redraws only the box. */
+function KeywordSearch({ params, drafts, onSearch }: Omit<Props, "groups">) {
+  const keyword = useDraft(drafts, "keyword");
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        drafts.submit(params);
+        onSearch?.();
+      }}
+    >
+      <Input
+        type="search"
+        aria-label="Keyword search"
+        placeholder="Keyword search"
+        maxLength={TEXT_MAX_LENGTH}
+        value={keyword}
+        onChange={(e) => drafts.set("keyword", e.target.value)}
+      />
+    </form>
   );
 }

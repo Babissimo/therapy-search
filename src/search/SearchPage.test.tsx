@@ -778,6 +778,24 @@ describe("SearchPage", () => {
     expect(vi.mocked(layoutPins).mock.calls.length).toBe(laidOut);
   });
 
+  it("redraws only the box typed in, not the page with its pins", async () => {
+    screenIs(true);
+    renderAt(SEARCH);
+    await screen.findByRole("link", { name: "Therapist p1-2" });
+    await screen.findByTestId("map");
+    const laidOut = () => vi.mocked(layoutPins).mock.calls.length;
+    const before = laidOut();
+    fireEvent.change(screen.getByRole("textbox", { name: "Location" }), { target: { value: "Leeds" } });
+    expect(screen.getByRole<HTMLInputElement>("textbox", { name: "Location" }).value).toBe("Leeds");
+    expect(laidOut()).toBe(before);
+    fireEvent.click(screen.getByRole("button", { name: /^Filters/ }));
+    const keyword = await screen.findByRole<HTMLInputElement>("searchbox", { name: "Keyword search" });
+    const opened = laidOut();
+    fireEvent.change(keyword, { target: { value: "grief" } });
+    expect(keyword.value).toBe("grief");
+    expect(laidOut()).toBe(opened);
+  });
+
   it("forgets a hovered card when a new search replaces the list, even one listing the same therapist", async () => {
     screenIs(true);
     renderAt(SEARCH);

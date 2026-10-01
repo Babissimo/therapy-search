@@ -6,14 +6,15 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ApiError, api } from "@/lib/api";
 import { NO_PLACE, SearchBox } from "./SearchBox";
 import { NO_POSTCODE, REFUSED } from "./useLocate";
-import { useSearchDrafts } from "./useSearchDrafts";
+import { useDraft, useSearchDrafts } from "./useSearchDrafts";
 
 function Harness({ params, onChange, onPlaceSearch }: { params: SearchParams; onChange: (next: SearchParams) => void; onPlaceSearch?: () => void }) {
   const drafts = useSearchDrafts(params, onChange);
+  const keyword = useDraft(drafts, "keyword");
   return (
     <>
       <SearchBox params={params} drafts={drafts} onPlaceSearch={onPlaceSearch} />
-      <input aria-label="Keyword" value={drafts.keyword} onChange={(e) => drafts.setKeyword(e.target.value)} />
+      <input aria-label="Keyword" value={keyword} onChange={(e) => drafts.set("keyword", e.target.value)} />
     </>
   );
 }
