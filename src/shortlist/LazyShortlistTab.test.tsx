@@ -34,6 +34,8 @@ afterEach(() => {
 
 describe("LazyShortlistTab", () => {
   it("draws nothing in the tab until its chunk is here, then the shortlist", async () => {
+    // The chunk's first import outlasts a findBy's one-second wait under load; a lazy tab still draws empty before it.
+    await import("./ShortlistTab");
     const { container } = renderTab(LazyShortlistTab);
     expect(container.textContent).toBe("");
     expect(await screen.findByRole("heading", { name: "Jo Bloggs" })).toBeTruthy();

@@ -22,7 +22,7 @@ type Between = { above?: ShortlistEntry; below?: ShortlistEntry };
 
 type Entries = ReadonlyMap<string, ShortlistEntry>;
 type Stored = { v: 1; entries: Record<string, ShortlistEntry> };
-type KeyValue = Pick<Storage, "getItem" | "setItem">;
+type KeyValue = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 type Events = Pick<EventTarget, "addEventListener" | "removeEventListener">;
 
 export type ShortlistStore = {
@@ -31,6 +31,13 @@ export type ShortlistStore = {
   /** `place`, the entry a therapist just removed had, puts them back where and as they were; a status alone adds them with it. */
   add: (card: ShortlistCard, place?: Partial<Omit<ShortlistEntry, "card">>) => void;
   remove: (slug: string) => void;
+  /** Takes everyone off, with their statuses and order, for a browser someone else may use next. */
+  clear: () => void;
+  /**
+   * How many times the list has been cleared, here or in another tab, since the page loaded. Whatever keeps entries of
+   * its own, to put a therapist back, forgets them as this changes.
+   */
+  clears: () => number;
   move: (slug: string, between: Between) => void;
   /** Leaves their place in the order alone, so the visitor's preference carries from one status to the next. */
   setStatus: (slug: string, status: Status) => void;
@@ -48,6 +55,7 @@ export function createShortlistStore(storage: KeyValue | null, now: () => number
   let list = ordered(entries);
   // Whether storage holds the list in memory; once a write is refused, only memory does.
   let persisted = true;
+  let clears = 0;
   const listeners = new Set<() => void>();
 
   const notify = () => {
@@ -63,11 +71,24 @@ export function createShortlistStore(storage: KeyValue | null, now: () => number
     notify();
   };
   const onStorage = (event: Event) => {
-    const { key } = event as StorageEvent;
+    const { key, newValue, storageArea } = event as StorageEvent;
+    if (storageArea && storageArea !== storage) return;
     // A null key means the other tab cleared all storage.
     if (key !== SHORTLIST_KEY && key !== null) return;
-    entries = stored(storage) ?? entries;
+    // Only a clear takes the list out of storage. Storage is still read, as this tab may have written to it since.
+    if (newValue === null) clears += 1;
+    entries = stored(storage) ?? (newValue === null ? new Map() : entries);
     notify();
+  };
+  // What another tab did while no one here was subscribed went unheard, a clear among them, so the first to subscribe
+  // again catches up. Anyone gone from storage meanwhile may have gone in a clear, which this tab can't tell from removals,
+  // so either counts as one.
+  const catchUp = () => {
+    const inStorage = persisted ? stored(storage) : undefined;
+    if (!inStorage || JSON.stringify([...inStorage]) === JSON.stringify([...entries])) return;
+    if ([...entries.keys()].some((slug) => !inStorage.has(slug))) clears += 1;
+    entries = inStorage;
+    list = ordered(entries);
   };
 
   return {
@@ -76,6 +97,14 @@ export function createShortlistStore(storage: KeyValue | null, now: () => number
     add: (card, place) =>
       update((next) => void next.set(card.slug, { addedAt: place?.addedAt ?? now(), rank: place?.rank, status: place?.status, card: cardOf(card) })),
     remove: (slug) => update((next) => void next.delete(slug)),
+    // Takes the list out of storage, which leaves nothing behind and is how other tabs know it was cleared.
+    clear: () => {
+      clears += 1;
+      entries = new Map();
+      persisted = erase(storage);
+      notify();
+    },
+    clears: () => clears,
     move: (slug, between) =>
       update((next) => {
         const entry = next.get(slug);
@@ -108,7 +137,10 @@ export function createShortlistStore(storage: KeyValue | null, now: () => number
       });
     },
     subscribe: (onChange) => {
-      if (listeners.size === 0) events?.addEventListener("storage", onStorage);
+      if (listeners.size === 0 && events) {
+        catchUp();
+        events.addEventListener("storage", onStorage);
+      }
       listeners.add(onChange);
       return () => {
         listeners.delete(onChange);
@@ -204,6 +236,16 @@ function write(storage: KeyValue | null, entries: Entries): boolean {
   const value: Stored = { v: 1, entries: Object.fromEntries(entries) };
   try {
     storage?.setItem(SHORTLIST_KEY, JSON.stringify(value));
+    return storage !== null;
+  } catch {
+    return false;
+  }
+}
+
+/** Whether storage let go of the list. */
+function erase(storage: KeyValue | null): boolean {
+  try {
+    storage?.removeItem(SHORTLIST_KEY);
     return storage !== null;
   } catch {
     return false;

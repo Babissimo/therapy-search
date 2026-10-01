@@ -16,9 +16,17 @@ type Props = {
 export function ShortlistButton({ therapist, kept, className }: Props) {
   const store = useShortlistStore();
   const entry = useShortlistEntry(therapist.slug);
-  // Held once they are removed, so adding them back returns their place, status and card.
-  const [last, setLast] = useState(entry ?? kept);
-  if (entry && entry !== last) setLast(entry);
+  // Held once they are removed, so adding them back returns their place, status and card, unless the list was cleared
+  // since; the count of clears is read rather than watched, so a button redraws for its own therapist alone.
+  const [last, setLast] = useState(() => ({ entry: entry ?? kept, clears: store.clears() }));
+  if (entry && entry !== last.entry) setLast({ entry, clears: store.clears() });
+
+  function toggle() {
+    if (entry) return store.remove(therapist.slug);
+    const place = last.clears === store.clears() ? last.entry : undefined;
+    store.add(place?.card ?? therapist, place);
+  }
+
   return (
     <IconButton
       label={entry ? `Remove ${therapist.name} from your shortlist` : `Add ${therapist.name} to your shortlist`}
@@ -27,7 +35,7 @@ export function ShortlistButton({ therapist, kept, className }: Props) {
       className={className}
       // Marked by slug, for a list to give it focus once a menu has taken the therapist off.
       data-bookmark={therapist.slug}
-      onClick={() => (entry ? store.remove(therapist.slug) : store.add(last?.card ?? therapist, last))}
+      onClick={toggle}
     >
       <Bookmark aria-hidden className={cn(entry && "fill-current")} />
     </IconButton>

@@ -15,6 +15,18 @@ import { CSS } from "@dnd-kit/utilities";
 import { Bookmark, ChevronRight, GripVertical } from "lucide-react";
 import { useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { IconButton } from "@/components/IconButton";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { feeText } from "@/search/fee";
 import { pinsBySlug, type Pin } from "@/search/map/pins";
@@ -26,7 +38,7 @@ import { ShortlistButton } from "./ShortlistButton";
 import { STATUS_ICON, STATUS_LABEL } from "./status";
 import { StatusTrack } from "./StatusTrack";
 import { byRank, statusOf, type Shortlist, type ShortlistCard, type ShortlistEntry, type Status } from "./store";
-import { useShortlist, useShortlistStore } from "./useShortlist";
+import { therapistCount, useShortlist, useShortlistClears, useShortlistStore } from "./useShortlist";
 
 type Props = {
   /** The search's terms, which pick out tags as they do in the results. */
@@ -45,6 +57,7 @@ type Props = {
 
 /** The shortlist beside the search's results, in the visitor's order, with those set aside gathered at its foot. */
 export function ShortlistTab({ sought, online = false, pins = [], unplaced = 0, selected, onHighlight }: Props) {
+  const store = useShortlistStore();
   const shortlist = useShortlist();
   const shown = useShown(shortlist);
   const [setAsideOpen, toggleSetAside] = useSetAsideOpen();
@@ -61,11 +74,24 @@ export function ShortlistTab({ sought, online = false, pins = [], unplaced = 0, 
     refocus.current = undefined;
     if (selector) root.current?.querySelector<HTMLElement>(selector)?.focus();
   });
+  const empty = shown.length === 0;
+  const note = useRef<HTMLDivElement>(null);
+  // Once a clear, here or in another tab, empties the list, focus left on nothing, as it is when it went with the list's
+  // controls, goes to the note in their place.
+  const wasEmpty = useRef(empty);
+  useLayoutEffect(() => {
+    if (empty && !wasEmpty.current && document.activeElement === document.body) note.current?.focus();
+    wasEmpty.current = empty;
+  }, [empty]);
   const listed = new Set(shortlist.map((entry) => entry.card.slug));
   const pinOf = pinsBySlug(pins);
-  if (shown.length === 0) {
+  if (empty) {
     return (
-      <div className="flex gap-3 py-2 fade-in-0 motion-safe:animate-in">
+      <div
+        ref={note}
+        tabIndex={-1}
+        className="-mx-2 flex gap-3 rounded-md p-2 outline-none fade-in-0 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-hidden motion-safe:animate-in"
+      >
         <Bookmark aria-hidden className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
         <p className="text-sm">
           Bookmark anyone who might suit you, from their card or profile, to compare them here, then mark where you stand with each as you
@@ -116,7 +142,11 @@ export function ShortlistTab({ sought, online = false, pins = [], unplaced = 0, 
 
   return (
     <div ref={root} className="space-y-4 fade-in-0 motion-safe:animate-in">
-      <p className="text-sm text-muted-foreground">Kept in this browser only{unplaced > 0 && ` · ${unplaced} not on the map`}.</p>
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+        <p className="text-sm text-muted-foreground">Kept in this browser only{unplaced > 0 && ` · ${unplaced} not on the map`}.</p>
+        {/* Offered while anyone is listed, as a card removed here still shows where the visitor stood with them. */}
+        <ClearShortlist listed={shortlist.length} removed={shown.length - shortlist.length} onClear={store.clear} />
+      </div>
       {list.length > 0 && cards(list, "h2")}
       {setAside.length > 0 && (
         <SetAsideSection count={setAside.filter((entry) => listed.has(entry.card.slug)).length} open={setAsideOpen} onToggle={toggleSetAside}>
@@ -127,6 +157,44 @@ export function ShortlistTab({ sought, online = false, pins = [], unplaced = 0, 
         {announcement}
       </p>
     </div>
+  );
+}
+
+type ClearProps = {
+  /** How many are on the shortlist. */
+  listed: number;
+  /** How many the tab still shows, removed, ready to be added back. */
+  removed: number;
+  onClear: () => void;
+};
+
+/** Takes everyone off the shortlist once the visitor confirms, for a browser someone else may use next. */
+function ClearShortlist({ listed, removed, onClear }: ClearProps) {
+  return (
+    <AlertDialog>
+      <AlertDialogTrigger asChild>
+        {/* Pulled out to the cards' right edge, past the ghost button's padding, on a line of its own too. */}
+        <Button variant="ghost" size="sm" className="-mr-2.5 ml-auto text-muted-foreground">
+          Clear shortlist
+        </Button>
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle className="text-lg">Clear your shortlist?</AlertDialogTitle>
+          <AlertDialogDescription className="text-base">
+            {listed > 0
+              ? `This removes ${therapistCount(listed)}, and where you stand with them, from this browser${
+                  removed > 0 ? `, and forgets the ${therapistCount(removed)} you removed` : ""
+                }. It can't be undone.`
+              : `This forgets the ${therapistCount(removed)} you removed, and where you stood with them, so they can't be put back as they were.`}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction onClick={onClear}>Clear shortlist</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }
 
@@ -315,14 +383,18 @@ function useAnnouncements(entries: Shortlist): Announcements {
   };
 }
 
-/** Everyone shortlisted while the tab is open, so a therapist removed here stays in place, ready to be added back. */
+/**
+ * Everyone shortlisted while the tab is open, so a therapist removed here stays in place, ready to be added back, until
+ * the list is cleared.
+ */
 function useShown(shortlist: Shortlist): Shortlist {
+  const clears = useShortlistClears();
   const [shown, setShown] = useState(shortlist);
-  const [seen, setSeen] = useState(shortlist);
-  if (seen !== shortlist) {
-    setSeen(shortlist);
+  const [seen, setSeen] = useState({ shortlist, clears });
+  if (seen.shortlist !== shortlist || seen.clears !== clears) {
+    setSeen({ shortlist, clears });
     const current = new Set(shortlist.map((entry) => entry.card.slug));
-    const removed = shown.filter((entry) => !current.has(entry.card.slug));
+    const removed = seen.clears === clears ? shown.filter((entry) => !current.has(entry.card.slug)) : [];
     setShown([...shortlist, ...removed].sort(byRank));
   }
   return shown;
