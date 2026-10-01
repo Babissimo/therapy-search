@@ -1,15 +1,19 @@
 import { Bookmark, List } from "lucide-react";
 import type { ReactNode, Ref } from "react";
 import { Morph } from "@/components/Morph";
-import { Badge } from "@/components/ui/badge";
 import { TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { therapistCount, useShortlist } from "@/shortlist/useShortlist";
+import { CountBadge } from "@/shortlist/CountBadge";
+import { statusOf } from "@/shortlist/store";
+import { useShortlist } from "@/shortlist/useShortlist";
 
 export type ListTab = "results" | "shortlist";
 
-/** Between the results and the shortlist. The shortlist's count is read here, so a bookmark redraws the tabs rather than the page. */
+/**
+ * Between the results and the shortlist. The shortlist's count is read here, so a bookmark redraws the tabs rather than
+ * the page. Those set aside aren't counted, the visitor having finished with them.
+ */
 export function ListTabs({ ref }: { ref?: Ref<HTMLDivElement> }) {
-  const count = useShortlist().length;
+  const count = useShortlist().filter((entry) => statusOf(entry) !== "setAside").length;
   return (
     <Morph name="list-tabs">
       <TabsList ref={ref}>
@@ -20,13 +24,7 @@ export function ListTabs({ ref }: { ref?: Ref<HTMLDivElement> }) {
         <TabsTrigger value="shortlist">
           <Bookmark data-icon="inline-start" aria-hidden />
           Shortlist
-          {count > 0 && (
-            <Badge variant="secondary" className="h-4 min-w-4 px-1 text-[0.625rem]">
-              <span aria-hidden>{count}</span>
-              {/* The comma keeps the count apart from the tab's name when a screen reader runs their text together. */}
-              <span className="sr-only">, {therapistCount(count)}</span>
-            </Badge>
-          )}
+          {count > 0 && <CountBadge count={count} />}
         </TabsTrigger>
       </TabsList>
     </Morph>

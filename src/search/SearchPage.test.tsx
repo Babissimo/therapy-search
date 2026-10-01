@@ -7,6 +7,7 @@ import type { SearchResult, TherapistCard } from "@shared/types";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { api } from "@/lib/api";
 import { listed } from "@/lib/listed.testing";
+import { ClosedGroupsContext, createClosedGroups, type ClosedGroups } from "@/shortlist/groups";
 import { createShortlistStore, type ShortlistStore } from "@/shortlist/store";
 import { ShortlistContext } from "@/shortlist/useShortlist";
 import type { Highlight } from "./map/highlight";
@@ -124,11 +125,13 @@ function Url() {
   );
 }
 
-/** The page's shortlist, empty at each test's start. Each addition is newer than the last, as a visitor's clicks are. */
+/** The page's shortlist, empty at each test's start, and its groups as a page load starts them. Each addition is newer than the last, as a visitor's clicks are. */
 let shortlist: ShortlistStore;
+let groups: ClosedGroups;
 beforeEach(() => {
   let now = 0;
   shortlist = createShortlistStore(null, () => ++now);
+  groups = createClosedGroups();
 });
 
 function renderAt(url: string, ...pages: TherapistCard[][]) {
@@ -146,15 +149,17 @@ function renderPage(url: string) {
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
       <ShortlistContext.Provider value={shortlist}>
-        <TooltipProvider>
-          <MemoryRouter initialEntries={[url]}>
-            <Routes>
-              <Route path="/" element={page} />
-              <Route path="/online" element={page} />
-              <Route path="/therapist/:slug" element={<Profile />} />
-            </Routes>
-          </MemoryRouter>
-        </TooltipProvider>
+        <ClosedGroupsContext.Provider value={groups}>
+          <TooltipProvider>
+            <MemoryRouter initialEntries={[url]}>
+              <Routes>
+                <Route path="/" element={page} />
+                <Route path="/online" element={page} />
+                <Route path="/therapist/:slug" element={<Profile />} />
+              </Routes>
+            </MemoryRouter>
+          </TooltipProvider>
+        </ClosedGroupsContext.Provider>
       </ShortlistContext.Provider>
     </QueryClientProvider>,
   );
@@ -797,6 +802,51 @@ describe("SearchPage", () => {
     expect(mapPins()).toEqual([`Pin ${key(HOVE)}: c`]);
     fireEvent.click(screen.getByRole("button", { name: "Add Therapist d to your shortlist" }));
     expect(mapPins()).toEqual([`Pin ${key(BRIGHTON)}: d`, `Pin ${key(HOVE)}: c`]);
+  });
+
+  it("maps the shortlist's open groups alone, keeping which are open as the tabs change", async () => {
+    screenIs(true);
+    placeByDistrict();
+    shortlist.add(therapist("c", "Hove BN3"));
+    shortlist.add(therapist("d", "BRIGHTON BN1"));
+    shortlist.setStatus("d", "setAside");
+    renderAt(SEARCH, [therapist("a", "BRIGHTON BN1")]);
+    await within(results()).findByRole("link", { name: "Therapist a" });
+    pick(/^Shortlist/);
+    await waitFor(() => expect(mapPins()).toEqual([`Pin ${key(HOVE)}: c`]));
+    fireEvent.click(screen.getByRole("button", { name: "Set aside, 1 therapist" }));
+    await waitFor(() => expect(mapPins()).toEqual([`Pin ${key(BRIGHTON)}: d`, `Pin ${key(HOVE)}: c`]));
+    fireEvent.click(screen.getByRole("button", { name: "To contact, 1 therapist" }));
+    await waitFor(() => expect(mapPins()).toEqual([`Pin ${key(BRIGHTON)}: d`]));
+    pick("Results");
+    pick(/^Shortlist/);
+    screen.getByRole("button", { name: "To contact, 1 therapist", expanded: false });
+    await waitFor(() => expect(mapPins()).toEqual([`Pin ${key(BRIGHTON)}: d`]));
+  });
+
+  it("counts everyone on the shortlist but those set aside", async () => {
+    screenIs(true);
+    shortlist.add(therapist("c"));
+    shortlist.add(therapist("d"));
+    shortlist.setStatus("d", "setAside");
+    renderAt(SEARCH);
+    await loaded();
+    screen.getByRole("tab", { name: "Shortlist, 1 therapist" });
+  });
+
+  it("counts those not on the map only among the groups that are open", async () => {
+    screenIs(true);
+    placeByDistrict();
+    shortlist.add(therapist("c", "Hove BN3"));
+    shortlist.add(therapist("d", " BN"));
+    shortlist.setStatus("d", "setAside");
+    renderAt(SEARCH);
+    await loaded();
+    pick(/^Shortlist/);
+    await waitFor(() => expect(mapPins()).toEqual([`Pin ${key(HOVE)}: c`]));
+    screen.getByText("Kept in this browser only.");
+    fireEvent.click(screen.getByRole("button", { name: "Set aside, 1 therapist" }));
+    expect(await screen.findByText("Kept in this browser only · 1 not on the map.")).toBeTruthy();
   });
 
   it("looks up the shortlist's places only once the map shows it", async () => {

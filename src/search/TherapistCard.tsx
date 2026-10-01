@@ -17,6 +17,8 @@ type Props = {
   sought: ReadonlySet<string>;
   /** In a pin's box, whose heading names the place: the name drops to an h3 and the card gives only the distance. */
   grouped?: boolean;
+  /** The name's heading level, where it differs from `grouped`'s: h3 under a heading of the list's own. */
+  heading?: "h2" | "h3";
   /** Among therapists met online or by phone: the card says nothing of where they are, nor of meeting in person unless that is all they offer. */
   online?: boolean;
   /** A control beside the name, such as the shortlist's bookmark. */
@@ -24,7 +26,7 @@ type Props = {
   onHighlight?: (on: boolean) => void;
 };
 
-export function TherapistCard({ therapist: t, sought, grouped = false, online = false, action, onHighlight }: Props) {
+export function TherapistCard({ therapist: t, sought, grouped = false, online = false, heading, action, onHighlight }: Props) {
   const profile = useProfileLink();
   const where = grouped || online ? undefined : placeOf(t);
   // UKCP's "0.2 miles from E8 3DQ" repeats the searched place, which the list already names.
@@ -39,7 +41,7 @@ export function TherapistCard({ therapist: t, sought, grouped = false, online = 
       onPointerLeave={() => onHighlight?.(false)}
       onFocus={() => onHighlight?.(true)}
       onBlur={() => onHighlight?.(false)}
-      heading={grouped ? "h3" : "h2"}
+      heading={heading ?? (grouped ? "h3" : "h2")}
       photo={
         <Portrait photoUrl={t.photoUrl} initials={t.initials} className="size-full" initialsClassName="text-3xl" />
       }

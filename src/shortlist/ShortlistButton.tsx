@@ -14,7 +14,7 @@ type Props = {
 export function ShortlistButton({ therapist, className }: Props) {
   const store = useShortlistStore();
   const entry = useShortlistEntry(therapist.slug);
-  // Kept once they are removed, so adding them back returns their place and card.
+  // Kept once they are removed, so adding them back returns their place, status and card.
   const [kept, setKept] = useState(entry);
   if (entry && entry !== kept) setKept(entry);
   return (
@@ -23,6 +23,8 @@ export function ShortlistButton({ therapist, className }: Props) {
       variant="ghost"
       size="icon-sm"
       className={className}
+      // Marked by slug, for a list to give it focus once a menu has taken the therapist off.
+      data-bookmark={therapist.slug}
       onClick={() => (entry ? store.remove(therapist.slug) : store.add(kept?.card ?? therapist, kept))}
     >
       <Bookmark aria-hidden className={cn(entry && "fill-current")} />
