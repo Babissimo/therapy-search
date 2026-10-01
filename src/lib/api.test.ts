@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { LOOKUP_VERSION } from "@shared/location";
-import { api, UNREADABLE } from "./api";
+import { api, OFFLINE, STALLED, UNREADABLE } from "./api";
 
 const RESULTS = `<span class="results-no">1-1 of 1 results</span><div class="profile-listing"><a href="therapist/Jo-Bloggs-ABCDEFGH"><h2>Jo Bloggs</h2></a></div>`;
 const answer = (body: string, status = 200) => vi.stubGlobal("fetch", vi.fn(async () => new Response(body, { status })));
@@ -83,5 +83,47 @@ describe("api", () => {
   it("passes on the Worker's error for a place lookup", async () => {
     answer(JSON.stringify({ error: "Couldn't look up that place just now." }), 502);
     await expect(api.place("BN3")).rejects.toMatchObject({ status: 502, message: "Couldn't look up that place just now." });
+  });
+
+  it("says plainly when the connection is down, in place of the browser's own words", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => Promise.reject(new TypeError("Failed to fetch"))));
+    await expect(api.search("Location=Leeds")).rejects.toMatchObject({ status: 0, message: OFFLINE });
+    await expect(api.place("BN3")).rejects.toMatchObject({ message: OFFLINE });
+  });
+
+  it("gives up on a request that stalls, and says so", async () => {
+    vi.useFakeTimers();
+    const abandoned = vi.fn();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        (_: string, init: RequestInit) =>
+          new Promise((_resolve, reject) =>
+            init.signal?.addEventListener("abort", () => {
+              abandoned();
+              reject(new DOMException("The operation was aborted.", "AbortError"));
+            }),
+          ),
+      ),
+    );
+    const search = expect(api.search("Location=Leeds")).rejects.toMatchObject({ status: 0, message: STALLED });
+    await vi.advanceTimersByTimeAsync(29_000);
+    expect(abandoned).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1_000);
+    await search;
+    expect(abandoned).toHaveBeenCalledOnce();
+    vi.useRealTimers();
+  });
+
+  it("lets a caller that stops waiting hear its own reason, not a stall", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((_: string, init: RequestInit) => new Promise((_resolve, reject) => init.signal?.addEventListener("abort", () => reject(init.signal?.reason)))),
+    );
+    const gone = new AbortController();
+    const office = api.office("Jo-Bloggs-a", "BN3", gone.signal);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    gone.abort(new DOMException("Left the page", "AbortError"));
+    await expect(office).rejects.toMatchObject({ name: "AbortError", message: "Left the page" });
   });
 });

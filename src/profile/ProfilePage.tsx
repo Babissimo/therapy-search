@@ -3,9 +3,9 @@ import { queryOptions, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, ChevronLeft, Diamond, ExternalLink, MapPin } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router";
 import type { Office, Profile, ProfileSection } from "@shared/types";
+import { FailedAlert, useFailure } from "@/components/FailedAlert";
 import { Portrait } from "@/components/Portrait";
 import { SkeletonText } from "@/components/SkeletonText";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -71,21 +71,21 @@ type Exits = { back?: ReactNode; close?: ReactNode };
 
 /** A therapist's profile, laid out by the width it is given, whether a page's or a drawer's. */
 export function ProfileBody({ slug, back, close }: { slug: string } & Exits) {
-  const { data: profile, error, isPending } = useQuery(profileQuery(slug));
+  const query = useQuery(profileQuery(slug));
+  const failure = useFailure(query, slug);
   const isMatch = useSearchMatch();
   const card = useOpeningCard(slug);
 
-  if (isPending) return <ProfileSkeleton back={back} close={close} />;
-  if (error) {
+  if (failure.error) {
     return (
       <div className="space-y-4">
         <StickyHeader back={back} close={close} />
-        <Alert variant="destructive">
-          <AlertDescription>{error.message}</AlertDescription>
-        </Alert>
+        <FailedAlert error={failure.error} retrying={failure.retrying} onRetry={failure.retry} />
       </div>
     );
   }
+  const profile = query.data;
+  if (profile === undefined) return <ProfileSkeleton back={back} close={close} />;
 
   const matches = matchingTags(profile, isMatch);
   const { long, short } = sectionsBySize(profile);

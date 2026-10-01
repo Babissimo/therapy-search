@@ -1,6 +1,7 @@
 import { Loader2, LocateFixed, Search } from "lucide-react";
 import { useId, useRef, useState } from "react";
 import { TEXT_MAX_LENGTH, toQuery, type SearchParams } from "@shared/query";
+import { ErrorLine } from "@/components/ErrorLine";
 import { IconButton } from "@/components/IconButton";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -90,9 +91,9 @@ export function SearchBox({ params, drafts, onPlaceSearch, className }: Props) {
         {here.locating ? "Finding your location" : ""}
       </p>
       {problem && (
-        <p id={problemId} role="alert" className="px-1 pt-1.5 text-xs text-destructive">
+        <ErrorLine id={problemId} className="px-1 pt-1.5">
           {problem}
-        </p>
+        </ErrorLine>
       )}
     </div>
   );
