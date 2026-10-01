@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import type { ReactElement } from "react";
-import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { act, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { CheckboxGroup } from "./CheckboxGroup";
 
@@ -106,6 +106,48 @@ describe("CheckboxGroup", () => {
       fireEvent.click(screen.getByRole("checkbox", { name: "Gestalt Psychotherapist" }));
       fireEvent.change(search, { target: { value: "" } });
       expect(screen.getByRole("button", { name: "Humanistic and integrative" }).getAttribute("aria-expanded")).toBe("true");
+    });
+  });
+
+  describe("a long list", () => {
+    const long = { label: "Languages", fields: Array.from({ length: 40 }, (_, i) => ({ name: "Languages", value: `L${i}`, label: `Language ${i}` })) };
+
+    // jsdom plays no animations, so one around the list is played by standing in for document.getAnimations. Returns its end.
+    const playing = (endTime: number) => {
+      let end = () => {};
+      const animation = {
+        playState: "running",
+        effect: { target: document.body, getComputedTiming: () => ({ endTime }) },
+        finished: new Promise<void>((resolve) => (end = resolve)),
+      };
+      Object.defineProperty(document, "getAnimations", { configurable: true, value: () => (animation.playState === "running" ? [animation] : []) });
+      return () =>
+        act(async () => {
+          animation.playState = "finished";
+          end();
+        });
+    };
+    afterEach(() => Reflect.deleteProperty(document, "getAnimations"));
+
+    it("lists every box at once when nothing around it is moving", () => {
+      render(<CheckboxGroup group={long} searchable isChecked={() => false} onToggle={() => {}} />);
+      expect(screen.getAllByRole("checkbox")).toHaveLength(40);
+    });
+
+    it("lists only its first boxes while the group around it animates, and the rest once it stops", async () => {
+      const stop = playing(200);
+      render(<CheckboxGroup group={long} searchable isChecked={(f) => f.value === "L30"} onToggle={() => {}} />);
+      const boxes = screen.getAllByRole("checkbox");
+      expect(boxes.length).toBeLessThan(20);
+      expect(boxes[0]?.parentElement?.textContent).toBe("Language 30");
+      await stop();
+      expect(screen.getAllByRole("checkbox")).toHaveLength(40);
+    });
+
+    it("takes no notice of an endless animation around it", () => {
+      playing(Infinity);
+      render(<CheckboxGroup group={long} searchable isChecked={() => false} onToggle={() => {}} />);
+      expect(screen.getAllByRole("checkbox")).toHaveLength(40);
     });
   });
 
