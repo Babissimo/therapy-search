@@ -356,6 +356,15 @@ describe("SearchPage", () => {
     expect(screen.queryByText(/^Tick anything that matters to you/)).toBeNull();
   });
 
+  it("says where to turn for help today beneath the prompt, near a place or online", () => {
+    screenIs(true);
+    renderAt("/");
+    expect(within(results()).getByText(/^Need help now\?/).querySelector("a[href='tel:116123']")).toBeTruthy();
+    cleanup();
+    renderAt("/online");
+    expect(within(results()).getByText(/^Need help now\?/).querySelector("a[href='tel:116123']")).toBeTruthy();
+  });
+
   it("lets the map leave the UK only for a search outside it", async () => {
     screenIs(true);
     renderAt(SEARCH);
@@ -639,6 +648,8 @@ describe("SearchPage", () => {
     expect(ask.textContent).toBe("Before we search near York");
     expect(within(ask).getByText("York").getAttribute("translate")).toBe("no");
     expect(document.activeElement?.contains(ask)).toBe(true);
+    // What is read out as it takes focus, without the help beneath, which stays quiet.
+    expect(document.activeElement?.textContent).not.toContain("Need help now?");
     expect(screen.queryByText(/^Tick anything that matters to you/)).toBeNull();
     const filters = screen.getByRole("region", { name: "Refine your search" });
     fireEvent.click(within(filters).getByRole("button", { name: /^Languages/ }));
