@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Profile } from "@shared/types";
 import { api, ApiError } from "@/lib/api";
@@ -8,15 +8,22 @@ import { ContactList, socialName } from "./ContactList";
 
 const PROFILE: Profile = { slug: "Jo-ABCDEFGH", name: "Jo Bloggs", initials: "JB", languages: [], emailInContact: false, social: [], about: [], practical: [], offices: [] };
 
-function renderList(profile: Partial<Profile>) {
+function renderList(profile: Partial<Profile>, onReach?: (link: HTMLAnchorElement) => void) {
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-      <ContactList profile={{ ...PROFILE, ...profile }} />
+      <ContactList profile={{ ...PROFILE, ...profile }} onReach={onReach} />
     </QueryClientProvider>,
   );
 }
 
 const href = (name: string) => screen.getByRole("link", { name }).getAttribute("href");
+
+/** Follows a link as a click does, short of the navigation jsdom can't do. */
+function follow(name: string) {
+  const link = screen.getByRole("link", { name });
+  link.addEventListener("click", (event) => event.preventDefault(), { once: true });
+  fireEvent.click(link);
+}
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -67,6 +74,20 @@ describe("ContactList", () => {
     renderList({ contactId: "9239" });
     await screen.findByText(/Too many searches/);
     screen.getByRole("button", { name: "Try again" });
+  });
+
+  it("tells its caller when the phone or email link is followed, and not the others", async () => {
+    vi.spyOn(api, "contact").mockResolvedValue({ phone: "01234 567890", email: "jo@example.com", website: "https://www.example.invalid/" });
+    const onReach = vi.fn();
+    renderList({ contactId: "9239", emailInContact: true, social: ["https://www.linkedin.com/in/jo"] }, onReach);
+    await screen.findByRole("link", { name: "Telephone: 01234 567890" });
+    follow("Website: example.invalid (opens in a new tab)");
+    follow("LinkedIn (opens in a new tab)");
+    follow("View on UKCP (opens in a new tab)");
+    expect(onReach).not.toHaveBeenCalled();
+    follow("Telephone: 01234 567890");
+    follow("Email: jo@example.com");
+    expect(onReach.mock.calls.map(([link]) => link.getAttribute("href"))).toEqual(["tel:01234567890", "mailto:jo@example.com"]);
   });
 });
 

@@ -11,12 +11,27 @@ import { NEW_TAB } from "@/lib/newTab";
 
 /**
  * `title` gives the whole of a text that is shortened or may be cut off. A `verbatim` text, an address or a number, is
- * left as it is by a browser translating the page.
+ * left as it is by a browser translating the page. `reaches` marks a way to get in touch, not to read more.
  */
-type Item = { icon: LucideIcon; kind?: string; text: string; title?: string; href: string; external?: boolean; verbatim?: boolean };
+type Item = {
+  icon: LucideIcon;
+  kind?: string;
+  text: string;
+  title?: string;
+  href: string;
+  external?: boolean;
+  verbatim?: boolean;
+  reaches?: boolean;
+};
+
+type Props = {
+  profile: Profile;
+  /** When the visitor follows the phone or email link, which may mean they got in touch. */
+  onReach?: (link: HTMLAnchorElement) => void;
+};
 
 /** Every way to reach the therapist, each marked by an icon. UKCP gives phone and website only on request, made as the profile opens. */
-export function ContactList({ profile }: { profile: Profile }) {
+export function ContactList({ profile, onReach }: Props) {
   const { contactId } = profile;
   const contact = useQuery({
     queryKey: ["contact", contactId],
@@ -30,8 +45,8 @@ export function ContactList({ profile }: { profile: Profile }) {
   const email = profile.email ?? (profile.emailInContact ? contact.data?.email : undefined);
 
   const items: Item[] = [];
-  if (phone) items.push({ icon: Phone, kind: "Telephone", text: phone, href: `tel:${phone.replace(/\s/g, "")}`, verbatim: true });
-  if (email) items.push({ icon: Mail, kind: "Email", text: email, title: email, href: `mailto:${email}`, verbatim: true });
+  if (phone) items.push({ icon: Phone, kind: "Telephone", text: phone, href: `tel:${phone.replace(/\s/g, "")}`, verbatim: true, reaches: true });
+  if (email) items.push({ icon: Mail, kind: "Email", text: email, title: email, href: `mailto:${email}`, verbatim: true, reaches: true });
   if (website) items.push({ icon: Globe, kind: "Website", text: shortUrl(website), title: website, href: website, external: true, verbatim: true });
   for (const url of profile.social) {
     if (url !== website) items.push({ icon: AtSign, text: socialName(url), title: url, href: url, external: true, verbatim: true });
@@ -48,6 +63,7 @@ export function ContactList({ profile }: { profile: Profile }) {
               title={item.title}
               aria-label={nameOf(item)}
               className="inline-flex max-w-full items-center gap-1.5 hover:underline"
+              onClick={item.reaches ? (event) => onReach?.(event.currentTarget) : undefined}
               {...(item.external && { target: "_blank", rel: "noreferrer" })}
             >
               <item.icon aria-hidden className="size-4 shrink-0 text-muted-foreground" />

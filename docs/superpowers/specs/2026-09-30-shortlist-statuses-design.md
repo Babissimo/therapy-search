@@ -105,7 +105,7 @@ type ShortlistEntry = { addedAt: number; rank?: number; status?: Status; note?: 
 ### 4.5 The profile
 
 - While the therapist is shortlisted, the status track (§4.2) follows the sticky header, not inside it, so the header keeps its height as the visitor reads on.
-- Following the phone or email link of a therapist who is "To contact", or not shortlisted, offers "Mark as contacted?" under the contact row, with "Yes" and "Not now". It offers rather than marks because following a link does not mean a message was sent. Website, social and UKCP links do not offer it. The offer stays until it is answered or the profile closes.
+- Following the phone or email link of a therapist who is "To contact", or not shortlisted, offers "Mark as contacted?" under the contact row, with "Yes" and "Not now". It offers rather than marks because following a link does not mean a message was sent. Website, social and UKCP links do not offer it. The offer stays until it is answered, the therapist is marked another way, or the profile closes. Answering it gives focus back to the link followed, and "Yes" is said as a change of status is (§4.3), with ", and added to your shortlist" where it adds them.
 - All of this is in `ProfileBody`, so the drawer and the page have it alike.
 
 ### 4.6 The shortlist's map

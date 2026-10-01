@@ -262,6 +262,117 @@ describe("ProfilePage's status track", () => {
   });
 });
 
+describe("ProfilePage's contact offer", () => {
+  const THERAPIST: ShortlistCard = { slug: "Test-ABCDEFGH", name: "Test Therapist", initials: "TT", tags: [] };
+  const REACHABLE: Profile = { ...PROFILE, email: "test@example.com", social: ["https://www.linkedin.com/in/test"] };
+  const offer = () => screen.queryByRole("group", { name: "Mark as contacted?" });
+  const step = async () => (await screen.findByRole("list", { name: "Steps with Test Therapist" })).querySelector("[aria-current=step]")?.textContent;
+
+  /** Follows a link as a click does, short of the navigation jsdom can't do. */
+  function follow(name: string) {
+    const link = screen.getByRole("link", { name });
+    link.addEventListener("click", (event) => event.preventDefault(), { once: true });
+    fireEvent.click(link);
+    return link;
+  }
+
+  async function renderReachable(store = createShortlistStore(null)) {
+    renderAt(["/therapist/Test-ABCDEFGH"], REACHABLE, { store });
+    await screen.findByRole("heading", { name: "Test Therapist" });
+    return store;
+  }
+
+  it("asks under the contact row once the email is followed, and not after a social or UKCP link", async () => {
+    await renderReachable();
+    follow("LinkedIn (opens in a new tab)");
+    follow("View on UKCP (opens in a new tab)");
+    expect(offer()).toBeNull();
+    const email = follow("Email: test@example.com");
+    expect(offer()?.closest("header")).toBeTruthy();
+    expect(email.compareDocumentPosition(offer()!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("asks once the phone is followed, and not after the website", async () => {
+    vi.spyOn(api, "contact").mockResolvedValue({ phone: "01234 567890", website: "https://www.example.invalid/" });
+    renderAt(["/therapist/Test-ABCDEFGH"], { ...PROFILE, contactId: "9239" });
+    await screen.findByRole("link", { name: "Telephone: 01234 567890" });
+    follow("Website: example.invalid (opens in a new tab)");
+    expect(offer()).toBeNull();
+    follow("Telephone: 01234 567890");
+    expect(offer()).not.toBeNull();
+  });
+
+  it("shortlists a therapist not on the list as contacted on Yes, says so, and gives focus back to the link", async () => {
+    const store = await renderReachable();
+    const email = follow("Email: test@example.com");
+    fireEvent.click(screen.getByRole("button", { name: "Yes" }));
+    expect(store.get().map((entry) => entry.status)).toEqual(["contacted"]);
+    expect(offer()).toBeNull();
+    expect(document.activeElement).toBe(email);
+    screen.getByText("Test Therapist: Contacted, and added to your shortlist.");
+    screen.getByRole("button", { name: "Remove Test Therapist from your shortlist" });
+    expect(await step()).toBe("Contacted");
+  });
+
+  it("marks a shortlisted therapist still to contact as contacted on Yes, keeping their place and card", async () => {
+    const store = createShortlistStore(null);
+    // As a search showed them, which says more than the header.
+    const card = { ...THERAPIST, location: "Testtown", tags: ["Anxiety"] };
+    store.add(card, { rank: 5 });
+    await renderReachable(store);
+    follow("Email: test@example.com");
+    fireEvent.click(screen.getByRole("button", { name: "Yes" }));
+    expect(store.get()).toEqual([expect.objectContaining({ rank: 5, status: "contacted", card })]);
+    screen.getByText("Test Therapist: Contacted.");
+    expect(await step()).toBe("Contacted");
+  });
+
+  it("marks nothing on Not now, gives focus back to the link, and asks again once it is followed again", async () => {
+    const store = await renderReachable();
+    const email = follow("Email: test@example.com");
+    fireEvent.click(screen.getByRole("button", { name: "Not now" }));
+    expect(store.get()).toEqual([]);
+    expect(offer()).toBeNull();
+    expect(document.activeElement).toBe(email);
+    follow("Email: test@example.com");
+    expect(offer()).not.toBeNull();
+  });
+
+  it("asks nothing about a therapist already marked", async () => {
+    const store = createShortlistStore(null);
+    store.add(THERAPIST, { status: "setAside" });
+    await renderReachable(store);
+    follow("Email: test@example.com");
+    expect(offer()).toBeNull();
+  });
+
+  it("stays as other links are followed, and goes once the track marks the therapist", async () => {
+    const store = createShortlistStore(null);
+    store.add(THERAPIST);
+    await renderReachable(store);
+    follow("Email: test@example.com");
+    follow("LinkedIn (opens in a new tab)");
+    expect(offer()).not.toBeNull();
+    fireEvent.click(await screen.findByRole("button", { name: "Mark contacted, Test Therapist" }));
+    expect(offer()).toBeNull();
+  });
+
+  it("stays away once the track marks the therapist, even when it puts them back at To contact", async () => {
+    const store = createShortlistStore(null);
+    store.add(THERAPIST);
+    await renderReachable(store);
+    follow("Email: test@example.com");
+    expect(offer()).not.toBeNull();
+    fireEvent.click(await screen.findByRole("button", { name: "Mark contacted, Test Therapist" }));
+    expect(offer()).toBeNull();
+    // As a keyboard opens it, since jsdom's pointer events lack the button Radix checks for.
+    fireEvent.keyDown(screen.getByRole("button", { name: "Status of Test Therapist: contacted" }), { key: "Enter" });
+    fireEvent.click(screen.getByRole("menuitemradio", { name: "To contact" }));
+    expect(await step()).toBe("To contact");
+    expect(offer()).toBeNull();
+  });
+});
+
 describe("ProfilePage's content", () => {
   const section = (heading: string, items: string[]) => ({ heading, paragraphs: [], items, details: [] });
   const office = (name: string, cost: string) => ({ name, isMain: false, address: [], cost });

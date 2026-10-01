@@ -22,6 +22,7 @@ import { LazyStatusTrack } from "@/shortlist/LazyStatusTrack";
 import { ShortlistButton } from "@/shortlist/ShortlistButton";
 import type { ShortlistCard } from "@/shortlist/store";
 import { ContactList, ContactListSkeleton } from "./ContactList";
+import { ContactOffer } from "./ContactOffer";
 import { isInterestOf, type ShownSection } from "./interests";
 import { nearestOffice } from "./nearestOffice";
 import { useOfficePlace } from "./place";
@@ -123,7 +124,12 @@ export function ProfileBody({ slug, back, close }: { slug: string } & Exits) {
               </span>
             )
           }
-          contacts={<ContactList profile={profile} />}
+          contacts={
+            <>
+              <ContactList profile={profile} onReach={standing.reached} />
+              {standing.offering && <ContactOffer onAnswer={(yes) => standing.answered(therapist, yes)} />}
+            </>
+          }
         />
       </StickyHeader>
 
