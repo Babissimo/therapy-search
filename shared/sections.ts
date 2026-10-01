@@ -37,9 +37,21 @@ export const SECTIONS: Partial<Record<MultiParam, Section[]>> = {
       values: ["Cultural Issues", "Gender", "Identity Problems", "Race Issues", "Sexuality", "Spirituality", "Transgender"],
     },
     { heading: "Work", values: ["Employment Difficulties", "Workplace Counselling"] },
-    { heading: "Sexual offending", values: ["Sex Offenders", "Those at Risk of Sexual Offending", "Those at Risk of Sexually Offending"] },
-    { heading: "Online and telephone", values: ["Online Counselling", "Telephone Counselling"] },
-    { heading: "For therapists", values: ["Private Practice Issues", "Supervision", "Training"] },
+    {
+      heading: "Sexual offending",
+      about: "Therapists who work with people at risk of sexual offending, or who have offended.",
+      values: ["Sex Offenders", "Those at Risk of Sexual Offending", "Those at Risk of Sexually Offending"],
+    },
+    {
+      heading: "Online and telephone",
+      about: 'Therapists who list online or phone counselling among what they help with. To choose how you meet, use "Type of session".',
+      values: ["Online Counselling", "Telephone Counselling"],
+    },
+    {
+      heading: "For therapists",
+      about: "For therapists looking for supervision, training or help with their own practice.",
+      values: ["Private Practice Issues", "Supervision", "Training"],
+    },
   ],
   TypesOfTherapy: [
     {

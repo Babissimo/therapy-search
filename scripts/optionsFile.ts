@@ -7,7 +7,8 @@ export function optionsDiff(committed: Options, live: Options): string[] {
     new Set([...o.helpWith.map((t) => `HelpWith: ${t}`), ...o.groups.flatMap((g) => [`group: ${g.label}`, ...g.fields.map((f) => `${f.name}: ${f.value}`)])]);
   const before = entries(committed);
   const after = entries(live);
-  // Wording shows on the page but is never sent, so it is compared apart from the values.
+  // Labels show on the page, and the help is what each group's own help is written from; neither is ever sent, so wording
+  // is compared apart from the values.
   const wording = (o: Options) =>
     new Map(o.groups.flatMap((g) => [[`help for ${g.label}`, g.help], ...g.fields.map((f) => [`label of ${f.name}: ${f.value}`, f.label] as const)]));
   const wordingBefore = wording(committed);
