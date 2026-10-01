@@ -37,11 +37,13 @@ const currentStep = () =>
     .getAllByRole("listitem")
     .find((step) => step.getAttribute("aria-current") === "step")?.textContent;
 
-const filled = (part: Element | null) => part?.classList.contains("bg-primary");
-
-/** The track as drawn: a dot per step (● done, ‖ paused, ○ still to come), each followed by the line to the next (━ filled, ─ not). */
-const drawn = () =>
-  within(screen.getByRole("list", { name: "Steps with Jo Bloggs" }))
+/**
+ * The track as drawn: a dot per step (● done, ‖ paused, ○ still to come), each followed by the line to the next (━ filled,
+ * ─ not), reading a part as filled by `fill`, its class.
+ */
+const drawn = (fill = "bg-primary") => {
+  const filled = (part: Element | null) => part?.classList.contains(fill);
+  return within(screen.getByRole("list", { name: "Steps with Jo Bloggs" }))
     .getAllByRole("listitem")
     .map((step) => {
       // The dot comes before the line, and the last step has no line.
@@ -50,6 +52,7 @@ const drawn = () =>
       return dot + (line ? (filled(line) ? "━" : "─") : "");
     })
     .join("");
+};
 
 const nextStep = () => screen.queryByRole("button", { name: /, Jo Bloggs$/ })?.textContent;
 
@@ -74,6 +77,14 @@ describe("StatusTrack", () => {
     screen.getByText(label, { selector: "p" });
     expect(nextStep()).toBe(next);
     screen.getByRole("button", { name: `Status of Jo Bloggs: ${label.toLowerCase()}` });
+  });
+
+  it("draws the same track under forced colours, which paint every fill as the page", () => {
+    renderTrack("waiting");
+    expect(drawn("forced-colors:bg-[CanvasText]")).toBe("●━‖─○─○");
+    const list = screen.getByRole("list", { name: "Steps with Jo Bloggs" });
+    const ahead = [...list.querySelectorAll("span.flex-1")].filter((line) => line.classList.contains("forced-colors:bg-[GrayText]"));
+    expect(ahead).toHaveLength(2);
   });
 
   it("moves the therapist on a step at a time, saying so each time", () => {

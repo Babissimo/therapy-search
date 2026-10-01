@@ -10,6 +10,11 @@ import { useShortlistStore } from "./useShortlist";
 /** The usual path, as the track draws it. */
 const STEPS: readonly Status[] = ["toContact", "contacted", "consultation", "seeing"];
 
+// The track's fills, for the steps taken and the path still ahead. Forced colours paint every background as the page's,
+// so there they take the text's colour and the disabled text's.
+const TAKEN = "bg-primary forced-colors:bg-[CanvasText]";
+const AHEAD = "bg-border forced-colors:bg-[GrayText]";
+
 /** Where the button moves a therapist on to, in its words; the path ends at "Seeing them", with none. */
 const NEXT_STEP: Record<Status, { label: string; status: Status } | undefined> = {
   toContact: { label: "Mark contacted", status: "contacted" },
@@ -62,9 +67,9 @@ export function StatusTrack({ therapist, status, listed = true, onChosen, onRemo
             {status === "waiting" && i === current ? (
               <Pause aria-hidden className="size-3 fill-current text-primary" />
             ) : (
-              <span aria-hidden className={cn("size-2.5 rounded-full", i <= current ? "bg-primary" : "border-[1.5px] border-control")} />
+              <span aria-hidden className={cn("size-2.5 rounded-full", i <= current ? TAKEN : "border-[1.5px] border-control")} />
             )}
-            {i < STEPS.length - 1 && <span aria-hidden className={cn("mx-1 h-0.5 flex-1 rounded-full", i < current ? "bg-primary" : "bg-border")} />}
+            {i < STEPS.length - 1 && <span aria-hidden className={cn("mx-1 h-0.5 flex-1 rounded-full", i < current ? TAKEN : AHEAD)} />}
           </li>
         ))}
       </ol>
