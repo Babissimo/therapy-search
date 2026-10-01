@@ -21,23 +21,35 @@ export function ShortlistButton({ therapist, kept, className }: Props) {
   const [last, setLast] = useState(() => ({ entry: entry ?? kept, clears: store.clears() }));
   if (entry && entry !== last.entry) setLast({ entry, clears: store.clears() });
 
+  // Whether the last press here added them. It is said only while it holds, so a press that repeats one undone elsewhere is said again.
+  const [added, setAdded] = useState<boolean>();
+  const said =
+    added !== Boolean(entry) ? "" : added ? `Added ${therapist.name} to your shortlist.` : `Removed ${therapist.name} from your shortlist.`;
+
   function toggle() {
+    setAdded(!entry);
     if (entry) return store.remove(therapist.slug);
     const place = last.clears === store.clears() ? last.entry : undefined;
     store.add(place?.card ?? therapist, place);
   }
 
   return (
-    <IconButton
-      label={entry ? `Remove ${therapist.name} from your shortlist` : `Add ${therapist.name} to your shortlist`}
-      variant="ghost"
-      size="icon-sm"
-      className={className}
-      // Marked by slug, for a list to give it focus once a menu has taken the therapist off.
-      data-bookmark={therapist.slug}
-      onClick={toggle}
-    >
-      <Bookmark aria-hidden className={cn(entry && "fill-current")} />
-    </IconButton>
+    <>
+      <IconButton
+        label={entry ? `Remove ${therapist.name} from your shortlist` : `Add ${therapist.name} to your shortlist`}
+        variant="ghost"
+        size="icon-sm"
+        className={className}
+        // Marked by slug, for a list to give it focus once a menu has taken the therapist off.
+        data-bookmark={therapist.slug}
+        onClick={toggle}
+      >
+        <Bookmark aria-hidden className={cn(entry && "fill-current")} />
+      </IconButton>
+      {/* Focus stays on the button, whose new name is seldom read out, so the press is said here. */}
+      <span aria-live="polite" className="sr-only">
+        {said}
+      </span>
+    </>
   );
 }

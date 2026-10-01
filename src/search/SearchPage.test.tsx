@@ -310,7 +310,7 @@ describe("SearchPage", () => {
     fireEvent.click(more);
     expect(await screen.findByRole("button", { name: "Try again" })).toBe(more);
     expect(more.querySelector("svg")?.classList.contains("lucide-rotate-cw")).toBe(true);
-    expect(results().querySelector("[aria-live]")?.textContent).toBe("UKCP answered 503.");
+    within(results()).getByText("UKCP answered 503.", { selector: "[aria-live]" });
     act(() => more.focus());
     expect(screen.getByRole("tooltip").textContent).toBe("UKCP answered 503.");
   });

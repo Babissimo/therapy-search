@@ -73,4 +73,20 @@ describe("ShortlistButton", () => {
     fireEvent.click(screen.getByRole("button", { name: "Add Jo Bloggs to your shortlist" }));
     expect(store.get()).toEqual([{ addedAt: 5001, card: JO }]);
   });
+
+  it("says what each press did, and says it again once something else has undone it", () => {
+    const store = renderButton();
+    // There before the first press, as a screen reader reads out only changes to a region it knows.
+    const region = document.querySelector("[aria-live=polite]")!;
+    expect(region.textContent).toBe("");
+    fireEvent.click(screen.getByRole("button", { name: "Add Jo Bloggs to your shortlist" }));
+    expect(region.textContent).toBe("Added Jo Bloggs to your shortlist.");
+    fireEvent.click(screen.getByRole("button", { name: "Remove Jo Bloggs from your shortlist" }));
+    expect(region.textContent).toBe("Removed Jo Bloggs from your shortlist.");
+    // Added back by another tab, say.
+    act(() => store.add(JO));
+    expect(region.textContent).toBe("");
+    fireEvent.click(screen.getByRole("button", { name: "Remove Jo Bloggs from your shortlist" }));
+    expect(region.textContent).toBe("Removed Jo Bloggs from your shortlist.");
+  });
 });
