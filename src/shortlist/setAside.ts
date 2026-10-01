@@ -1,4 +1,5 @@
-import { createContext, useContext, useSyncExternalStore } from "react";
+import { createContext, useContext } from "react";
+import { createStore, useStore } from "@/lib/store";
 
 /** Whether the shortlist's "Set aside" section is open, which the tab's list and the map both follow. */
 export type SetAsideView = {
@@ -12,19 +13,8 @@ export type SetAsideView = {
  * starts closed, holding those the visitor has finished with.
  */
 export function createSetAsideView(): SetAsideView {
-  let open = false;
-  const listeners = new Set<() => void>();
-  return {
-    get: () => open,
-    toggle: () => {
-      open = !open;
-      for (const listener of listeners) listener();
-    },
-    subscribe: (onChange) => {
-      listeners.add(onChange);
-      return () => void listeners.delete(onChange);
-    },
-  };
+  const open = createStore(false);
+  return { get: open.get, toggle: () => open.set(!open.get()), subscribe: open.subscribe };
 }
 
 /** The view the page's tab and map share; left unset, the one kept for this page load. */
@@ -34,5 +24,5 @@ let pageView: SetAsideView | undefined;
 
 export function useSetAsideOpen(): [boolean, () => void] {
   const view = useContext(SetAsideContext) ?? (pageView ??= createSetAsideView());
-  return [useSyncExternalStore(view.subscribe, view.get), view.toggle];
+  return [useStore(view), view.toggle];
 }
