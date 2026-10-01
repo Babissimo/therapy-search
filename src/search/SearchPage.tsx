@@ -190,18 +190,22 @@ function SearchView({ params, onChange, wide }: ViewProps) {
   }
 
   const aside = useRef<HTMLDivElement>(null);
-  // Past the list and the map's pins to the search box, which comes after them; and to the list, put away or not. Before a
-  // search on wide screens, past the prompt to the filters right of it, as online's start offers. Each brings the results'
-  // tab forward, as the toolbar stands aside for the shortlist's.
+  // Past the toolbar to the list, put away or not, and while the toolbar stands aside for the shortlist, which it otherwise
+  // comes before, back to its search box. Before a search on wide screens, past the prompt to the filters right of it, as
+  // online's start offers. Each brings the results' tab forward.
   const skips: Skip[] = searching
     ? [
-        {
-          label: "Skip to the search box",
-          onSkip: () => {
-            if (tab !== "results") pickTab("results");
-            focusOnceShown(() => document.getElementById(SEARCH_BOX_ID));
-          },
-        },
+        ...(shortlistOpen
+          ? [
+              {
+                label: "Skip to the search box",
+                onSkip: () => {
+                  pickTab("results");
+                  focusOnceShown(() => document.getElementById(SEARCH_BOX_ID));
+                },
+              },
+            ]
+          : []),
         {
           label: "Skip to the results",
           onSkip: () => {
@@ -332,63 +336,70 @@ function SearchView({ params, onChange, wide }: ViewProps) {
           {/* Apart from the list, which goes inert as it is put away over the map, and stays put as it moves between the side
               bar and the sheet. There before a search starts, as a live region is heard only once it is there. */}
           <ResultsStatus params={params} results={results} searching={searching} />
-          {!searching ? (
+          {!searching && (
             <ListColumn wide={wide} tabs={tabs} top={!wide && toolbar("list")} topHidden={shortlistOpen} scroll={scroll}>
               {lists}
             </ListColumn>
-          ) : (
-            wide && (
-              <ResultsPanel
-                open={panelOpen}
-                onOpenChange={setPanelOpen}
-                toggleRef={panelToggleRef}
-                tabs={tabs}
-                masthead={<Masthead />}
-                scrollRef={scroll.ref}
-                onScroll={scroll.save}
-                footer={footer}
-              >
-                {lists}
-              </ResultsPanel>
-            )
           )}
           {(searching || wide) && (
-            // Before a search it holds the toolbar alone, so it goes with it, leaving the shortlist the page.
+            // Before a search it holds the toolbar alone, so it goes with it, leaving the shortlist the page. With a search it
+            // holds the toolbar, the list and the map, in the order the keyboard takes them: the map in the second column with
+            // the toolbar drawn over it, and the side bar in the first, or on a phone the sheet over them both.
             <div
               ref={aside}
               hidden={!searching && shortlistOpen}
-              className={cn("relative", searching ? "min-w-0 flex-1" : "w-96 shrink-0 border-l")}
-            >
-              {searching && (
-                <MapSlot>
-                  <MapPane
-                    {...mapView}
-                    entry={entry}
-                    highlight={highlight}
-                    selected={selected}
-                    onSelect={select}
-                    onDeselect={() => setSelection(undefined)}
-                    onSearchArea={
-                      mapsShortlist
-                        ? undefined
-                        : (postcode) => {
-                            if (samePostcode(postcode, params.text.Location)) return false;
-                            drafts.applyAt(postcode);
-                            setFiltersOpen(false);
-                            return true;
-                          }
-                    }
-                    outsideUK={params.flags.LocationSearchOutsideUK}
-                    coveredBelow={wide ? undefined : (height) => coverOf(sheet, height)}
-                  />
-                </MapSlot>
+              className={cn(
+                "relative",
+                searching ? "grid min-w-0 flex-1 grid-cols-[auto_minmax(0,1fr)] grid-rows-[minmax(0,1fr)]" : "w-96 shrink-0 border-l",
               )}
+            >
               {toolbar(searching ? "map" : "aside")}
-              {!wide && searching && (
+              {searching && wide && (
+                <ResultsPanel
+                  open={panelOpen}
+                  onOpenChange={setPanelOpen}
+                  toggleRef={panelToggleRef}
+                  tabs={tabs}
+                  masthead={<Masthead />}
+                  scrollRef={scroll.ref}
+                  onScroll={scroll.save}
+                  footer={footer}
+                >
+                  {lists}
+                </ResultsPanel>
+              )}
+              {searching && !wide && (
                 <ResultsSheet position={sheet} onPositionChange={setSheet} tabs={tabs} scrollRef={scroll.ref} onScroll={scroll.save} footer={footer}>
                   <Masthead className="pb-3" />
                   {lists}
                 </ResultsSheet>
+              )}
+              {/* In the same place in the tree on any screen, so the map stays as the window crosses between wide and narrow. */}
+              {searching && (
+                <div className="col-start-2 row-start-1">
+                  <MapSlot>
+                    <MapPane
+                      {...mapView}
+                      entry={entry}
+                      highlight={highlight}
+                      selected={selected}
+                      onSelect={select}
+                      onDeselect={() => setSelection(undefined)}
+                      onSearchArea={
+                        mapsShortlist
+                          ? undefined
+                          : (postcode) => {
+                              if (samePostcode(postcode, params.text.Location)) return false;
+                              drafts.applyAt(postcode);
+                              setFiltersOpen(false);
+                              return true;
+                            }
+                      }
+                      outsideUK={params.flags.LocationSearchOutsideUK}
+                      coveredBelow={wide ? undefined : (height) => coverOf(sheet, height)}
+                    />
+                  </MapSlot>
+                </div>
               )}
             </div>
           )}
@@ -468,6 +479,8 @@ function Toolbar({
           overMap &&
             "pointer-events-none motion-safe:transition-[left,opacity,display] motion-safe:transition-discrete motion-safe:duration-200 [&[hidden]]:opacity-0",
           overMap && faded && "starting:opacity-0",
+          // Placed in the map's cell, right of the side bar's, though it comes before the side bar in the tree.
+          overMap && "col-start-2 row-start-1",
           // As wide as beside the list (a w-96 column less its border and p-3), so nothing in it shifts as it moves onto the
           // map and back.
           overMap && "lg:right-auto lg:w-[calc(24rem-1.5rem-1px)]",
