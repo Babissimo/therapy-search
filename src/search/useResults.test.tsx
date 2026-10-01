@@ -3,11 +3,12 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { emptyParams } from "@shared/query";
+import { emptyParams, type SearchParams } from "@shared/query";
 import type { TherapistCard } from "@shared/types";
 import { api } from "@/lib/api";
 import { listed } from "@/lib/listed.testing";
 import { inOrder, orderSeed } from "./order";
+import { withFlag } from "./state";
 import { cachedCard, shownCard, useResults } from "./useResults";
 
 const newClient = () => new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -77,6 +78,56 @@ describe("useResults", () => {
     const [first] = result.current.therapists;
     expect(cachedCard(client, first!.slug)).toBe(first);
     expect(cachedCard(client, expected[12]!)).toBeUndefined();
+  });
+});
+
+describe("useResults with only photos", () => {
+  const photosOnly = (params: SearchParams) => withFlag(params, "OnlyProfilesWithPhotos", true);
+  // Twenty of the thirty show a photo, more than a page.
+  const photographed = cards.map((card, i) => ({ ...card, photoUrl: i % 3 === 2 ? undefined : "https://example.invalid/photo.jpg" }));
+  const withPhoto = new Set(photographed.filter((card) => card.photoUrl).map((card) => card.slug));
+
+  it("cuts its results from the same search's, loaded whole, in their order and counted afresh", async () => {
+    answerShuffled(photographed);
+    const client = newClient();
+    const all = renderHook(() => useResults(emptyParams()), { wrapper: withClient(client) });
+    await waitFor(() => expect(all.result.current.therapists).toHaveLength(12));
+    const { result } = renderHook(() => useResults(photosOnly(emptyParams())), { wrapper: withClient(client) });
+    await waitFor(() => expect(result.current.query.isSuccess).toBe(true));
+    act(() => void result.current.query.fetchNextPage());
+    await waitFor(() => expect(result.current.therapists).toHaveLength(20));
+    expect(shown(result.current.therapists)).toEqual(expectedOf(photographed).filter((slug) => withPhoto.has(slug)));
+    expect(result.current.first?.total).toBe(20);
+    expect(api.search).toHaveBeenCalledTimes(1);
+  });
+
+  it("asks UKCP with the flag when the same search without it is not loaded", async () => {
+    answerShuffled(photographed);
+    const { result } = renderHook(() => useResults(photosOnly(emptyParams())), { wrapper: withClient() });
+    await waitFor(() => expect(result.current.query.isSuccess).toBe(true));
+    expect(api.search).toHaveBeenCalledWith(expect.stringContaining("OnlyProfilesWithPhotos=true"));
+  });
+
+  it("asks UKCP with the flag when no one in the same search, loaded whole, shows a photo", async () => {
+    answerShuffled(cards.map((card) => ({ ...card, photoUrl: undefined })));
+    const client = newClient();
+    const all = renderHook(() => useResults(emptyParams()), { wrapper: withClient(client) });
+    await waitFor(() => expect(all.result.current.therapists).toHaveLength(12));
+    const { result } = renderHook(() => useResults(photosOnly(emptyParams())), { wrapper: withClient(client) });
+    await waitFor(() => expect(result.current.query.isSuccess).toBe(true));
+    expect(api.search).toHaveBeenCalledTimes(2);
+    expect(api.search).toHaveBeenLastCalledWith(expect.stringContaining("OnlyProfilesWithPhotos=true"));
+  });
+
+  it("asks UKCP with the flag when the same search without it has more than its first batch", async () => {
+    vi.spyOn(api, "search").mockImplementation(async () => ({ ...listingsOf(photographed), total: 600 }));
+    const client = newClient();
+    const all = renderHook(() => useResults(emptyParams()), { wrapper: withClient(client) });
+    await waitFor(() => expect(all.result.current.query.isSuccess).toBe(true));
+    const { result } = renderHook(() => useResults(photosOnly(emptyParams())), { wrapper: withClient(client) });
+    await waitFor(() => expect(result.current.query.isSuccess).toBe(true));
+    expect(api.search).toHaveBeenCalledTimes(2);
+    expect(api.search).toHaveBeenLastCalledWith(expect.stringContaining("OnlyProfilesWithPhotos=true"));
   });
 });
 
@@ -165,6 +216,20 @@ describe("useResults near a place", () => {
     const first = renderHook(() => useResults(near("Leeds")), { wrapper: withClient(client) });
     await waitFor(() => expect(first.result.current.query.isSuccess).toBe(true));
     renderHook(() => useResults(near("Leeds")), { wrapper: withClient(client) });
+    expect(early).toHaveBeenCalledTimes(1);
+  });
+
+  it("asks for nothing, nor the nearest few, for only photos when the same search is loaded whole", async () => {
+    answerShuffled(located);
+    const early = answerEarly(12);
+    const client = newClient();
+    const all = renderHook(() => useResults(near("Leeds")), { wrapper: withClient(client) });
+    await waitFor(() => expect(all.result.current.query.isSuccess).toBe(true));
+    const { result } = renderHook(() => useResults(withFlag(near("Leeds"), "OnlyProfilesWithPhotos", true)), { wrapper: withClient(client) });
+    await waitFor(() => expect(result.current.query.isSuccess).toBe(true));
+    const withPhoto = new Set(located.filter((card) => card.photoUrl).map((card) => card.slug));
+    expect(shown(result.current.therapists)).toEqual(expectedNear.filter((slug) => withPhoto.has(slug)));
+    expect(api.search).toHaveBeenCalledTimes(1);
     expect(early).toHaveBeenCalledTimes(1);
   });
 
