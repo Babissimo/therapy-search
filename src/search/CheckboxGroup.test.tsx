@@ -13,7 +13,7 @@ const group = {
 describe("CheckboxGroup", () => {
   it("narrows a searchable list as you type", () => {
     render(<CheckboxGroup group={group} searchable isChecked={() => false} onToggle={() => {}} />);
-    fireEvent.change(screen.getByRole("searchbox", { name: "Search Languages" }), { target: { value: "pol" } });
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search languages" }), { target: { value: "pol" } });
     expect(screen.getAllByRole("checkbox")).toHaveLength(1);
     screen.getByRole("checkbox", { name: "Polish" });
   });
@@ -92,7 +92,7 @@ describe("CheckboxGroup", () => {
 
     it("shows every match under its heading while searching", () => {
       renderWithTips(<CheckboxGroup group={types} searchable isChecked={() => false} onToggle={() => {}} />);
-      fireEvent.change(screen.getByRole("searchbox", { name: "Search Type of Therapy" }), { target: { value: "psycho" } });
+      fireEvent.change(screen.getByRole("searchbox", { name: "Search type of therapy" }), { target: { value: "psycho" } });
       expect(screen.queryByRole("button", { name: "Humanistic and integrative" })).toBeNull();
       screen.getByText("Humanistic and integrative");
       screen.getByRole("button", { name: "About Humanistic and integrative" });
@@ -101,7 +101,7 @@ describe("CheckboxGroup", () => {
 
     it("leaves a box ticked during a search in view once the search is cleared", () => {
       renderWithTips(<CheckboxGroup group={types} searchable isChecked={() => false} onToggle={() => {}} />);
-      const search = screen.getByRole("searchbox", { name: "Search Type of Therapy" });
+      const search = screen.getByRole("searchbox", { name: "Search type of therapy" });
       fireEvent.change(search, { target: { value: "gestalt" } });
       fireEvent.click(screen.getByRole("checkbox", { name: "Gestalt Psychotherapist" }));
       fireEvent.change(search, { target: { value: "" } });

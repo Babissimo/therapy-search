@@ -7,6 +7,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { groupNameInSentence } from "./filterGroups";
 import { isMulti } from "./state";
 import { TickedCount } from "./TickedCount";
 
@@ -66,7 +67,7 @@ export function CheckboxGroup({ group, searchable, isChecked, onToggle }: Props)
   return (
     <div className="space-y-3">
       {searchable && (
-        <Input type="search" aria-label={`Search ${group.label}`} placeholder="Search this list" value={filter} onChange={(e) => setFilter(e.target.value)} />
+        <Input type="search" aria-label={`Search ${groupNameInSentence(group)}`} placeholder="Search this list" value={filter} onChange={(e) => setFilter(e.target.value)} />
       )}
       {narrows && (
         <p className="flex gap-1.5 text-xs text-muted-foreground">

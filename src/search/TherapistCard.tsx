@@ -31,7 +31,13 @@ export function TherapistCard({ therapist: t, sought, grouped = false, online = 
   const where = grouped || online ? undefined : placeOf(t);
   // UKCP's "0.2 miles from E8 3DQ" repeats the searched place, which the list already names.
   const away = online ? undefined : t.distance?.replace(/\bfrom\b.*$/, "away");
-  const place = where && away ? `${where} (${away})` : (where ?? away);
+  // The place is left as it is by a browser translating the page, which would read Bath or Reading as words.
+  const place = (where || away) && (
+    <>
+      {where && <span translate="no">{where}</span>}
+      {where && away ? ` (${away})` : away}
+    </>
+  );
   const meets = online && /remote/i.test(t.sessionTypes ?? "") ? undefined : t.sessionTypes;
 
   return (
@@ -47,7 +53,7 @@ export function TherapistCard({ therapist: t, sought, grouped = false, online = 
       }
       // The stretched link makes the whole card clickable, as UKCP's is.
       name={
-        <Link {...profile(t.slug)} className="after:absolute after:inset-0">
+        <Link {...profile(t.slug)} translate="no" className="after:absolute after:inset-0">
           {t.name}
         </Link>
       }

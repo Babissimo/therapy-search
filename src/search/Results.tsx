@@ -173,7 +173,7 @@ function PinGroup({ pin, marked, sought, highlight }: PinGroupProps) {
       <h2 id={headingId} className="eyebrow flex items-center gap-1.5 text-primary">
         <MapPin aria-hidden className={cn("size-4 shrink-0", marked ? "text-highlight" : "text-muted-foreground")} />
         {/* The space parts the two in the group's name; the dot does so on screen, where spaced capitals run together. */}
-        {pinLabel(pin)} <span aria-hidden>·</span> <span className="font-normal text-muted-foreground">{pin.therapists.length} therapists</span>
+        <span translate="no">{pinLabel(pin)}</span> <span aria-hidden>·</span> <span className="font-normal text-muted-foreground">{pin.therapists.length} therapists</span>
       </h2>
       <ul className="space-y-3">
         {pin.therapists.map((t) => (

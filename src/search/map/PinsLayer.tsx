@@ -159,7 +159,9 @@ function TherapistPin({ pin, shortlisted, markers, onSelect }: TherapistPinProps
       eventHandlers={{ click: activate }}
     >
       {/* Lifted clear of the pin, which grows under the pointer (index.css). */}
-      <MapTooltip offset={[0, -10]}>{only ? [only.name, only.location].filter(Boolean).join(" · ") : `${pin.therapists.length} therapists here`}</MapTooltip>
+      <MapTooltip offset={[0, -10]}>
+        {only ? <span translate="no">{[only.name, only.location].filter(Boolean).join(" · ")}</span> : `${pin.therapists.length} therapists here`}
+      </MapTooltip>
     </MapMarker>
   );
 }

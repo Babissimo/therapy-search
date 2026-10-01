@@ -19,7 +19,7 @@ export function LocationNotice({ typed, searched }: { typed: string; searched?: 
   if (!searched) return null;
   return (
     <p className="text-sm">
-      Location searched: <strong>{searched}</strong>
+      Location searched: <strong translate="no">{searched}</strong>
     </p>
   );
 }

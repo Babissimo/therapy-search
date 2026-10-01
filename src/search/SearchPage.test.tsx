@@ -1122,12 +1122,12 @@ describe("SearchPage online", () => {
     screenIs(true);
     renderAt(ONLINE);
     expect(prompt()).toBeTruthy();
-    fireEvent.click(within(filters()).getByRole("button", { name: /^Type of Session/ }));
+    fireEvent.click(within(filters()).getByRole("button", { name: /^Type of session/ }));
     fireEvent.click(within(filters()).getByRole("checkbox", { name: "Telephone Therapy" }));
     expect(url().toString()).toBe("TypesOfSession=Telephone+Therapy");
     expect(prompt()).toBeTruthy();
     expect(api.search).not.toHaveBeenCalled();
-    fireEvent.click(within(filters()).getByRole("button", { name: /^Additional Filters/ }));
+    fireEvent.click(within(filters()).getByRole("button", { name: /^More filters/ }));
     fireEvent.click(within(filters()).getByRole("checkbox", { name: "Only show profiles with photos" }));
     await loaded();
     expect(prompt()).toBeNull();
@@ -1212,9 +1212,9 @@ describe("SearchPage online", () => {
     await loaded();
     expect(screen.queryByRole("button", { name: "Filters" })).toBeNull();
     expect(results().compareDocumentPosition(filters()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    fireEvent.click(within(filters()).getByRole("button", { name: /^Type of Session/ }));
+    fireEvent.click(within(filters()).getByRole("button", { name: /^Type of session/ }));
     expect(within(filters()).queryByRole("checkbox", { name: "Face to Face - Long Term" })).toBeNull();
-    fireEvent.click(within(filters()).getByRole("button", { name: /^Additional Filters/ }));
+    fireEvent.click(within(filters()).getByRole("button", { name: /^More filters/ }));
     expect(within(filters()).queryByRole("checkbox", { name: "Only show wheelchair accessible" })).toBeNull();
     fireEvent.click(within(filters()).getByRole("checkbox", { name: "Telephone Therapy" }));
     expect(url().toString()).toBe("TypesOfSession=Telephone+Therapy&Languages=Greek");

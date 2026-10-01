@@ -116,7 +116,7 @@ function OnlinePrompt({ wide }: { wide: boolean }) {
           Open Filters <FiltersIcon /> and choose one
         </>
       )}
-      , such as what they help with, how they work or the languages they speak, to see who fits. Type of Session alone won't narrow them enough.
+      , such as what they help with, how they work or the languages they speak, to see who fits. Type of session alone won't narrow them enough.
     </Prompt>
   );
 }

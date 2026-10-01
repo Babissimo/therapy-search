@@ -229,7 +229,7 @@ describe("ProfilePage's content", () => {
   it("links each office's name to its map", async () => {
     const mapped = { ...office("Brighton Office", "£70"), mapUrl: "https://maps.example/?q=Brighton" };
     renderAt(["/therapist/Test-ABCDEFGH"], { ...PROFILE, offices: [mapped, office("London Office", "£70")] });
-    const link = await screen.findByRole("link", { name: "Brighton Office, map" });
+    const link = await screen.findByRole("link", { name: "Brighton Office, map (opens in a new tab)" });
     expect(link.getAttribute("href")).toBe("https://maps.example/?q=Brighton");
     screen.getByText("London Office");
     expect(screen.queryByRole("link", { name: /London Office/ })).toBeNull();
