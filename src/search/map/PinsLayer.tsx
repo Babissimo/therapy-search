@@ -1,8 +1,9 @@
 import type L from "leaflet";
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type RefObject } from "react";
+import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { useMap } from "react-leaflet";
 import { useNavigate } from "react-router";
 import { MapMarker, MapMarkerClusterGroup, MapTooltip, markerData } from "@/components/ui/map";
+import { useStore } from "@/lib/store";
 import { useProfileLink } from "@/profile/profileLink";
 import { useShortlistedSlugs } from "@/shortlist/useShortlist";
 import type { Highlight } from "./highlight";
@@ -35,7 +36,7 @@ function who(pin: Pin): string {
 export function PinsLayer({ pins, highlight, selected, onSelect, onDeselect, marksShortlist = false }: Props) {
   const cluster = useRef<L.MarkerClusterGroup>(null);
   const markers = useRef(new Map<string, L.Marker>());
-  const slug = useSyncExternalStore(highlight.subscribe, highlight.get);
+  const slug = useStore(highlight);
   const shortlisted = useShortlistedSlugs(marksShortlist);
   // Before the marks, which a redrawn icon has lost.
   useRedrawnClusters(cluster, markers.current, shortlisted);

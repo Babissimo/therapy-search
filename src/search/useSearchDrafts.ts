@@ -1,5 +1,6 @@
 import { useLayoutEffect, useState, useSyncExternalStore } from "react";
 import { emptyParams, type SearchParams } from "@shared/query";
+import { createStore } from "@/lib/store";
 import { withFlag, withText } from "./state";
 
 /** The boxes typed in before a search. */
@@ -52,18 +53,12 @@ export function useDraft(drafts: SearchDrafts, box: Box): string {
 }
 
 function createDraftStore(initial: Record<Box, string>) {
-  const typed = { ...initial };
-  const listeners = new Set<() => void>();
+  const typed = createStore(initial);
   return {
-    get: (box: Box) => typed[box],
+    get: (box: Box) => typed.get()[box],
     set: (box: Box, text: string) => {
-      if (typed[box] === text) return;
-      typed[box] = text;
-      for (const listener of listeners) listener();
+      if (typed.get()[box] !== text) typed.set({ ...typed.get(), [box]: text });
     },
-    subscribe: (onChange: () => void) => {
-      listeners.add(onChange);
-      return () => listeners.delete(onChange);
-    },
+    subscribe: typed.subscribe,
   };
 }

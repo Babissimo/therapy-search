@@ -2,7 +2,6 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { ThemeSwitch } from "./ThemeSwitch";
 
 let systemDark = false;
 let reducedMotion = false;
@@ -25,6 +24,8 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+  vi.resetModules();
   listeners.clear();
   systemDark = false;
   reducedMotion = false;
@@ -32,24 +33,27 @@ afterEach(() => {
   document.documentElement.classList.remove("dark");
 });
 
-const renderSwitch = () =>
-  render(
+/** Draws the switch, imported afresh in each test so it reads storage as a page load does. */
+async function renderSwitch() {
+  const { ThemeSwitch } = await import("./ThemeSwitch");
+  return render(
     <TooltipProvider>
       <ThemeSwitch />
     </TooltipProvider>,
   );
+}
 const isDark = () => document.documentElement.classList.contains("dark");
 
 describe("ThemeSwitch", () => {
-  it("starts on the stored choice", () => {
+  it("starts on the stored choice", async () => {
     localStorage.setItem("theme", "dark");
-    renderSwitch();
+    await renderSwitch();
     expect(screen.getByRole<HTMLInputElement>("radio", { name: "Dark" }).checked).toBe(true);
     expect(isDark()).toBe(true);
   });
 
-  it("follows the system until light or dark is picked, and remembers the pick", () => {
-    renderSwitch();
+  it("follows the system until light or dark is picked, and remembers the pick", async () => {
+    await renderSwitch();
     expect(screen.getByRole<HTMLInputElement>("radio", { name: "System" }).checked).toBe(true);
 
     setSystemDark(true);
@@ -64,19 +68,19 @@ describe("ThemeSwitch", () => {
     expect(isDark()).toBe(false);
   });
 
-  it("forgets the pick on returning to system", () => {
+  it("forgets the pick on returning to system", async () => {
     localStorage.setItem("theme", "light");
     systemDark = true;
-    renderSwitch();
+    await renderSwitch();
 
     fireEvent.click(screen.getByRole("radio", { name: "System" }));
     expect(isDark()).toBe(true);
     expect(localStorage.getItem("theme")).toBeNull();
   });
 
-  it("cross-fades into a pick, changing the page only once the fade has captured it as it was", () => {
+  it("cross-fades into a pick, changing the page only once the fade has captured it as it was", async () => {
     const start = withViewTransitions();
-    renderSwitch();
+    await renderSwitch();
     fireEvent.click(screen.getByRole("radio", { name: "Dark" }));
     expect(isDark()).toBe(false);
     act(() => start.mock.calls[0]![0]());
@@ -84,13 +88,28 @@ describe("ThemeSwitch", () => {
     expect(screen.getByRole<HTMLInputElement>("radio", { name: "Dark" }).checked).toBe(true);
   });
 
-  it("changes at once, without the fade, under reduced motion", () => {
+  it("changes at once, without the fade, under reduced motion", async () => {
     reducedMotion = true;
     const start = withViewTransitions();
-    renderSwitch();
+    await renderSwitch();
     fireEvent.click(screen.getByRole("radio", { name: "Dark" }));
     expect(isDark()).toBe(true);
     expect(start).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["refuses writes", () => vi.spyOn(Storage.prototype, "setItem")],
+    ["is out of reach", () => vi.spyOn(window, "localStorage", "get")],
+  ])("keeps a pick for the page load when storage %s, as the masthead is drawn afresh", async (_, spyOn) => {
+    spyOn().mockImplementation(() => {
+      throw new DOMException("denied", "SecurityError");
+    });
+    const { unmount } = await renderSwitch();
+    fireEvent.click(screen.getByRole("radio", { name: "Dark" }));
+    unmount();
+    await renderSwitch();
+    expect(screen.getByRole<HTMLInputElement>("radio", { name: "Dark" }).checked).toBe(true);
+    expect(isDark()).toBe(true);
   });
 });
 
