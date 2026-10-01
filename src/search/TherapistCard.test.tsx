@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen, within } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it } from "vitest";
@@ -18,10 +18,12 @@ const therapist = (extra: Partial<Therapist> = {}): Therapist => ({
   ...extra,
 });
 
-function renderCard(t: Therapist, sought: string[] = [], { grouped, action, online }: { grouped?: boolean; action?: ReactNode; online?: boolean } = {}) {
+type Options = { grouped?: boolean; action?: ReactNode; online?: boolean; fee?: string };
+
+function renderCard(t: Therapist, sought: string[] = [], { grouped, action, online, fee }: Options = {}) {
   render(
     <MemoryRouter>
-      <TherapistCard therapist={t} sought={new Set(sought)} grouped={grouped} action={action} online={online} />
+      <TherapistCard therapist={t} sought={new Set(sought)} grouped={grouped} action={action} online={online} fee={fee} />
     </MemoryRouter>,
   );
 }
@@ -34,6 +36,20 @@ describe("TherapistCard", () => {
     screen.getByText("In-person");
     screen.getByText("Remote");
     screen.getByText("Summary text.");
+  });
+
+  it("gives the fee of the office it names on a line of its own, and none it hasn't", () => {
+    renderCard(therapist(), [], { fee: "From £60" });
+    expect(screen.getByText("From £60").closest("p")?.textContent).toBe("Fees: From £60");
+    expect(screen.getByText("Remote").closest("p")?.textContent).toBe("In-person, Remote");
+    cleanup();
+    renderCard(therapist());
+    expect(screen.queryByText(/Fees/)).toBeNull();
+  });
+
+  it("gives the fee on its own among therapists met online", () => {
+    renderCard(therapist({ sessionTypes: "Remote" }), [], { online: true, fee: "£70" });
+    expect(screen.getByText("£70").closest("p")?.textContent).toBe("Fees: £70");
   });
 
   it("keeps a full postcode without its town", () => {

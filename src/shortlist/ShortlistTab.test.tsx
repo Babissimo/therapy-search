@@ -1,9 +1,11 @@
 // @vitest-environment jsdom
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import type { ComponentProps } from "react";
 import { MemoryRouter } from "react-router";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { api } from "@/lib/api";
 import type { Pin } from "@/search/map/pins";
 import { ClosedGroupsContext, createClosedGroups, type ClosedGroups } from "./groups";
 import { ShortlistTab } from "./ShortlistTab";
@@ -25,16 +27,19 @@ function renderTab({ sought = [], groups = createClosedGroups(), ...props }: Pro
   let t = 1000;
   const store = createShortlistStore(null, () => t++);
   for (const c of cards) store.add(c);
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
-    <ShortlistContext.Provider value={store}>
-      <ClosedGroupsContext.Provider value={groups}>
-        <TooltipProvider>
-          <MemoryRouter>
-            <ShortlistTab sought={new Set(sought)} {...props} />
-          </MemoryRouter>
-        </TooltipProvider>
-      </ClosedGroupsContext.Provider>
-    </ShortlistContext.Provider>,
+    <QueryClientProvider client={client}>
+      <ShortlistContext.Provider value={store}>
+        <ClosedGroupsContext.Provider value={groups}>
+          <TooltipProvider>
+            <MemoryRouter>
+              <ShortlistTab sought={new Set(sought)} {...props} />
+            </MemoryRouter>
+          </TooltipProvider>
+        </ClosedGroupsContext.Provider>
+      </ShortlistContext.Provider>
+    </QueryClientProvider>,
   );
   return store;
 }
@@ -45,6 +50,11 @@ const entry = (name: string) => screen.getByRole("heading", { name }).closest("l
 const names = () => screen.getAllByRole("heading", { level: 3 }).map((h) => h.textContent);
 /** The groups shown, by the status each heading's button opens and closes. */
 const groupsShown = () => screen.getAllByRole("heading", { level: 2 }).map((h) => h.querySelector("button")?.dataset.groupToggle);
+
+// Each card's office is asked about; these profiles name no fee unless a test says otherwise.
+beforeEach(() => {
+  vi.spyOn(api, "office").mockResolvedValue({});
+});
 
 afterEach(() => {
   vi.useRealTimers();
@@ -102,6 +112,21 @@ describe("ShortlistTab", () => {
     renderTab({ sought: ["grief"] }, card("Ann-AAAAAAAA", "Ann"));
     screen.getByText("Grief");
     expect(screen.queryByText("Anxiety")).toBeNull();
+  });
+
+  it("gives each card the fee its profile names for its office, as the results do", async () => {
+    const office = vi.spyOn(api, "office").mockResolvedValue({ cost: "£65" });
+    renderTab({}, card("Ann-AAAAAAAA", "Ann"));
+    await screen.findByText("£65");
+    expect(office).toHaveBeenCalledWith("Ann-AAAAAAAA", "LEEDS LS1", expect.any(AbortSignal));
+  });
+
+  it("asks nothing about the offices of a closed group", async () => {
+    const groups = createClosedGroups();
+    groups.toggle("toContact");
+    renderTab({ groups }, card("Ann-AAAAAAAA", "Ann"));
+    await act(async () => {});
+    expect(api.office).not.toHaveBeenCalled();
   });
 
   it("keeps a removed therapist in place, dimmed, until they are added back", () => {

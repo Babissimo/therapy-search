@@ -7,11 +7,13 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
 import { ShortlistButton } from "@/shortlist/ShortlistButton";
 import { soughtTerms } from "./activeFilters";
+import { feeText } from "./fee";
 import { LocationNotice } from "./LocationNotice";
 import { listEntries, pinLabel, type Pin } from "./map/pins";
 import { reachLine, resultCount } from "./reach";
 import { ResultsError } from "./ResultsError";
 import { TherapistCard, TherapistCardSkeleton } from "./TherapistCard";
+import { useOffices } from "./useOffices";
 import type { SearchResults } from "./useResults";
 
 type Props = {
@@ -45,6 +47,7 @@ export function Results(props: Props) {
 
 function ResultsList({ params, results, listRef, pins = [], unplaced = [], selected, onHighlight, online = false }: Props) {
   const { query, first, therapists, searchedPlace } = results;
+  const { officeOf } = useOffices(therapists, !params.flags.LocationSearchOutsideUK);
   if (query.isPending) {
     return (
       <div className="space-y-4" aria-busy>
@@ -77,6 +80,7 @@ function ResultsList({ params, results, listRef, pins = [], unplaced = [], selec
   const reach = reachLine(therapists, count ?? 0, searchedPlace !== undefined);
   const highlight = (slug: string) => (on: boolean) => onHighlight?.(on ? slug : undefined);
   const sought = soughtTerms(params);
+  const feeOf = (t: Therapist) => feeText(officeOf(t)?.cost);
 
   return (
     // Dims while the next search's results are on their way.
@@ -113,9 +117,16 @@ function ResultsList({ params, results, listRef, pins = [], unplaced = [], selec
               className={cn("rounded-xl fade-in-0 motion-safe:animate-in", marked && t && "ring-2 ring-highlight")}
             >
               {t ? (
-                <TherapistCard therapist={t} sought={sought} online={online} action={<ShortlistButton therapist={t} />} onHighlight={highlight(t.slug)} />
+                <TherapistCard
+                  therapist={t}
+                  sought={sought}
+                  online={online}
+                  action={<ShortlistButton therapist={t} />}
+                  fee={feeOf(t)}
+                  onHighlight={highlight(t.slug)}
+                />
               ) : (
-                <PinGroup pin={entry.pin} marked={marked} sought={sought} highlight={highlight} />
+                <PinGroup pin={entry.pin} marked={marked} sought={sought} feeOf={feeOf} highlight={highlight} />
               )}
             </li>
           );
@@ -158,10 +169,16 @@ function SlowNote({ loading, whole }: { loading: boolean; whole: boolean }) {
   );
 }
 
-type PinGroupProps = { pin: Pin; marked: boolean; sought: ReadonlySet<string>; highlight: (slug: string) => (on: boolean) => void };
+type PinGroupProps = {
+  pin: Pin;
+  marked: boolean;
+  sought: ReadonlySet<string>;
+  feeOf: (t: Therapist) => string | undefined;
+  highlight: (slug: string) => (on: boolean) => void;
+};
 
 /** Everyone at a stacked pin, under the place they list. */
-function PinGroup({ pin, marked, sought, highlight }: PinGroupProps) {
+function PinGroup({ pin, marked, sought, feeOf, highlight }: PinGroupProps) {
   const headingId = useId();
   return (
     // A group rather than a section, which would make every place a landmark.
@@ -178,7 +195,14 @@ function PinGroup({ pin, marked, sought, highlight }: PinGroupProps) {
       <ul className="space-y-3">
         {pin.therapists.map((t) => (
           <li key={t.slug}>
-            <TherapistCard therapist={t} sought={sought} grouped action={<ShortlistButton therapist={t} />} onHighlight={highlight(t.slug)} />
+            <TherapistCard
+              therapist={t}
+              sought={sought}
+              grouped
+              action={<ShortlistButton therapist={t} />}
+              fee={feeOf(t)}
+              onHighlight={highlight(t.slug)}
+            />
           </li>
         ))}
       </ul>

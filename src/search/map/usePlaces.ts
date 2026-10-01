@@ -1,8 +1,9 @@
 import { useQueries, useQuery } from "@tanstack/react-query";
-import { canonicalLocation } from "@shared/location";
+import { canonicalLocation, classifyLocation } from "@shared/location";
 import { SEARCH_MILES } from "@shared/query";
 import type { TherapistCard } from "@shared/types";
 import { api } from "@/lib/api";
+import { useOffices } from "@/search/useOffices";
 import { choosePoint, type Point } from "./geo";
 import { layoutPins, lookupText, officeDistrict, type LookupResult, type Pin } from "./pins";
 
@@ -50,37 +51,6 @@ export function useCardLookups(locations: (string | undefined)[], outsideUK: boo
 }
 
 /**
- * The postcode of each therapist's office in the district their card gives, where their profile has one, and whether any
- * is still being asked for. Asked only of cards giving no more than a district, at home, and kept for the session; an
- * answer nothing shows any more is no longer waited for.
- */
-export function useOfficePostcodes(
-  therapists: TherapistCard[],
-  enabled: boolean,
-): { officeOf: (therapist: TherapistCard) => string | undefined; asking: boolean } {
-  const asked = enabled
-    ? therapists.flatMap((t) => {
-        const outcode = officeDistrict(t.location);
-        return outcode ? [{ slug: t.slug, outcode }] : [];
-      })
-    : [];
-  const queries = useQueries({
-    queries: asked.map(({ slug, outcode }) => ({
-      queryKey: ["office", { slug, outcode }],
-      queryFn: ({ signal }: { signal: AbortSignal }) => api.office(slug, outcode, signal),
-      staleTime: Infinity,
-      gcTime: Infinity,
-    })),
-  });
-  const answers = new Map(asked.map(({ slug, outcode }, i) => [`${slug} ${outcode}`, queries[i]?.data] as const));
-  const officeOf = (therapist: TherapistCard) => {
-    const answer = answers.get(`${therapist.slug} ${officeDistrict(therapist.location)}`);
-    return answer?.found ? answer.postcode : undefined;
-  };
-  return { officeOf, asking: queries.some((query) => query.isPending) };
-}
-
-/**
  * The therapists' pins, those who can't be placed, and whether any card's place is still being looked up. A pin moves
  * to its office's postcode once that is placed, and until then, or if it can't be, stays where the card's location puts
  * it. Offices are left out of `placing`, so the map never waits on UKCP to frame, and counted in `moving`, as a pin they
@@ -91,7 +61,14 @@ export function usePins(
   centre: { point?: Point; settled: boolean },
   outsideUK: boolean,
 ): { pins: Pin[]; unplaced: TherapistCard[]; placing: boolean; moving: boolean } {
-  const { officeOf, asking } = useOfficePostcodes(therapists, !outsideUK);
+  const offices = useOffices(therapists, !outsideUK);
+  // Only a card giving no more than a district is placed better by its office's postcode, and only by one in that district.
+  const officeOf = (therapist: TherapistCard) => {
+    const district = officeDistrict(therapist.location);
+    const postcode = district ? offices.officeOf(therapist)?.postcode : undefined;
+    const office = postcode === undefined ? undefined : classifyLocation(postcode);
+    return office?.kind === "postcode" && office.outcode === district ? postcode : undefined;
+  };
   const lookupFor = useCardLookups([...therapists.map((t) => t.location), ...therapists.map(officeOf)], outsideUK);
   const placeOf = (therapist: TherapistCard): LookupResult | undefined => {
     const office = officeOf(therapist);
@@ -104,6 +81,6 @@ export function usePins(
     pins,
     unplaced,
     placing: therapists.some((t) => lookupFor(t.location) === undefined),
-    moving: asking || therapists.some((t) => officeOf(t) !== undefined && lookupFor(officeOf(t)) === undefined),
+    moving: therapists.some((t) => (officeDistrict(t.location) && offices.pending(t)) || (officeOf(t) !== undefined && lookupFor(officeOf(t)) === undefined)),
   };
 }

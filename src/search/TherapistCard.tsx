@@ -1,4 +1,4 @@
-import { Armchair, MapPin, Video, type LucideIcon } from "lucide-react";
+import { Armchair, Banknote, MapPin, Video, type LucideIcon } from "lucide-react";
 import type { ComponentProps, ReactNode } from "react";
 import { Link } from "react-router";
 import { classifyLocation } from "@shared/location";
@@ -23,10 +23,12 @@ type Props = {
   online?: boolean;
   /** A control beside the name, such as the shortlist's bookmark. */
   action?: ReactNode;
+  /** The fee at the office the card names, once the therapist's profile has been read. */
+  fee?: string;
   onHighlight?: (on: boolean) => void;
 };
 
-export function TherapistCard({ therapist: t, sought, grouped = false, online = false, heading, action, onHighlight }: Props) {
+export function TherapistCard({ therapist: t, sought, grouped = false, online = false, heading, action, fee, onHighlight }: Props) {
   const profile = useProfileLink();
   const where = grouped || online ? undefined : placeOf(t);
   // UKCP's "0.2 miles from E8 3DQ" repeats the searched place, which the list already names.
@@ -60,6 +62,15 @@ export function TherapistCard({ therapist: t, sought, grouped = false, online = 
         )
       }
       meets={meets && <Sessions text={meets} />}
+      fee={
+        fee && (
+          <span className="flex items-center gap-1.5">
+            <Banknote aria-hidden className="size-4 shrink-0" />
+            <span className="sr-only">Fees: </span>
+            {fee}
+          </span>
+        )
+      }
       action={action}
       summary={t.summary}
       tags={t.tags.filter((tag) => sought.has(tag.toLowerCase()))}
@@ -88,13 +99,14 @@ type LayoutProps = ComponentProps<typeof Card> & {
   name: ReactNode;
   place?: ReactNode;
   meets?: ReactNode;
+  fee?: ReactNode;
   action?: ReactNode;
   summary?: ReactNode;
   tags?: string[];
 };
 
 /** The card's layout, which the card and its skeleton share. */
-function CardLayout({ heading: Heading = "h2", photo, name, place, meets, action, summary, tags = [], className, ...card }: LayoutProps) {
+function CardLayout({ heading: Heading = "h2", photo, name, place, meets, fee, action, summary, tags = [], className, ...card }: LayoutProps) {
   return (
     <Card className={cn("relative", className)} {...card}>
       <CardContent className="space-y-3">
@@ -104,6 +116,7 @@ function CardLayout({ heading: Heading = "h2", photo, name, place, meets, action
             <Heading className="font-heading text-lg leading-snug font-medium">{name}</Heading>
             {place && <p className="text-sm">{place}</p>}
             {meets && <p className="text-sm text-muted-foreground">{meets}</p>}
+            {fee && <p className="text-sm text-muted-foreground">{fee}</p>}
           </div>
           {/* Raised above the stretched link, which would otherwise take its clicks. */}
           {action && <div className="relative z-10 -mt-1 -mr-1 self-start">{action}</div>}

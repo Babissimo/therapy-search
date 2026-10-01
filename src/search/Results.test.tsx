@@ -11,7 +11,7 @@ import { listed } from "@/lib/listed.testing";
 import { LoadMore } from "./LoadMore";
 import type { Pin } from "./map/pins";
 import { Results } from "./Results";
-import { withHelpWithTerms, withText } from "./state";
+import { withFlag, withHelpWithTerms, withText } from "./state";
 import { useResults } from "./useResults";
 
 // Results keep the order they are answered in here; order.test.ts and useResults.test.tsx cover the order itself.
@@ -268,6 +268,33 @@ describe("Results", () => {
     expect(screen.getAllByText("Anxiety")).toHaveLength(3);
     expect(within(screen.getByRole("group")).getAllByText("Anxiety")).toHaveLength(2);
     expect(screen.queryByText("Trauma")).toBeNull();
+  });
+
+  it("gives each card the fee its profile names for its office once read, in a pin's box too", async () => {
+    const at = (slug: string, location: string) => ({ slug, name: `Therapist ${slug}`, initials: "T", tags: [], location });
+    const therapists = [at("a", "Leeds LS1"), at("b", "Leeds LS2"), at("c", "Leeds LS2")];
+    vi.spyOn(api, "search").mockResolvedValue(listed({ total: 3, from: 1, to: 3, notices: [], therapists }));
+    const office = vi.spyOn(api, "office").mockImplementation(async (slug) => (slug === "b" ? {} : { cost: `£${slug === "a" ? 60 : 70}` }));
+    const view = renderResults(leeds);
+    await screen.findByText("£60");
+    view.rerender(leeds, { pins: [{ key: "LS2", point: { lat: 53.8, lng: -1.55 }, therapists: therapists.slice(1), kind: "outcode" }] });
+    within(screen.getByRole("group")).getByText("£70");
+    expect(screen.getAllByText("Fees:")).toHaveLength(2);
+    expect(office.mock.calls.map(([slug, location]) => [slug, location])).toEqual([
+      ["a", "LEEDS LS1"],
+      ["b", "LEEDS LS2"],
+      ["c", "LEEDS LS2"],
+    ]);
+  });
+
+  it("asks nothing of profiles in a search outside the UK", async () => {
+    vi.spyOn(api, "search").mockResolvedValue(
+      listed({ total: 1, from: 1, to: 1, notices: [], therapists: [{ slug: "a", name: "Therapist a", initials: "T", tags: [], location: "Paris 75001" }] }),
+    );
+    const office = vi.spyOn(api, "office");
+    renderResults(withFlag(withText(emptyParams(), "Location", "Paris"), "LocationSearchOutsideUK", true));
+    await screen.findByRole("link", { name: "Therapist a" });
+    expect(office).not.toHaveBeenCalled();
   });
 
   it("counts plainly when the search has no location", async () => {

@@ -12,9 +12,9 @@ export function AboutText() {
         . It is not run by, affiliated with or endorsed by UKCP.
       </p>
       <p>
-        Searches and profiles come from UKCP's site as needed, including profiles read to pin a therapist at their office. Nothing is copied
-        into a database here. To spare UKCP's servers, each visitor is rate-limited and answers are reused: searches for 15 minutes (online
-        ones for 6 hours), profiles for an hour and office postcodes for 30 days.
+        Searches and profiles come from UKCP's site as needed, including profiles read for each card's office, to pin it and show its fee.
+        Nothing is copied into a database here. To spare UKCP's servers, each visitor is rate-limited and answers are reused: searches for
+        15 minutes (online ones for 6 hours), profiles for an hour and offices' postcodes and fees for 30 days.
       </p>
       <h3 className="font-medium">Who sees what</h3>
       <ul className="list-disc space-y-1.5 pl-4">
