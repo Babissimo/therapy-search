@@ -17,7 +17,7 @@ type Props = {
   onSelect: (pin: Pin) => void;
   /** Lets the selected pin go, as the pointer leaves it. */
   onDeselect?: () => void;
-  /** Badges and raises the pins of shortlisted therapists, which a map of the shortlist alone has no need to. */
+  /** Badges and raises the pins of shortlisted therapists not set aside, which a map of the shortlist alone has no need to. */
   marksShortlist?: boolean;
 };
 
@@ -58,7 +58,7 @@ export function PinsLayer({ pins, highlight, selected, onSelect, onDeselect, mar
   );
 }
 
-/** Redraws the clusters holding anyone who joins or leaves the shortlist; their own pins redraw themselves. */
+/** Redraws the clusters holding anyone who joins or leaves those picked out (the shortlist less those set aside); their own pins redraw themselves. */
 function useRedrawnClusters(cluster: RefObject<L.MarkerClusterGroup | null>, markers: Map<string, L.Marker>, shortlisted: ReadonlySet<string>) {
   const last = useRef(shortlisted);
   useEffect(() => {
@@ -70,7 +70,7 @@ function useRedrawnClusters(cluster: RefObject<L.MarkerClusterGroup | null>, mar
   }, [cluster, markers, shortlisted]);
 }
 
-/** A pin holding a shortlisted therapist rests raised; a cluster, with no therapists of its own, rests level. */
+/** A pin holding a therapist picked out rests raised; a cluster, with no therapists of its own, rests level. */
 function restingZ(therapists: Pin["therapists"] | undefined, shortlisted: ReadonlySet<string>): number {
   return therapists?.some((t) => shortlisted.has(t.slug)) ? SHORTLISTED_Z : 0;
 }
@@ -165,7 +165,7 @@ function TherapistPin({ pin, shortlisted, markers, onSelect }: TherapistPinProps
   // re-renders, such as another card being hovered, keep Leaflet's marker, icon and position rather than re-clustering it.
   const [position] = useState<[number, number]>(() => [pin.point.lat, pin.point.lng]);
   const [therapists] = useState(pin.therapists);
-  // Drawn afresh, and swapped in by Leaflet, only as this pin's own therapists join or leave the shortlist.
+  // Drawn afresh, and swapped in by Leaflet, only as this pin's own therapists join or leave those picked out.
   const listed = therapists.filter((t) => shortlisted.has(t.slug)).map((t) => t.slug).join(" ");
   const icon = useMemo(() => pinIcon(therapists, new Set(listed.split(" "))), [therapists, listed]);
   const only = pin.therapists.length === 1 ? pin.therapists[0] : undefined;

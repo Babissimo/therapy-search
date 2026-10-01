@@ -100,7 +100,7 @@ type ShortlistEntry = { addedAt: number; rank?: number; status?: Status; note?: 
 ### 4.4 Result cards
 
 - A shortlisted therapist's result card gains their status's label and icon under the place and session types. "To contact" adds nothing, since the filled bookmark says it already.
-- A therapist set aside has their card faded, as a removed card on the shortlist is, and the results map no longer picks out their pin as shortlisted. Results keep their order.
+- A therapist set aside has their card's portrait faded, its text kept at full contrast since the card stays live in every later search, and the results map no longer picks out their pin as shortlisted. Results keep their order.
 
 ### 4.5 The profile
 
@@ -126,7 +126,7 @@ type ShortlistEntry = { addedAt: number; rank?: number; status?: Status; note?: 
 - **Store:** entries read with and without the new fields; an unknown status and a wrongly typed note; choosing "To contact" clears the status; adding back returns status and note; the note's limit; another tab's changes carry the new fields.
 - **Tab:** one list in the shortlist's order with those set aside at its foot; "Set aside" starts closed, and its pins leave the map while it is; the tab's count leaves out those set aside; dragging within the list and within "Set aside"; a therapist set aside and brought back returns to their old place; focus and the announcement after a change by menu and by next step; removing and adding back.
 - **Track:** the steps, label and next-step button for each status, the paused step and the grey track; focus once the next-step button goes.
-- **Result cards:** the status line, nothing for "To contact", and the faded card when set aside.
+- **Result cards:** the status line, nothing for "To contact", and the faded portrait when set aside.
 - **Profile:** the track after the header; the contact offer after phone and email but not a website; "Yes" for a therapist not yet shortlisted adds them as "Contacted".
 - **Map:** `pinIcon`'s badge and accessible name for each status, and none on a stacked pin.
 - **Manual:** a pass in the browser in both themes, on a wide window and in the sheet at phone width: the cards' tracks, the menu and next step, dragging by pointer, touch and keyboard, "Set aside" opening and closing, the profile's track and the map's badges.

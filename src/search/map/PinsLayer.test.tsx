@@ -201,6 +201,30 @@ describe("PinsLayer", () => {
     expect(added.markers()).toHaveLength(0);
   });
 
+  it("stops picking out a therapist's pin while they are set aside, redrawing it only as they go into or out of it", async () => {
+    const shortlist = createShortlistStore(null);
+    shortlist.add(therapist("a"));
+    const added = watchAdded();
+    render(onMap(<PinsLayer pins={[pin(BRIGHTON, "a"), pin(HOVE, "b")]} highlight={highlight} marksShortlist onSelect={() => {}} />, shortlist));
+    await waitFor(() => expect(added.markers()).toHaveLength(2));
+    const a = added.markers().find((m) => iconName(m) === "Therapist a, on your shortlist");
+    added.forget();
+    const refreshed = vi.spyOn(L.MarkerClusterGroup.prototype, "refreshClusters");
+    act(() => shortlist.setStatus("a", "contacted"));
+    expect(refreshed).not.toHaveBeenCalled();
+    act(() => shortlist.setStatus("a", "setAside"));
+    expect(a && iconName(a)).toBe("Therapist a");
+    expect(a?.options.zIndexOffset).toBe(0);
+    expect(refreshed.mock.calls).toEqual([[[a]]]);
+    act(() => shortlist.setStatus("a", "toContact"));
+    expect(a && iconName(a)).toBe("Therapist a, on your shortlist");
+    expect(a?.options.zIndexOffset).toBeGreaterThan(0);
+    expect(refreshed.mock.calls).toEqual([[[a]], [[a]]]);
+    // Redrawn in place, as joining or leaving the shortlist redraws it, rather than added to the map again.
+    await new Promise((resolve) => setTimeout(resolve));
+    expect(added.markers()).toHaveLength(0);
+  });
+
   it("marks a pin again once the shortlist redraws it", async () => {
     const shown = { element: document.createElement("div"), setZIndexOffset: vi.fn() };
     vi.spyOn(L.MarkerClusterGroup.prototype, "getVisibleParent").mockReturnValue({

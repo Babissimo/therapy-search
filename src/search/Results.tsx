@@ -1,11 +1,12 @@
 import { MapPin } from "lucide-react";
-import { useEffect, useId, useState, type ReactNode, type Ref } from "react";
+import { useEffect, useId, useState, type ComponentProps, type ReactNode, type Ref } from "react";
 import { asksWhole, type SearchParams } from "@shared/query";
 import type { TherapistCard as Therapist } from "@shared/types";
 import { SkeletonText } from "@/components/SkeletonText";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
 import { ShortlistButton } from "@/shortlist/ShortlistButton";
+import { useShortlistStatus } from "@/shortlist/useShortlist";
 import { soughtTerms } from "./activeFilters";
 import { feeText } from "./fee";
 import { LocationNotice } from "./LocationNotice";
@@ -110,14 +111,7 @@ function ResultsList({ params, results, listRef, pins = [], unplaced = [], selec
               className={cn("rounded-xl fade-in-0 motion-safe:animate-in", marked && t && "ring-2 ring-highlight")}
             >
               {t ? (
-                <TherapistCard
-                  therapist={t}
-                  sought={sought}
-                  online={online}
-                  action={<ShortlistButton therapist={t} />}
-                  fee={feeOf(t)}
-                  onHighlight={highlight(t.slug)}
-                />
+                <ResultCard therapist={t} sought={sought} online={online} fee={feeOf(t)} onHighlight={highlight(t.slug)} />
               ) : (
                 <PinGroup pin={entry.pin} marked={marked} sought={sought} feeOf={feeOf} highlight={highlight} />
               )}
@@ -127,6 +121,12 @@ function ResultsList({ params, results, listRef, pins = [], unplaced = [], selec
       </ul>
     </section>
   );
+}
+
+/** A result's card with its bookmark, saying where the visitor stands with them once shortlisted. */
+function ResultCard(props: Omit<ComponentProps<typeof TherapistCard>, "action" | "status">) {
+  const status = useShortlistStatus(props.therapist.slug);
+  return <TherapistCard {...props} action={<ShortlistButton therapist={props.therapist} />} status={status} />;
 }
 
 /** The list's heading and the lines under it, shared by the list and its skeleton. */
@@ -194,14 +194,7 @@ function PinGroup({ pin, marked, sought, feeOf, highlight }: PinGroupProps) {
       <ul className="space-y-3">
         {pin.therapists.map((t) => (
           <li key={t.slug}>
-            <TherapistCard
-              therapist={t}
-              sought={sought}
-              grouped
-              action={<ShortlistButton therapist={t} />}
-              fee={feeOf(t)}
-              onHighlight={highlight(t.slug)}
-            />
+            <ResultCard therapist={t} sought={sought} grouped fee={feeOf(t)} onHighlight={highlight(t.slug)} />
           </li>
         ))}
       </ul>
