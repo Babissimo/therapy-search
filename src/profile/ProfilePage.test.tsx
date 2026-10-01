@@ -88,6 +88,16 @@ describe("ProfilePage's way back", () => {
     fireEvent.click(screen.getByRole("button", { name: "Back to results" }));
     await screen.findByText("Search page");
   });
+
+  it("tries a failed profile again, and hands the keyboard to the therapist's name once it arrives", async () => {
+    renderAt(["/therapist/Test-ABCDEFGH"], new ApiError(503, "UKCP answered 503."));
+    const retry = await screen.findByRole("button", { name: "Try again" });
+    vi.mocked(api.profile).mockResolvedValue(PROFILE);
+    act(() => retry.focus());
+    fireEvent.click(retry);
+    const name = await screen.findByRole("heading", { name: "Test Therapist" });
+    await waitFor(() => expect(document.activeElement).toBe(name));
+  });
 });
 
 describe("ProfilePage's header", () => {

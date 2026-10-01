@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { AtSign, ExternalLink, Globe, Mail, Phone, type LucideIcon } from "lucide-react";
 import { ukcpProfileUrl } from "@shared/query";
 import type { Profile } from "@shared/types";
+import { ErrorLine } from "@/components/ErrorLine";
 import { SkeletonText } from "@/components/SkeletonText";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
@@ -56,12 +57,12 @@ export function ContactList({ profile }: { profile: Profile }) {
         )}
       </ContactRow>
       {contact.error && (
-        <p className="text-sm text-destructive">
+        <ErrorLine>
           {contact.error.message}{" "}
           <Button variant="link" size="sm" className="h-auto p-0" onClick={() => contact.refetch()}>
             Try again
           </Button>
-        </p>
+        </ErrorLine>
       )}
     </div>
   );

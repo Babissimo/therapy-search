@@ -7,6 +7,11 @@ import type { OfficeDetails } from "@shared/office";
 import { limitConcurrency } from "./limit";
 
 export const UNREADABLE = "UKCP's pages have changed, so this site can't read them yet. Search on UKCP directly.";
+export const OFFLINE = "Couldn't reach the internet. Check your connection and try again.";
+export const STALLED = "This is taking too long. Check your connection and try again.";
+
+// Long enough for a whole-list search, UKCP's slowest answer, to come over a slow connection.
+const TIMEOUT_MS = 30_000;
 
 // Each uncached office lookup reads a profile from UKCP, which would otherwise see a page's twelve at once.
 const officeTurns = limitConcurrency(4);
@@ -34,11 +39,39 @@ function post(body: string | Record<string, string>): RequestInit {
   return { method: "POST", body: new URLSearchParams(body) };
 }
 
+/**
+ * What `url` answers, read by `body`, with a connection that drops or stalls reported in words a visitor can act on. A
+ * request still unanswered after TIMEOUT_MS has stalled, rather than leaving the page waiting for good.
+ */
+async function answer<B>(url: string, { signal, ...init }: RequestInit, body: (res: Response) => Promise<B>): Promise<B> {
+  // Aborted by the caller's signal or by the timeout, whichever comes first; AbortSignal.any reaches Safari only in 17.4.
+  const abort = new AbortController();
+  let stalled = false;
+  const timer = setTimeout(() => {
+    stalled = true;
+    abort.abort();
+  }, TIMEOUT_MS);
+  const cancel = () => abort.abort(signal?.reason);
+  if (signal?.aborted) cancel();
+  else signal?.addEventListener("abort", cancel);
+  try {
+    const res = await fetch(url, { ...init, signal: abort.signal });
+    if (!res.ok) throw await failure(res);
+    return await body(res);
+  } catch (error) {
+    if (stalled) throw new ApiError(0, STALLED);
+    // fetch rejects with a TypeError when no answer comes at all: offline, or the connection dropped.
+    if (error instanceof TypeError) throw new ApiError(0, OFFLINE);
+    throw error;
+  } finally {
+    clearTimeout(timer);
+    signal?.removeEventListener("abort", cancel);
+  }
+}
+
 /** The Worker passes UKCP's HTML through untouched; the page reads it here, in the browser. */
 async function request<T>(url: string, read: (html: string) => T, init: RequestInit): Promise<T> {
-  const res = await fetch(url, init);
-  if (!res.ok) throw await failure(res);
-  const html = await res.text();
+  const html = await answer(url, init, (res) => res.text());
   return readable(() => read(html));
 }
 
@@ -59,9 +92,7 @@ function listingsOf(html: string): Listings {
 }
 
 async function json<T>(url: string, init: RequestInit): Promise<T> {
-  const res = await fetch(url, init);
-  if (!res.ok) throw await failure(res);
-  return (await res.json()) as T;
+  return answer(url, init, (res) => res.json() as Promise<T>);
 }
 
 export const api = {

@@ -295,7 +295,7 @@ function SearchView({ params, onChange, wide }: ViewProps) {
         <div className="group/tabs flex min-h-0 flex-1">
           {/* Apart from the list, which goes inert as it is put away over the map, and stays put as it moves between the side
               bar and the sheet. There before a search starts, as a live region is heard only once it is there. */}
-          <ResultsStatus params={params} results={results} searching={searching} className="sr-only" />
+          <ResultsStatus params={params} results={results} searching={searching} />
           {!searching ? (
             <ListColumn wide={wide} tabs={tabs} top={!wide && toolbar("list")} topHidden={shortlistOpen} scroll={scroll}>
               {lists}

@@ -1,12 +1,12 @@
-import { Fragment, lazy, useEffect, type ReactNode } from "react";
+import { Fragment, lazy, useEffect, type ReactNode, type Ref } from "react";
 import { queryOptions, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, ChevronLeft, Diamond, ExternalLink, MapPin } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router";
 import type { Office, Profile, ProfileSection } from "@shared/types";
+import { FailedAlert, useFailure } from "@/components/FailedAlert";
 import { MapSlot } from "@/components/MapSlot";
 import { Portrait } from "@/components/Portrait";
 import { SkeletonText } from "@/components/SkeletonText";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -72,21 +72,21 @@ type Exits = { back?: ReactNode; close?: ReactNode };
 
 /** A therapist's profile, laid out by the width it is given, whether a page's or a drawer's. */
 export function ProfileBody({ slug, back, close }: { slug: string } & Exits) {
-  const { data: profile, error, isPending } = useQuery(profileQuery(slug));
+  const query = useQuery(profileQuery(slug));
+  const failure = useFailure(query, slug);
   const isMatch = useSearchMatch();
   const card = useOpeningCard(slug);
 
-  if (isPending) return <ProfileSkeleton back={back} close={close} />;
-  if (error) {
+  if (failure.error) {
     return (
       <div className="space-y-4">
         <StickyHeader back={back} close={close} />
-        <Alert variant="destructive">
-          <AlertDescription>{error.message}</AlertDescription>
-        </Alert>
+        <FailedAlert error={failure.error} retrying={failure.retrying} onRetry={failure.retry} />
       </div>
     );
   }
+  const profile = query.data;
+  if (profile === undefined) return <ProfileSkeleton back={back} close={close} />;
 
   const matches = matchingTags(profile, isMatch);
   const { long, short } = sectionsBySize(profile);
@@ -107,6 +107,7 @@ export function ProfileBody({ slug, back, close }: { slug: string } & Exits) {
             />
           }
           name={profile.name}
+          headingRef={failure.landing}
           location={
             profile.location && (
               <span className="flex gap-1.5">
@@ -224,10 +225,10 @@ function SectionSkeleton({ lines = 0, tags = 0 }: { lines?: number; tags?: numbe
   );
 }
 
-type IdentityProps = { photo: ReactNode; name: ReactNode; location?: ReactNode; contacts: ReactNode };
+type IdentityProps = { photo: ReactNode; name: ReactNode; location?: ReactNode; contacts: ReactNode; headingRef?: Ref<HTMLHeadingElement> };
 
 /** Who the therapist is and how to reach them, laid out for the header of the profile and of its skeleton. */
-function Identity({ photo, name, location, contacts }: IdentityProps) {
+function Identity({ photo, name, location, contacts, headingRef }: IdentityProps) {
   return (
     <div className="flex items-start gap-4">
       {/* Large for a first look, as far as UKCP's 200 px photos allow, then no taller than the text beside it once the header
@@ -242,7 +243,14 @@ function Identity({ photo, name, location, contacts }: IdentityProps) {
       </div>
       <div className="min-w-0 space-y-1.5">
         <div>
-          <h1 className="font-heading text-2xl leading-tight font-medium @lg:text-3xl">{name}</h1>
+          {/* Focused only by the page, when what held the keyboard goes. */}
+          <h1
+            ref={headingRef}
+            tabIndex={-1}
+            className="rounded-sm font-heading text-2xl leading-tight font-medium outline-none focus-visible:ring-3 focus-visible:ring-ring/50 @lg:text-3xl"
+          >
+            {name}
+          </h1>
           {location && <p className="text-sm text-muted-foreground">{location}</p>}
         </div>
         {contacts}

@@ -12,6 +12,7 @@ import {
 import { asksWhole, PAGE_SIZE, toQuery, type SearchParams } from "@shared/query";
 import type { SearchResult, TherapistCard } from "@shared/types";
 import type { Listings } from "@shared/ukcp/parseResults";
+import { useFailure, type Failure } from "@/components/FailedAlert";
 import { api } from "@/lib/api";
 import { FRESH_FOR } from "@/lib/queryClient";
 import { locationFellBack } from "./LocationNotice";
@@ -37,6 +38,8 @@ export type SearchResults = {
   loading: boolean;
   /** True while the last search's results show in place of this one's. */
   stale: boolean;
+  /** The first batch's failure, which shows alone, with nothing else of the search, until it is asked again and answers. */
+  failure: Failure;
 };
 
 /**
@@ -52,13 +55,14 @@ export function useResults(params: SearchParams, enabled = true): SearchResults 
     // Without a search, the last one's results would linger in its place.
     placeholderData: enabled ? keepPreviousData : undefined,
   });
+  const failure = useFailure(query, toQuery(params));
+  const failed = failure.error !== undefined;
   const arrived = query.data !== undefined && !query.isPlaceholderData;
   // A first batch cut from results already loaded comes before the nearest few could.
   const asksEarly = enabled && !asksWhole(params) && photosFromLoaded(client, params) === undefined;
   const early = useQuery({ ...earlyQuery(params), enabled: asksEarly && !arrived }).data;
-  // A failed batch is the search's failure, which shows alone.
-  const showsEarly = asksEarly && !arrived && !query.isError && early !== undefined && (early.therapists.length > 0 || early.total === 0);
-  const pages = showsEarly ? [early] : (query.data?.pages ?? []);
+  const showsEarly = asksEarly && !arrived && !failed && early !== undefined && (early.therapists.length > 0 || early.total === 0);
+  const pages = failed ? [] : showsEarly ? [early] : (query.data?.pages ?? []);
   const first = pages[0];
   const searched = first?.locationSearched;
   return {
@@ -66,8 +70,9 @@ export function useResults(params: SearchParams, enabled = true): SearchResults 
     first,
     therapists: distinct(pages),
     searchedPlace: searched !== undefined && !locationFellBack(params.text.Location, searched) ? searched : undefined,
-    loading: query.isPending && !showsEarly,
-    stale: query.isPlaceholderData && !showsEarly,
+    loading: query.isPending && !showsEarly && !failed,
+    stale: query.isPlaceholderData && !showsEarly && !failed,
+    failure,
   };
 }
 

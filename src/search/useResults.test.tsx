@@ -199,6 +199,44 @@ describe("useResults near a place", () => {
     expect([result.current.loading, result.current.therapists]).toEqual([false, []]);
   });
 
+  it("keeps a failed batch's error, alone, while it is asked again, with none of the nearest few", async () => {
+    const search = vi.spyOn(api, "search").mockRejectedValue(new Error("UKCP is down"));
+    answerEarly(12);
+    const { result } = renderHook(() => useResults(near("Leeds")), { wrapper: withClient() });
+    await waitFor(() => expect(result.current.failure.error?.message).toBe("UKCP is down"));
+    search.mockImplementation(() => new Promise(() => {}));
+    act(() => result.current.failure.retry());
+    await waitFor(() => expect(result.current.query.isFetching).toBe(true));
+    const { failure, therapists, loading, stale } = result.current;
+    expect([failure.error?.message, therapists, loading, stale]).toEqual(["UKCP is down", [], false, false]);
+  });
+
+  it("shows nothing of the last search while a failed one is asked again", async () => {
+    answerShuffled(located);
+    const { result, rerender } = renderHook((params) => useResults(params), { wrapper: withClient(), initialProps: emptyParams() });
+    await waitFor(() => expect(result.current.therapists).toHaveLength(12));
+    const search = vi.spyOn(api, "search").mockRejectedValue(new Error("UKCP is down"));
+    rerender(near("York"));
+    await waitFor(() => expect(result.current.failure.error).toBeDefined());
+    search.mockImplementation(() => new Promise(() => {}));
+    act(() => result.current.failure.retry());
+    await waitFor(() => expect(result.current.query.isPlaceholderData).toBe(true));
+    expect([result.current.failure.error?.message, result.current.therapists, result.current.stale]).toEqual(["UKCP is down", [], false]);
+  });
+
+  it("lets a failure go once another search is asked, so going back to it loads as usual", async () => {
+    const search = vi.spyOn(api, "search").mockRejectedValue(new Error("UKCP is down"));
+    const { result, rerender } = renderHook((params) => useResults(params), { wrapper: withClient(), initialProps: emptyParams() });
+    await waitFor(() => expect(result.current.failure.error).toBeDefined());
+    search.mockResolvedValue(listingsOf(cards));
+    rerender(near("York"));
+    await waitFor(() => expect(result.current.therapists).toHaveLength(12));
+    search.mockImplementation(() => new Promise(() => {}));
+    rerender(emptyParams());
+    await waitFor(() => expect(result.current.query.isFetching).toBe(true));
+    expect(result.current.failure.error).toBeUndefined();
+  });
+
   it("shows the batch alone when the nearest few fail", async () => {
     answerShuffled(located);
     vi.spyOn(api, "searchEarly").mockRejectedValue(new Error("Too many searches"));

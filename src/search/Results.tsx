@@ -13,6 +13,7 @@ import { LocationNotice } from "./LocationNotice";
 import { listEntries, pinLabel, type Pin } from "./map/pins";
 import { resultsHeading } from "./reach";
 import { ResultsError } from "./ResultsError";
+import { useSlowLine } from "./ResultsStatus";
 import { TherapistCard, TherapistCardSkeleton } from "./TherapistCard";
 import { useOffices } from "./useOffices";
 import type { SearchResults } from "./useResults";
@@ -38,11 +39,20 @@ const UKCP_PAGING = /^(Location searches are grouped by distance|This search ret
 
 /** A search's list. Its ResultsStatus goes outside it, as the list is marked busy and dimmed while it loads. */
 export function Results({ params, results, listRef, pins = [], unplaced = [], selected, onHighlight, online = false }: Props) {
-  const { query, first, therapists, searchedPlace, loading, stale } = results;
+  const { first, therapists, searchedPlace, loading, stale, failure } = results;
   const { officeOf } = useOffices(therapists, !params.flags.LocationSearchOutsideUK);
+  // Kept from screen readers, which the status region tells.
+  const slow = useSlowLine(params, results);
+  const slowNote = slow && (
+    <p aria-hidden className="mb-4 text-sm text-muted-foreground">
+      {slow}
+    </p>
+  );
+  if (failure.error) return <ResultsError error={failure.error} params={params} retrying={failure.retrying} onRetry={failure.retry} />;
   if (loading) {
     return (
       <div className="space-y-4" aria-busy>
+        {slowNote}
         <div aria-hidden>
           {/* Online, the heading stands alone. Near a place, the note says how the list is ordered as well as what its pins
               show, which takes two lines. */}
@@ -58,7 +68,6 @@ export function Results({ params, results, listRef, pins = [], unplaced = [], se
       </div>
     );
   }
-  if (query.isLoadingError) return <ResultsError error={query.error} params={params} />;
 
   const count = first?.total;
   const located = searchedPlace !== undefined;
@@ -67,46 +76,50 @@ export function Results({ params, results, listRef, pins = [], unplaced = [], se
   const feeOf = (t: Therapist) => feeText(officeOf(t)?.cost);
 
   return (
-    // Dims while the next search's results are on their way.
-    <section aria-busy={stale} className={cn("space-y-4 motion-safe:transition-opacity", stale && "opacity-60")}>
-      {/* The heading and each entry fade in as they replace their skeleton or arrive, and again as their tab is shown,
-          which starts their animations afresh. Side by side rather than one within another, so no fade dims another. */}
-      <div className="space-y-4 fade-in-0 motion-safe:animate-in">
-        {/* With no one found, the heading has said so, and the place still says where. Online, the heading stands alone. */}
-        <Summary
-          title={resultsHeading(therapists, count, located)}
-          sub={searchedPlace ?? (!online && therapists.length > 0 && `${therapists.length} of ${count}`)}
-          note={!online && therapists.length > 0 && listNote(located, unplaced.length)}
-        />
-        <LocationNotice typed={params.text.Location} searched={first?.locationSearched} />
-        {first?.notices.filter((notice) => !UKCP_PAGING.test(notice)).map((notice) => (
-          <Alert key={notice}>
-            <AlertDescription>{notice}</AlertDescription>
-          </Alert>
-        ))}
-      </div>
-      <ul ref={listRef} className="space-y-4">
-        {listEntries(therapists, pins).map((entry) => {
-          const { key, pin, therapist: t } = entry;
-          const marked = pin !== undefined && pin.key === selected?.key;
-          return (
-            // Marked by pin, so the page can bring a selected pin's entry into view.
-            <li
-              key={key}
-              data-pin={pin?.key}
-              aria-current={marked || undefined}
-              className={cn("rounded-xl fade-in-0 motion-safe:animate-in", marked && t && "ring-2 ring-highlight")}
-            >
-              {t ? (
-                <ResultCard therapist={t} sought={sought} online={online} fee={feeOf(t)} onHighlight={highlight(t.slug)} />
-              ) : (
-                <PinGroup pin={entry.pin} marked={marked} sought={sought} feeOf={feeOf} highlight={highlight} />
-              )}
-            </li>
-          );
-        })}
-      </ul>
-    </section>
+    <>
+      {slowNote}
+      {/* Dims while the next search's results are on their way. */}
+      <section aria-busy={stale} className={cn("space-y-4 motion-safe:transition-opacity", stale && "opacity-60")}>
+        {/* The heading and each entry fade in as they replace their skeleton or arrive, and again as their tab is shown,
+            which starts their animations afresh. Side by side rather than one within another, so no fade dims another. */}
+        <div className="space-y-4 fade-in-0 motion-safe:animate-in">
+          {/* With no one found, the heading has said so, and the place still says where. Online, the heading stands alone. */}
+          <Summary
+            headingRef={failure.landing}
+            title={resultsHeading(therapists, count, located)}
+            sub={searchedPlace ?? (!online && therapists.length > 0 && `${therapists.length} of ${count}`)}
+            note={!online && therapists.length > 0 && listNote(located, unplaced.length)}
+          />
+          <LocationNotice typed={params.text.Location} searched={first?.locationSearched} />
+          {first?.notices.filter((notice) => !UKCP_PAGING.test(notice)).map((notice) => (
+            <Alert key={notice}>
+              <AlertDescription>{notice}</AlertDescription>
+            </Alert>
+          ))}
+        </div>
+        <ul ref={listRef} className="space-y-4">
+          {listEntries(therapists, pins).map((entry) => {
+            const { key, pin, therapist: t } = entry;
+            const marked = pin !== undefined && pin.key === selected?.key;
+            return (
+              // Marked by pin, so the page can bring a selected pin's entry into view.
+              <li
+                key={key}
+                data-pin={pin?.key}
+                aria-current={marked || undefined}
+                className={cn("rounded-xl fade-in-0 motion-safe:animate-in", marked && t && "ring-2 ring-highlight")}
+              >
+                {t ? (
+                  <ResultCard therapist={t} sought={sought} online={online} fee={feeOf(t)} onHighlight={highlight(t.slug)} />
+                ) : (
+                  <PinGroup pin={entry.pin} marked={marked} sought={sought} feeOf={feeOf} highlight={highlight} />
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      </section>
+    </>
   );
 }
 
@@ -117,10 +130,13 @@ function ResultCard(props: Omit<ComponentProps<typeof TherapistCard>, "action" |
 }
 
 /** The list's heading and the lines under it, shared by the list and its skeleton. */
-function Summary({ title, sub, note }: { title: ReactNode; sub?: ReactNode; note?: ReactNode }) {
+function Summary({ title, sub, note, headingRef }: { title: ReactNode; sub?: ReactNode; note?: ReactNode; headingRef?: Ref<HTMLHeadingElement> }) {
   return (
     <div className="space-y-1">
-      <h2 className="font-heading text-xl font-medium">{title}</h2>
+      {/* Focused only by the page, when what held the keyboard goes. */}
+      <h2 ref={headingRef} tabIndex={-1} className="rounded-sm font-heading text-xl font-medium outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
+        {title}
+      </h2>
       {sub && <p className="text-sm text-muted-foreground">{sub}</p>}
       {note && <p className="text-xs text-muted-foreground">{note}</p>}
     </div>
