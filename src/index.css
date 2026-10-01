@@ -25,6 +25,7 @@
     --color-chart-1: var(--chart-1);
     --color-ring: var(--ring);
     --color-input: var(--input);
+    --color-control: var(--control);
     --color-border: var(--border);
     --color-destructive: var(--destructive);
     --color-highlight: var(--highlight);
@@ -79,6 +80,8 @@
     --highlight: oklch(0.645 0.137 69.5);
     --border: oklch(0.917 0.007 174.4);
     --input: oklch(0.917 0.007 174.4);
+    /* The edge of a box to type in or tick, at 3:1 against the page and cards, so an empty one can be found. */
+    --control: oklch(0.64 0.02 187.4);
     --ring: oklch(0.606 0.05 187.2);
     --chart-1: oklch(0.87 0 0);
     --chart-2: oklch(0.556 0 0);
@@ -116,6 +119,7 @@
     --highlight: oklch(0.77 0.142 75.4);
     --border: oklch(1 0 0 / 10%);
     --input: oklch(1 0 0 / 15%);
+    --control: oklch(0.56 0.02 187.4);
     --ring: oklch(0.653 0.048 187.3);
     --chart-1: oklch(0.87 0 0);
     --chart-2: oklch(0.556 0 0);
@@ -156,6 +160,20 @@
     }
 }
 
+/* One focus mark for whatever the keyboard reaches: a solid outline in the text's ink, clear of the control, which
+   forced colours keep. It stands in for the faint rings the components draw as box-shadows, which forced colours drop.
+   Outside any layer, so it outranks the utilities' outline-none. */
+:focus-visible {
+  outline: 2px solid var(--foreground);
+  outline-offset: 2px;
+  --tw-ring-shadow: 0 0 #0000;
+}
+/* Inside what fills a scrolling or clipped box, whose edges would hide an outline drawn beyond them. */
+[role="tabpanel"]:focus-visible,
+.leaflet-container:focus-visible {
+  outline-offset: -2px;
+}
+
 /* Leaflet's own elements, brought in line with the theme. */
 @layer base {
   .leaflet-container {
@@ -180,7 +198,7 @@
     @apply hidden;
   }
   .leaflet-control-attribution {
-    @apply rounded-md bg-muted! px-1! py-0.5! text-[10px] leading-none! text-muted-foreground!;
+    @apply rounded-md bg-muted! px-1! py-0.5! text-xs leading-none! text-muted-foreground!;
   }
   /* A marked pin's ring is a disc behind each avatar, which shows past the avatars' own rings, so on a stack it traces
      the circles. Amber stands out against the slate-tinted tiles, light and dark, where the theme's slates don't. It
