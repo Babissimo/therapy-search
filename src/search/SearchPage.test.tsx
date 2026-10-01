@@ -7,7 +7,7 @@ import type { SearchResult, TherapistCard } from "@shared/types";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { api } from "@/lib/api";
 import { listed } from "@/lib/listed.testing";
-import { ClosedGroupsContext, createClosedGroups, type ClosedGroups } from "@/shortlist/groups";
+import { createSetAsideView, SetAsideContext, type SetAsideView } from "@/shortlist/setAside";
 import { createShortlistStore, type ShortlistStore } from "@/shortlist/store";
 import { ShortlistContext } from "@/shortlist/useShortlist";
 import type { Highlight } from "./map/highlight";
@@ -158,13 +158,16 @@ function Url() {
   );
 }
 
-/** The page's shortlist, empty at each test's start, and its groups as a page load starts them. Each addition is newer than the last, as a visitor's clicks are. */
+/**
+ * The page's shortlist, empty at each test's start, and its "Set aside" section as a page load starts it. Each addition is newer
+ * than the last, as a visitor's clicks are.
+ */
 let shortlist: ShortlistStore;
-let groups: ClosedGroups;
+let setAside: SetAsideView;
 beforeEach(() => {
   let now = 0;
   shortlist = createShortlistStore(null, () => ++now);
-  groups = createClosedGroups();
+  setAside = createSetAsideView();
 });
 
 function renderAt(url: string, ...pages: TherapistCard[][]) {
@@ -182,7 +185,7 @@ function renderPage(url: string, client = new QueryClient({ defaultOptions: { qu
   render(
     <QueryClientProvider client={client}>
       <ShortlistContext.Provider value={shortlist}>
-        <ClosedGroupsContext.Provider value={groups}>
+        <SetAsideContext.Provider value={setAside}>
           <TooltipProvider>
             <MemoryRouter initialEntries={[url]}>
               <Routes>
@@ -192,7 +195,7 @@ function renderPage(url: string, client = new QueryClient({ defaultOptions: { qu
               </Routes>
             </MemoryRouter>
           </TooltipProvider>
-        </ClosedGroupsContext.Provider>
+        </SetAsideContext.Provider>
       </ShortlistContext.Provider>
     </QueryClientProvider>,
   );
@@ -940,7 +943,7 @@ describe("SearchPage", () => {
     expect(mapPins()).toEqual([`Pin ${key(BRIGHTON)}: d`, `Pin ${key(HOVE)}: c`]);
   });
 
-  it("maps the shortlist's open groups alone, keeping which are open as the tabs change", async () => {
+  it("maps those set aside only while their section is open, keeping it open as the tabs change", async () => {
     screenIs(true);
     placeByDistrict();
     shortlist.add(therapist("c", "Hove BN3"));
@@ -950,14 +953,14 @@ describe("SearchPage", () => {
     await within(results()).findByRole("link", { name: "Therapist a" });
     pick(/^Shortlist/);
     await waitFor(() => expect(mapPins()).toEqual([`Pin ${key(HOVE)}: c`]));
-    fireEvent.click(screen.getByRole("button", { name: "Set aside, 1 therapist" }));
+    fireEvent.click(screen.getByRole("button", { name: "Set aside, 1 therapist", expanded: false }));
     await waitFor(() => expect(mapPins()).toEqual([`Pin ${key(BRIGHTON)}: d`, `Pin ${key(HOVE)}: c`]));
-    fireEvent.click(screen.getByRole("button", { name: "To contact, 1 therapist" }));
-    await waitFor(() => expect(mapPins()).toEqual([`Pin ${key(BRIGHTON)}: d`]));
     pick("Results");
     pick(/^Shortlist/);
-    screen.getByRole("button", { name: "To contact, 1 therapist", expanded: false });
-    await waitFor(() => expect(mapPins()).toEqual([`Pin ${key(BRIGHTON)}: d`]));
+    screen.getByRole("button", { name: "Set aside, 1 therapist", expanded: true });
+    await waitFor(() => expect(mapPins()).toEqual([`Pin ${key(BRIGHTON)}: d`, `Pin ${key(HOVE)}: c`]));
+    fireEvent.click(screen.getByRole("button", { name: "Set aside, 1 therapist", expanded: true }));
+    await waitFor(() => expect(mapPins()).toEqual([`Pin ${key(HOVE)}: c`]));
   });
 
   it("counts everyone on the shortlist but those set aside", async () => {
@@ -970,7 +973,7 @@ describe("SearchPage", () => {
     screen.getByRole("tab", { name: "Shortlist, 1 therapist" });
   });
 
-  it("counts those not on the map only among the groups that are open", async () => {
+  it("counts those set aside among those not on the map only while their section is open", async () => {
     screenIs(true);
     placeByDistrict();
     shortlist.add(therapist("c", "Hove BN3"));
