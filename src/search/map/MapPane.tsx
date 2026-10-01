@@ -31,8 +31,11 @@ export type MapPaneProps = {
   onSelect: (pin: Pin) => void;
   /** Lets the selected pin go, as the map is clicked away from any pin or, where the pointer can hover, the pointer leaves the pin. */
   onDeselect: () => void;
-  /** Searches at the postcode nearest the middle of the map, answering false when it is the one already searched. */
-  onSearchArea: (postcode: string) => boolean;
+  /**
+   * Searches at the postcode nearest the middle of the map, answering false when it is the one already searched; absent
+   * where the map shows no search.
+   */
+  onSearchArea?: (postcode: string) => boolean;
   /** The search reads its location as a place anywhere in the world, so the map isn't kept to the UK. */
   outsideUK?: boolean;
   /** How much of the map's bottom, in pixels, lies under the results, given the map's height. */

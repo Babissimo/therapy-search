@@ -21,19 +21,19 @@ type Props = {
   settled: boolean;
   /** How much of the map's bottom, in pixels, lies under something laid over it, given the map's height. */
   coveredBelow?: (height: number) => number;
-  /** Searches at the postcode, answering false when it is the one already searched. */
-  onSearch: (postcode: string) => boolean;
+  /** Searches at the postcode, answering false when it is the one already searched; absent where there is no search to move. */
+  onSearch?: (postcode: string) => boolean;
   /** Frames the search again; absent when there is nothing to frame. */
   onRecentre?: () => void;
 };
 
 /**
  * Once the visitor moves the map from where the search framed it to somewhere a search could mean, offers a search at
- * the postcode nearest the middle of the map in view, and to frame the search again. It measures the move from the
- * view it mounts on, so its owner mounts it afresh as each search is framed.
+ * the postcode nearest the middle of the map in view, where the map shows a search, and to frame it again. It measures
+ * the move from the view it mounts on, so its owner mounts it afresh as each search is framed.
  */
 export function MovedMapButtons({ centre, settled, coveredBelow, onSearch, onRecentre }: Props) {
-  const near = usePostcodeNear((postcode) => (onSearch(postcode) ? undefined : ALREADY_SEARCHED), {
+  const near = usePostcodeNear((postcode) => (onSearch?.(postcode) === false ? ALREADY_SEARCHED : undefined), {
     none: NO_POSTCODE_HERE,
     failed: () => AREA_UNKNOWN,
   });
@@ -54,7 +54,8 @@ export function MovedMapButtons({ centre, settled, coveredBelow, onSearch, onRec
   }, [map, dismiss]);
   const covered = coveredBelow?.(map.getSize().y) ?? 0;
   // Read as the map lies now, since raising the sheet re-aims the part in view without a move.
-  const wanted = settled && !recentred && movedElsewhere(seen, framed, middleInView(map, covered), centre);
+  const offers = onSearch !== undefined || onRecentre !== undefined;
+  const wanted = offers && settled && !recentred && movedElsewhere(seen, framed, middleInView(map, covered), centre);
   const shown = usePresence(wanted);
   const group = useRef<HTMLDivElement>(null);
   // Focus on a button goes to the map, rather than dropping, as the search or framing it starts takes the buttons away or
@@ -84,17 +85,19 @@ export function MovedMapButtons({ centre, settled, coveredBelow, onSearch, onRec
         )}
         {/* A pill however many buttons it holds, overriding the group's own rounding of its last one. */}
         <ButtonGroup ref={group} className="rounded-full shadow-md [&>[data-slot]:not(:has(~[data-slot]))]:rounded-r-full!">
-          <Button
-            type="button"
-            variant="outline"
-            className="rounded-full px-3 dark:bg-background"
-            // Not disabled while looking, which would drop focus; a second press is ignored.
-            aria-disabled={near.looking}
-            onClick={() => near.lookNear(() => Promise.resolve(middleInView(map, covered)))}
-          >
-            {near.looking ? <Loader2 aria-hidden className="animate-spin" /> : <Search aria-hidden />}
-            Search this area
-          </Button>
+          {onSearch && (
+            <Button
+              type="button"
+              variant="outline"
+              className="rounded-full px-3 dark:bg-background"
+              // Not disabled while looking, which would drop focus; a second press is ignored.
+              aria-disabled={near.looking}
+              onClick={() => near.lookNear(() => Promise.resolve(middleInView(map, covered)))}
+            >
+              {near.looking ? <Loader2 aria-hidden className="animate-spin" /> : <Search aria-hidden />}
+              Search this area
+            </Button>
+          )}
           {onRecentre && (
             <Button
               type="button"

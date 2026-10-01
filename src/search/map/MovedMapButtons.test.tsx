@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { useEffect } from "react";
 import { afterEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import { ApiError, api } from "@/lib/api";
@@ -69,6 +69,13 @@ function renderAt(
   render(<MovedMapButtons centre={BRIGHTON} settled={settled} onSearch={onSearch} onRecentre={onRecentre} coveredBelow={coveredBelow} />);
   act(() => leaflet.show(view));
   return onSearch;
+}
+
+/** Mounts the buttons on a map framed around `framed` with no search to offer, as the shortlist's map is, then shows `view`. */
+function renderWithoutSearch(view: View, onRecentre?: () => void, framed = viewAround(BRIGHTON, 5)) {
+  leaflet.start(framed);
+  render(<MovedMapButtons settled onRecentre={onRecentre} />);
+  act(() => leaflet.show(view));
 }
 
 /** Moves the map once its effects run, as the framing of a search does. */
@@ -210,6 +217,14 @@ describe("MovedMapButtons", () => {
     expect(onRecentre).toHaveBeenCalledOnce();
     expect(screen.queryByRole("group")).toBeNull();
     expect(document.activeElement).toBe(leaflet.container);
+  });
+
+  it("offers only to recentre where there is no search to make, and nothing with no frame to return to either", () => {
+    renderWithoutSearch(viewAround(HOVE, 5), vi.fn());
+    expect(within(screen.getByRole("group")).getAllByRole("button").map((b) => b.textContent)).toEqual(["Recentre"]);
+    cleanup();
+    renderWithoutSearch(viewAround(HOVE, 5));
+    expect(screen.queryByRole("group")).toBeNull();
   });
 
   it("ignores a recentre while the search it offers looks for a postcode", async () => {

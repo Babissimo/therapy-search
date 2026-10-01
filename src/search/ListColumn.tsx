@@ -9,12 +9,14 @@ type Props = {
   tabs: ReactNode;
   /** The toolbar and filter chips, above the tabs on a phone; wide screens set them to the list's right instead. */
   top: ReactNode;
+  /** Hides `top`, keeping what is typed or open in it. */
+  topHidden: boolean;
   scroll: ReturnType<typeof useRememberedScroll>;
   children: ReactNode;
 };
 
 /** The results and shortlist taking the page, where there is no map for them to sit beside. */
-export function ListColumn({ wide, tabs, top, scroll, children }: Props) {
+export function ListColumn({ wide, tabs, top, topHidden, scroll, children }: Props) {
   const onScroll = (e: { currentTarget: HTMLElement }) => scroll.save(e.currentTarget.scrollTop);
   return (
     // The site's name heads the list alone, leaving what stands to its right the window's full height.
@@ -38,7 +40,9 @@ export function ListColumn({ wide, tabs, top, scroll, children }: Props) {
           <Morph name="list">
             <div ref={scroll.ref} onScroll={onScroll} className="relative min-h-0 flex-1 overflow-y-auto">
               <Masthead className="border-b px-4 py-3" />
-              <div className="space-y-2 p-3">{top}</div>
+              <div hidden={topHidden} className="space-y-2 p-3">
+                {top}
+              </div>
               <div className="sticky top-0 z-10 border-b bg-background px-4 py-2">{tabs}</div>
               <div className="p-4">{children}</div>
             </div>

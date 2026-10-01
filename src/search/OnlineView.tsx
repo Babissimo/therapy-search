@@ -1,8 +1,8 @@
 import { Tabs } from "radix-ui";
 import { useId, useRef, useState } from "react";
 import { useLocation } from "react-router";
-import { toQuery, type SearchParams } from "@shared/query";
-import { Morph } from "@/components/Morph";
+import type { SearchParams } from "@shared/query";
+import { Morph, startMorph } from "@/components/Morph";
 import { cn } from "@/lib/utils";
 import { LazyShortlistTab } from "@/shortlist/LazyShortlistTab";
 import { useShortlistRefresh } from "@/shortlist/useShortlist";
@@ -36,12 +36,11 @@ export function OnlineView({ params, onChange, wide }: Props) {
   const firstSearch = searching ? undefined : narrowsOnline;
   useShortlistRefresh(results.therapists);
   const filtersId = useId();
-  // Kept by search, so a new one shows its results whichever tab was open.
-  const query = toQuery(params);
-  const [tabChoice, setTabChoice] = useState<{ query: string; tab: ListTab }>();
-  const tab = tabChoice?.query === query ? tabChoice.tab : "results";
+  // The toolbar and filters stand aside while the shortlist is open, so a new search always begins on the results.
+  const [tab, setTab] = useState<ListTab>("results");
+  const shortlistOpen = tab === "shortlist";
   // The shortlist keeps its place apart from the results', under a key of its own.
-  const scroll = useRememberedScroll(tab === "results" ? entry : `${entry} shortlist`, tab === "shortlist" || !searching || !results.loading);
+  const scroll = useRememberedScroll(shortlistOpen ? `${entry} shortlist` : entry, shortlistOpen || !searching || !results.loading);
   const listRef = useRef<HTMLUListElement>(null);
 
   const toolbar = (
@@ -87,7 +86,12 @@ export function OnlineView({ params, onChange, wide }: Props) {
   );
 
   return (
-    <Tabs.Root value={tab} onValueChange={(value) => setTabChoice({ query, tab: value as ListTab })} asChild>
+    <Tabs.Root
+      value={tab}
+      // The toolbar comes and goes with the shortlist, so the list glides into its place.
+      onValueChange={(value) => startMorph(() => setTab(value as ListTab))}
+      asChild
+    >
       <div className="group/tabs flex min-h-0 flex-1">
         <ListColumn
           wide={wide}
@@ -98,13 +102,15 @@ export function OnlineView({ params, onChange, wide }: Props) {
               {chips}
             </>
           }
+          topHidden={shortlistOpen}
           scroll={scroll}
         >
           {lists}
         </ListColumn>
-        {/* Right of the list, as Near me sets its toolbar and filters right of its results. */}
+        {/* Right of the list, as Near me sets its toolbar and filters right of its results. Nothing in it acts on the
+            shortlist, so it stands aside for it, hidden so what is open in it stays for the results. */}
         {wide && (
-          <div className="flex w-96 shrink-0 flex-col gap-2 border-l p-3">
+          <div hidden={shortlistOpen} className="flex w-96 shrink-0 flex-col gap-2 border-l p-3">
             {toolbar}
             {chips}
             <FiltersSection
