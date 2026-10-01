@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 export function SkeletonText({ lines = 1, className }: { lines?: number; className?: string }) {
   return Array.from({ length: lines }, (_, i) => (
     <span key={i} className="block">
-      <span className={cn("inline-block h-[0.75em] w-full animate-pulse rounded-md bg-muted align-middle", i === lines - 1 && className)} />
+      <span className={cn("inline-block h-[0.75em] w-full motion-safe:animate-pulse rounded-md bg-muted align-middle", i === lines - 1 && className)} />
     </span>
   ));
 }

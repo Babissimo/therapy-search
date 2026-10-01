@@ -18,6 +18,7 @@ import {
 import MarkerClusterGroup from "react-leaflet-cluster";
 import { Button } from "@/components/ui/button";
 import { useDarkTheme } from "@/layout/useDarkTheme";
+import { useMediaQuery } from "@/lib/useMediaQuery";
 import { cn } from "@/lib/utils";
 
 // Derived from shadcn-map (https://shadcn-map.vercel.app), keeping only the parts this site uses. It has no
@@ -30,13 +31,44 @@ function Map({
   children,
   ...props
 }: Omit<MapContainerProps, "zoomControl"> & { center: LatLngExpression; ref?: Ref<LeafletMap> }) {
+  // Leaflet reads these once, as the map is made.
+  const still = useReducedMotion();
   return (
-    <MapContainer zoom={zoom} maxZoom={maxZoom} zoomControl={false} className={cn("size-full", className)} {...props}>
+    <MapContainer
+      zoom={zoom}
+      maxZoom={maxZoom}
+      zoomControl={false}
+      zoomAnimation={!still}
+      fadeAnimation={!still}
+      markerZoomAnimation={!still}
+      inertia={!still}
+      className={cn("size-full", className)}
+      {...props}
+    >
       <FollowSize />
       <DataCreditsOnly />
+      {still && <StillPans />}
       {children}
     </MapContainer>
   );
+}
+
+/** Whether the visitor asks for less motion, for maps to zoom, pan and split clusters without gliding. */
+function useReducedMotion(): boolean {
+  return useMediaQuery("(prefers-reduced-motion: reduce)");
+}
+
+/** Leaflet glides any pan shorter than the map, such as an arrow key's, unless each call asks otherwise; no option stops it. */
+function StillPans() {
+  const map = useMap();
+  useEffect(() => {
+    const glide = map.panBy;
+    map.panBy = (offset, options) => glide.call(map, offset, { ...options, animate: false });
+    return () => {
+      map.panBy = glide;
+    };
+  }, [map]);
+  return null;
 }
 
 /** Leaflet measures its container once; a panel opening beside the map resizes it without resizing the window. */
@@ -128,6 +160,7 @@ function MapMarkerClusterGroup({
     <MarkerClusterGroup
       showCoverageOnHover={false}
       spiderfyOnMaxZoom={false}
+      animate={!useReducedMotion()}
       iconCreateFunction={icon ? (cluster: MarkerCluster) => icon(cluster.getAllChildMarkers()) : undefined}
       {...props}
     />
@@ -235,4 +268,4 @@ function MapControlContainer({ className, ...props }: ComponentProps<"div">) {
   return <div ref={ref} className={cn("absolute z-1000 size-fit cursor-default", className)} {...props} />;
 }
 
-export { Map, MapBounds, MapControlContainer, MapMarker, MapMarkerClusterGroup, MapTileLayer, MapTooltip, MapZoomControl, elementIcon, markerData, tileSource };
+export { Map, MapBounds, MapControlContainer, MapMarker, MapMarkerClusterGroup, MapTileLayer, MapTooltip, MapZoomControl, elementIcon, markerData, tileSource, useReducedMotion };
