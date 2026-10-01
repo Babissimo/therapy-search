@@ -1,6 +1,8 @@
-import { readFileSync } from "node:fs";
-import { describe, expect, it } from "vitest";
-import { officeDetails } from "./offices";
+import { JSDOM } from "jsdom";
+import { describe, expect, it, vi } from "vitest";
+import { fixture } from "../../shared/ukcp/__fixtures__";
+import { parseProfile } from "../../shared/ukcp/parseProfile";
+import { officeDetails, officesIn } from "./offices";
 
 const office = (address: string, cost?: string) => `<div class="profile-locations">
         <section>
@@ -66,10 +68,35 @@ describe("officeDetails", () => {
   });
 
   it("reads the offices of a profile page as UKCP writes it", () => {
-    const html = readFileSync(new URL("../../shared/ukcp/__fixtures__/profile.html", import.meta.url), "utf8");
-    expect(officeDetails(html, "Testtown AB1")).toEqual({
+    expect(officeDetails(fixture("profile.html"), "Testtown AB1")).toEqual({
       postcode: "AB1 2CD",
       cost: "£70 per fifty-minute session.\n\nOnline video-call sessions are payable in advance: debit/credit card, PayPal or bank transfer.",
     });
+  });
+});
+
+describe("officesIn", () => {
+  // The browser's parser is lent a DOMParser for this call alone, so nothing the Worker runs ever finds one.
+  const browserOffices = (html: string) => {
+    vi.stubGlobal("DOMParser", new JSDOM().window.DOMParser);
+    try {
+      return parseProfile(html, "Jo-Bloggs-ABCDEFGH").offices.map(({ address, cost }) => ({ address, cost }));
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  };
+
+  it("reads each office's address and fee as the browser's parser does", () => {
+    const html = fixture("profile.html");
+    expect(officesIn(html)).toHaveLength(2);
+    expect(officesIn(html)).toEqual(browserOffices(html));
+  });
+
+  it("reads a fee as the browser's parser does: all that follows its heading, up to the next", () => {
+    const loose = `<div class="profile-locations"><section><h3>Office</h3><address>Hove BN3 2FL</address>
+<h4>Cost:</h4>£70 a session<br><span>Concessions</span>
+<p>Ask about evenings</p><h4>Languages</h4><span>English</span></section></div>`;
+    expect(officesIn(page(loose))).toEqual([{ address: ["Hove BN3 2FL"], cost: "£70 a session\nConcessions\nAsk about evenings" }]);
+    expect(browserOffices(page(loose))).toEqual(officesIn(page(loose)));
   });
 });

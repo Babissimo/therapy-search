@@ -1,12 +1,12 @@
 import { classifyLocation } from "../../shared/location";
 import { officeNamed, type OfficeDetails } from "../../shared/office";
-import { oneLine } from "../../shared/ukcp/text";
+import { optional, tidyLines } from "../../shared/ukcp/text";
 
 // Each office is a section of its own under .profile-locations, read only to that section's end, so nothing runs on into
 // the footer, which holds UKCP's own address.
 const OFFICE = /class="(?:[^"]*\s)?profile-locations(?:\s[^"]*)?"(?:(?!<\/section>)[\s\S])*?<section[^>]*>([\s\S]*?)<\/section>/g;
 const ADDRESS = /<address[^>]*>([\s\S]*?)<\/address>/;
-// What follows the "Cost:" heading, up to any heading after it.
+// What follows the "Cost:" heading, up to any heading after it, as parseProfile reads it.
 const COST = /<h4[^>]*>[^<]*cost[^<]*<\/h4>([\s\S]*?)(?=<h4|$)/i;
 const ENTITIES = new Map([
   ["amp", "&"],
@@ -23,26 +23,26 @@ const ENTITIES = new Map([
  * no DOMParser. Its lines come out as the browser's parser reads them, so the office named is the one the profile marks.
  */
 export function officeDetails(html: string, location: string): OfficeDetails {
-  const offices = [...html.matchAll(OFFICE)].map(([, section = ""]) => ({
-    address: textOf(ADDRESS.exec(section)?.[1] ?? "")
-      .split("\n")
-      .filter(Boolean),
-    cost: textOf(COST.exec(section)?.[1] ?? ""),
-  }));
+  const offices = officesIn(html);
   const office = offices[officeNamed(offices, location) ?? -1];
   if (!office) return {};
   const place = classifyLocation(office.address.join(" "));
   return { ...(place.kind === "postcode" && { postcode: place.postcode }), ...(office.cost && { cost: office.cost }) };
 }
 
+/** Each office's address lines and fee, as parseProfile reads them. */
+export function officesIn(html: string): { address: string[]; cost?: string }[] {
+  return [...html.matchAll(OFFICE)].map(([, section = ""]) => ({
+    address: textOf(ADDRESS.exec(section)?.[1] ?? "")
+      .split("\n")
+      .filter(Boolean),
+    cost: optional(textOf(COST.exec(section)?.[1] ?? "")),
+  }));
+}
+
 /** Text with <br> as line breaks, tidied as multiLine tidies an element's. */
 function textOf(html: string): string {
-  return decode(html.replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]*>/g, ""))
-    .split("\n")
-    .map((line) => oneLine(line))
-    .join("\n")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
+  return tidyLines(decode(html.replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]*>/g, "")));
 }
 
 function decode(text: string): string {
