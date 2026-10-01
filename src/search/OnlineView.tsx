@@ -9,13 +9,14 @@ import { useShortlistRefresh } from "@/shortlist/useShortlist";
 import { soughtTerms } from "./activeFilters";
 import { FilterChips } from "./FilterChips";
 import { ONLINE_FILTER_GROUPS } from "./filterGroups";
+import { FilterPanel } from "./FilterPanel";
 import { FiltersSection, MobileFilters, UpdateResults } from "./Filters";
 import { ListColumn } from "./ListColumn";
 import { ListPanels, ListTabs, type ListTab } from "./ListTabs";
 import { LoadMore } from "./LoadMore";
 import { ModeSwitch } from "./ModeSwitch";
 import { narrowsOnline, onlineSearch } from "./online";
-import { FiltersIcon, Prompt } from "./Prompt";
+import { Prompt } from "./Prompt";
 import { Results } from "./Results";
 import { useResults } from "./useResults";
 import { useSearchDrafts } from "./useSearchDrafts";
@@ -52,7 +53,8 @@ export function OnlineView({ params, onChange, wide }: Props) {
             {/* As tall as Near me's search box, so the one gives way to the other in a toolbar of one size. */}
             <p className="flex min-h-8 min-w-0 flex-1 items-center px-1 text-sm">Online or by phone, wherever you are</p>
           </Morph>
-          {!wide && <MobileFilters params={params} drafts={drafts} groups={ONLINE_FILTER_GROUPS} ready={firstSearch} />}
+          {/* Before a search a phone sets the filters out beneath the prompt instead. */}
+          {!wide && searching && <MobileFilters params={params} drafts={drafts} groups={ONLINE_FILTER_GROUPS} />}
         </div>
       </div>
     </Morph>
@@ -70,7 +72,15 @@ export function OnlineView({ params, onChange, wide }: Props) {
             <LoadMore results={results} listRef={listRef} atEnd />
           </>
         ) : (
-          <OnlinePrompt wide={wide} />
+          <div className="space-y-8">
+            <OnlinePrompt wide={wide} />
+            {!wide && (
+              <div className="space-y-6">
+                <FilterPanel params={params} drafts={drafts} groups={ONLINE_FILTER_GROUPS} />
+                <UpdateResults drafts={drafts} label="Show results" ready={firstSearch} />
+              </div>
+            )}
+          </div>
         )
       }
     />
@@ -111,19 +121,12 @@ export function OnlineView({ params, onChange, wide }: Props) {
   );
 }
 
-/** In place of the results until a filter narrows the search. The filters sit to its right on wide screens, behind their button otherwise. */
+/** In place of the results until a filter narrows the search. The filters sit to its right on wide screens, beneath it on a phone. */
 function OnlinePrompt({ wide }: { wide: boolean }) {
   return (
-    <Prompt ask="Start with what matters to you." className="py-10 sm:py-16">
-      Thousands of UKCP therapists work online or by phone.{" "}
-      {wide ? (
-        "Choose a filter to the right"
-      ) : (
-        <>
-          Open Filters <FiltersIcon /> and choose one
-        </>
-      )}
-      , such as what they help with, how they work or the languages they speak, then show who fits. Type of Session alone won't narrow them enough.
+    <Prompt ask="Start with what matters to you." className={wide ? "py-10 sm:py-16" : "pt-6"}>
+      Thousands of UKCP therapists work online or by phone. Choose a filter {wide ? "to the right" : "below"}, such as what they
+      help with, how they work or the languages they speak, then show who fits. Type of Session alone won't narrow them enough.
     </Prompt>
   );
 }

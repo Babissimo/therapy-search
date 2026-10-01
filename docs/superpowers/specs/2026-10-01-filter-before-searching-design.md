@@ -55,10 +55,10 @@ A box whose tick differs from the search on screen shows a small amber dot after
 
 ### 3.5 The apply button
 
-- **Phone sheet, both views:** "Show results" at the sheet's foot, which closes it, and closing it searches (§3.3). Before Near me has a place it reads "Done", and the ticks wait in the draft for the place search; before the online view's first search, ticks wait the same way until they narrow the search by online's rule.
+- **Phone sheet, both views:** "Show results" at the sheet's foot, which closes it, and closing it searches (§3.3). A view offers the sheet once it has a search; before then its filters sit in the list (§4.1).
 - **Wide, Near me over the map:** "Update results" at the foot of the filters, which stay open.
 - **Wide, Online:** "Show results" at the foot of the filter column before the view's first search, "Update results" after.
-- **Wide, Near me before a place:** none; the place search (§4) takes the ticks.
+- **Before a search:** Near me has none, as the place search (§4) takes the ticks; online's foot of the filters reads "Show results", in the column on wide screens and in the list on a phone.
 
 The wide buttons stay in place, marked unavailable while the draft holds nothing new (online before its first search, also while the draft doesn't narrow it by online's rule; after it, unticking the last such filter goes back to the prompt), so a keyboard user keeps their place as the search begins.
 
@@ -69,7 +69,7 @@ The wide buttons stay in place, marked unavailable while the draft holds nothing
 Until Near me has a place to search:
 
 - The prompt reads "Start with what matters to you.", as online's does, and asks for ticks first and the place last.
-- The place box moves below the filters, under "Where are you?". On wide screens it sits at the foot of the column right of the prompt; on a phone the filter groups sit open in the list under the prompt, since the list is empty until a search, and the place box follows them. The Near me / Online switch stays at the top.
+- The place box moves below the filters, under "Where are you?". On wide screens it sits at the foot of the column right of the prompt; on a phone the filter groups sit in the list under the prompt, since the list is empty until a search, and the place box follows them. The Near me / Online switch stays at the top.
 - When the search begins, the place box moves to the toolbar over the map as it does now.
 
 Online's start screen on a phone sets out its filters the same way, with Show results where Near me has the place box.
@@ -79,7 +79,7 @@ Online's start screen on a phone sets out its filters the same way, with Show re
 From the start screen, searching a place (typed, or by Use my location) with no filter in the draft does not search. Anything that would make a chip counts as a filter; the outside-UK tick does not.
 
 - The prompt gives way to "Before we search near {place}" with "A tick or two keeps the list to people who suit you." It takes focus, so it is read out.
-- A "Search without filters" button under the place box searches the place as it stands. Choosing it stops the prompt for the rest of the page load.
+- A "Search without filters" button under the place box searches the place as it stands. Choosing it stops the prompt for as long as Near me stays open.
 - Searching again once something is ticked searches as usual.
 - A link that already carries a place opens on its results, and a search once the map shows (a new place, Search this area) never prompts.
 

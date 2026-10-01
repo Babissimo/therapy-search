@@ -1,4 +1,3 @@
-import { SlidersHorizontal } from "lucide-react";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
@@ -10,9 +9,4 @@ export function Prompt({ ask, children, className }: { ask: ReactNode; children:
       <p className="text-lg text-muted-foreground sm:text-xl">{children}</p>
     </div>
   );
-}
-
-/** The Filters button's icon, set in running text. */
-export function FiltersIcon() {
-  return <SlidersHorizontal aria-hidden className="inline size-[0.9em] align-[-0.1em]" />;
 }
