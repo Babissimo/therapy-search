@@ -4,6 +4,7 @@ import {
   queryOptions,
   useInfiniteQuery,
   useQuery,
+  useQueryClient,
   type InfiniteData,
   type QueryClient,
   type UseInfiniteQueryResult,
@@ -15,7 +16,7 @@ import { api } from "@/lib/api";
 import { FRESH_FOR } from "@/lib/queryClient";
 import { locationFellBack } from "./LocationNotice";
 import { inOrder, orderSeed, settled } from "./order";
-import { withPage } from "./state";
+import { withFlag, withPage } from "./state";
 
 /** A page of results with the batch it was cut from, which the next page is cut from too while it lasts. */
 type Page = SearchResult & { batch: Listings; stride: number };
@@ -44,6 +45,7 @@ export type SearchResults = {
  * them it will list first. Nothing is asked for, or shown, until `enabled`.
  */
 export function useResults(params: SearchParams, enabled = true): SearchResults {
+  const client = useQueryClient();
   const query = useInfiniteQuery({
     ...resultsQuery(params),
     enabled,
@@ -51,7 +53,8 @@ export function useResults(params: SearchParams, enabled = true): SearchResults 
     placeholderData: enabled ? keepPreviousData : undefined,
   });
   const arrived = query.data !== undefined && !query.isPlaceholderData;
-  const asksEarly = enabled && !asksWhole(params);
+  // A first batch cut from results already loaded comes before the nearest few could.
+  const asksEarly = enabled && !asksWhole(params) && photosFromLoaded(client, params) === undefined;
   const early = useQuery({ ...earlyQuery(params), enabled: asksEarly && !arrived }).data;
   // A failed batch is the search's failure, which shows alone.
   const showsEarly = asksEarly && !arrived && !query.isError && early !== undefined && (early.therapists.length > 0 || early.total === 0);
@@ -95,7 +98,8 @@ function resultsQuery(params: SearchParams) {
   // Spelt out because TypeScript otherwise fills in the page data's type before inferring the page parameter's.
   return infiniteQueryOptions<Page, Error, InfiniteData<Page, After>, readonly unknown[], After>({
     queryKey: resultsKey(params),
-    queryFn: ({ pageParam }) => pageAfter(pageParam, (n) => batchInOrder(batchQuery(n))),
+    queryFn: ({ pageParam, client }) =>
+      pageAfter(pageParam, async (n) => (n === 1 ? photosFromLoaded(client, params) : undefined) ?? batchInOrder(batchQuery(n))),
     initialPageParam: { shown: 0 },
     getNextPageParam: (last) => (last.therapists.length > 0 && last.to < last.total ? { shown: last.to, batch: last.batch, stride: last.stride } : undefined),
     // As long as results stay fresh, so Back from a profile finds every page still loaded.
@@ -154,6 +158,21 @@ async function pageAfter({ shown, batch, stride }: After, fetchBatch: (n: number
 async function batchInOrder(query: string): Promise<Listings> {
   const batch = await api.search(query);
   return { ...batch, listings: inOrder(batch.listings, orderSeed()) };
+}
+
+/**
+ * A photos-only search's first batch, cut from the same search without the flag when that is loaded with every result
+ * in its first batch. UKCP's flag keeps exactly the cards that show a photo, so asking it again would bring nothing new.
+ */
+function photosFromLoaded(client: QueryClient, params: SearchParams): Listings | undefined {
+  if (!params.flags.OnlyProfilesWithPhotos) return undefined;
+  const loaded = client.getQueryData<InfiniteData<Page, After>>(resultsKey(withFlag(params, "OnlyProfilesWithPhotos", false)))?.pages[0]?.batch;
+  if (loaded === undefined || (loaded.total > 0 && (loaded.from !== 1 || loaded.to < loaded.total))) return undefined;
+  // A batch in order stays in order with cards taken out.
+  const listings = loaded.listings.filter((listing) => listing.hasPhoto);
+  // With none left, UKCP's own empty answer brings its advice, which the loaded batch's notices lack.
+  if (listings.length === 0 && loaded.total > 0) return undefined;
+  return { ...loaded, total: listings.length, from: listings.length > 0 ? 1 : 0, to: listings.length, listings };
 }
 
 /** A batch's count, place and notices, without its cards. */
