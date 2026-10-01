@@ -1,8 +1,11 @@
-import { CONTACT_URL } from "@/site";
+import { Link, useMatch } from "react-router";
+import { CONTACT_URL, STATEMENT_PATH } from "@/site";
 import { HelpNow } from "./HelpNow";
 
 /** What the site is, where to turn for help today, and how it treats UKCP, the geocoders and visitors, shown from the site's name. */
 export function AboutText() {
+  // Over the statement itself, the link names the page shown rather than going to it afresh.
+  const here = useMatch(STATEMENT_PATH) !== null;
   return (
     <>
       <p>
@@ -39,6 +42,20 @@ export function AboutText() {
           get in touch
         </a>
         .
+      </p>
+      <p>
+        <Link
+          className="underline"
+          to={STATEMENT_PATH}
+          aria-current={here ? "page" : undefined}
+          onClick={(event) => {
+            // A plain click only, so a click that asks for a new tab or window still gets one.
+            if (here && !(event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)) event.preventDefault();
+          }}
+        >
+          Accessibility statement
+        </Link>
+        : what works, what doesn't yet, and how to report a problem.
       </p>
       <p className="text-xs text-muted-foreground">
         <a className="underline" href="https://postcodes.io">

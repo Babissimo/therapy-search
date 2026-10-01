@@ -45,7 +45,8 @@
         white-space: nowrap;
       }
       /* A slow connection can take a while to bring the script, so the way round waits before suggesting the browser can't run it. */
-      .fallback .late {
+      .fallback .late,
+      .fallback .report {
         animation: fallback-late 0s 10s both;
       }
       @keyframes fallback-late {
@@ -59,6 +60,10 @@
         .fallback .loading,
         .fallback .late {
           display: none;
+        }
+        /* Without the script there is nothing to wait for. */
+        .fallback .report {
+          animation: none;
         }
       </style>
     </noscript>
@@ -88,6 +93,12 @@
           If the search doesn't load, the connection may be too slow or this browser too old for it. UKCP's own directory
           lists the same therapists:
           <a href="https://www.psychotherapy.org.uk/find-a-therapist/">find a therapist on the UKCP website</a>.
+        </p>
+        <!-- The accessibility statement needs the script, so its way to report a problem is here too. -->
+        <p class="report">
+          If this site doesn't work for you, please
+          <a href="https://github.com/Babissimo/therapy-search/issues/new?template=accessibility.yml">report a problem</a>
+          on <span translate="no">GitHub</span>.
         </p>
       </main>
     </div>

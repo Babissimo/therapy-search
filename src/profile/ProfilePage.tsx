@@ -1,14 +1,13 @@
 import { Component, createRef, Fragment, lazy, useEffect, type ReactNode, type Ref } from "react";
 import { queryOptions, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, ChevronLeft, Diamond, ExternalLink, MapPin } from "lucide-react";
-import { Link, useLocation, useNavigate } from "react-router";
+import { Check, Diamond, ExternalLink, MapPin } from "lucide-react";
 import type { Office, Profile, ProfileSection } from "@shared/types";
+import { BackButton } from "@/components/BackButton";
 import { FailedAlert, useFailure } from "@/components/FailedAlert";
 import { MapSlot } from "@/components/MapSlot";
 import { Portrait } from "@/components/Portrait";
 import { SkeletonText } from "@/components/SkeletonText";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -44,32 +43,7 @@ export function ProfilePage({ slug }: { slug: string }) {
     window.scrollTo({ top: 0 });
   }, [slug]);
   useTitle(useQuery(profileQuery(slug)).data?.name);
-  return <ProfileBody slug={slug} back={<BackButton />} />;
-}
-
-/** Back to wherever the visitor came from, usually their search, or to a new search when they arrived here directly. */
-function BackButton() {
-  const navigate = useNavigate();
-  const { key } = useLocation();
-  // Pulls the chevron out to the content's left edge, past the ghost button's padding.
-  const className = "-ml-2.5";
-  // React Router keys the first page of a visit "default": there is nothing in the app to go back to.
-  if (key === "default") {
-    return (
-      <Button variant="ghost" className={className} asChild>
-        <Link to="/">
-          <ChevronLeft aria-hidden />
-          Search for a therapist
-        </Link>
-      </Button>
-    );
-  }
-  return (
-    <Button variant="ghost" className={className} onClick={() => navigate(-1)}>
-      <ChevronLeft aria-hidden />
-      Back to results
-    </Button>
-  );
+  return <ProfileBody slug={slug} back={<BackButton label="Back to results" />} />;
 }
 
 /** The ways out of a profile: a page's goes above it, a drawer's closes it from the corner. */

@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { UKCP_ORIGIN } from "@shared/query";
 import { HelpNow } from "@/layout/HelpNow";
 import { SITE_NAME } from "@/lib/useTitle";
+import { REPORT_URL } from "@/site";
 import indexHtml from "../../index.html?raw";
 import { ErrorBoundary } from "./ErrorBoundary";
 
@@ -34,7 +35,7 @@ describe("ErrorBoundary", () => {
     expect(screen.getByText("The search")).toBeTruthy();
   });
 
-  it("says what went wrong in place of a blank page, with a reload and UKCP's own directory", () => {
+  it("says what went wrong in place of a blank page, with a reload, UKCP's own directory and a way to report it", () => {
     // React reports the error it caught to the console.
     vi.spyOn(console, "error").mockImplementation(() => {});
     render(
@@ -47,12 +48,15 @@ describe("ErrorBoundary", () => {
     expect(screen.getByRole("button", { name: "Reload the page" })).toBeTruthy();
     const ukcp = screen.getByRole("link", { name: "find a therapist on the UKCP website" });
     expect(ukcp.getAttribute("href")).toBe("https://www.psychotherapy.org.uk/find-a-therapist/");
+    const report = screen.getByRole("link", { name: "report a problem" });
+    expect(report.getAttribute("href")).toBe("https://github.com/Babissimo/therapy-search/issues/new?template=accessibility.yml");
   });
 
-  it("names the site and UKCP's directory as index.html's own page does, before the script draws one", () => {
+  it("names the site, UKCP's directory and where to report a problem as index.html's own page does, before the script draws one", () => {
     expect(indexHtml).toContain(`<title>${SITE_NAME}</title>`);
     expect(indexHtml).toContain(`<h1>${SITE_NAME}</h1>`);
     expect(indexHtml).toContain(`href="${UKCP_ORIGIN}/find-a-therapist/"`);
+    expect(indexHtml).toContain(`href="${REPORT_URL}"`);
   });
 
   it("says where to turn for help today in HelpNow's words, when drawing fails and on index.html's page, loading or not", () => {

@@ -137,6 +137,28 @@ describe("AppRoutes", () => {
     expect(screen.getByRole("link", { name: "Search for a therapist" })).toBeTruthy();
   });
 
+  it("shows the accessibility statement as a page of its own, beneath the site's name", () => {
+    renderAt("/accessibility");
+    const header = screen.getByRole("banner");
+    expect(within(header).getByRole("button", { name: "Find a UKCP therapist" })).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 1, name: "Accessibility statement" })).toBeTruthy();
+    // Reached other than by a link, as by a reload, it leaves the keyboard at the top.
+    expect(document.activeElement).toBe(document.body);
+    expect(api.search).not.toHaveBeenCalled();
+  });
+
+  it("takes the keyboard to the statement's heading as the About card's link leads there from the search", async () => {
+    renderAt("/");
+    fireEvent.click(screen.getByRole("button", { name: "Find a UKCP therapist" }));
+    fireEvent.click(within(screen.getByRole("dialog", { name: "About this site" })).getByRole("link", { name: "Accessibility statement" }));
+    const heading = await screen.findByRole("heading", { level: 1, name: "Accessibility statement" });
+    expect(screen.getByTestId("url").textContent).toBe("/accessibility");
+    await waitFor(() => expect(document.activeElement).toBe(heading));
+    // Past the card's close, which hands focus back to the title only when nothing else has taken it.
+    await act(() => new Promise((done) => setTimeout(done, 50)));
+    expect(document.activeElement).toBe(heading);
+  });
+
   it("shortlists a therapist from the search, and opens them from the shortlist's tab over it", async () => {
     renderAt("/?Location=Leeds");
     fireEvent.click(await screen.findByRole("button", { name: "Add Jo Bloggs to your shortlist" }));
