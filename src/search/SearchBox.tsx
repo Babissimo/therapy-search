@@ -14,6 +14,8 @@ type Props = {
   drafts: SearchDrafts;
   /** Hears a search for a place, typed or located. */
   onPlaceSearch?: () => void;
+  /** Hears the box, or the button that locates, taking focus: a sign a search for a place may follow. */
+  onFocus?: () => void;
   className?: string;
 };
 
@@ -21,7 +23,7 @@ type Props = {
  * The location search, which can search the visitor's nearest postcode; either way it takes the typed keyword with it.
  * With the box empty it asks for a place rather than searching everywhere.
  */
-export function SearchBox({ params, drafts, onPlaceSearch, className }: Props) {
+export function SearchBox({ params, drafts, onPlaceSearch, onFocus, className }: Props) {
   const here = useLocate((postcode) => {
     drafts.submitAt(params, postcode);
     onPlaceSearch?.();
@@ -39,6 +41,7 @@ export function SearchBox({ params, drafts, onPlaceSearch, className }: Props) {
       <form
         role="search"
         className="flex gap-2"
+        onFocus={onFocus}
         onSubmit={(e) => {
           e.preventDefault();
           if (location.trim() === "") {
