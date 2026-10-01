@@ -49,16 +49,28 @@ describe("SearchBox and FilterPanel", () => {
     expect(onChange.mock.calls[0]?.[0].text).toMatchObject({ Location: "York", KeywordFilter: "anxiety" });
   });
 
-  it("take the typed location with the outside-UK tick or any other tick", () => {
+  it("hold ticks, the outside-UK tick among them, until the box searches them with the typed location", () => {
     const onChange = vi.fn();
     render(panel(emptyParams(), onChange));
     fireEvent.change(location(), { target: { value: "Paris" } });
     fireEvent.click(screen.getByRole("button", { name: "Additional Filters" }));
     fireEvent.click(screen.getByRole("checkbox", { name: "Search locations outside the UK" }));
-    expect(onChange.mock.calls[0]?.[0]).toMatchObject({ flags: { LocationSearchOutsideUK: true }, text: { Location: "Paris" } });
     fireEvent.click(screen.getByRole("button", { name: "Languages" }));
     fireEvent.click(screen.getByRole("checkbox", { name: "French" }));
-    expect(onChange.mock.calls[1]?.[0]).toMatchObject({ multi: { Languages: ["French"] }, text: { Location: "Paris" } });
+    expect(onChange).not.toHaveBeenCalled();
+    expect(screen.getByRole("checkbox", { name: "French" }).getAttribute("aria-checked")).toBe("true");
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+    expect(onChange.mock.calls[0]?.[0]).toMatchObject({ flags: { LocationSearchOutsideUK: true }, multi: { Languages: ["French"] }, text: { Location: "Paris" } });
+  });
+
+  it("mark each box ticked or unticked since the search on show, and count a group's ticks as they stand", () => {
+    const { container } = render(panel(withMulti(emptyParams(), "Languages", "German", true)));
+    fireEvent.click(screen.getByRole("checkbox", { name: "German" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "French" }));
+    expect(container.querySelectorAll("[data-unsearched]")).toHaveLength(2);
+    screen.getByRole("button", { name: "Languages, 1 ticked" });
+    fireEvent.click(screen.getByRole("checkbox", { name: "German" }));
+    expect(container.querySelectorAll("[data-unsearched]")).toHaveLength(1);
   });
 
   it("list the outside-UK tick among the additional filters, which start open when it is ticked", () => {
@@ -67,15 +79,17 @@ describe("SearchBox and FilterPanel", () => {
     expect(screen.getByRole("checkbox", { name: "Search locations outside the UK" }).getAttribute("aria-checked")).toBe("true");
   });
 
-  it("clear every filter but keep the typed location and whether it is outside the UK", () => {
+  it("clear every filter for the next search, keeping the typed location and whether it is outside the UK", () => {
     const onChange = vi.fn();
     const params = withFlag(withMulti(withText(emptyParams(), "KeywordFilter", "grief"), "Languages", "French", true), "LocationSearchOutsideUK", true);
     render(panel(params, onChange));
     fireEvent.change(location(), { target: { value: "Paris" } });
     fireEvent.click(screen.getByRole("button", { name: "Clear all filters" }));
+    expect(onChange).not.toHaveBeenCalled();
+    expect(keyword().value).toBe("");
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
     const outsideParis = withFlag(withText(emptyParams(), "Location", "Paris"), "LocationSearchOutsideUK", true);
     expect(onChange).toHaveBeenCalledWith(outsideParis);
-    expect(keyword().value).toBe("");
   });
 
   it("keep a typed location until the search's own location changes", () => {

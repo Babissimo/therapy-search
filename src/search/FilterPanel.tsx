@@ -6,18 +6,22 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CheckboxGroup } from "./CheckboxGroup";
 import { FILTER_GROUPS } from "./filterGroups";
-import { isChecked, tickedIn, withField } from "./state";
+import { isChecked, tickedIn } from "./state";
 import { TickedCount } from "./TickedCount";
-import { useDraft, type SearchDrafts } from "./useSearchDrafts";
+import { useDraft, useDraftFilters, type SearchDrafts } from "./useSearchDrafts";
 
 /** The long lists that carry an in-list search box on UKCP. */
 const SEARCHABLE = new Set(["TypesOfTherapy", "Languages", "Colleges"]);
 
 type Props = { params: SearchParams; drafts: SearchDrafts; groups?: FilterGroup[]; onSearch?: () => void };
 
-/** Keyword and UKCP's "Refine your search" filters, under a heading its container gives. Every change takes the typed location and keyword with it. */
+/**
+ * Keyword and UKCP's "Refine your search" filters, under a heading its container gives. Ticks wait in the draft, marked
+ * until searched, for whatever searches next to take with the typed location and keyword.
+ */
 export function FilterPanel({ params, drafts, groups = FILTER_GROUPS, onSearch }: Props) {
-  const openGroups = groups.filter((g) => tickedIn(params, g) > 0).map((g) => g.label);
+  const draft = useDraftFilters(drafts);
+  const openGroups = groups.filter((g) => tickedIn(draft, g) > 0).map((g) => g.label);
 
   return (
     <div className="space-y-6">
@@ -25,7 +29,7 @@ export function FilterPanel({ params, drafts, groups = FILTER_GROUPS, onSearch }
         <Button type="button" variant="link" size="sm" className="h-auto px-0" onClick={drafts.clear}>
           Clear all filters
         </Button>
-        <KeywordSearch params={params} drafts={drafts} onSearch={onSearch} />
+        <KeywordSearch drafts={drafts} onSearch={onSearch} />
       </div>
 
       <Accordion type="multiple" defaultValue={openGroups}>
@@ -35,7 +39,7 @@ export function FilterPanel({ params, drafts, groups = FILTER_GROUPS, onSearch }
               <AccordionTrigger className="flex-1">
                 <span className="flex items-center gap-2">
                   {group.label}
-                  <TickedCount count={tickedIn(params, group)} />
+                  <TickedCount count={tickedIn(draft, group)} />
                 </span>
               </AccordionTrigger>
               {group.help && <HelpTip label={`About ${group.label}`}>{group.help}</HelpTip>}
@@ -45,8 +49,9 @@ export function FilterPanel({ params, drafts, groups = FILTER_GROUPS, onSearch }
               <CheckboxGroup
                 group={group}
                 searchable={group.fields.some((f) => SEARCHABLE.has(f.name))}
-                isChecked={(field) => isChecked(params, field)}
-                onToggle={(field, on) => drafts.submit(withField(params, field, on))}
+                isChecked={(field) => isChecked(draft, field)}
+                isChanged={(field) => isChecked(draft, field) !== isChecked(params, field)}
+                onToggle={drafts.toggle}
               />
             </AccordionContent>
           </AccordionItem>
@@ -57,13 +62,13 @@ export function FilterPanel({ params, drafts, groups = FILTER_GROUPS, onSearch }
 }
 
 /** The keyword box, on its own so typing in it redraws only the box. */
-function KeywordSearch({ params, drafts, onSearch }: Omit<Props, "groups">) {
+function KeywordSearch({ drafts, onSearch }: Omit<Props, "params" | "groups">) {
   const keyword = useDraft(drafts, "keyword");
   return (
     <form
       onSubmit={(e) => {
         e.preventDefault();
-        drafts.submit(params);
+        drafts.apply();
         onSearch?.();
       }}
     >

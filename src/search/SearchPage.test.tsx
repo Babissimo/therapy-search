@@ -349,12 +349,12 @@ describe("SearchPage", () => {
 
   it("goes back to the prompt in place of the map and results when the search is cleared, and opens the next search on its list", async () => {
     screenIs(false);
-    renderAt(SEARCH);
+    renderAt("/?Location=Leeds&Languages=French");
     await loaded();
     expect(await screen.findByTestId("map")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Show map" }));
     fireEvent.change(screen.getByRole("textbox", { name: "Location" }), { target: { value: "" } });
-    fireEvent.click(screen.getByRole("button", { name: "Filters" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Filters/ }));
     fireEvent.click(await screen.findByRole("button", { name: "Clear all filters" }));
     fireEvent.click(screen.getByRole("button", { name: "Close" }));
     expect(within(results()).getByText(/^Type a town, city or postcode/)).toBeTruthy();
@@ -485,20 +485,79 @@ describe("SearchPage", () => {
     expect(api.search).toHaveBeenCalledOnce();
   });
 
-  it("leaves the filters open over the map, and the keyboard where it was in them, when a tick beside the prompt starts a search", async () => {
+  it("holds ticks made beside the prompt until a place is searched, then asks UKCP once for them all", async () => {
     screenIs(true);
     renderAt("/");
     const filters = () => screen.getByRole("region", { name: "Refine your search" });
     fireEvent.change(screen.getByRole("textbox", { name: "Location" }), { target: { value: "York" } });
     fireEvent.click(within(filters()).getByRole("button", { name: /^Languages/ }));
-    const french = within(filters()).getByRole("checkbox", { name: "French" });
-    french.focus();
-    fireEvent.click(french);
-    expect(url().toString()).toBe("Location=York&Languages=French");
+    fireEvent.click(within(filters()).getByRole("checkbox", { name: "French" }));
+    fireEvent.click(within(filters()).getByRole("checkbox", { name: "German" }));
+    expect(url().toString()).toBe("");
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+    expect(url().toString()).toBe("Location=York&Languages=French&Languages=German");
     await loaded();
-    expect(await screen.findByTestId("map")).toBeTruthy();
-    expect(document.activeElement).toBe(french);
-    expect(screen.getByRole("button", { name: "Close filters" })).toBeTruthy();
+    expect(api.search).toHaveBeenCalledOnce();
+  });
+
+  it("holds ticks over the map until Update results, which searches them once and keeps the filters and the keyboard where they were", async () => {
+    screenIs(true);
+    renderAt(SEARCH);
+    await loaded();
+    fireEvent.click(screen.getByRole("button", { name: "Filters" }));
+    const filters = () => screen.getByRole("region", { name: "Refine your search" });
+    const update = within(filters()).getByRole("button", { name: "Update results" });
+    expect(update.getAttribute("aria-disabled")).toBe("true");
+    fireEvent.click(within(filters()).getByRole("button", { name: /^Languages/ }));
+    fireEvent.click(within(filters()).getByRole("checkbox", { name: "French" }));
+    fireEvent.click(within(filters()).getByRole("checkbox", { name: "German" }));
+    expect(url().toString()).toBe("Location=Leeds");
+    expect(update.getAttribute("aria-disabled")).toBeNull();
+    update.focus();
+    fireEvent.click(update);
+    expect(url().toString()).toBe("Location=Leeds&Languages=French&Languages=German");
+    expect(filters()).toBeTruthy();
+    expect(document.activeElement).toBe(update);
+    expect(update.getAttribute("aria-disabled")).toBe("true");
+    await waitFor(() => expect(api.search).toHaveBeenCalledTimes(2));
+  });
+
+  it("searches ticks waiting over the map as the filters are put away", async () => {
+    screenIs(true);
+    renderAt(SEARCH);
+    await loaded();
+    fireEvent.click(screen.getByRole("button", { name: "Filters" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Languages/ }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "French" }));
+    fireEvent.click(screen.getByRole("button", { name: "Close filters" }));
+    expect(url().toString()).toBe("Location=Leeds&Languages=French");
+    expect(screen.queryByRole("region", { name: "Refine your search" })).toBeNull();
+    await waitFor(() => expect(api.search).toHaveBeenCalledTimes(2));
+  });
+
+  it("searches nothing as the filters over the map are put away with nothing new in them, whatever is typed in the place box", async () => {
+    screenIs(true);
+    renderAt(SEARCH);
+    await loaded();
+    fireEvent.change(screen.getByRole("textbox", { name: "Location" }), { target: { value: "Brist" } });
+    fireEvent.click(screen.getByRole("button", { name: "Filters" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Languages/ }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "French" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "French" }));
+    fireEvent.click(screen.getByRole("button", { name: "Close filters" }));
+    expect(url().toString()).toBe("Location=Leeds");
+    expect(api.search).toHaveBeenCalledOnce();
+  });
+
+  it("searches without a chip's filter at once, taking ticks still waiting with it", async () => {
+    screenIs(true);
+    renderAt("/?Location=Leeds&Languages=Greek");
+    await loaded();
+    fireEvent.click(screen.getByRole("button", { name: "Filters, 1 ticked" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "French" }));
+    fireEvent.click(screen.getByRole("button", { name: "Remove Greek" }));
+    expect(url().toString()).toBe("Location=Leeds&Languages=French");
+    await waitFor(() => expect(api.search).toHaveBeenCalledTimes(2));
   });
 
   it.each([
@@ -536,25 +595,64 @@ describe("SearchPage", () => {
     await loaded();
   });
 
-  it("keeps a phone's filters sheet open, and the keyboard in it, when a tick there starts a search from the prompt", async () => {
-    const resize = screenIs(false);
+  it("holds a phone's ticks until the filters sheet is put away, by Show results or otherwise", async () => {
+    screenIs(false);
+    renderAt(SEARCH);
+    await loaded();
+    const open = async () => {
+      fireEvent.click(screen.getByRole("button", { name: /^Filters/ }));
+      return screen.findByRole("dialog", { name: "Refine your search" });
+    };
+    let sheet = await open();
+    fireEvent.click(within(sheet).getByRole("button", { name: /^Languages/ }));
+    fireEvent.click(within(sheet).getByRole("checkbox", { name: "French" }));
+    expect(url().toString()).toBe("Location=Leeds");
+    expect(api.search).toHaveBeenCalledOnce();
+    fireEvent.click(within(sheet).getByRole("button", { name: "Show results" }));
+    expect(url().toString()).toBe("Location=Leeds&Languages=French");
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    sheet = await open();
+    fireEvent.click(within(sheet).getByRole("checkbox", { name: "French" }));
+    fireEvent.keyDown(sheet, { key: "Escape" });
+    expect(url().toString()).toBe("Location=Leeds");
+  });
+
+  it("keeps a phone's ticks before a place waiting in the sheet, put away with Done, for the place searched", async () => {
+    screenIs(false);
     renderAt("/");
+    fireEvent.click(screen.getByRole("button", { name: "Filters" }));
+    let sheet = await screen.findByRole("dialog", { name: "Refine your search" });
+    fireEvent.click(within(sheet).getByRole("button", { name: /^Languages/ }));
+    fireEvent.click(within(sheet).getByRole("checkbox", { name: "French" }));
+    fireEvent.click(within(sheet).getByRole("button", { name: "Done" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(url().toString()).toBe("");
+    fireEvent.click(screen.getByRole("button", { name: "Filters, 1 ticked" }));
+    sheet = await screen.findByRole("dialog", { name: "Refine your search" });
+    expect(sheet.querySelectorAll("[data-unsearched]")).toHaveLength(1);
+    fireEvent.click(within(sheet).getByRole("button", { name: "Done" }));
     fireEvent.change(screen.getByRole("textbox", { name: "Location" }), { target: { value: "York" } });
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+    expect(url().toString()).toBe("Location=York&Languages=French");
+    await loaded();
+  });
+
+  it("keeps ticks waiting in a phone's sheet as the screen widens, for the filters over the map to search", async () => {
+    const resize = screenIs(false);
+    renderAt(SEARCH);
+    await loaded();
     fireEvent.click(screen.getByRole("button", { name: "Filters" }));
     const sheet = await screen.findByRole("dialog", { name: "Refine your search" });
     fireEvent.click(within(sheet).getByRole("button", { name: /^Languages/ }));
-    const french = within(sheet).getByRole("checkbox", { name: "French" });
-    french.focus();
-    fireEvent.click(french);
-    expect(url().toString()).toBe("Location=York&Languages=French");
-    expect(await screen.findByTestId("map")).toBeTruthy();
-    expect(screen.getByRole("dialog", { name: "Refine your search" })).toBe(sheet);
-    expect(document.activeElement).toBe(french);
-    await waitFor(() => expect(api.search).toHaveBeenCalledOnce());
+    fireEvent.click(within(sheet).getByRole("checkbox", { name: "French" }));
     // Widened, the sheet goes, and the filters stay shut over the map, as they were never open there.
     resize(true);
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(screen.queryByRole("region", { name: "Refine your search" })).toBeNull();
+    expect(url().toString()).toBe("Location=Leeds");
+    fireEvent.click(screen.getByRole("button", { name: "Filters, 1 ticked" }));
+    fireEvent.click(screen.getByRole("button", { name: "Update results" }));
+    expect(url().toString()).toBe("Location=Leeds&Languages=French");
   });
 
   it("leaves the outside-UK tick out of the Filters count, as Clear all keeps it", async () => {
@@ -1180,23 +1278,39 @@ describe("SearchPage online", () => {
     expect(heading.nextElementSibling).toBeNull();
   });
 
-  it("searches nothing until a filter besides online or phone narrows the search, and nothing again once it is removed", async () => {
+  it("searches nothing until Show results with a filter besides online or phone, and nothing again once it is removed", async () => {
     screenIs(true);
     renderAt(ONLINE);
     expect(prompt()).toBeTruthy();
+    const show = () => within(filters()).getByRole("button", { name: "Show results" });
+    expect(show().getAttribute("aria-disabled")).toBe("true");
     fireEvent.click(within(filters()).getByRole("button", { name: /^Type of Session/ }));
     fireEvent.click(within(filters()).getByRole("checkbox", { name: "Telephone Therapy" }));
-    expect(url().toString()).toBe("TypesOfSession=Telephone+Therapy");
-    expect(prompt()).toBeTruthy();
-    expect(api.search).not.toHaveBeenCalled();
+    expect(show().getAttribute("aria-disabled")).toBe("true");
     fireEvent.click(within(filters()).getByRole("button", { name: /^Additional Filters/ }));
     fireEvent.click(within(filters()).getByRole("checkbox", { name: "Only show profiles with photos" }));
+    expect(show().getAttribute("aria-disabled")).toBeNull();
+    expect(url().toString()).toBe("");
+    expect(api.search).not.toHaveBeenCalled();
+    fireEvent.click(show());
     await loaded();
     expect(prompt()).toBeNull();
     expect(asked()).toBe("TypesOfSession=Telephone+Therapy&OnlyProfilesWithPhotos=true");
+    expect(within(filters()).getByRole("button", { name: "Update results" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Remove Only show profiles with photos" }));
     expect(prompt()).toBeTruthy();
     expect(within(results()).queryByRole("link", { name: /^Therapist/ })).toBeNull();
+    expect(api.search).toHaveBeenCalledOnce();
+  });
+
+  it("goes back to its prompt, asking UKCP nothing, when the last filter that narrows its search is unticked and the results updated", async () => {
+    screenIs(true);
+    renderAt(GREEK);
+    await loaded();
+    fireEvent.click(within(filters()).getByRole("checkbox", { name: "Greek" }));
+    fireEvent.click(within(filters()).getByRole("button", { name: "Update results" }));
+    expect(url().toString()).toBe("");
+    expect(prompt()).toBeTruthy();
     expect(api.search).toHaveBeenCalledOnce();
   });
 
@@ -1206,6 +1320,19 @@ describe("SearchPage online", () => {
     await loaded();
     expect(asked()).toBe(GREEK_ONLINE);
     expect(screen.queryByRole("button", { name: "Remove Only show wheelchair accessible" })).toBeNull();
+  });
+
+  it("takes ticks still waiting along to the other view", async () => {
+    screenIs(true);
+    renderAt(SEARCH);
+    await loaded();
+    fireEvent.click(screen.getByRole("button", { name: "Filters" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Languages/ }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Greek" }));
+    expect(screen.getByRole("link", { name: "Near me" }).getAttribute("href")).toBe("/?Location=Leeds");
+    fireEvent.click(screen.getByRole("link", { name: "Online" }));
+    expect([path(), url().toString()]).toEqual([ONLINE, "Languages=Greek"]);
+    await loaded();
   });
 
   it("goes online from a search near a place, taking its filters, and comes back to the place", async () => {
@@ -1279,6 +1406,7 @@ describe("SearchPage online", () => {
     fireEvent.click(within(filters()).getByRole("button", { name: /^Additional Filters/ }));
     expect(within(filters()).queryByRole("checkbox", { name: "Only show wheelchair accessible" })).toBeNull();
     fireEvent.click(within(filters()).getByRole("checkbox", { name: "Telephone Therapy" }));
+    fireEvent.click(within(filters()).getByRole("button", { name: "Update results" }));
     expect(url().toString()).toBe("TypesOfSession=Telephone+Therapy&Languages=Greek");
     await waitFor(() => expect(asked()).toBe("TypesOfSession=Telephone+Therapy&Languages=Greek"));
     await loaded();
@@ -1296,6 +1424,26 @@ describe("SearchPage online", () => {
     renderAt(ONLINE);
     fireEvent.click(screen.getByRole("button", { name: "Filters" }));
     expect((await screen.findByRole("dialog", { name: "Refine your search" })).dataset.side).toBe("right");
+  });
+
+  it("holds ticks in a phone's sheet that don't narrow the search, searching them with Show results once one does", async () => {
+    screenIs(false);
+    renderAt(ONLINE);
+    fireEvent.click(screen.getByRole("button", { name: "Filters" }));
+    let sheet = await screen.findByRole("dialog", { name: "Refine your search" });
+    fireEvent.click(within(sheet).getByRole("button", { name: /^Type of Session/ }));
+    fireEvent.click(within(sheet).getByRole("checkbox", { name: "Telephone Therapy" }));
+    fireEvent.keyDown(sheet, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(url().toString()).toBe("");
+    fireEvent.click(screen.getByRole("button", { name: /^Filters/ }));
+    sheet = await screen.findByRole("dialog", { name: "Refine your search" });
+    expect(sheet.querySelectorAll("[data-unsearched]")).toHaveLength(1);
+    fireEvent.click(within(sheet).getByRole("button", { name: /^Languages/ }));
+    fireEvent.click(within(sheet).getByRole("checkbox", { name: "Greek" }));
+    fireEvent.click(within(sheet).getByRole("button", { name: "Show results" }));
+    expect(url().toString()).toBe("TypesOfSession=Telephone+Therapy&Languages=Greek");
+    await loaded();
   });
 
   it.each([
@@ -1439,7 +1587,7 @@ describe("SearchPage's view transitions", () => {
     const filters = () => screen.getByRole("region", { name: "Refine your search" });
     fireEvent.click(within(filters()).getByRole("button", { name: /^Languages/ }));
     fireEvent.click(within(filters()).getByRole("checkbox", { name: "French" }));
-    expect(url().get("Languages")).toBe("French");
+    expect(url().get("Languages")).toBeNull();
     const search = (place: string) => {
       fireEvent.change(screen.getByRole("textbox", { name: "Location" }), { target: { value: place } });
       fireEvent.click(screen.getByRole("button", { name: "Search" }));
@@ -1452,6 +1600,7 @@ describe("SearchPage's view transitions", () => {
     fireEvent.change(screen.getByRole("textbox", { name: "Location" }), { target: { value: "" } });
     fireEvent.click(screen.getByRole("button", { name: /^Filters/ }));
     fireEvent.click(await screen.findByRole("button", { name: "Clear all filters" }));
+    fireEvent.click(screen.getByRole("button", { name: "Close filters" }));
     expect(screen.getByText(/^Type a town, city or postcode/)).toBeTruthy();
     expect(started).toEqual([["morph"], ["morph"]]);
   });

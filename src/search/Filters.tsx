@@ -1,20 +1,27 @@
 import { SlidersHorizontal, X } from "lucide-react";
-import { useState, type ComponentProps, type ReactNode } from "react";
+import { useState, useSyncExternalStore, type ComponentProps, type ReactNode } from "react";
 import type { SearchParams } from "@shared/query";
 import type { FilterGroup } from "@shared/types";
 import { IconButton } from "@/components/IconButton";
 import { Morph } from "@/components/Morph";
 import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { FilterPanel } from "./FilterPanel";
+import { tickedFilters } from "./state";
 import { TickedCount } from "./TickedCount";
-import type { SearchDrafts } from "./useSearchDrafts";
+import { useDraftFilters, type SearchDrafts } from "./useSearchDrafts";
 
 type PanelProps = { params: SearchParams; drafts: SearchDrafts; groups?: FilterGroup[] };
 
-/** The filters under their heading, which stays in view, with a close button when they can be put away. */
-export function FiltersSection({ id, onClose, className, ...panel }: PanelProps & { id: string; onClose?: () => void; className?: string }) {
+/** The filters under their heading, which stays in view, with a close button when they can be put away and a footer beneath. */
+export function FiltersSection({
+  id,
+  onClose,
+  footer,
+  className,
+  ...panel
+}: PanelProps & { id: string; onClose?: () => void; footer?: ReactNode; className?: string }) {
   return (
     <Morph name="filters">
       <section aria-labelledby={`${id}-heading`} id={id} className={cn("flex min-h-0 flex-col overflow-hidden rounded-xl border bg-background", className)}>
@@ -31,29 +38,42 @@ export function FiltersSection({ id, onClose, className, ...panel }: PanelProps 
         <div className="min-h-0 overflow-y-auto p-4">
           <FilterPanel {...panel} />
         </div>
+        {footer && <div className="border-t p-3">{footer}</div>}
       </section>
     </Morph>
   );
 }
 
-export function MobileFilters({ ticked, ...panel }: PanelProps & { ticked: number }) {
+export function MobileFilters({ ready, ...panel }: PanelProps & { ready?: (draft: SearchParams) => boolean }) {
   return (
-    <FiltersSheet phone {...panel}>
-      <FiltersSheetButton ticked={ticked} />
+    <FiltersSheet phone ready={ready} {...panel}>
+      <FiltersSheetButton ticked={tickedFilters(useDraftFilters(panel.drafts))} />
     </FiltersSheet>
   );
 }
 
 /**
  * The filters in a sheet from the right on a phone, opened by a FiltersSheetButton anywhere within it. The sheet keeps its
- * place in the tree however far its button moves about the page, so it stays open, and in use, as the button moves.
+ * place in the tree however far its button moves about the page, so it stays open, and in use, as the button moves. It
+ * covers the list, so where there is a search to show it searches what was ticked in it as it is put away, by its button
+ * or otherwise, once `ready` allows; until then the ticks wait for whatever searches next.
  */
-export function FiltersSheet({ phone, children, ...panel }: PanelProps & { phone: boolean; children: ReactNode }) {
+export function FiltersSheet({
+  phone,
+  searches = true,
+  ready,
+  children,
+  ...panel
+}: PanelProps & { phone: boolean; searches?: boolean; ready?: (draft: SearchParams) => boolean; children: ReactNode }) {
   const [open, setOpen] = useState(false);
-  // Wide screens have no sheet, so widening puts it away.
+  // Wide screens have no sheet, so widening puts it away, leaving its ticks waiting for the filters there.
   if (open && !phone) setOpen(false);
+  const openChange = (next: boolean) => {
+    if (!next && searches && panel.drafts.pending() && (ready?.(panel.drafts.search()) ?? true)) panel.drafts.apply();
+    setOpen(next);
+  };
   return (
-    <Sheet open={open} onOpenChange={setOpen}>
+    <Sheet open={open} onOpenChange={openChange}>
       {children}
       {phone && (
         <SheetContent side="right" className="gap-0">
@@ -64,6 +84,11 @@ export function FiltersSheet({ phone, children, ...panel }: PanelProps & { phone
             {/* Searching closes the sheet to show its results; ticks leave it open for more. */}
             <FilterPanel {...panel} onSearch={() => setOpen(false)} />
           </div>
+          <SheetFooter className="border-t">
+            <Button type="button" onClick={() => openChange(false)}>
+              {searches ? "Show results" : "Done"}
+            </Button>
+          </SheetFooter>
         </SheetContent>
       )}
     </Sheet>
@@ -86,5 +111,18 @@ export function FiltersButton({ ticked, className, ...props }: Omit<ComponentPro
       <SlidersHorizontal aria-hidden />
       <TickedCount count={ticked} className="absolute -top-1.5 -right-1.5 h-4 min-w-4 px-1 text-[0.625rem]" />
     </IconButton>
+  );
+}
+
+/**
+ * Searches what the draft holds, offered while that differs from the search on show and `ready` allows it. It stays in
+ * place, marked unavailable, when there is nothing to search, so the keyboard keeps its place as a search begins.
+ */
+export function UpdateResults({ drafts, label = "Update results", ready }: { drafts: SearchDrafts; label?: string; ready?: (draft: SearchParams) => boolean }) {
+  const offered = useSyncExternalStore(drafts.subscribe, () => drafts.pending() && (ready?.(drafts.search()) ?? true));
+  return (
+    <Button type="button" aria-disabled={!offered || undefined} onClick={offered ? drafts.apply : undefined} className="w-full aria-disabled:opacity-50">
+      {label}
+    </Button>
   );
 }

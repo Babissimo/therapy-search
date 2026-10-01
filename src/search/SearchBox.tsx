@@ -20,12 +20,13 @@ type Props = {
 };
 
 /**
- * The location search, which can search the visitor's nearest postcode; either way it takes the typed keyword with it.
+ * The location search, which can search the visitor's nearest postcode; either way it takes the typed keyword and the
+ * ticks waiting in the draft with it.
  * With the box empty it asks for a place rather than searching everywhere.
  */
 export function SearchBox({ params, drafts, onPlaceSearch, onFocus, className }: Props) {
   const here = useLocate((postcode) => {
-    drafts.submitAt(params, postcode);
+    drafts.applyAt(postcode);
     onPlaceSearch?.();
   });
   // Kept by search, so a new one, however it comes, takes the request for a place away.
@@ -49,7 +50,7 @@ export function SearchBox({ params, drafts, onPlaceSearch, onFocus, className }:
             input.current?.focus();
             return;
           }
-          drafts.submit(params);
+          drafts.apply();
           onPlaceSearch?.();
         }}
       >
