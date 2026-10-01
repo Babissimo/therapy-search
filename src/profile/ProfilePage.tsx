@@ -1,4 +1,4 @@
-import { Fragment, lazy, useEffect, type ReactNode, type Ref } from "react";
+import { Component, createRef, Fragment, lazy, useEffect, type ReactNode, type Ref } from "react";
 import { queryOptions, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, ChevronLeft, Diamond, ExternalLink, MapPin } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router";
@@ -18,14 +18,17 @@ import { useStuck } from "@/lib/useStuck";
 import { useTitle } from "@/lib/useTitle";
 import { cn } from "@/lib/utils";
 import { cachedCard } from "@/search/useResults";
+import { LazyStatusTrack } from "@/shortlist/LazyStatusTrack";
 import { ShortlistButton } from "@/shortlist/ShortlistButton";
 import type { ShortlistCard } from "@/shortlist/store";
 import { ContactList, ContactListSkeleton } from "./ContactList";
+import { ContactOffer } from "./ContactOffer";
 import { isInterestOf, type ShownSection } from "./interests";
 import { nearestOffice } from "./nearestOffice";
 import { useOfficePlace } from "./place";
 import { sectionsBySize } from "./sectionsBySize";
 import { matchingTags, useOpeningCard, useSearchMatch } from "./searchedTerms";
+import { useStanding } from "./standing";
 
 const ProfileMap = lazy(() => import("./ProfileMap"));
 
@@ -75,8 +78,10 @@ type Exits = { back?: ReactNode; close?: ReactNode };
 export function ProfileBody({ slug, back, close }: { slug: string } & Exits) {
   const query = useQuery(profileQuery(slug));
   const failure = useFailure(query, slug);
+  const client = useQueryClient();
   const isMatch = useSearchMatch();
   const card = useOpeningCard(slug);
+  const standing = useStanding(slug);
 
   if (failure.error) {
     return (
@@ -95,9 +100,11 @@ export function ProfileBody({ slug, back, close }: { slug: string } & Exits) {
   const besideLong = long.length > 0;
   const nearest = nearestOffice(profile.offices, card);
   const offices = nearest === undefined ? profile.offices : [profile.offices[nearest]!, ...profile.offices.toSpliced(nearest, 1)];
+  // The card the visitor's search showed, where there was one, says more than the header.
+  const therapist = cachedCard(client, slug) ?? headerCard(profile);
   return (
-    <article className={BODY}>
-      <StickyHeader back={back} close={close} bookmark={<ProfileBookmark profile={profile} />}>
+    <article ref={standing.root} className={BODY}>
+      <StickyHeader back={back} close={close} bookmark={<ShortlistButton therapist={therapist} />}>
         <Identity
           photo={
             <Portrait
@@ -117,49 +124,73 @@ export function ProfileBody({ slug, back, close }: { slug: string } & Exits) {
               </span>
             )
           }
-          contacts={<ContactList profile={profile} />}
+          contacts={
+            <>
+              <ContactList profile={profile} onReach={standing.reached} />
+              {standing.offering && <ContactOffer onAnswer={(yes) => standing.answered(therapist, yes)} />}
+            </>
+          }
         />
       </StickyHeader>
 
-      <Columns
-        besideLong={besideLong}
-        main={
-          (hasMatches || besideLong) && (
-            <>
-              {hasMatches && (
-                <>
-                  <SectionView
-                    section={{ heading: "Matches your search", paragraphs: [], items: matches, details: [] }}
-                    isMatch={isMatch}
-                    isInterest={isInterestOf(profile)}
-                    announce={false}
-                  />
-                  <Separator />
-                </>
-              )}
-              <Sections sections={long} isMatch={isMatch} />
-            </>
-          )
-        }
-        aside={
-          (short.length > 0 || profile.offices.length > 0) && (
-            <>
-              <ShortSections besideLong={besideLong}>
-                {short.map((section, i) => (
-                  <SectionView key={i} section={section} isMatch={isMatch} />
-                ))}
-              </ShortSections>
-              {offices.length > 0 && (
-                <div className={cn("grid gap-8 @xl:grid-cols-2", besideLong && "@4xl:grid-cols-1")}>
-                  {offices.map((office, i) => (
-                    <OfficeCard key={i} office={office} profile={profile} distance={nearest !== undefined && i === 0 ? card?.distance : undefined} />
+      {/* Not last, where space-y-8 would give the columns a margin at the foot. */}
+      <p aria-live="polite" className="sr-only">
+        {standing.announcement}
+      </p>
+
+      {standing.status && (
+        // At the track's height while its chunk comes, so the profile below stays put.
+        <div className="min-h-11 max-w-sm">
+          <LazyStatusTrack
+            therapist={therapist}
+            status={standing.status}
+            onChosen={(to) => standing.chosen(therapist, to)}
+            onRemoved={standing.removed}
+          />
+        </div>
+      )}
+
+      <HeldPlace above={standing.status !== undefined}>
+        <Columns
+          besideLong={besideLong}
+          main={
+            (hasMatches || besideLong) && (
+              <>
+                {hasMatches && (
+                  <>
+                    <SectionView
+                      section={{ heading: "Matches your search", paragraphs: [], items: matches, details: [] }}
+                      isMatch={isMatch}
+                      isInterest={isInterestOf(profile)}
+                      announce={false}
+                    />
+                    <Separator />
+                  </>
+                )}
+                <Sections sections={long} isMatch={isMatch} />
+              </>
+            )
+          }
+          aside={
+            (short.length > 0 || profile.offices.length > 0) && (
+              <>
+                <ShortSections besideLong={besideLong}>
+                  {short.map((section, i) => (
+                    <SectionView key={i} section={section} isMatch={isMatch} />
                   ))}
-                </div>
-              )}
-            </>
-          )
-        }
-      />
+                </ShortSections>
+                {offices.length > 0 && (
+                  <div className={cn("grid gap-8 @xl:grid-cols-2", besideLong && "@4xl:grid-cols-1")}>
+                    {offices.map((office, i) => (
+                      <OfficeCard key={i} office={office} profile={profile} distance={nearest !== undefined && i === 0 ? card?.distance : undefined} />
+                    ))}
+                  </div>
+                )}
+              </>
+            )
+          }
+        />
+      </HeldPlace>
     </article>
   );
 }
@@ -279,6 +310,47 @@ function Columns({ main, aside, besideLong }: { main?: ReactNode; aside?: ReactN
   );
 }
 
+type HeldPlaceProps = { above: unknown; children: ReactNode };
+
+/** Where what `HeldPlace` wraps stood before a commit, and how far its scroller had scrolled. */
+type Place = { scroller: Element; scrolled: number; top: number };
+
+/**
+ * Keeps what it wraps where it is on screen while the profile's header is stuck, as what is drawn above it (`above`, as a
+ * key) comes or goes. Scroll anchoring would, but BODY turns it off and Safari has none.
+ */
+class HeldPlace extends Component<HeldPlaceProps> {
+  private readonly root = createRef<HTMLDivElement>();
+
+  // A class, since only this reads the page before a commit's changes reach it, those above included.
+  override getSnapshotBeforeUpdate(prev: HeldPlaceProps): Place | null {
+    const element = this.root.current;
+    // Until the header sticks, the change is in view at the top of the profile, and a scroll would stick the header.
+    if (prev.above === this.props.above || !element?.closest("article")?.querySelector(":scope > header[data-stuck]")) return null;
+    const scroller = scrollerOf(element);
+    return scroller && { scroller, scrolled: scroller.scrollTop, top: element.offsetTop };
+  }
+
+  override componentDidUpdate(_: HeldPlaceProps, __: unknown, place?: Place | null) {
+    const element = this.root.current;
+    if (!place || !element) return;
+    // By offset, which the scroll can't skew, and set rather than scrolled by: a page made shorter has already pulled its scroll back.
+    place.scroller.scrollTop = place.scrolled + element.offsetTop - place.top;
+  }
+
+  override render() {
+    return <div ref={this.root}>{this.props.children}</div>;
+  }
+}
+
+/** What scrolls an element: the drawer's content in the drawer, the page otherwise. */
+function scrollerOf(element: Element): Element | null {
+  for (let box = element.parentElement; box; box = box.parentElement) {
+    if (["auto", "scroll"].includes(getComputedStyle(box).overflowY)) return box;
+  }
+  return document.scrollingElement;
+}
+
 /** Who the profile is and how to reach them, kept in view as the visitor reads on. */
 function StickyHeader({ back, close, bookmark, children }: Exits & { bookmark?: ReactNode; children?: ReactNode }) {
   const [ref, stuck] = useStuck();
@@ -306,12 +378,6 @@ function StickyHeader({ back, close, bookmark, children }: Exits & { bookmark?: 
       </div>
     </header>
   );
-}
-
-/** Shortlists the card the visitor's search showed where there was one, since it says more than the header. */
-function ProfileBookmark({ profile }: { profile: Profile }) {
-  const client = useQueryClient();
-  return <ShortlistButton therapist={cachedCard(client, profile.slug) ?? headerCard(profile)} />;
 }
 
 /** The therapist as the header shows them, for a shortlist card until a search that finds them fills it in. */

@@ -2,14 +2,14 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, renderHook, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, type Location } from "react-router";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import { emptyParams, readParams } from "@shared/query";
 import type { Profile, TherapistCard } from "@shared/types";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { api, ApiError } from "@/lib/api";
 import { listed } from "@/lib/listed.testing";
 import { useResults } from "@/search/useResults";
-import { createShortlistStore, type ShortlistStore } from "@/shortlist/store";
+import { createShortlistStore, type ShortlistCard, type ShortlistStore } from "@/shortlist/store";
 import { ShortlistContext } from "@/shortlist/useShortlist";
 import { ProfilePage } from "./ProfilePage";
 
@@ -63,6 +63,23 @@ afterEach(() => {
   mapChunk.fails = false;
 });
 
+/** Stands in for the IntersectionObserver jsdom lacks, and returns what reports the header clipped at the top, as its scroller does once it sticks. */
+function stickable() {
+  const reports: IntersectionObserverCallback[] = [];
+  vi.stubGlobal(
+    "IntersectionObserver",
+    class {
+      constructor(callback: IntersectionObserverCallback) {
+        reports.push(callback);
+      }
+      observe() {}
+      disconnect() {}
+    },
+  );
+  const clipped = { boundingClientRect: { top: -1 }, intersectionRect: { top: 0 } } as IntersectionObserverEntry;
+  return () => act(() => reports.at(-1)!([clipped], {} as IntersectionObserver));
+}
+
 describe("ProfilePage's way back", () => {
   it("goes back to the visitor's search", async () => {
     renderAt(["/?Location=Leeds", "/therapist/Test-ABCDEFGH"]);
@@ -114,22 +131,11 @@ describe("ProfilePage's header", () => {
   });
 
   it("marks itself stuck once its scroller clips it at the top, for its photo to shrink", async () => {
-    const reports: IntersectionObserverCallback[] = [];
-    vi.stubGlobal(
-      "IntersectionObserver",
-      class {
-        constructor(callback: IntersectionObserverCallback) {
-          reports.push(callback);
-        }
-        observe() {}
-        disconnect() {}
-      },
-    );
+    const stick = stickable();
     renderAt(["/therapist/Test-ABCDEFGH"]);
     const header = (await screen.findByRole("heading", { name: "Test Therapist" })).closest("header");
     expect(header?.dataset.stuck).toBeUndefined();
-    const clipped = { boundingClientRect: { top: -1 }, intersectionRect: { top: 0 } } as IntersectionObserverEntry;
-    act(() => reports.at(-1)!([clipped], {} as IntersectionObserver));
+    stick();
     expect(header?.dataset.stuck).toBe("true");
   });
 });
@@ -160,6 +166,210 @@ describe("ProfilePage's bookmark", () => {
     await screen.findByRole("heading", { name: "Test Therapist" });
     add();
     expect(store.get().map((entry) => entry.card)).toEqual([CARD]);
+  });
+});
+
+describe("ProfilePage's status track", () => {
+  const THERAPIST: ShortlistCard = { slug: "Test-ABCDEFGH", name: "Test Therapist", initials: "TT", tags: [] };
+  const track = () => screen.findByRole("list", { name: "Steps with Test Therapist" });
+  const step = (steps: HTMLElement) => steps.querySelector("[aria-current=step]")?.textContent;
+
+  it("follows the header, outside it, while the therapist is shortlisted", async () => {
+    const store = createShortlistStore(null);
+    store.add(THERAPIST, { status: "contacted" });
+    renderAt(["/therapist/Test-ABCDEFGH"], PROFILE, { store });
+    const steps = await track();
+    const header = screen.getByRole("heading", { name: "Test Therapist" }).closest("header")!;
+    expect(header.contains(steps)).toBe(false);
+    expect(header.compareDocumentPosition(steps) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(step(steps)).toBe("Contacted");
+  });
+
+  it("shows none for a therapist not shortlisted, and one at To contact once the bookmark adds them", async () => {
+    renderAt(["/therapist/Test-ABCDEFGH"]);
+    await screen.findByRole("heading", { name: "Test Therapist" });
+    expect(screen.queryByRole("list", { name: "Steps with Test Therapist" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Add Test Therapist to your shortlist" }));
+    expect(step(await track())).toBe("To contact");
+  });
+
+  it("comes and goes without moving what the visitor reads below it, once the header has stuck", async () => {
+    const stick = stickable();
+    const slotted = () => document.querySelector("article > .min-h-11") !== null;
+    // jsdom lays nothing out, so the columns are placed as a browser would: lower by the track's slot (its 44 px and space-y-8's 32) while it is there.
+    vi.spyOn(HTMLElement.prototype, "offsetTop", "get").mockImplementation(() => (slotted() ? 376 : 300));
+    // Nor does it scroll: the page's scroller, which a browser keeps from going past the page's end, 76 px further while the slot is there.
+    let scrolled = 200;
+    const page = {
+      get scrollTop() {
+        return Math.min(scrolled, slotted() ? 576 : 500);
+      },
+      set scrollTop(to: number) {
+        scrolled = to;
+      },
+    };
+    Object.defineProperty(document, "scrollingElement", { configurable: true, value: page });
+    onTestFinished(() => void Reflect.deleteProperty(document, "scrollingElement"));
+    renderAt(["/therapist/Test-ABCDEFGH"]);
+    await screen.findByRole("heading", { name: "Test Therapist" });
+    const add = () => fireEvent.click(screen.getByRole("button", { name: "Add Test Therapist to your shortlist" }));
+    const remove = () => fireEvent.click(screen.getByRole("button", { name: "Remove Test Therapist from your shortlist" }));
+    // At the top of the profile, the track comes and goes in view, as the visitor asked.
+    add();
+    await track();
+    expect(page.scrollTop).toBe(200);
+    remove();
+    expect(page.scrollTop).toBe(200);
+    stick();
+    page.scrollTop = 300;
+    add();
+    expect(page.scrollTop).toBe(376);
+    remove();
+    expect(page.scrollTop).toBe(300);
+    // At the page's end, where the browser has already pulled the scroll back by the time the slot has gone.
+    page.scrollTop = 500;
+    add();
+    expect(page.scrollTop).toBe(576);
+    remove();
+    expect(page.scrollTop).toBe(500);
+  });
+
+  it("says each change of status", async () => {
+    const store = createShortlistStore(null);
+    store.add(THERAPIST);
+    renderAt(["/therapist/Test-ABCDEFGH"], PROFILE, { store });
+    await track();
+    fireEvent.click(screen.getByRole("button", { name: "Mark contacted, Test Therapist" }));
+    expect(screen.getByText("Test Therapist: Contacted.").getAttribute("aria-live")).toBe("polite");
+  });
+
+  it("gives focus to the bookmark once the menu removes the therapist, and the bookmark brings them back as they were", async () => {
+    const store = createShortlistStore(null);
+    store.add(THERAPIST, { status: "consultation" });
+    renderAt(["/therapist/Test-ABCDEFGH"], PROFILE, { store });
+    await track();
+    // As a keyboard opens it, since jsdom's pointer events lack the button Radix checks for.
+    fireEvent.keyDown(screen.getByRole("button", { name: "Status of Test Therapist: consultation" }), { key: "Enter" });
+    fireEvent.click(screen.getByRole("menuitem", { name: "Remove from shortlist" }));
+    expect(store.has("Test-ABCDEFGH")).toBe(false);
+    expect(screen.queryByRole("list", { name: "Steps with Test Therapist" })).toBeNull();
+    const bookmark = screen.getByRole("button", { name: "Add Test Therapist to your shortlist" });
+    // Radix moves focus a macrotask after its menu goes.
+    await act(() => new Promise((resolve) => setTimeout(resolve, 0)));
+    expect(document.activeElement).toBe(bookmark);
+    fireEvent.click(bookmark);
+    expect(step(await track())).toBe("Consultation");
+  });
+});
+
+describe("ProfilePage's contact offer", () => {
+  const THERAPIST: ShortlistCard = { slug: "Test-ABCDEFGH", name: "Test Therapist", initials: "TT", tags: [] };
+  const REACHABLE: Profile = { ...PROFILE, email: "test@example.com", social: ["https://www.linkedin.com/in/test"] };
+  const offer = () => screen.queryByRole("group", { name: "Mark as contacted?" });
+  const step = async () => (await screen.findByRole("list", { name: "Steps with Test Therapist" })).querySelector("[aria-current=step]")?.textContent;
+
+  /** Follows a link as a click does, short of the navigation jsdom can't do. */
+  function follow(name: string) {
+    const link = screen.getByRole("link", { name });
+    link.addEventListener("click", (event) => event.preventDefault(), { once: true });
+    fireEvent.click(link);
+    return link;
+  }
+
+  async function renderReachable(store = createShortlistStore(null)) {
+    renderAt(["/therapist/Test-ABCDEFGH"], REACHABLE, { store });
+    await screen.findByRole("heading", { name: "Test Therapist" });
+    return store;
+  }
+
+  it("asks under the contact row once the email is followed, and not after a social or UKCP link", async () => {
+    await renderReachable();
+    follow("LinkedIn (opens in a new tab)");
+    follow("View on UKCP (opens in a new tab)");
+    expect(offer()).toBeNull();
+    const email = follow("Email: test@example.com");
+    expect(offer()?.closest("header")).toBeTruthy();
+    expect(email.compareDocumentPosition(offer()!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("asks once the phone is followed, and not after the website", async () => {
+    vi.spyOn(api, "contact").mockResolvedValue({ phone: "01234 567890", website: "https://www.example.invalid/" });
+    renderAt(["/therapist/Test-ABCDEFGH"], { ...PROFILE, contactId: "9239" });
+    await screen.findByRole("link", { name: "Telephone: 01234 567890" });
+    follow("Website: example.invalid (opens in a new tab)");
+    expect(offer()).toBeNull();
+    follow("Telephone: 01234 567890");
+    expect(offer()).not.toBeNull();
+  });
+
+  it("shortlists a therapist not on the list as contacted on Yes, says so, and gives focus back to the link", async () => {
+    const store = await renderReachable();
+    const email = follow("Email: test@example.com");
+    fireEvent.click(screen.getByRole("button", { name: "Yes" }));
+    expect(store.get().map((entry) => entry.status)).toEqual(["contacted"]);
+    expect(offer()).toBeNull();
+    expect(document.activeElement).toBe(email);
+    screen.getByText("Test Therapist: Contacted, and added to your shortlist.");
+    screen.getByRole("button", { name: "Remove Test Therapist from your shortlist" });
+    expect(await step()).toBe("Contacted");
+  });
+
+  it("marks a shortlisted therapist still to contact as contacted on Yes, keeping their place and card", async () => {
+    const store = createShortlistStore(null);
+    // As a search showed them, which says more than the header.
+    const card = { ...THERAPIST, location: "Testtown", tags: ["Anxiety"] };
+    store.add(card, { rank: 5 });
+    await renderReachable(store);
+    follow("Email: test@example.com");
+    fireEvent.click(screen.getByRole("button", { name: "Yes" }));
+    expect(store.get()).toEqual([expect.objectContaining({ rank: 5, status: "contacted", card })]);
+    screen.getByText("Test Therapist: Contacted.");
+    expect(await step()).toBe("Contacted");
+  });
+
+  it("marks nothing on Not now, gives focus back to the link, and asks again once it is followed again", async () => {
+    const store = await renderReachable();
+    const email = follow("Email: test@example.com");
+    fireEvent.click(screen.getByRole("button", { name: "Not now" }));
+    expect(store.get()).toEqual([]);
+    expect(offer()).toBeNull();
+    expect(document.activeElement).toBe(email);
+    follow("Email: test@example.com");
+    expect(offer()).not.toBeNull();
+  });
+
+  it("asks nothing about a therapist already marked", async () => {
+    const store = createShortlistStore(null);
+    store.add(THERAPIST, { status: "setAside" });
+    await renderReachable(store);
+    follow("Email: test@example.com");
+    expect(offer()).toBeNull();
+  });
+
+  it("stays as other links are followed, and goes once the track marks the therapist", async () => {
+    const store = createShortlistStore(null);
+    store.add(THERAPIST);
+    await renderReachable(store);
+    follow("Email: test@example.com");
+    follow("LinkedIn (opens in a new tab)");
+    expect(offer()).not.toBeNull();
+    fireEvent.click(await screen.findByRole("button", { name: "Mark contacted, Test Therapist" }));
+    expect(offer()).toBeNull();
+  });
+
+  it("stays away once the track marks the therapist, even when it puts them back at To contact", async () => {
+    const store = createShortlistStore(null);
+    store.add(THERAPIST);
+    await renderReachable(store);
+    follow("Email: test@example.com");
+    expect(offer()).not.toBeNull();
+    fireEvent.click(await screen.findByRole("button", { name: "Mark contacted, Test Therapist" }));
+    expect(offer()).toBeNull();
+    // As a keyboard opens it, since jsdom's pointer events lack the button Radix checks for.
+    fireEvent.keyDown(screen.getByRole("button", { name: "Status of Test Therapist: contacted" }), { key: "Enter" });
+    fireEvent.click(screen.getByRole("menuitemradio", { name: "To contact" }));
+    expect(await step()).toBe("To contact");
+    expect(offer()).toBeNull();
   });
 });
 
