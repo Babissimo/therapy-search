@@ -198,12 +198,72 @@ describe("SearchPage", () => {
     expect(await screen.findByTestId("map")).toBeTruthy();
     const toolbar = () => screen.getByRole("button", { name: "Filters" }).closest(".absolute")!;
     fireEvent.click(screen.getByRole("button", { name: "Hide list" }));
-    expect(results().closest("[inert]")).not.toBeNull();
+    expect(list().closest("[inert]")).not.toBeNull();
     // The toolbar stands aside for the toggle left over the map's top left.
     expect(toolbar().className).toContain("left-14");
     fireEvent.click(screen.getByRole("button", { name: "Show list" }));
-    expect(results().closest("[inert]")).toBeNull();
+    expect(list().closest("[inert]")).toBeNull();
     expect(toolbar().className).not.toContain("left-14");
+  });
+
+  it("keeps Load more over the map as an icon while the results are put away", async () => {
+    screenIs(true);
+    renderAt(SEARCH);
+    await loaded();
+    const more = screen.getByRole("button", { name: "Load more" });
+    expect(more.querySelector("svg")?.classList.contains("lucide-plus")).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "Hide list" }));
+    // The same button, so it shrinks to its icon rather than being swapped for another.
+    expect(screen.getByRole("button", { name: "Load more" })).toBe(more);
+    expect(more.closest("[inert]")).toBeNull();
+    expect(more.className).toContain("w-8");
+    expect(more.querySelector("svg")?.classList.contains("lucide-list-plus")).toBe(true);
+    fireEvent.click(more);
+    expect(await within(results()).findByText(/^24 of 30/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Show list" }));
+    expect(more.className).not.toContain("w-8");
+    expect(more.querySelector("svg")?.classList.contains("lucide-plus")).toBe(true);
+  });
+
+  it("names Load more in a tooltip only while it is folded to its icon", async () => {
+    screenIs(true);
+    renderAt(SEARCH);
+    await loaded();
+    const more = screen.getByRole("button", { name: "Load more" });
+    act(() => more.focus());
+    expect(screen.queryByRole("tooltip")).toBeNull();
+    expect(more.getAttribute("aria-describedby")).toBeNull();
+    act(() => more.blur());
+    fireEvent.click(screen.getByRole("button", { name: "Hide list" }));
+    act(() => more.focus());
+    expect(screen.getByRole("tooltip").textContent).toBe("Load more");
+  });
+
+  it("says why a page failed while the results are put away, as their alert is hidden with them", async () => {
+    screenIs(true);
+    renderAt(SEARCH);
+    await loaded();
+    fireEvent.click(screen.getByRole("button", { name: "Hide list" }));
+    vi.mocked(api.search).mockRejectedValueOnce(new Error("UKCP answered 503."));
+    const more = screen.getByRole("button", { name: "Load more" });
+    fireEvent.click(more);
+    expect(await screen.findByRole("button", { name: "Try again" })).toBe(more);
+    expect(more.querySelector("svg")?.classList.contains("lucide-rotate-cw")).toBe(true);
+    expect(results().querySelector("[aria-live]")?.textContent).toBe("UKCP answered 503.");
+    act(() => more.focus());
+    expect(screen.getByRole("tooltip").textContent).toBe("UKCP answered 503.");
+  });
+
+  it("hands the keyboard to the side bar's toggle when the last page arrives while the results are put away", async () => {
+    screenIs(true);
+    renderAt(SEARCH, [therapist("a")], [therapist("b")]);
+    await within(results()).findByText(/^1 of 2/);
+    fireEvent.click(screen.getByRole("button", { name: "Hide list" }));
+    const more = screen.getByRole("button", { name: "Load more" });
+    act(() => more.focus());
+    fireEvent.click(more);
+    await within(results()).findByText(/^2 of 2/);
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("button", { name: "Show list" })));
   });
 
   it("asks for a search in place of the results, with no map, when there is nothing to search for", async () => {
