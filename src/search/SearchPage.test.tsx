@@ -226,6 +226,13 @@ function placeByDistrict() {
   vi.spyOn(api, "place").mockImplementation(async (text) => ({ found: true, kind: "outcode", candidates: [text.endsWith("BN3") ? HOVE : BRIGHTON] }));
 }
 
+// Radix tabs switch on the mousedown that begins a click.
+function pick(name: string | RegExp) {
+  const tab = screen.getByRole("tab", { name });
+  fireEvent.mouseDown(tab);
+  fireEvent.click(tab);
+}
+
 afterEach(() => {
   vi.useRealTimers();
   vi.restoreAllMocks();
@@ -1041,13 +1048,6 @@ describe("SearchPage", () => {
     expect(screen.getByTestId("map").dataset.highlighted).toBe("");
   });
 
-  // Radix tabs switch on the mousedown that begins a click.
-  function pick(name: string | RegExp) {
-    const tab = screen.getByRole("tab", { name });
-    fireEvent.mouseDown(tab);
-    fireEvent.click(tab);
-  }
-
   it("keeps the shortlist in a tab beside the results, counting who is on it", async () => {
     screenIs(true);
     renderAt(SEARCH);
@@ -1512,9 +1512,7 @@ describe("SearchPage online", () => {
     renderAt(GREEK, [{ ...therapist("a"), tags: ["Online Therapy"] }]);
     await within(results()).findByRole("heading", { name: "1 result" });
     const inResults = within(screen.getByRole("tabpanel", { name: "Results" })).getByText("Online Therapy").outerHTML;
-    const tab = screen.getByRole("tab", { name: /^Shortlist/ });
-    fireEvent.mouseDown(tab);
-    fireEvent.click(tab);
+    pick(/^Shortlist/);
     expect(within(screen.getByRole("tabpanel", { name: /^Shortlist/ })).getByText("Online Therapy").outerHTML).toBe(inResults);
   });
 
@@ -1580,9 +1578,7 @@ describe("SearchPage online", () => {
     expect(list().contains(more)).toBe(true);
     const last = within(results()).getAllByRole("link", { name: /^Therapist p/ }).at(-1)!;
     expect(last.compareDocumentPosition(more) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    const tab = screen.getByRole("tab", { name: /^Shortlist/ });
-    fireEvent.mouseDown(tab);
-    fireEvent.click(tab);
+    pick(/^Shortlist/);
     expect(screen.queryByRole("button", { name: "Load more" })).toBeNull();
   });
 
@@ -1604,9 +1600,7 @@ describe("SearchPage online", () => {
     renderAt(ONLINE);
     expect(prompt()).toBeTruthy();
     expect(api.search).not.toHaveBeenCalled();
-    const tab = screen.getByRole("tab", { name: /^Shortlist/ });
-    fireEvent.mouseDown(tab);
-    fireEvent.click(tab);
+    pick(/^Shortlist/);
     expect(within(screen.getByRole("tabpanel", { name: /^Shortlist/ })).getByRole("link", { name: "Therapist a" })).toBeTruthy();
   });
 
@@ -1617,11 +1611,6 @@ describe("SearchPage online", () => {
     screenIs(wide);
     renderAt(GREEK);
     await loaded();
-    const pick = (name: RegExp) => {
-      const tab = screen.getByRole("tab", { name });
-      fireEvent.mouseDown(tab);
-      fireEvent.click(tab);
-    };
     pick(/^Shortlist/);
     expect(screen.queryByRole("link", { name: "Near me" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Remove Greek" })).toBeNull();
@@ -1636,11 +1625,6 @@ describe("SearchPage online", () => {
     screenIs(true);
     shortlist.add(therapist("a"));
     renderAt(ONLINE);
-    const pick = (name: RegExp) => {
-      const tab = screen.getByRole("tab", { name });
-      fireEvent.mouseDown(tab);
-      fireEvent.click(tab);
-    };
     const scrollTo = (top: number) => {
       list().scrollTop = top;
       fireEvent.scroll(list());
@@ -1664,9 +1648,7 @@ describe("SearchPage online", () => {
       expect(within(panel).queryByText(/In-person|Remote/)).toBeNull();
     };
     saysNeither(screen.getByRole("tabpanel", { name: "Results" }));
-    const tab = screen.getByRole("tab", { name: /^Shortlist/ });
-    fireEvent.mouseDown(tab);
-    fireEvent.click(tab);
+    pick(/^Shortlist/);
     saysNeither(screen.getByRole("tabpanel", { name: /^Shortlist/ }));
   });
 });
@@ -1758,11 +1740,6 @@ describe("SearchPage's view transitions", () => {
     screenIs(wide);
     shortlist.add(therapist("a"));
     renderAt(address);
-    const pick = (name: RegExp) => {
-      const tab = screen.getByRole("tab", { name });
-      fireEvent.mouseDown(tab);
-      fireEvent.click(tab);
-    };
     pick(/^Shortlist/);
     await waitFor(() => expect(started).toEqual([["morph"]]));
     pick(/^Results/);
@@ -1776,9 +1753,7 @@ describe("SearchPage's view transitions", () => {
     screenIs(wide);
     renderAt(SEARCH);
     await loaded();
-    const tab = screen.getByRole("tab", { name: /^Shortlist/ });
-    fireEvent.mouseDown(tab);
-    fireEvent.click(tab);
+    pick(/^Shortlist/);
     expect(screen.getByRole("tab", { name: /^Shortlist/ }).getAttribute("aria-selected")).toBe("true");
     expect(started).toEqual([]);
   });
