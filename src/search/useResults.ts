@@ -1,10 +1,19 @@
-import { infiniteQueryOptions, keepPreviousData, useInfiniteQuery, type InfiniteData, type QueryClient, type UseInfiniteQueryResult } from "@tanstack/react-query";
-import { PAGE_SIZE, toQuery, type SearchParams } from "@shared/query";
+import {
+  infiniteQueryOptions,
+  keepPreviousData,
+  queryOptions,
+  useInfiniteQuery,
+  useQuery,
+  type InfiniteData,
+  type QueryClient,
+  type UseInfiniteQueryResult,
+} from "@tanstack/react-query";
+import { asksWhole, PAGE_SIZE, toQuery, type SearchParams } from "@shared/query";
 import type { SearchResult, TherapistCard } from "@shared/types";
 import type { Listings } from "@shared/ukcp/parseResults";
 import { api } from "@/lib/api";
 import { locationFellBack } from "./LocationNotice";
-import { inOrder, orderSeed } from "./order";
+import { inOrder, orderSeed, settled } from "./order";
 import { withPage } from "./state";
 
 // As long as results stay fresh, so Back from a profile finds every page still loaded.
@@ -16,16 +25,25 @@ type Page = SearchResult & { batch: Listings; stride: number };
 type After = { shown: number; batch?: Listings; stride?: number };
 
 export type SearchResults = {
+  /**
+   * The pages of batches, for "Load more". Until the first batch is in, the cards may be the nearest few, which its
+   * `isPending` and `isPlaceholderData` know nothing of: whether there is anything to show is `loading` and `stale`.
+   */
   query: UseInfiniteQueryResult<InfiniteData<Page, After>>;
   first?: SearchResult;
   therapists: TherapistCard[];
   /** The place UKCP measured distances from, unless it fell back to searching the whole UK. */
   searchedPlace?: string;
+  /** True until there is something of this search to show. */
+  loading: boolean;
+  /** True while the last search's results show in place of this one's. */
+  stale: boolean;
 };
 
 /**
  * A search's results in this browser's order, a page at a time for "Load more", cut from batches that are each asked
- * of UKCP once. Nothing is asked for, or shown, until `enabled`.
+ * of UKCP once. Near a place, the nearest few are asked for beside the first batch and show until it arrives, those of
+ * them it will list first. Nothing is asked for, or shown, until `enabled`.
  */
 export function useResults(params: SearchParams, enabled = true): SearchResults {
   const query = useInfiniteQuery({
@@ -34,7 +52,12 @@ export function useResults(params: SearchParams, enabled = true): SearchResults 
     // Without a search, the last one's results would linger in its place.
     placeholderData: enabled ? keepPreviousData : undefined,
   });
-  const pages = query.data?.pages ?? [];
+  const arrived = query.data !== undefined && !query.isPlaceholderData;
+  const asksEarly = enabled && !asksWhole(params);
+  const early = useQuery({ ...earlyQuery(params), enabled: asksEarly && !arrived }).data;
+  // A failed batch is the search's failure, which shows alone.
+  const showsEarly = asksEarly && !arrived && !query.isError && early !== undefined && (early.therapists.length > 0 || early.total === 0);
+  const pages = showsEarly ? [early] : (query.data?.pages ?? []);
   const first = pages[0];
   const searched = first?.locationSearched;
   return {
@@ -42,12 +65,31 @@ export function useResults(params: SearchParams, enabled = true): SearchResults 
     first,
     therapists: distinct(pages),
     searchedPlace: searched !== undefined && !locationFellBack(params.text.Location, searched) ? searched : undefined,
+    loading: query.isPending && !showsEarly,
+    stale: query.isPlaceholderData && !showsEarly,
   };
 }
 
 /** Asks for a search's first page ahead of the page that shows it, which then finds it on its way or already here. */
 export function prefetchResults(client: QueryClient, params: SearchParams): void {
+  if (!asksWhole(params) && client.getQueryData(resultsKey(params)) === undefined) void client.prefetchQuery(earlyQuery(params));
   void client.prefetchInfiniteQuery(resultsQuery(params));
+}
+
+/** A location search's nearest few, those its first batch will list first, as its first page will show them. */
+function earlyQuery(params: SearchParams) {
+  const query = toQuery(withPage(params, 1));
+  return queryOptions({
+    queryKey: earlyKey(params),
+    queryFn: async (): Promise<SearchResult> => {
+      const nearest = await api.searchEarly(query);
+      const therapists = settled(nearest.listings, nearest.to >= nearest.total, orderSeed())
+        .slice(0, PAGE_SIZE)
+        .map((listing) => listing.read());
+      return { ...aboutBatch(nearest), from: 1, to: therapists.length, therapists };
+    },
+    gcTime: KEEP_FOR,
+  });
 }
 
 function resultsQuery(params: SearchParams) {
@@ -64,7 +106,8 @@ function resultsQuery(params: SearchParams) {
 
 /** The card a search still in `client`'s cache showed for this therapist, if one did. */
 export function cachedCard(client: QueryClient, slug: string): TherapistCard | undefined {
-  for (const [, data] of client.getQueriesData<InfiniteData<Page, After>>({ queryKey: ["results"] })) {
+  const cached = [...client.getQueriesData<Cached>({ queryKey: ["results"] }), ...client.getQueriesData<Cached>({ queryKey: ["early-results"] })];
+  for (const [, data] of cached) {
     const card = cardIn(data, slug);
     if (card) return card;
   }
@@ -73,15 +116,23 @@ export function cachedCard(client: QueryClient, slug: string): TherapistCard | u
 
 /** The card this search showed for this therapist, while its results are in `client`'s cache. */
 export function shownCard(client: QueryClient, params: SearchParams, slug: string): TherapistCard | undefined {
-  return cardIn(client.getQueryData<InfiniteData<Page, After>>(resultsKey(params)), slug);
+  return cardIn(client.getQueryData<Cached>(resultsKey(params)), slug) ?? cardIn(client.getQueryData<Cached>(earlyKey(params)), slug);
 }
 
-function cardIn(data: InfiniteData<Page, After> | undefined, slug: string): TherapistCard | undefined {
-  return data?.pages.flatMap((page) => page.therapists).find((therapist) => therapist.slug === slug);
+/** A search's pages, or its nearest few, as kept in the cache. */
+type Cached = InfiniteData<Page, After> | SearchResult;
+
+function cardIn(data: Cached | undefined, slug: string): TherapistCard | undefined {
+  const pages = data === undefined ? [] : "pages" in data ? data.pages : [data];
+  return pages.flatMap((page) => page.therapists).find((therapist) => therapist.slug === slug);
 }
 
 function resultsKey(params: SearchParams) {
   return ["results", toQuery(withPage(params, 1))];
+}
+
+function earlyKey(params: SearchParams) {
+  return ["early-results", toQuery(withPage(params, 1))];
 }
 
 /**

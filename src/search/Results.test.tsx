@@ -15,7 +15,7 @@ import { withFlag, withHelpWithTerms, withText } from "./state";
 import { useResults } from "./useResults";
 
 // Results keep the order they are answered in here; order.test.ts and useResults.test.tsx cover the order itself.
-vi.mock("./order", () => ({ orderSeed: () => 0, inOrder: <T,>(listings: T[]) => listings }));
+vi.mock("./order", () => ({ orderSeed: () => 0, inOrder: <T,>(listings: T[]) => listings, settled: <T,>(listings: T[]) => listings }));
 
 const TOO_MANY = "Too many searches in a short time. Wait a minute and try again.";
 
@@ -104,6 +104,24 @@ describe("Results", () => {
     renderResults(leeds);
     expect(screen.queryAllByRole("heading")).toEqual([]);
     expect(screen.queryAllByRole("alert")).toEqual([]);
+  });
+
+  it("shows the nearest few in place of the stand-in while the first batch is on its way, and Load more once it lands", async () => {
+    let release!: () => void;
+    const released = new Promise<void>((resolve) => (release = resolve));
+    const batches = answerBatches();
+    const answer = batches.getMockImplementation()!;
+    batches.mockImplementation(async (query) => {
+      await released;
+      return answer(query);
+    });
+    vi.spyOn(api, "searchEarly").mockImplementation(answer);
+    renderResults(leeds);
+    expect(await screen.findByRole("heading", { name: "12 results within 0.1 miles" })).toBeTruthy();
+    expect([cards().length, screen.queryByRole("button", { name: "Load more" })]).toEqual([12, null]);
+    await act(async () => release());
+    expect(await screen.findByRole("button", { name: "Load more" })).toBeTruthy();
+    expect(cards()).toHaveLength(12);
   });
 
   it("heads a searched place's list with how many have loaded and how far out they reach, over the place", async () => {
