@@ -203,7 +203,7 @@ const SEARCH = "/?Location=Leeds";
 const url = () => new URLSearchParams(screen.getByTestId("url").textContent ?? "");
 const path = () => screen.getByTestId("url").dataset.path;
 const results = () => screen.getByRole("region", { name: "Results and shortlist" });
-const loaded = () => within(results()).findByText(/^\d+ of 30/);
+const loaded = () => within(results()).findByRole("heading", { name: "30 results" });
 /** The side bar's scrolling list, which holds everything but its tabs and footer. */
 const list = () => results().querySelector<HTMLElement>(".overflow-y-auto")!;
 const names = () => within(results()).getAllByRole("link", { name: /^Therapist/ }).map((link) => link.textContent);
@@ -1168,13 +1168,13 @@ describe("SearchPage online", () => {
   it("lists everyone working online or by phone who matches its filters, with no place to search and no map", async () => {
     screenIs(true);
     renderAt(GREEK);
-    await loaded();
+    const heading = await loaded();
     await mapLoads();
     expect(screen.queryByTestId("map")).toBeNull();
     expect(screen.queryByRole("textbox", { name: "Location" })).toBeNull();
     expect(asked()).toBe(GREEK_ONLINE);
-    expect(within(results()).getByText("Only therapists who say they work online or by phone.")).toBeTruthy();
-    expect(within(results()).queryByText(/^Pins show/)).toBeNull();
+    // The count stands alone, with no share of it loaded, order or pins to speak of.
+    expect(heading.nextElementSibling).toBeNull();
   });
 
   it("searches nothing until a filter besides online or phone narrows the search, and nothing again once it is removed", async () => {
@@ -1257,7 +1257,7 @@ describe("SearchPage online", () => {
     screenIs(true);
     shortlist.add({ ...therapist("a"), tags: ["Online Therapy"] });
     renderAt(GREEK, [{ ...therapist("a"), tags: ["Online Therapy"] }]);
-    await within(results()).findByText(/^1 of 1/);
+    await within(results()).findByRole("heading", { name: "1 result" });
     const inResults = within(screen.getByRole("tabpanel", { name: "Results" })).getByText("Online Therapy").outerHTML;
     const tab = screen.getByRole("tab", { name: /^Shortlist/ });
     fireEvent.mouseDown(tab);
@@ -1362,7 +1362,7 @@ describe("SearchPage online", () => {
     const a = { ...therapist("a", "London E8"), sessionTypes: "In-person & Remote" };
     shortlist.add(a);
     renderAt(GREEK, [a]);
-    await within(results()).findByText(/^1 of 1/);
+    await within(results()).findByRole("heading", { name: "1 result" });
     const saysNeither = (panel: HTMLElement) => {
       expect(within(panel).getByRole("link", { name: "Therapist a" })).toBeTruthy();
       expect(within(panel).queryByText("London E8")).toBeNull();
