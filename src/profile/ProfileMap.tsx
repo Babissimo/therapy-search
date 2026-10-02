@@ -21,6 +21,8 @@ export default function ProfileMap({ profile, point, zoom }: Props) {
       scrollWheelZoom={false}
       boxZoom={false}
       keyboard={false}
+      // One map for each office, so a profile may show several.
+      sharedCredits
     >
       <MapTileLayer />
       <MapMarker position={centre} icon={pin} interactive={false} keyboard={false} />

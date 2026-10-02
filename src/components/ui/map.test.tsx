@@ -2,7 +2,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import L from "leaflet";
 import { createRef } from "react";
-import { useMapEvents } from "react-leaflet";
+import { TileLayer, useMapEvents } from "react-leaflet";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Map, MapBounds, MapMarker, MapMarkerClusterGroup, MapTileLayer, MapZoomControl, elementIcon, markerData, tileSource } from "./map";
 
@@ -24,6 +24,10 @@ describe("tileSource", () => {
     expect(attribution).toContain("OpenStreetMap");
     expect(attribution).toContain("CARTO");
     expect(tileSource("k", true).url).toBe("https://basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png?key=k");
+  });
+
+  it("links CARTO's credit to the page CARTO's terms name for it", () => {
+    expect(tileSource("k").attribution).toContain('<a href="https://carto.com/attribution/">CARTO</a>');
   });
 
   it("says which tiles are dark, for their tint to follow", () => {
@@ -114,6 +118,76 @@ describe("Map", () => {
   it("credits the map's data alone, with no tiles drawn yet", () => {
     const { container } = render(<Map center={[51.5, -0.1]} zoom={10} style={{ height: 400, width: 400 }} />);
     expect(container.querySelector(".leaflet-control-attribution")?.textContent).not.toContain("Leaflet");
+  });
+
+  describe("with credits shared among several maps", () => {
+    const CREDITS = '&copy; <a href="https://osm.test/copyright">OpenStreetMap</a>, &copy; <a href="https://carto.test/attribution">CARTO</a>';
+    /** Each map's credits, by their text, and their links' tabindex, in the page's order. */
+    const credits = (container: HTMLElement) =>
+      [...container.querySelectorAll(".leaflet-control-attribution")].map((box) => [
+        box.textContent,
+        [...box.querySelectorAll("a")].map((link) => link.getAttribute("tabindex")),
+      ]);
+    const map = (key: string, shared = true, tiles = "a") => (
+      <Map key={key} center={[51.5, -0.1]} zoom={10} sharedCredits={shared} style={{ height: 200, width: 200 }}>
+        <TileLayer key={tiles} url={`https://tiles.test/${tiles}/{z}/{x}/{y}.png`} attribution={CREDITS} />
+      </Map>
+    );
+    const shown = "© OpenStreetMap, © CARTO";
+
+    it("shows every map's credits, keeping only the first map's links in the Tab order", async () => {
+      const { container } = render(
+        <>
+          {map("one")}
+          {map("two")}
+          {map("lone", false)}
+          {map("three")}
+        </>,
+      );
+      await waitFor(() =>
+        expect(credits(container)).toEqual([
+          [shown, [null, null]],
+          [shown, ["-1", "-1"]],
+          [shown, [null, null]],
+          [shown, ["-1", "-1"]],
+        ]),
+      );
+    });
+
+    it("hands the Tab stop on to the next map when the first goes", async () => {
+      const { container, rerender } = render(
+        <>
+          {map("one")}
+          {map("two")}
+        </>,
+      );
+      await waitFor(() => expect(credits(container).map(([, tabs]) => tabs)).toEqual([[null, null], ["-1", "-1"]]));
+      rerender(<>{map("two")}</>);
+      expect(credits(container)).toEqual([[shown, [null, null]]]);
+    });
+
+    it("keeps its place in the Tab order as Leaflet writes the credits afresh, as a theme's tiles do", async () => {
+      const { container, rerender } = render(
+        <>
+          {map("one")}
+          {map("two")}
+        </>,
+      );
+      await waitFor(() => expect(credits(container).map(([, tabs]) => tabs)).toEqual([[null, null], ["-1", "-1"]]));
+      rerender(
+        <>
+          {map("one", true, "dark")}
+          {map("two", true, "dark")}
+        </>,
+      );
+      await waitFor(() =>
+        expect(credits(container)).toEqual([
+          [shown, [null, null]],
+          [shown, ["-1", "-1"]],
+        ]),
+      );
+      expect(container.querySelectorAll(".leaflet-tile-pane img[src*='/dark/']").length).toBeGreaterThan(0);
+    });
   });
 
   it("lets a cluster read the data its markers carry", async () => {

@@ -28,9 +28,15 @@ function Map({
   className,
   zoom = 6,
   maxZoom = 18,
+  sharedCredits = false,
   children,
   ...props
-}: Omit<MapContainerProps, "zoomControl"> & { center: LatLngExpression; ref?: Ref<LeafletMap> }) {
+}: Omit<MapContainerProps, "zoomControl"> & {
+  center: LatLngExpression;
+  ref?: Ref<LeafletMap>;
+  /** One of several maps on the page, whose credits keep one place in the Tab order between them (SharedCredits). */
+  sharedCredits?: boolean;
+}) {
   // Leaflet reads these once, as the map is made.
   const still = useReducedMotion();
   return (
@@ -47,6 +53,7 @@ function Map({
     >
       <FollowSize />
       <DataCreditsOnly />
+      {sharedCredits && <SharedCredits />}
       {still && <StillPans />}
       {children}
     </MapContainer>
@@ -91,6 +98,43 @@ function DataCreditsOnly() {
   return null;
 }
 
+// The maps whose credits keep one place in the Tab order between them.
+const sharing = new Set<HTMLElement>();
+
+/** The first sharing map in the page's order keeps its credits' links in the Tab order; the others' leave it. */
+function retab() {
+  const maps = [...sharing].sort((a, b) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1));
+  maps.forEach((container, i) => {
+    for (const link of container.querySelectorAll(".leaflet-control-attribution a")) {
+      if (i === 0) link.removeAttribute("tabindex");
+      else link.setAttribute("tabindex", "-1");
+    }
+  });
+}
+
+/**
+ * Every map shows its own credits, linked, as CARTO's terms ask of each basemap, but a page of several maps needs those
+ * links in its Tab order once, the others naming the same pages.
+ */
+function SharedCredits() {
+  const map = useMap();
+  useEffect(() => {
+    const container = map.getContainer();
+    sharing.add(container);
+    retab();
+    // Leaflet rewrites the credits whenever a layer comes or goes: the tiles as they first load, and again with each theme.
+    const observer = new MutationObserver(retab);
+    const credits = map.attributionControl?.getContainer();
+    if (credits) observer.observe(credits, { childList: true, subtree: true });
+    return () => {
+      observer.disconnect();
+      sharing.delete(container);
+      retab();
+    };
+  }, [map]);
+  return null;
+}
+
 /** `dark` says whether the tiles are drawn dark, which their tint (index.css) follows. */
 export type TileSource = { url: string; attribution: string; dark: boolean };
 
@@ -102,7 +146,7 @@ function tileSource(cartoKey: string | undefined, dark = false): TileSource {
   return {
     // CARTO's documented form: one host, which HTTP/2 serves over a single connection.
     url: `https://basemaps.cartocdn.com/rastertiles/${dark ? "dark_all" : "light_all"}/{z}/{x}/{y}{r}.png?key=${encodeURIComponent(cartoKey)}`,
-    attribution: `${OSM_ATTRIBUTION}, &copy; <a href="https://carto.com/attributions">CARTO</a>`,
+    attribution: `${OSM_ATTRIBUTION}, &copy; <a href="https://carto.com/attribution/">CARTO</a>`,
     dark,
   };
 }
