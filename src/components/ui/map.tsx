@@ -226,7 +226,7 @@ function MapZoomControl({ className }: { className?: string }) {
   }, [map]);
   return (
     <MapControlContainer className={cn("top-2 left-2", className)}>
-      <div role="group" aria-label="Zoom" className="flex flex-col gap-1">
+      <div role="group" aria-label="Zoom" className="flex flex-col gap-1 pointer-coarse:gap-4">
         <Button
           type="button"
           size="icon-sm"

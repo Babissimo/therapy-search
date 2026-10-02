@@ -328,7 +328,7 @@ function SortableEntry({ entry, heading, listed, sought, online, fee, pinKey, ma
         variant="ghost"
         size="icon-sm"
         // Only the handle takes a touch as a drag, so the list still scrolls under a finger elsewhere.
-        className="cursor-grab touch-none text-muted-foreground active:cursor-grabbing"
+        className="cursor-grab touch-none text-muted-foreground active:cursor-grabbing pointer-coarse:mr-1"
         disabled={!listed}
         {...attributes}
         {...listeners}

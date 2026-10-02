@@ -86,7 +86,8 @@ export function ResultsSheet({ position, onPositionChange, tabs, scrollRef, onSc
           onPointerUp={end}
           onPointerCancel={end}
           onClick={raiseForTab}
-          className="relative flex h-14 shrink-0 cursor-grab touch-none items-center justify-between gap-2 px-4"
+          // Lowered on a touch screen, where the tabs stand taller, to clear the handle.
+          className="relative flex h-14 shrink-0 cursor-grab touch-none items-center justify-between gap-2 px-4 pointer-coarse:pt-2"
         >
           <span aria-hidden className="absolute top-1.5 left-1/2 h-1 w-10 -translate-x-1/2 rounded-full bg-muted-foreground/40" />
           {tabs}

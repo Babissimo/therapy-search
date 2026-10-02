@@ -25,7 +25,7 @@ export function FilterPanel({ params, drafts, groups = FILTER_GROUPS, onSearch }
 
   return (
     <div className="space-y-6">
-      <div className="space-y-2">
+      <div className="space-y-2 pointer-coarse:space-y-4">
         <Button type="button" variant="link" size="sm" className="h-auto px-0" onClick={drafts.clear}>
           Clear all filters
         </Button>
@@ -36,7 +36,7 @@ export function FilterPanel({ params, drafts, groups = FILTER_GROUPS, onSearch }
         {groups.map((group) => (
           // Marked with UKCP's name for the group, for a shortcut to find it by.
           <AccordionItem key={group.label} value={group.label} data-filter-group={group.label}>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 pointer-coarse:gap-2">
               <AccordionTrigger className="flex-1">
                 <span className="flex items-center gap-2">
                   {groupName(group)}

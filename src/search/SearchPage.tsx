@@ -380,7 +380,7 @@ function SearchView({ params, onChange, wide }: ViewProps) {
               )}
               {searching && !wide && (
                 <ResultsSheet position={sheet} onPositionChange={setSheet} tabs={tabs} scrollRef={scroll.ref} onScroll={scroll.save} footer={footer}>
-                  <Masthead className="pb-3" />
+                  <Masthead className="pb-3 pointer-coarse:pt-2" />
                   {lists}
                 </ResultsSheet>
               )}
@@ -514,7 +514,7 @@ function Toolbar({
             <ModeSwitch online={false} params={params} drafts={drafts} />
             {/* Before a search the place box follows the filters instead. */}
             {overMap && (
-              <div className="flex items-start gap-2">
+              <div className="flex items-start gap-2 pointer-coarse:gap-3">
                 {/* A search for a place puts the filters away to show where it is; ticks and the keyword leave them open for more. */}
                 <Morph name="place">
                   <SearchBox
@@ -610,7 +610,7 @@ type PlaceStepProps = {
 function PlaceStep({ params, drafts, hold, onPlaceSearch, onUnfiltered }: PlaceStepProps) {
   const filtered = useSyncExternalStore(drafts.subscribe, () => activeFilters(drafts.search()).length > 0);
   return (
-    <div className="space-y-2">
+    <div className="space-y-2 pointer-coarse:space-y-4">
       <p className="text-sm font-medium">Where are you?</p>
       <SearchBox params={params} drafts={drafts} hold={hold} onPlaceSearch={onPlaceSearch} onFocus={warmMap} />
       {onUnfiltered && !filtered && (

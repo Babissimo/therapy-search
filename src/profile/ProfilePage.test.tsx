@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, renderHook, screen, waitFor, within } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { MemoryRouter, Route, Routes, type Location } from "react-router";
 import { afterEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import { emptyParams, readParams } from "@shared/query";
@@ -11,7 +12,7 @@ import { listed } from "@/lib/listed.testing";
 import { useResults } from "@/search/useResults";
 import { createShortlistStore, type ShortlistCard, type ShortlistStore } from "@/shortlist/store";
 import { ShortlistContext } from "@/shortlist/useShortlist";
-import { ProfilePage } from "./ProfilePage";
+import { ProfileBody, ProfilePage } from "./ProfilePage";
 
 /** Set by a test whose office maps' code can't be fetched. */
 const mapChunk = vi.hoisted(() => ({ fails: false }));
@@ -33,9 +34,14 @@ const PROFILE: Profile = { slug: "Test-ABCDEFGH", name: "Test Therapist", initia
 
 const newClient = () => new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
-type Setup = { store?: ShortlistStore; client?: QueryClient };
+/** `close` shows the profile as a drawer does, closed from its header, rather than as a page. */
+type Setup = { store?: ShortlistStore; client?: QueryClient; close?: ReactNode };
 
-function renderAt(entries: (string | Partial<Location>)[], result: Profile | ApiError = PROFILE, { store = createShortlistStore(null), client = newClient() }: Setup = {}) {
+function renderAt(
+  entries: (string | Partial<Location>)[],
+  result: Profile | ApiError = PROFILE,
+  { store = createShortlistStore(null), client = newClient(), close }: Setup = {},
+) {
   const profile = vi.spyOn(api, "profile");
   if (result instanceof ApiError) profile.mockRejectedValue(result);
   else profile.mockResolvedValue(result);
@@ -48,7 +54,7 @@ function renderAt(entries: (string | Partial<Location>)[], result: Profile | Api
           <MemoryRouter initialEntries={entries} initialIndex={entries.length - 1}>
             <Routes>
               <Route path="/" element={<p>Search page</p>} />
-              <Route path="/therapist/:slug" element={<ProfilePage slug="Test-ABCDEFGH" />} />
+              <Route path="/therapist/:slug" element={close ? <ProfileBody slug="Test-ABCDEFGH" close={close} /> : <ProfilePage slug="Test-ABCDEFGH" />} />
             </Routes>
           </MemoryRouter>
         </TooltipProvider>
@@ -128,6 +134,14 @@ describe("ProfilePage's header", () => {
     renderAt(["/therapist/Test-ABCDEFGH"], { ...PROFILE, email: "test@example.com" });
     const email = await screen.findByRole("link", { name: "Email: test@example.com" });
     expect(email.closest("header")).not.toBeNull();
+  });
+
+  it("stands its bookmark apart from a drawer's close button on a touch screen, where each takes a target wider than itself", async () => {
+    renderAt(["/therapist/Test-ABCDEFGH"], PROFILE, { close: <button type="button">Close</button> });
+    const bookmark = await screen.findByRole("button", { name: "Add Test Therapist to your shortlist" });
+    const close = screen.getByRole("button", { name: "Close" });
+    expect(close.parentElement).toBe(bookmark.parentElement);
+    expect(close.parentElement?.classList.contains("pointer-coarse:gap-4")).toBe(true);
   });
 
   it("marks itself stuck once its scroller clips it at the top, for its photo to shrink", async () => {

@@ -62,7 +62,7 @@ export function ContactList({ profile, onReach }: Props) {
               href={item.href}
               title={item.title}
               aria-label={nameOf(item)}
-              className="inline-flex max-w-full items-center gap-1.5 hover:underline"
+              className="relative inline-flex max-w-full touch-target items-center gap-1.5 hover:underline"
               onClick={item.reaches ? (event) => onReach?.(event.currentTarget) : undefined}
               {...(item.external && { target: "_blank", rel: "noreferrer" })}
             >
@@ -81,7 +81,8 @@ export function ContactList({ profile, onReach }: Props) {
         )}
       </ContactRow>
       {contact.error && (
-        <ErrorLine>
+        // Clear, on a touch screen, of the links' targets above.
+        <ErrorLine className="pointer-coarse:pt-6">
           {contact.error.message}{" "}
           <Button variant="link" size="sm" className="h-auto p-0" onClick={() => contact.refetch()}>
             Try again
@@ -111,10 +112,14 @@ export function ContactListSkeleton() {
   );
 }
 
-/** One row that scrolls sideways where the header is narrow, so the header stays short enough to keep in view. */
+/**
+ * One row that scrolls sideways where the header is narrow, so the header stays short enough to keep in view. On a touch
+ * screen it is padded for the links' targets, which its scrolling would otherwise clip, and drawn out by as much to keep
+ * its place.
+ */
 function ContactRow({ children }: { children: ReactNode }) {
   return (
-    <ul className="flex gap-x-4 gap-y-1 overflow-x-auto text-sm whitespace-nowrap [scrollbar-width:none] @lg:flex-wrap @lg:overflow-visible">
+    <ul className="flex gap-x-4 gap-y-1 overflow-x-auto text-sm whitespace-nowrap [scrollbar-width:none] pointer-coarse:-my-3 pointer-coarse:gap-y-6 pointer-coarse:py-3 @lg:flex-wrap @lg:overflow-visible">
       {children}
     </ul>
   );

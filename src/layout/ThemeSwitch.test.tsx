@@ -68,6 +68,14 @@ describe("ThemeSwitch", () => {
     expect(isDark()).toBe(false);
   });
 
+  it("widens each choice to a touch target's width on a touch screen, and stands its target on it", async () => {
+    await renderSwitch();
+    for (const name of ["Light", "System", "Dark"]) {
+      const { classList } = screen.getByRole("radio", { name }).closest("label")!;
+      expect(["pointer-coarse:w-11", "touch-target", "relative"].map((c) => classList.contains(c))).toEqual([true, true, true]);
+    }
+  });
+
   it("forgets the pick on returning to system", async () => {
     localStorage.setItem("theme", "light");
     systemDark = true;

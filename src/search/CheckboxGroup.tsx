@@ -12,8 +12,9 @@ import { isMulti } from "./state";
 import { TickedCount } from "./TickedCount";
 
 // A long list scrolls within its group. The padding holds the checkboxes' enlarged hit areas, which otherwise overhang the
-// last row and let a list that fits scroll a little; the margin takes it back out of the layout.
-const SCROLL_BOX = "-mb-1.5 max-h-64 overflow-y-auto pr-1 pb-1.5";
+// last row and let a list that fits scroll a little, and on a touch screen the help buttons' targets; the margin takes it
+// back out of the layout.
+const SCROLL_BOX = "-mb-1.5 max-h-64 overflow-y-auto pr-1 pb-1.5 pointer-coarse:pr-2";
 // A flat list first mounts a few more boxes than its scroll box shows, and the rest once still, so mounting can't eat its opening.
 const FIRST_BOXES = 12;
 
@@ -103,11 +104,11 @@ export function CheckboxGroup({ group, searchable, isChecked, isChanged, onToggl
             return (
               <Collapsible key={section.heading} asChild open={expanded} onOpenChange={(on) => openSection(section.heading, on)}>
                 <li>
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1 pointer-coarse:gap-2">
                     {needle ? (
                       <span className="py-1 text-sm text-muted-foreground">{section.heading}</span>
                     ) : (
-                      <CollapsibleTrigger className="flex items-center gap-1.5 rounded-md py-1 text-left text-sm outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50">
+                      <CollapsibleTrigger className="flex items-center gap-1.5 rounded-md py-1 text-left pointer-coarse:min-h-11 text-sm outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50">
                         <ChevronRight className={cn("size-4 shrink-0 text-muted-foreground motion-safe:transition-transform", expanded && "rotate-90")} aria-hidden />
                         <span>{section.heading}</span>
                         <TickedCount count={section.fields.filter(isChecked).length} />
