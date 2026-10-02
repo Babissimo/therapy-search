@@ -16,6 +16,10 @@
   ],
   // UKCP's anti-forgery session, shared by every isolate.
   "kv_namespaces": [{ "binding": "UKCP_SESSION", "id": "0d58d3e6b9c14526b49ed5b8c371b6a1" }],
-  "vars": { "SITE_URL": "https://therapy-search.babissimo.workers.dev" },
+  "routes": [{ "pattern": "therapysearch.babissimo.net", "custom_domain": true }],
+  // Wrangler turns workers.dev off once routes are set. It stays on because a visitor's shortlist and notes live in
+  // localStorage, which belongs to the origin they first used.
+  "workers_dev": true,
+  "vars": { "SITE_URL": "https://therapysearch.babissimo.net" },
   "observability": { "enabled": false }
 }

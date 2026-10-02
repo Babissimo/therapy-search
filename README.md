@@ -1,7 +1,7 @@
 # Therapy search
 
 An unofficial, simpler page for searching the [UKCP therapist directory](https://www.psychotherapy.org.uk/find-a-therapist/), live at
-https://therapy-search.babissimo.workers.dev. It offers the same searches and profiles as UKCP's own page, fetched from UKCP when a
+https://therapysearch.babissimo.net. It offers the same searches and profiles as UKCP's own page, fetched from UKCP when a
 visitor asks for them. It is not run by or affiliated with UKCP.
 
 One Cloudflare Worker, on the free plan, serves both the React front end and the `/api` routes that call UKCP. The design, including how
