@@ -21,7 +21,10 @@ function answer() {
   return vi.spyOn(api, "search").mockResolvedValue(NONE);
 }
 
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
 
 describe("prefetchSearchAt", () => {
   it("asks for a search near a place, and its nearest few, before the page does, which then asks for nothing more", async () => {
@@ -59,5 +62,36 @@ describe("prefetchSearchAt", () => {
     const search = answer();
     prefetchSearchAt(newClient(), hash);
     expect(search).not.toHaveBeenCalled();
+  });
+});
+
+describe("warmMap", () => {
+  /** How often the map's code has been fetched since the modules were made afresh. */
+  let fetched = 0;
+
+  /** This module afresh, on a window wide and tall enough for the map to show beside the list, or not. */
+  async function freshOn(wide: boolean) {
+    vi.resetModules();
+    fetched = 0;
+    vi.doMock("./map/MapPane", () => {
+      fetched++;
+      return { default: () => null };
+    });
+    vi.stubGlobal("matchMedia", (query: string) => ({ matches: wide && query === "(min-width: 64rem) and (min-height: 31rem)" }));
+    return import("./prefetch");
+  }
+
+  it("fetches the map's code ahead where the map shows beside the list", async () => {
+    (await freshOn(true)).warmMap();
+    await vi.waitFor(() => expect(fetched).toBe(1));
+  });
+
+  it("leaves the map's code until the map is asked for where the list leads", async () => {
+    const { warmMap, loadMap } = await freshOn(false);
+    warmMap();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(fetched).toBe(0);
+    await loadMap();
+    expect(fetched).toBe(1);
   });
 });
