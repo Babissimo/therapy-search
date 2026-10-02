@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import { STATUS_LABEL } from "@/shortlist/status";
 import type { ShortlistCard, Status } from "@/shortlist/store";
-import { useShortlistStatus, useShortlistStore } from "@/shortlist/useShortlist";
+import { useShortlistAnnouncement, useShortlistStatus, useShortlistStore } from "@/shortlist/useShortlist";
 
 /**
  * Where the visitor stands with a profile's therapist, with the offer to mark them contacted once a phone or email link is
@@ -14,7 +14,7 @@ export function useStanding(slug: string) {
   const [offered, setOffered] = useState(false);
   // Marked another way, by the track or in another tab, they need no asking.
   if (offered && !unmarked) setOffered(false);
-  const [announcement, setAnnouncement] = useState("");
+  const [announcement, announce] = useShortlistAnnouncement();
   const root = useRef<HTMLElement>(null);
   // The phone or email link followed, which takes focus back once the offer is answered.
   const followed = useRef<HTMLElement | null>(null);
@@ -26,7 +26,7 @@ export function useStanding(slug: string) {
     root.current?.querySelector<HTMLElement>(`[data-bookmark="${window.CSS.escape(slug)}"]`)?.focus();
   });
 
-  const chosen = (therapist: ShortlistCard, to: Status) => setAnnouncement(`${therapist.name}: ${STATUS_LABEL[to]}.`);
+  const chosen = (therapist: ShortlistCard, to: Status) => announce(`${therapist.name}: ${STATUS_LABEL[to]}.`);
 
   return {
     /** The profile, in which the bookmark is found. */
@@ -39,7 +39,10 @@ export function useStanding(slug: string) {
     /** After the track gives the therapist a new status. */
     chosen,
     /** After the track's menu takes the therapist off the shortlist. */
-    removed: () => void (toBookmark.current = true),
+    removed: (therapist: ShortlistCard) => {
+      announce(`Removed ${therapist.name} from your shortlist.`);
+      toBookmark.current = true;
+    },
     /** After the visitor follows a phone or email link: asks whether they got in touch, while the therapist is to contact or not shortlisted. */
     reached: (link: HTMLElement) => {
       if (!unmarked) return;
@@ -54,7 +57,7 @@ export function useStanding(slug: string) {
           chosen(therapist, "contacted");
         } else {
           store.add(therapist, { status: "contacted" });
-          setAnnouncement(`${therapist.name}: ${STATUS_LABEL.contacted}, and added to your shortlist.`);
+          announce(`${therapist.name}: ${STATUS_LABEL.contacted}, and added to your shortlist.`);
         }
       }
       setOffered(false);

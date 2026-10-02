@@ -243,7 +243,7 @@ describe("ProfilePage's status track", () => {
     expect(screen.getByText("Test Therapist: Contacted.").getAttribute("aria-live")).toBe("polite");
   });
 
-  it("gives focus to the bookmark once the menu removes the therapist, and the bookmark brings them back as they were", async () => {
+  it("says who the menu removed and gives focus to the bookmark, which brings them back as they were", async () => {
     const store = createShortlistStore(null);
     store.add(THERAPIST, { status: "consultation" });
     renderAt(["/therapist/Test-ABCDEFGH"], PROFILE, { store });
@@ -253,12 +253,14 @@ describe("ProfilePage's status track", () => {
     fireEvent.click(screen.getByRole("menuitem", { name: "Remove from shortlist" }));
     expect(store.has("Test-ABCDEFGH")).toBe(false);
     expect(screen.queryByRole("list", { name: "Steps with Test Therapist" })).toBeNull();
+    screen.getByText("Removed Test Therapist from your shortlist.", { selector: "[aria-live=polite]" });
     const bookmark = screen.getByRole("button", { name: "Add Test Therapist to your shortlist" });
     // Radix moves focus a macrotask after its menu goes.
     await act(() => new Promise((resolve) => setTimeout(resolve, 0)));
     expect(document.activeElement).toBe(bookmark);
     fireEvent.click(bookmark);
     expect(step(await track())).toBe("Consultation");
+    expect(screen.queryByText("Removed Test Therapist from your shortlist.")).toBeNull();
   });
 });
 

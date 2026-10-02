@@ -145,7 +145,7 @@ export function ProfileBody({ slug, back, close }: { slug: string } & Exits) {
             therapist={therapist}
             status={standing.status}
             onChosen={(to) => standing.chosen(therapist, to)}
-            onRemoved={standing.removed}
+            onRemoved={() => standing.removed(therapist)}
           />
         </div>
       )}

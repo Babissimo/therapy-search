@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useSyncExternalStore } from "react";
+import { createContext, useContext, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import type { TherapistCard } from "@shared/types";
 import { browserStorage } from "@/lib/storage";
 import { createShortlistStore, statusOf, type Shortlist, type ShortlistEntry, type ShortlistStore, type Status } from "./store";
@@ -68,6 +68,17 @@ export function useShortlistStatus(slug: string): Status | undefined {
     const entry = store.get().find((e) => e.card.slug === slug);
     return entry && statusOf(entry);
   });
+}
+
+/**
+ * What a polite live region says of a change the visitor made, given once the change is made. It is said until the list next
+ * changes, here or in another tab, so the same words said again after an undo are heard again.
+ */
+export function useShortlistAnnouncement(): [string, (text: string) => void] {
+  const store = useShortlistStore();
+  const [made, setMade] = useState<{ text: string; after?: Shortlist }>({ text: "" });
+  const holds = useSyncExternalStore(store.subscribe, () => made.after === store.get());
+  return [holds ? made.text : "", (text) => setMade({ text, after: store.get() })];
 }
 
 /** How many times the shortlist has been cleared since the page loaded, for whatever keeps entries of its own to forget them. */
