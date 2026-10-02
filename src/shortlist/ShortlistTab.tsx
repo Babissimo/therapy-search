@@ -12,7 +12,7 @@ import {
 } from "@dnd-kit/core";
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Bookmark, ChevronRight, GripVertical } from "lucide-react";
+import { Bookmark, ChevronDown, ChevronRight, ChevronUp, GripVertical } from "lucide-react";
 import { useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { IconButton } from "@/components/IconButton";
 import {
@@ -37,7 +37,7 @@ import { useSetAsideOpen } from "./setAside";
 import { ShortlistButton } from "./ShortlistButton";
 import { STATUS_ICON, STATUS_LABEL } from "./status";
 import { StatusTrack } from "./StatusTrack";
-import { byRank, statusOf, type Shortlist, type ShortlistCard, type ShortlistEntry, type Status } from "./store";
+import { byRank, statusOf, type Between, type Shortlist, type ShortlistCard, type ShortlistEntry, type Status } from "./store";
 import { therapistCount, useShortlist, useShortlistAnnouncement, useShortlistClears, useShortlistStore } from "./useShortlist";
 
 type Props = {
@@ -115,9 +115,19 @@ export function ShortlistTab({ sought, online = false, pins = [], unplaced = 0, 
     refocus.current = `[data-bookmark="${window.CSS.escape(therapist.slug)}"]`;
   }
 
+  // Focus stays on the button pressed, which redrawing the list can take it from, or goes to the other once the therapist
+  // reaches an end, where the one pressed is disabled.
+  function moved(entries: Shortlist, from: number, to: number) {
+    const { card } = entries[from]!;
+    store.move(card.slug, between(entries, shown, from, to));
+    announce(`${card.name} moved to number ${to + 1} of ${entries.length}.`);
+    const up = to < from ? to > 0 : to === entries.length - 1;
+    refocus.current = `[data-move-${up ? "up" : "down"}="${window.CSS.escape(card.slug)}"]`;
+  }
+
   const cards = (entries: Shortlist, heading: "h2" | "h3") => (
     <SortableList entries={entries} shown={shown}>
-      {entries.map((entry) => {
+      {entries.map((entry, i) => {
         const { card } = entry;
         const status = statusOf(entry);
         const pinKey = pinOf.get(card.slug)?.key;
@@ -133,6 +143,8 @@ export function ShortlistTab({ sought, online = false, pins = [], unplaced = 0, 
             pinKey={pinKey}
             marked={pinKey !== undefined && pinKey === selected?.key}
             onHighlight={onHighlight}
+            onUp={i > 0 ? () => moved(entries, i, i - 1) : undefined}
+            onDown={i < entries.length - 1 ? () => moved(entries, i, i + 1) : undefined}
             onChosen={(to) => changed(card, status, to)}
             onRemoved={() => removed(card)}
           />
@@ -249,18 +261,12 @@ function SortableList({ entries, shown, children }: ListProps) {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
-  // The therapist goes beside their new neighbour here and in the shortlist's whole order alike, so they keep a place
-  // among everyone for when they go into or out of "Set aside". A therapist removed here counts as a neighbour, keeping theirs.
   function onDragEnd({ active, over }: DragEndEvent) {
     const slugs = entries.map((entry) => entry.card.slug);
     const from = slugs.indexOf(String(active.id));
     const to = over ? slugs.indexOf(String(over.id)) : -1;
     if (to === -1 || to === from) return;
-    const order = arrayMove([...entries], from, to);
-    const others = shown.filter((entry) => entry.card.slug !== active.id);
-    const above = order[to - 1];
-    const below = order[to + 1];
-    store.move(String(active.id), above ? { above, below: others[others.indexOf(above) + 1] } : { above: others[others.indexOf(below!) - 1], below });
+    store.move(String(active.id), between(entries, shown, from, to));
   }
 
   return (
@@ -278,6 +284,19 @@ function SortableList({ entries, shown, children }: ListProps) {
   );
 }
 
+/**
+ * Where a therapist moved from `from` to `to` among `entries` goes: beside their new neighbour there and in the shortlist's
+ * whole order alike, so they keep a place among everyone `shown` for when they go into or out of "Set aside". A therapist
+ * removed here counts as a neighbour, keeping theirs.
+ */
+function between(entries: Shortlist, shown: Shortlist, from: number, to: number): Between {
+  const order = arrayMove([...entries], from, to);
+  const others = shown.filter((entry) => entry !== entries[from]);
+  const above = order[to - 1];
+  const below = order[to + 1];
+  return above ? { above, below: others[others.indexOf(above) + 1] } : { above: others[others.indexOf(below!) - 1], below };
+}
+
 type EntryProps = {
   entry: ShortlistEntry;
   heading: "h2" | "h3";
@@ -289,14 +308,20 @@ type EntryProps = {
   /** At the pin selected on the map. */
   marked: boolean;
   onHighlight?: (slug: string | undefined) => void;
+  /** Moves the therapist a place up or down; missing at that end of the list. */
+  onUp?: () => void;
+  onDown?: () => void;
   /** After the track gives the therapist a new status. */
   onChosen: (status: Status) => void;
   /** After the track's menu takes the therapist off the shortlist. */
   onRemoved: () => void;
 };
 
-/** A card with a handle to move it by; a therapist removed here can't be moved until they are added back. */
-function SortableEntry({ entry, heading, listed, sought, online, fee, pinKey, marked, onHighlight, onChosen, onRemoved }: EntryProps) {
+/**
+ * A card with a handle to drag it by and buttons to move it a place at a time; a therapist removed here can't be moved
+ * until they are added back.
+ */
+function SortableEntry({ entry, heading, listed, sought, online, fee, pinKey, marked, onHighlight, onUp, onDown, onChosen, onRemoved }: EntryProps) {
   const { card } = entry;
   const status = statusOf(entry);
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
@@ -321,20 +346,48 @@ function SortableEntry({ entry, heading, listed, sought, online, fee, pinKey, ma
         isDragging && "relative z-10 [&_[data-slot=card]]:shadow-lg forced-colors:outline-2 forced-colors:outline-offset-4 forced-colors:outline-dashed",
       )}
     >
-      <IconButton
-        ref={setActivatorNodeRef}
-        label={`Move ${card.name}`}
-        side="right"
-        variant="ghost"
-        size="icon-sm"
-        // Only the handle takes a touch as a drag, so the list still scrolls under a finger elsewhere.
-        className="cursor-grab touch-none text-muted-foreground active:cursor-grabbing pointer-coarse:mr-1"
-        disabled={!listed}
-        {...attributes}
-        {...listeners}
-      >
-        <GripVertical aria-hidden />
-      </IconButton>
+      {/* Move up and Move down are marked by slug, for the list to give one of them focus once the card has moved. On a touch
+          screen the three stand far enough apart, and from the card, that no one's target takes another's taps. */}
+      <div className="flex flex-col pointer-coarse:mr-1 pointer-coarse:gap-4">
+        <IconButton
+          label={`Move ${card.name} up`}
+          side="right"
+          variant="ghost"
+          size="icon-sm"
+          className="text-muted-foreground"
+          disabled={!listed || !onUp}
+          data-move-up={card.slug}
+          onClick={onUp}
+        >
+          <ChevronUp aria-hidden />
+        </IconButton>
+        <IconButton
+          ref={setActivatorNodeRef}
+          label={`Move ${card.name}`}
+          side="right"
+          variant="ghost"
+          size="icon-sm"
+          // Only the handle takes a touch as a drag, so the list still scrolls under a finger elsewhere.
+          className="cursor-grab touch-none text-muted-foreground active:cursor-grabbing"
+          disabled={!listed}
+          {...attributes}
+          {...listeners}
+        >
+          <GripVertical aria-hidden />
+        </IconButton>
+        <IconButton
+          label={`Move ${card.name} down`}
+          side="right"
+          variant="ghost"
+          size="icon-sm"
+          className="text-muted-foreground"
+          disabled={!listed || !onDown}
+          data-move-down={card.slug}
+          onClick={onDown}
+        >
+          <ChevronDown aria-hidden />
+        </IconButton>
+      </div>
       <div className={cn("min-w-0 flex-1 rounded-xl", marked && "ring-2 ring-highlight forced-marked")}>
         <TherapistCard
           therapist={card}

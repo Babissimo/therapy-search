@@ -68,6 +68,8 @@ const stepOf = (name: string) =>
 
 const openSetAside = () => fireEvent.click(screen.getByRole("button", { name: /^Set aside, /, expanded: false }));
 
+const button = (name: string) => screen.getByRole<HTMLButtonElement>("button", { name });
+
 // Each card's office is asked about; these profiles name no fee unless a test says otherwise.
 beforeEach(() => {
   vi.spyOn(api, "office").mockResolvedValue({});
@@ -397,6 +399,79 @@ describe("ShortlistTab", () => {
     moveByKeys("Bo", "ArrowUp", "Space");
     expect(names()).toEqual(["Bo", "Cy", "Ann"]);
     expect(store.get().map((e) => e.card.name)).toEqual(["Di", "Bo", "Cy", "Ann"]);
+  });
+
+  it("moves a therapist a place at a time by the buttons beside their handle, saying where they are now, focus staying on the button pressed", () => {
+    const store = renderTab({}, card("Ann-AAAAAAAA", "Ann"), card("Bo-BBBBBBBB", "Bo"), card("Cy-CCCCCCCC", "Cy"), card("Di-DDDDDDDD", "Di"));
+    fireEvent.click(button("Move Di down"));
+    expect(names()).toEqual(["Cy", "Di", "Bo", "Ann"]);
+    screen.getByText("Di moved to number 2 of 4.");
+    expect(document.activeElement).toBe(button("Move Di down"));
+    fireEvent.click(button("Move Ann up"));
+    expect(names()).toEqual(["Cy", "Di", "Ann", "Bo"]);
+    screen.getByText("Ann moved to number 3 of 4.");
+    expect(document.activeElement).toBe(button("Move Ann up"));
+    expect(store.get().map((e) => e.card.name)).toEqual(["Cy", "Di", "Ann", "Bo"]);
+  });
+
+  it("gives focus to the other button once a therapist reaches an end of the list, where the one pressed is disabled", () => {
+    renderTab({}, card("Ann-AAAAAAAA", "Ann"), card("Bo-BBBBBBBB", "Bo"), card("Cy-CCCCCCCC", "Cy"));
+    expect([button("Move Cy up").disabled, button("Move Ann down").disabled]).toEqual([true, true]);
+    fireEvent.click(button("Move Bo up"));
+    expect(names()).toEqual(["Bo", "Cy", "Ann"]);
+    expect(button("Move Bo up").disabled).toBe(true);
+    expect(document.activeElement).toBe(button("Move Bo down"));
+    fireEvent.click(button("Move Cy down"));
+    expect(names()).toEqual(["Bo", "Ann", "Cy"]);
+    screen.getByText("Cy moved to number 3 of 3.");
+    expect(button("Move Cy down").disabled).toBe(true);
+    expect(document.activeElement).toBe(button("Move Cy up"));
+  });
+
+  it("stands the move buttons and handle apart, and off the card, on a touch screen, where each takes a 44px target", () => {
+    renderTab({}, card("Ann-AAAAAAAA", "Ann"), card("Bo-BBBBBBBB", "Bo"));
+    const column = button("Move Ann up").parentElement!;
+    expect([...column.children]).toEqual([button("Move Ann up"), button("Move Ann"), button("Move Ann down")]);
+    // 28px buttons, 16px apart: targets centred on them meet without overlapping.
+    expect(column.className).toContain("pointer-coarse:gap-4");
+    expect(column.className).toContain("pointer-coarse:mr-1");
+  });
+
+  it("offers no move to a therapist alone on the list", () => {
+    renderTab({}, card("Ann-AAAAAAAA", "Ann"));
+    expect([button("Move Ann up").disabled, button("Move Ann down").disabled]).toEqual([true, true]);
+  });
+
+  it("moves others past a removed therapist by their buttons, keeping the removed one's place, but can't move them", () => {
+    const store = renderTab({}, card("Ann-AAAAAAAA", "Ann"), card("Bo-BBBBBBBB", "Bo"), card("Cy-CCCCCCCC", "Cy"));
+    fireEvent.click(screen.getByRole("button", { name: "Remove Bo from your shortlist" }));
+    expect([button("Move Bo up").disabled, button("Move Bo down").disabled]).toEqual([true, true]);
+    fireEvent.click(button("Move Cy down"));
+    expect(names()).toEqual(["Bo", "Cy", "Ann"]);
+    screen.getByText("Cy moved to number 2 of 3.");
+    fireEvent.click(screen.getByRole("button", { name: "Add Bo to your shortlist" }));
+    expect(store.get().map((e) => e.card.name)).toEqual(["Bo", "Cy", "Ann"]);
+  });
+
+  it("keeps a move by buttons among those set aside, or among those not, numbering each among their own", () => {
+    const store = renderTab(
+      { statuses: { "Ann-AAAAAAAA": "setAside", "Di-DDDDDDDD": "setAside" } },
+      card("Ann-AAAAAAAA", "Ann"),
+      card("Bo-BBBBBBBB", "Bo"),
+      card("Cy-CCCCCCCC", "Cy"),
+      card("Di-DDDDDDDD", "Di"),
+    );
+    fireEvent.click(button("Move Bo up"));
+    expect(names()).toEqual(["Bo", "Cy"]);
+    screen.getByText("Bo moved to number 1 of 2.");
+    // At the top of the list, after whoever precedes them among everyone.
+    expect(store.get().map((e) => e.card.name)).toEqual(["Di", "Bo", "Cy", "Ann"]);
+    openSetAside();
+    fireEvent.click(button("Move Di down"));
+    expect(names()).toEqual(["Bo", "Cy", "Ann", "Di"]);
+    screen.getByText("Di moved to number 2 of 2.");
+    expect(document.activeElement).toBe(button("Move Di up"));
+    expect(store.get().map((e) => e.card.name)).toEqual(["Bo", "Cy", "Ann", "Di"]);
   });
 
   it("shows therapists shortlisted in another tab while it is open", () => {

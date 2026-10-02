@@ -24,7 +24,7 @@ export type ShortlistEntry = { addedAt: number; rank?: number; status?: StoredSt
 export type Shortlist = readonly ShortlistEntry[];
 
 /** The neighbours a therapist is moved between, as listed; either is missing at an end of the list. */
-type Between = { above?: ShortlistEntry; below?: ShortlistEntry };
+export type Between = { above?: ShortlistEntry; below?: ShortlistEntry };
 
 type Entries = ReadonlyMap<string, ShortlistEntry>;
 type Stored = { v: 1; entries: Record<string, ShortlistEntry> };
