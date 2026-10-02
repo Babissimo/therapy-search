@@ -4,9 +4,10 @@ An unofficial, simpler page for searching the [UKCP therapist directory](https:/
 https://therapysearch.babissimo.net. It offers the same searches and profiles as UKCP's own page, fetched from UKCP when a
 visitor asks for them. It is not run by or affiliated with UKCP.
 
-One Cloudflare Worker, on the free plan, serves both the React front end and the `/api` routes that call UKCP. The design, including how
+One Cloudflare Worker, on the free plan, serves the React front end and the `/api` routes that call UKCP. The design, including how
 UKCP's interface works and how the site keeps its load on UKCP low, is in
-[the spec](docs/superpowers/specs/2026-09-27-ukcp-search-parity-design.md).
+[the spec](docs/superpowers/specs/2026-09-27-ukcp-search-parity-design.md). For browsers that can't run the front end, the Worker also
+draws a [plain search](docs/superpowers/specs/2026-10-02-plain-search-design.md) at `/plain`, from the same cached answers.
 
 ## Working on it
 

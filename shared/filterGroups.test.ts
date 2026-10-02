@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { OPTIONS } from "@shared/options";
-import type { FilterGroup } from "@shared/types";
+import { OPTIONS } from "./options";
+import type { FilterGroup } from "./types";
 import { filterGroups, onlineFilterGroups } from "./filterGroups";
 
 const UKCP_LABELS = new Set([...OPTIONS.groups.flatMap((g) => g.fields.map((f) => f.label)), "Search locations outside the UK"]);

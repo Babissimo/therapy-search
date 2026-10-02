@@ -1,6 +1,7 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { matchPath, parsePath } from "react-router";
-import { narrowsOnline, ONLINE_PATH } from "./online";
+import { narrowsOnline } from "@shared/online";
+import { ONLINE_PATH } from "./online";
 import { placed } from "./state";
 import { prefetchResults } from "./useResults";
 import { viewSearch } from "./useSearchState";

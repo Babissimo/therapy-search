@@ -78,3 +78,9 @@ export function nearestQuery(lat: number, lng: number): string {
   const rounded = (degrees: number) => (Math.round(degrees * 1000) / 1000).toFixed(3);
   return new URLSearchParams({ lat: rounded(lat), lng: rounded(lng) }).toString();
 }
+
+/** UKCP answers a place it doesn't know with results from anywhere, saying only that it searched "United Kingdom". */
+export function locationFellBack(typed: string, searched: string | undefined): boolean {
+  const place = typed.trim();
+  return place !== "" && searched === "United Kingdom" && !/^(uk|united kingdom)$/i.test(place);
+}

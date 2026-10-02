@@ -80,13 +80,13 @@ describe("officesIn", () => {
   const browserOffices = (html: string) => {
     vi.stubGlobal("DOMParser", new JSDOM().window.DOMParser);
     try {
-      return parseProfile(html, "Jo-Bloggs-ABCDEFGH").offices.map(({ address, cost }) => ({ address, cost }));
+      return parseProfile(html, "Jo-Bloggs-ABCDEFGH").offices.map(({ mapUrl: _, ...office }) => office);
     } finally {
       vi.unstubAllGlobals();
     }
   };
 
-  it("reads each office's address and fee as the browser's parser does", () => {
+  it("reads each office's name, address and fee as the browser's parser does", () => {
     const html = fixture("profile.html");
     expect(officesIn(html)).toHaveLength(2);
     expect(officesIn(html)).toEqual(browserOffices(html));
@@ -96,7 +96,7 @@ describe("officesIn", () => {
     const loose = `<div class="profile-locations"><section><h3>Office</h3><address>Hove BN3 2FL</address>
 <h4>Cost:</h4>£70 a session<br><span>Concessions</span>
 <p>Ask about evenings</p><h4>Languages</h4><span>English</span></section></div>`;
-    expect(officesIn(page(loose))).toEqual([{ address: ["Hove BN3 2FL"], cost: "£70 a session\nConcessions\nAsk about evenings" }]);
+    expect(officesIn(page(loose))).toEqual([{ name: "Office", isMain: false, address: ["Hove BN3 2FL"], cost: "£70 a session\nConcessions\nAsk about evenings" }]);
     expect(browserOffices(page(loose))).toEqual(officesIn(page(loose)));
   });
 });

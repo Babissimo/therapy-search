@@ -4,6 +4,7 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import { useRef } from "react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { onlineSearch } from "@shared/online";
 import { BATCH_SIZE, emptyParams, type SearchParams } from "@shared/query";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { api, ApiError, OFFLINE } from "@/lib/api";
@@ -12,7 +13,6 @@ import { createShortlistStore, type ShortlistStore } from "@/shortlist/store";
 import { ShortlistContext } from "@/shortlist/useShortlist";
 import { LoadMore } from "./LoadMore";
 import type { Pin } from "./map/pins";
-import { onlineSearch } from "./online";
 import { Results } from "./Results";
 import { ResultsStatus } from "./ResultsStatus";
 import { withFlag, withHelpWithTerms, withText } from "./state";

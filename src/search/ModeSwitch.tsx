@@ -1,9 +1,10 @@
 import { MapPin, Video } from "lucide-react";
 import { useEffect, useRef, type MouseEvent } from "react";
 import { Link, useNavigate, type To } from "react-router";
+import { onlineParams } from "@shared/online";
 import { toQuery, type SearchParams } from "@shared/query";
 import { startMorph } from "@/components/Morph";
-import { nearMeParams, ONLINE_PATH, onlineParams, rememberPlace } from "./online";
+import { nearMeParams, ONLINE_PATH, rememberPlace } from "./online";
 import { useDraftSearch, type SearchDrafts } from "./useSearchDrafts";
 
 // As the side bar's tabs look, full width, the page showing marked as the open tab.
