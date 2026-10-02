@@ -54,7 +54,6 @@ vi.mock("./FitView", async () => {
       placed,
       restored,
       instant,
-      coveredBelow,
       underToolbar,
       recentres,
       onFramed,
@@ -62,7 +61,6 @@ vi.mock("./FitView", async () => {
       placed: number;
       restored?: { fitKey: string; placed: number };
       instant?: boolean;
-      coveredBelow?: (height: number) => number;
       underToolbar?: boolean;
       recentres?: number;
       onFramed?: () => void;
@@ -72,7 +70,6 @@ vi.mock("./FitView", async () => {
         "data-testid": "fit",
         "data-placed": placed,
         "data-instant": String(Boolean(instant)),
-        "data-covered": coveredBelow?.(800) ?? "",
         "data-under-toolbar": String(Boolean(underToolbar)),
         "data-recentres": recentres ?? 0,
         "data-restored": restored ? `${restored.fitKey} with ${restored.placed} placed` : "",
@@ -86,13 +83,12 @@ vi.mock("./MovedMapButtons", async () => {
   type Props = {
     centre?: { lat: number; lng: number };
     settled: boolean;
-    coveredBelow?: (height: number) => number;
     onSearch: (postcode: string) => boolean;
     onRecentre?: () => void;
   };
   return {
     // Numbered as it mounts, and clicked to stand for a postcode found near the middle of the map, or a recentre.
-    MovedMapButtons: ({ centre, settled, coveredBelow, onSearch, onRecentre }: Props) => {
+    MovedMapButtons: ({ centre, settled, onSearch, onRecentre }: Props) => {
       const [mount] = useState(() => ++mounts);
       return createElement(
         Fragment,
@@ -103,7 +99,6 @@ vi.mock("./MovedMapButtons", async () => {
           "data-mount": mount,
           "data-centre": centre ? `${centre.lat},${centre.lng}` : "",
           "data-settled": String(settled),
-          "data-covered": coveredBelow?.(800) ?? "",
           onClick: () => onSearch("BN3 1FG"),
         }),
         onRecentre && createElement("button", { type: "button", "data-testid": "recentre", onClick: onRecentre }),
@@ -209,12 +204,6 @@ describe("MapPane", () => {
     cleanup();
     renderPane({ fitKey: "Languages=French" });
     expect(screen.queryByTestId("recentre")).toBeNull();
-  });
-
-  it("frames and searches clear of whatever covers the map's bottom", () => {
-    renderPane({ fitKey: "Location=Brighton", centre: BRIGHTON, coveredBelow: (height) => height / 2 });
-    expect(screen.getByTestId("fit").dataset.covered).toBe("400");
-    expect(screen.getByTestId("search-area").dataset.covered).toBe("400");
   });
 
   it("frames clear of the toolbar only where it lies over the map", () => {

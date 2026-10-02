@@ -42,15 +42,11 @@ import { useResults } from "./useResults";
 import { useDraftFilters, useSearchDrafts, type SearchDrafts } from "./useSearchDrafts";
 import { useSearchState } from "./useSearchState";
 import { useRememberedScroll, useRememberedTab } from "./viewMemory";
+import { WIDE } from "./wide";
 
-// Fetched as the place box takes focus, so it is usually here by the time a first search's results are.
+// Beside the list, fetched as the place box takes focus, so it is usually here by the time a first search's results are.
+// Where the list leads, fetched once the map is asked for.
 const MapPane = lazy(loadMap);
-
-/**
- * Wide enough for the list to sit beside the map, and tall enough for the side bar to show a whole card under its tabs.
- * Below either, the list leads and the map waits behind a button.
- */
-const WIDE = "(min-width: 64rem) and (min-height: 31rem)";
 
 const NO_CENTRE = { settled: true };
 

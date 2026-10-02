@@ -62,11 +62,10 @@ function renderAt(
     settled = true,
     onSearch = vi.fn(() => true),
     onRecentre = undefined as (() => void) | undefined,
-    coveredBelow = undefined as ((height: number) => number) | undefined,
   } = {},
 ) {
   leaflet.start(framed);
-  render(<MovedMapButtons centre={BRIGHTON} settled={settled} onSearch={onSearch} onRecentre={onRecentre} coveredBelow={coveredBelow} />);
+  render(<MovedMapButtons centre={BRIGHTON} settled={settled} onSearch={onSearch} onRecentre={onRecentre} />);
   act(() => leaflet.show(view));
   return onSearch;
 }
@@ -105,34 +104,6 @@ describe("MovedMapButtons", () => {
     const framed = viewAround({ lat: BRIGHTON.lat + 20 / 69.05, lng: BRIGHTON.lng }, 50);
     renderAt(viewAround(BRIGHTON, 5), { framed, onRecentre: vi.fn() });
     expect(screen.queryByRole("group")).toBeNull();
-  });
-
-  it("takes the search's own place to be where the part of the map left uncovered is aimed", () => {
-    const framed = viewAround({ lat: BRIGHTON.lat + 20 / 69.05, lng: BRIGHTON.lng }, 50);
-    // An eighth of the way down, halfway down the quarter left in view, is Brighton: the whole map's middle is 1.9
-    // miles south of it.
-    renderAt(viewAround({ lat: BRIGHTON.lat - 1.875 / 69.05, lng: BRIGHTON.lng }, 5), { framed, coveredBelow: (height) => (height * 3) / 4 });
-    expect(button()).toBeNull();
-  });
-
-  it("offers a search once raising what covers the map aims the part in view away from the search's place", () => {
-    const framed = viewAround({ lat: BRIGHTON.lat + 20 / 69.05, lng: BRIGHTON.lng }, 50);
-    leaflet.start(framed);
-    const { rerender } = render(<MovedMapButtons centre={BRIGHTON} settled onSearch={vi.fn(() => true)} />);
-    act(() => leaflet.show(viewAround(BRIGHTON, 5)));
-    expect(button()).toBeNull();
-    // An eighth of the way down, 1.9 miles north of Brighton.
-    rerender(<MovedMapButtons centre={BRIGHTON} settled coveredBelow={(height) => (height * 3) / 4} onSearch={vi.fn(() => true)} />);
-    expect(button()).not.toBeNull();
-  });
-
-  it("counts moves of the whole map, so raising what covers it and nudging the map offers no search", () => {
-    const framed = viewAround(BRIGHTON, 5);
-    leaflet.start(framed);
-    const { rerender } = render(<MovedMapButtons centre={BRIGHTON} settled coveredBelow={() => 0} onSearch={vi.fn(() => true)} />);
-    rerender(<MovedMapButtons centre={BRIGHTON} settled coveredBelow={(height) => (height * 3) / 4} onSearch={vi.fn(() => true)} />);
-    act(() => leaflet.show({ ...framed, north: framed.north + 0.001, south: framed.south + 0.001 }));
-    expect(button()).toBeNull();
   });
 
   it("hears a move made as it renders again", () => {
@@ -237,16 +208,6 @@ describe("MovedMapButtons", () => {
     expect(onRecentre).not.toHaveBeenCalled();
   });
 
-  it("sits at the bottom of the map, above whatever covers it", () => {
-    leaflet.start(viewAround(BRIGHTON, 5));
-    const { rerender } = render(<MovedMapButtons centre={BRIGHTON} settled onSearch={vi.fn(() => true)} />);
-    act(() => leaflet.show(viewAround(HOVE, 5)));
-    const holder = () => screen.getByRole("group").closest<HTMLElement>("[style]")!;
-    expect(holder().style.bottom).toBe("calc(0px + 2rem)");
-    rerender(<MovedMapButtons centre={BRIGHTON} settled coveredBelow={(height) => height / 2} onSearch={vi.fn(() => true)} />);
-    expect(holder().style.bottom).toBe("calc(400px + 2rem)");
-  });
-
   it("offers nothing while a search is settling", () => {
     renderAt(viewAround(HOVE, 5), { settled: false });
     expect(button()).toBeNull();
@@ -258,16 +219,6 @@ describe("MovedMapButtons", () => {
     press();
     await waitFor(() => expect(onSearch).toHaveBeenCalledWith("BN3 1FG"));
     expect(nearest).toHaveBeenCalledWith(expect.closeTo(HOVE.lat, 6), expect.closeTo(HOVE.lng, 6));
-  });
-
-  it("searches from the middle of the part of the map left uncovered", async () => {
-    const nearest = vi.spyOn(api, "nearest").mockResolvedValue({ found: true, postcode: "BN3 1FG" });
-    const view = viewAround(HOVE, 5);
-    renderAt(view, { coveredBelow: (height) => height / 2 });
-    press();
-    await waitFor(() => expect(nearest).toHaveBeenCalled());
-    // A quarter of the way down, halfway down the top half left in view.
-    expect(nearest).toHaveBeenCalledWith(expect.closeTo(view.north - (view.north - view.south) / 4, 6), expect.closeTo(HOVE.lng, 6));
   });
 
   it("says so when the postcode found is the one already searched", async () => {

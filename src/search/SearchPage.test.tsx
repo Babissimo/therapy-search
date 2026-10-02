@@ -58,7 +58,6 @@ vi.mock("./map/MapPane", async () => {
     onDeselect: () => void;
     onSearchArea?: (postcode: string) => boolean;
     outsideUK?: boolean;
-    coveredBelow?: (height: number) => number;
     underToolbar?: boolean;
   };
   return {
@@ -75,7 +74,6 @@ vi.mock("./map/MapPane", async () => {
       onDeselect,
       onSearchArea,
       outsideUK,
-      coveredBelow,
       underToolbar,
     }: Props) => {
       if (mapChunk.fails) throw new TypeError("Failed to fetch dynamically imported module");
@@ -93,8 +91,6 @@ vi.mock("./map/MapPane", async () => {
           "data-highlighted": slug ?? "",
           "data-selected": selected?.key ?? "",
           "data-outside-uk": String(Boolean(outsideUK)),
-          // As much of an 800px map as the sheet covers.
-          "data-covered": coveredBelow?.(800) ?? "",
           "data-under-toolbar": String(Boolean(underToolbar)),
         },
         pins.map((pin) =>
@@ -1327,17 +1323,6 @@ describe("SearchPage", () => {
       ["H3", "Therapist c"],
     ]);
     expect(names()).toEqual(["Therapist a", "Therapist c", "Therapist b"]);
-  });
-
-  it.each([
-    ["wide", true],
-    ["narrow", false],
-  ])("leaves the map wholly uncovered on %s screens", async (_, wide) => {
-    screenIs(wide);
-    renderAt(SEARCH);
-    await loaded();
-    if (!wide) fireEvent.click(screen.getByRole("button", { name: "Map" }));
-    expect((await screen.findByTestId("map")).dataset.covered).toBe("");
   });
 
   it("marks a selected pin's place in the list until the pin is activated again or the map clicked off it", async () => {
