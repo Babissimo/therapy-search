@@ -83,7 +83,9 @@ export default function MapPane({
         {/* Tiles stop at the bounds, which a view wider or taller than them reaches past. */}
         {tiles && <MapTileLayer bounds={bounds} />}
         <MapBounds bounds={bounds} />
-        <MapZoomControl className="top-auto right-2 bottom-8 left-auto max-lg:hidden" />
+        {/* For those who can't pinch or scroll to zoom. At the foot beside the offer to search where the map has moved, or on a
+            narrow map, which leaves the foot to that offer, at the top. */}
+        <MapZoomControl className="top-auto right-2 bottom-8 left-auto max-lg:top-2 max-lg:bottom-auto" />
         {/* Above the therapists' pins, which often share its point, but beneath one hovered (index.css raises it above
             every marker) or marked (PinsLayer raises it 1000); it lets clicks through to them. */}
         {centre && <MapMarker position={[centre.lat, centre.lng]} icon={centrePin} interactive={false} keyboard={false} zIndexOffset={200} />}
