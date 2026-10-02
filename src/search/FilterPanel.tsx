@@ -34,7 +34,8 @@ export function FilterPanel({ params, drafts, groups = FILTER_GROUPS, onSearch }
 
       <Accordion type="multiple" defaultValue={openGroups}>
         {groups.map((group) => (
-          <AccordionItem key={group.label} value={group.label}>
+          // Marked with UKCP's name for the group, for a shortcut to find it by.
+          <AccordionItem key={group.label} value={group.label} data-filter-group={group.label}>
             <div className="flex items-center gap-1">
               <AccordionTrigger className="flex-1">
                 <span className="flex items-center gap-2">

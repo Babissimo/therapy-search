@@ -708,6 +708,41 @@ describe("SearchPage", () => {
     expect(screen.getByText("Start with what matters to you.")).toBeTruthy();
   });
 
+  it.each([
+    ["wide", true],
+    ["narrow", false],
+  ])("opens the languages from beneath the prompt on %s screens, taking the keyboard to their search box, and holds ticks made there", (_, wide) => {
+    screenIs(wide);
+    renderAt("/");
+    const shortcut = () => within(results()).getByRole("button", { name: "Find a therapist who speaks your language" });
+    const languages = () => screen.getByRole("button", { name: /^Languages/ });
+    expect(languages().getAttribute("aria-expanded")).toBe("false");
+    fireEvent.click(shortcut());
+    expect(languages().getAttribute("aria-expanded")).toBe("true");
+    expect(document.activeElement).toBe(screen.getByRole("searchbox", { name: "Search languages" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "French" }));
+    expect(url().toString()).toBe("");
+    // Already open, the group stays so.
+    fireEvent.click(shortcut());
+    expect(languages().getAttribute("aria-expanded")).toBe("true");
+    expect(document.activeElement).toBe(screen.getByRole("searchbox", { name: "Search languages" }));
+    expect(api.search).not.toHaveBeenCalled();
+  });
+
+  it("opens the languages from beneath the online prompt, and from beneath the ask for a filter first", () => {
+    screenIs(true);
+    renderAt("/online");
+    fireEvent.click(within(results()).getByRole("button", { name: "Find a therapist who speaks your language" }));
+    expect(document.activeElement).toBe(screen.getByRole("searchbox", { name: "Search languages" }));
+    cleanup();
+    renderAt("/");
+    fireEvent.change(screen.getByRole("textbox", { name: "Location" }), { target: { value: "York" } });
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+    within(results()).getByText(/^Before we search near/);
+    fireEvent.click(within(results()).getByRole("button", { name: "Find a therapist who speaks your language" }));
+    expect(document.activeElement).toBe(screen.getByRole("searchbox", { name: "Search languages" }));
+  });
+
   it("asks for a filter first when a place is searched from the start with nothing ticked, and searches once one is", async () => {
     screenIs(true);
     renderAt("/");
