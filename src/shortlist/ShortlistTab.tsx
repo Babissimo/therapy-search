@@ -32,6 +32,7 @@ import { feeText } from "@/search/fee";
 import { pinsBySlug, type Pin } from "@/search/map/pins";
 import { TherapistCard } from "@/search/TherapistCard";
 import { useOffices } from "@/search/useOffices";
+import { CopyShortlist } from "./CopyShortlist";
 import { CountBadge } from "./CountBadge";
 import { useSetAsideOpen } from "./setAside";
 import { ShortlistButton } from "./ShortlistButton";
@@ -155,11 +156,17 @@ export function ShortlistTab({ sought, online = false, pins = [], unplaced = 0, 
 
   return (
     <div ref={root} className="space-y-4 fade-in-0 motion-safe:animate-in">
-      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 print:hidden">
         <p className="text-sm text-muted-foreground">Kept in this browser only{unplaced > 0 && ` · ${unplaced} not on the map`}.</p>
-        {/* Offered while anyone is listed, as a card removed here still shows where the visitor stood with them. */}
-        <ClearShortlist listed={shortlist.length} removed={shown.length - shortlist.length} onClear={store.clear} />
+        {/* Pulled out to the cards' right edge, past the ghost buttons' padding, on a line of their own too. */}
+        <div className="-mr-2.5 ml-auto flex">
+          {shortlist.length > 0 && <CopyShortlist shortlist={shortlist} onDone={announce} />}
+          {/* Offered while anyone is listed, as a card removed here still shows where the visitor stood with them. */}
+          <ClearShortlist listed={shortlist.length} removed={shown.length - shortlist.length} onClear={store.clear} />
+        </div>
       </div>
+      {/* Paper has no tabs to say whose list this is. */}
+      <p className="hidden font-heading text-xl font-medium print:block">Your shortlist</p>
       {list.length > 0 && cards(list, "h2")}
       {setAside.length > 0 && (
         <SetAsideSection count={setAside.filter((entry) => listed.has(entry.card.slug)).length} open={setAsideOpen} onToggle={toggleSetAside}>
@@ -186,8 +193,7 @@ function ClearShortlist({ listed, removed, onClear }: ClearProps) {
   return (
     <AlertDialog>
       <AlertDialogTrigger asChild>
-        {/* Pulled out to the cards' right edge, past the ghost button's padding, on a line of its own too. */}
-        <Button variant="ghost" size="sm" className="-mr-2.5 ml-auto text-muted-foreground">
+        <Button variant="ghost" size="sm" className="text-muted-foreground">
           Clear shortlist
         </Button>
       </AlertDialogTrigger>
@@ -218,7 +224,8 @@ function SetAsideSection({ count, open, onToggle, children }: SectionProps) {
   const listId = useId();
   const Icon = STATUS_ICON.setAside;
   return (
-    <section className="space-y-2">
+    // Closed, it stays off paper, which would have its heading over no one.
+    <section className={cn("space-y-2", !open && "print:hidden")}>
       <h2>
         {/* Marked for the list to give it focus when a therapist is set aside while it is closed. */}
         <button
@@ -229,7 +236,10 @@ function SetAsideSection({ count, open, onToggle, children }: SectionProps) {
           onClick={onToggle}
           className="flex w-full items-center gap-2 rounded-md py-1 text-left text-sm font-medium outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
         >
-          <ChevronRight aria-hidden className={cn("size-4 shrink-0 text-muted-foreground motion-safe:transition-transform", open && "rotate-90")} />
+          <ChevronRight
+            aria-hidden
+            className={cn("size-4 shrink-0 text-muted-foreground motion-safe:transition-transform print:hidden", open && "rotate-90")}
+          />
           <Icon aria-hidden className="size-4 shrink-0 text-muted-foreground" />
           {STATUS_LABEL.setAside}
           <CountBadge count={count} />
@@ -341,6 +351,8 @@ function SortableEntry({ entry, heading, listed, sought, online, fee, pinKey, ma
       style={{ transform: CSS.Translate.toString(transform), transition }}
       className={cn(
         "flex items-center gap-1",
+        // Off the shortlist, so off paper too.
+        !listed && "print:hidden",
         // Carried over its neighbours, lifted off the list; framed in dashes under forced colours, which drop the shadow, clear
         // of the outline a marked card has there.
         isDragging && "relative z-10 [&_[data-slot=card]]:shadow-lg forced-colors:outline-2 forced-colors:outline-offset-4 forced-colors:outline-dashed",
