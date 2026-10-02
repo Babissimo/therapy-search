@@ -55,6 +55,7 @@ vi.mock("./FitView", async () => {
       restored,
       instant,
       coveredBelow,
+      underToolbar,
       recentres,
       onFramed,
     }: {
@@ -62,6 +63,7 @@ vi.mock("./FitView", async () => {
       restored?: { fitKey: string; placed: number };
       instant?: boolean;
       coveredBelow?: (height: number) => number;
+      underToolbar?: boolean;
       recentres?: number;
       onFramed?: () => void;
     }) =>
@@ -71,6 +73,7 @@ vi.mock("./FitView", async () => {
         "data-placed": placed,
         "data-instant": String(Boolean(instant)),
         "data-covered": coveredBelow?.(800) ?? "",
+        "data-under-toolbar": String(Boolean(underToolbar)),
         "data-recentres": recentres ?? 0,
         "data-restored": restored ? `${restored.fitKey} with ${restored.placed} placed` : "",
         onClick: onFramed,
@@ -212,6 +215,14 @@ describe("MapPane", () => {
     renderPane({ fitKey: "Location=Brighton", centre: BRIGHTON, coveredBelow: (height) => height / 2 });
     expect(screen.getByTestId("fit").dataset.covered).toBe("400");
     expect(screen.getByTestId("search-area").dataset.covered).toBe("400");
+  });
+
+  it("frames clear of the toolbar only where it lies over the map", () => {
+    renderPane({ fitKey: "Location=Brighton", centre: BRIGHTON, underToolbar: true });
+    expect(screen.getByTestId("fit").dataset.underToolbar).toBe("true");
+    cleanup();
+    renderPane({ fitKey: "Location=Brighton", centre: BRIGHTON });
+    expect(screen.getByTestId("fit").dataset.underToolbar).toBe("false");
   });
 
   it("remembers its view and how many it placed for the history entry, and opens there again for the same search", () => {
