@@ -11,6 +11,22 @@
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <script>
+      // Marks a browser older than the build needs (Chrome 111, Safari 16.4, Firefox 115), which is offered the plain search,
+      // and which src/main.tsx leaves without the app. Written for any browser that runs script. @property must stay out of
+      // the test: Tailwind covers its absence, so Firefox 115 to 127 run the app as newer ones do.
+      (function () {
+        var css = window.CSS;
+        var capable =
+          // oklch: Chrome 111, Firefox 113, Safari 15.4
+          css && css.supports && css.supports("color", "oklch(0 0 0)") &&
+          // Media query ranges: Safari 16.4
+          window.matchMedia && window.matchMedia("(width >= 0px)").matches &&
+          // toSorted: Firefox 115
+          typeof [].toSorted == "function";
+        if (!capable) document.documentElement.className += " old-browser";
+      })();
+    </script>
+    <script>
       // Applies the theme before first paint, so a dark page never flashes white. Mirrors src/layout/theme.ts.
       {
         let theme;
@@ -54,6 +70,20 @@
           visibility: hidden;
         }
       }
+      /* A browser too old for the app is offered the plain search at once, with nothing to wait for. */
+      .fallback .old {
+        display: none;
+      }
+      .old-browser .fallback .old {
+        display: block;
+      }
+      .old-browser .fallback .loading,
+      .old-browser .fallback .late {
+        display: none;
+      }
+      .old-browser .fallback .report {
+        animation: none;
+      }
     </style>
     <noscript>
       <style>
@@ -73,12 +103,19 @@
     <div id="root">
       <main class="fallback">
         <h1>Find a UKCP therapist (unofficial)</h1>
+        <!-- The plain search is the Worker's, at /plain, and needs neither JavaScript nor a recent browser. -->
         <noscript>
           <p>
-            This search needs JavaScript, which is turned off in this browser. UKCP's own directory lists the same therapists:
+            This search needs JavaScript, which is turned off in this browser. The <a href="/plain">plain search</a> works
+            without it, and UKCP's own directory lists the same therapists:
             <a href="https://www.psychotherapy.org.uk/find-a-therapist/">find a therapist on the UKCP website</a>.
           </p>
         </noscript>
+        <p class="old">
+          This browser is too old for this search. The <a href="/plain">plain search</a> works in any browser, and UKCP's own
+          directory lists the same therapists:
+          <a href="https://www.psychotherapy.org.uk/find-a-therapist/">find a therapist on the UKCP website</a>.
+        </p>
         <p class="loading">Loading the search…</p>
         <!-- HelpNow's words and numbers, which ErrorBoundary.test.tsx holds this copy to. Above the late note, as the space
              that note keeps while hidden would part it from the rest. -->
@@ -90,9 +127,9 @@
           <a translate="no" href="tel:999">999</a>.
         </p>
         <p class="late">
-          If the search doesn't load, the connection may be too slow or this browser too old for it. UKCP's own directory
-          lists the same therapists:
-          <a href="https://www.psychotherapy.org.uk/find-a-therapist/">find a therapist on the UKCP website</a>.
+          If the search doesn't load, the connection may be too slow or this browser too old for it. Try the
+          <a href="/plain">plain search</a>, which works in any browser, or UKCP's own directory, which lists the same
+          therapists: <a href="https://www.psychotherapy.org.uk/find-a-therapist/">find a therapist on the UKCP website</a>.
         </p>
         <!-- The accessibility statement needs the script, so its way to report a problem is here too. -->
         <p class="report">
