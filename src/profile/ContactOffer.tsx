@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 export function ContactOffer({ onAnswer }: { onAnswer: (yes: boolean) => void }) {
   const question = useId();
   return (
-    <div role="group" aria-labelledby={question} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm fade-in-0 motion-safe:animate-in">
+    // Off paper, which can't answer it.
+    <div role="group" aria-labelledby={question} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm fade-in-0 motion-safe:animate-in print:hidden">
       <p id={question}>Mark as contacted?</p>
       <div className="flex gap-1">
         <Button variant="outline" size="sm" onClick={() => onAnswer(true)}>

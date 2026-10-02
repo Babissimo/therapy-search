@@ -7,7 +7,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
 import { ShortlistButton } from "@/shortlist/ShortlistButton";
 import { useShortlistStatus } from "@/shortlist/useShortlist";
-import { soughtTerms } from "./activeFilters";
+import { activeFilters, soughtTerms } from "./activeFilters";
 import { feeText } from "./fee";
 import { LocationNotice } from "./LocationNotice";
 import { listEntries, pinLabel, type Pin } from "./map/pins";
@@ -31,6 +31,8 @@ type Props = {
   onHighlight?: (slug: string | undefined) => void;
   /** Among therapists met online or by phone, with no place to show. */
   online?: boolean;
+  /** The search as the visitor set it, where `params` adds to it, whose filters paper names. */
+  asked?: SearchParams;
 };
 
 // UKCP's notices about its own pages, which don't hold for this list: that it lists a location search at random, when
@@ -38,7 +40,7 @@ type Props = {
 const UKCP_PAGING = /^(Location searches are grouped by distance|This search returns more than \d+ results)/;
 
 /** A search's list. Its ResultsStatus goes outside it, as the list is marked busy and dimmed while it loads. */
-export function Results({ params, results, listRef, pins = [], unplaced = [], selected, onHighlight, online = false }: Props) {
+export function Results({ params, results, listRef, pins = [], unplaced = [], selected, onHighlight, online = false, asked = params }: Props) {
   const { first, therapists, searchedPlace, loading, stale, failure } = results;
   const { officeOf } = useOffices(therapists, !params.flags.LocationSearchOutsideUK);
   // Kept from screen readers, which the status region tells.
@@ -75,6 +77,7 @@ export function Results({ params, results, listRef, pins = [], unplaced = [], se
   const located = searchedPlace !== undefined;
   const highlight = (slug: string) => (on: boolean) => onHighlight?.(on ? slug : undefined);
   const sought = soughtTerms(params);
+  const filters = activeFilters(asked);
   const feeOf = (t: Therapist) => feeText(officeOf(t)?.cost);
 
   return (
@@ -85,13 +88,23 @@ export function Results({ params, results, listRef, pins = [], unplaced = [], se
         {/* The heading and each entry fade in as they replace their skeleton or arrive, and again as their tab is shown,
             which starts their animations afresh. Side by side rather than one within another, so no fade dims another. */}
         <div className="space-y-4 fade-in-0 motion-safe:animate-in">
-          {/* With no one found, the heading has said so, and the place still says where. Online, the heading stands alone. */}
-          <Summary
-            headingRef={failure.landing}
-            title={resultsHeading(therapists, count, located)}
-            sub={searchedPlace ? <span translate="no">{searchedPlace}</span> : !online && therapists.length > 0 && `${therapists.length} of ${count}`}
-            note={!online && therapists.length > 0 && listNote(located, unplaced.length)}
-          />
+          {/* With no one found, the heading has said so, and the place still says where. Online, the heading stands alone. Paper,
+              without the chips or Load more, names the filters and says how many there are, in lines boxed with the heading, as
+              hidden on screen they would still count among space-y's children. */}
+          <div>
+            <Summary
+              headingRef={failure.landing}
+              title={resultsHeading(therapists, count, located)}
+              sub={searchedPlace ? <span translate="no">{searchedPlace}</span> : !online && therapists.length > 0 && `${therapists.length} of ${count}`}
+              note={!online && therapists.length > 0 && listNote(located, unplaced.length)}
+            />
+            {online && (
+              <p className="mt-1 hidden text-sm print:block">
+                Working online or by phone{count !== undefined && therapists.length < count && `: the first ${therapists.length} of ${count}`}.
+              </p>
+            )}
+            {filters.length > 0 && <p className="mt-1 hidden text-sm print:block">Filters: {filters.map((filter) => filter.label).join(", ")}</p>}
+          </div>
           <LocationNotice typed={params.text.Location} searched={first?.locationSearched} />
           {first?.notices.filter((notice) => !UKCP_PAGING.test(notice)).map((notice) => (
             <Alert key={notice}>
@@ -145,10 +158,14 @@ function Summary({ title, sub, note, headingRef }: { title: ReactNode; sub?: Rea
   );
 }
 
-/** How the list is ordered and what its pins show. UKCP measures each distance to the therapist's address. */
-function listNote(located: boolean, unplaced: number): string {
-  const order = located ? "Nearest first, measured from the centre of the place searched. " : "";
-  return `${order}Pins show the postcode or area each therapist lists${unplaced > 0 ? ` · ${unplaced} not on the map` : ""}.`;
+/** How the list is ordered and what its pins show, which paper, having no map, leaves out. UKCP measures each distance to the therapist's address. */
+function listNote(located: boolean, unplaced: number): ReactNode {
+  return (
+    <>
+      {located && "Nearest first, measured from the centre of the place searched. "}
+      <span className="print:hidden">Pins show the postcode or area each therapist lists{unplaced > 0 && ` · ${unplaced} not on the map`}.</span>
+    </>
+  );
 }
 
 type PinGroupProps = {

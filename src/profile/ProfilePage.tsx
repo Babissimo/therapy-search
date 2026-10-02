@@ -199,8 +199,9 @@ export function ProfileBody({ slug, back, close }: { slug: string } & Exits) {
   );
 }
 
-// Lest a sticking header's shrink take back the scroll that stuck it: no scroll anchors, and a foot as tall as its largest shrink.
-const BODY = "@container space-y-8 [overflow-anchor:none] has-data-stuck:pb-12";
+// Lest a sticking header's shrink take back the scroll that stuck it: no scroll anchors, and a foot as tall as its largest
+// shrink. Paper, with nothing to scroll, has no foot, which could end it on a blank page.
+const BODY = "@container space-y-8 [overflow-anchor:none] not-print:has-data-stuck:pb-12";
 
 /** A profile still loading, laid out as most are: long sections beside short ones. */
 function ProfileSkeleton({ back, close }: Exits) {
@@ -271,7 +272,7 @@ function Identity({ photo, name, location, contacts, headingRef }: IdentityProps
           sticks, shrinking by no more than BODY's foot. A container, which the initials size to. */}
       <div
         className={cn(
-          "@container size-24 shrink-0 @lg:size-32 group-data-stuck/header:size-14 @lg:group-data-stuck/header:size-20",
+          "@container size-24 shrink-0 @lg:size-32 not-print:group-data-stuck/header:size-14 @lg:not-print:group-data-stuck/header:size-20",
           "motion-safe:transition-[width,height] motion-safe:duration-200",
         )}
       >
@@ -362,10 +363,11 @@ function StickyHeader({ back, close, bookmark, children }: Exits & { bookmark?: 
     // A drawer is drawn in the popover colour, which the header matches so text scrolling beneath it stays hidden. The
     // background reaches a little past the content either side, over the rings that cards and focused controls draw
     // outside their boxes; the rule keeps to the content's width. It sticks a pixel high, for `useStuck` to see it clipped.
+    // Printed, it heads the first page rather than sticking.
     <header
       ref={ref}
       data-stuck={stuck || undefined}
-      className="group/header sticky -top-px z-10 -mx-1 bg-background px-1 in-data-[slot=sheet-content]:bg-popover"
+      className="group/header sticky -top-px z-10 -mx-1 bg-background px-1 in-data-[slot=sheet-content]:bg-popover print:static"
     >
       <div className="space-y-2 border-b py-3">
         {back}
@@ -420,7 +422,7 @@ function ShortSections({ besideLong, children }: { besideLong: boolean; children
   return (
     <div className={cn("grid gap-8 @xl:grid-cols-2", besideLong && "@4xl:grid-cols-1")}>
       {children.map((section, i) => (
-        <div key={i} className={cn("border-t pt-8", first)}>
+        <div key={i} className={cn("border-t pt-8 print:break-inside-avoid", first)}>
           {section}
         </div>
       ))}
@@ -601,12 +603,12 @@ function OfficeCard({ office, profile, distance }: { office: Office; profile: Pr
   );
 }
 
-/** A small map around the office, once it is placed; Leaflet loads only then. */
+/** A small map around the office, once it is placed; Leaflet loads only then. Paper has the address instead. */
 function OfficeMap({ office, profile }: { office: Office; profile: Profile }) {
   const place = useOfficePlace(office, profile.location);
   if (!place) return null;
   return (
-    <div role="region" aria-label={`Map of ${office.name || "the office"}`} className="isolate mt-auto h-40 overflow-hidden rounded-lg border">
+    <div role="region" aria-label={`Map of ${office.name || "the office"}`} className="isolate mt-auto h-40 overflow-hidden rounded-lg border print:hidden">
       <MapSlot>
         {/* Leaflet takes its centre only once, so a new place makes a new map. */}
         <ProfileMap key={`${place.point.lat},${place.point.lng}`} profile={profile} point={place.point} zoom={place.zoom} />

@@ -88,7 +88,7 @@ export function LoadMore({ results: { query }, listRef, placing = false, atEnd =
   );
   return (
     <>
-      <div className={cn("space-y-3", atEnd ? "pt-4" : "border-t bg-background p-4")}>
+      <div className={cn("space-y-3 print:hidden", atEnd ? "pt-4" : "border-t bg-background p-4")}>
         {query.isFetchNextPageError && (
           <Alert variant="destructive">
             <AlertDescription>{query.error?.message}</AlertDescription>

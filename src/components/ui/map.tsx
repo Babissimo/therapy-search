@@ -82,8 +82,12 @@ function StillPans() {
 function FollowSize() {
   const map = useMap();
   useEffect(() => {
-    const observer = new ResizeObserver(() => map.invalidateSize());
-    observer.observe(map.getContainer());
+    const container = map.getContainer();
+    // A hidden map, as on paper, keeps the size it had: a view fitted into no room has no zoom, which breaks the clusters.
+    const observer = new ResizeObserver(() => {
+      if (container.clientWidth > 0 && container.clientHeight > 0) map.invalidateSize();
+    });
+    observer.observe(container);
     return () => observer.disconnect();
   }, [map]);
   return null;

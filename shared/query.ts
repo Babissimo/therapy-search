@@ -127,3 +127,8 @@ export function ukcpSearchUrl(params: SearchParams): string {
 export function ukcpProfileUrl(slug: string): string {
   return `${UKCP_ORIGIN}/therapist/${slug}`;
 }
+
+/** A therapist's UKCP profile as a person would type it from paper, without "https://www.". */
+export function ukcpProfileAddress(slug: string): string {
+  return ukcpProfileUrl(slug).replace(/^https?:\/\/(www\.)?/, "");
+}

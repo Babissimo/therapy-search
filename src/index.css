@@ -4,7 +4,14 @@
 @import "@fontsource-variable/atkinson-hyperlegible-next";
 @import "@fontsource-variable/newsreader/opsz.css";
 
-@custom-variant dark (&:is(.dark *));
+/* Paper takes the light theme, whatever the screen's (see .dark). */
+@custom-variant dark {
+  @media not print {
+    &:is(.dark *) {
+      @slot;
+    }
+  }
+}
 
 @theme inline {
     /* Names and headlines in a serif; everything else in a sans drawn for legibility. */
@@ -99,41 +106,44 @@
     --sidebar-ring: oklch(0.708 0 0);
 }
 
-.dark {
-    color-scheme: dark;
-    --background: oklch(0.215 0.01 196.4);
-    --foreground: oklch(0.944 0.007 174.4);
-    --card: oklch(0.255 0.014 188.8);
-    --card-foreground: oklch(0.944 0.007 174.4);
-    --popover: oklch(0.255 0.014 188.8);
-    --popover-foreground: oklch(0.944 0.007 174.4);
-    --primary: oklch(0.75 0.047 185.7);
-    --primary-foreground: oklch(0.207 0.016 188.9);
-    --secondary: oklch(0.298 0.016 196.3);
-    --secondary-foreground: oklch(0.944 0.007 174.4);
-    --muted: oklch(0.298 0.016 196.3);
-    --muted-foreground: oklch(0.727 0.02 184.1);
-    --accent: oklch(0.298 0.016 196.3);
-    --accent-foreground: oklch(0.944 0.007 174.4);
-    --destructive: oklch(0.704 0.191 22.216);
-    --highlight: oklch(0.77 0.142 75.4);
-    --border: oklch(1 0 0 / 10%);
-    --input: oklch(1 0 0 / 15%);
-    --control: oklch(0.56 0.02 187.4);
-    --ring: oklch(0.653 0.048 187.3);
-    --chart-1: oklch(0.87 0 0);
-    --chart-2: oklch(0.556 0 0);
-    --chart-3: oklch(0.439 0 0);
-    --chart-4: oklch(0.371 0 0);
-    --chart-5: oklch(0.269 0 0);
-    --sidebar: oklch(0.205 0 0);
-    --sidebar-foreground: oklch(0.985 0 0);
-    --sidebar-primary: oklch(0.488 0.243 264.376);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.269 0 0);
-    --sidebar-accent-foreground: oklch(0.985 0 0);
-    --sidebar-border: oklch(1 0 0 / 10%);
-    --sidebar-ring: oklch(0.556 0 0);
+/* Dark on screen alone: a printer, which leaves out backgrounds, would put the light text on white paper. */
+@media not print {
+    .dark {
+        color-scheme: dark;
+        --background: oklch(0.215 0.01 196.4);
+        --foreground: oklch(0.944 0.007 174.4);
+        --card: oklch(0.255 0.014 188.8);
+        --card-foreground: oklch(0.944 0.007 174.4);
+        --popover: oklch(0.255 0.014 188.8);
+        --popover-foreground: oklch(0.944 0.007 174.4);
+        --primary: oklch(0.75 0.047 185.7);
+        --primary-foreground: oklch(0.207 0.016 188.9);
+        --secondary: oklch(0.298 0.016 196.3);
+        --secondary-foreground: oklch(0.944 0.007 174.4);
+        --muted: oklch(0.298 0.016 196.3);
+        --muted-foreground: oklch(0.727 0.02 184.1);
+        --accent: oklch(0.298 0.016 196.3);
+        --accent-foreground: oklch(0.944 0.007 174.4);
+        --destructive: oklch(0.704 0.191 22.216);
+        --highlight: oklch(0.77 0.142 75.4);
+        --border: oklch(1 0 0 / 10%);
+        --input: oklch(1 0 0 / 15%);
+        --control: oklch(0.56 0.02 187.4);
+        --ring: oklch(0.653 0.048 187.3);
+        --chart-1: oklch(0.87 0 0);
+        --chart-2: oklch(0.556 0 0);
+        --chart-3: oklch(0.439 0 0);
+        --chart-4: oklch(0.371 0 0);
+        --chart-5: oklch(0.269 0 0);
+        --sidebar: oklch(0.205 0 0);
+        --sidebar-foreground: oklch(0.985 0 0);
+        --sidebar-primary: oklch(0.488 0.243 264.376);
+        --sidebar-primary-foreground: oklch(0.985 0 0);
+        --sidebar-accent: oklch(0.269 0 0);
+        --sidebar-accent-foreground: oklch(0.985 0 0);
+        --sidebar-border: oklch(1 0 0 / 10%);
+        --sidebar-ring: oklch(0.556 0 0);
+    }
 }
 
 /* A label naming a group of things, in small spaced capitals. */
@@ -239,6 +249,55 @@
   [role^="menuitem"]:focus {
     outline: 2px solid Highlight;
     outline-offset: -2px;
+  }
+}
+
+/* On paper. What is only for the screen, such as buttons, toolbars and maps, is hidden by print:hidden where it is drawn,
+   and the boxes a list scrolls in let it run on, with no foot of padding to end the print on a blank page. Outside any
+   layer, so these outrank the utilities. */
+@media print {
+  /* A drawer prints alone, at its full length in the page's flow, in place of the page it opened over; other layers that
+     come and go over the page stay off paper. */
+  body:has([data-print-alone]) > :not([data-print-alone], :has([data-print-alone])),
+  [data-slot$="-overlay"],
+  [data-slot="sheet-content"]:not([data-print-alone]),
+  [data-slot="alert-dialog-content"],
+  [data-slot="dropdown-menu-content"],
+  [data-slot="popover-content"],
+  [data-slot="tooltip-content"] {
+    display: none;
+  }
+  /* The lock a dialog puts on the page's scroll would end the print at the first page in some browsers, and its margin for
+     the scroll bar narrow the page. */
+  html body[data-scroll-locked] {
+    overflow: visible !important;
+    margin: 0 !important;
+  }
+  [data-print-alone] {
+    display: block;
+    position: static;
+    width: auto;
+    max-width: none;
+    height: auto;
+    overflow: visible;
+    border: 0;
+    box-shadow: none;
+  }
+  /* Grounds a printer would leave out by default, which part one tag from the next and carry the light text of some. */
+  [data-slot="badge"],
+  [data-slot="avatar-fallback"] {
+    print-color-adjust: exact;
+  }
+  [data-slot="card"] {
+    break-inside: avoid;
+  }
+  :focus-visible {
+    outline: none;
+  }
+  h1,
+  h2,
+  h3 {
+    break-after: avoid;
   }
 }
 

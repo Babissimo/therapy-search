@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { emptyParams, InvalidParam, readParams, toQuery, ukcpSearchUrl, type AllowedValues } from "./query";
+import { emptyParams, InvalidParam, readParams, toQuery, ukcpProfileAddress, ukcpSearchUrl, type AllowedValues } from "./query";
 
 const read = (query: string, allowed?: AllowedValues) => readParams(new URLSearchParams(query), allowed);
 const canonical = (query: string) => toQuery(read(query));
@@ -60,5 +60,11 @@ describe("ukcpSearchUrl", () => {
       "https://www.psychotherapy.org.uk/find-a-therapist/?Location=Leeds&Languages=Welsh&Distance=30",
     );
     expect(ukcpSearchUrl(read("Languages=Welsh"))).toBe("https://www.psychotherapy.org.uk/find-a-therapist/?Languages=Welsh");
+  });
+});
+
+describe("ukcpProfileAddress", () => {
+  it("writes a therapist's UKCP page as a person would type it, leaving their name as it reads", () => {
+    expect(ukcpProfileAddress("Ann-O’Neill-ABCDEFGH")).toBe("psychotherapy.org.uk/therapist/Ann-O’Neill-ABCDEFGH");
   });
 });

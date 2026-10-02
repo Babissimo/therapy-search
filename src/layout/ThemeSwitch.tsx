@@ -17,7 +17,7 @@ export function ThemeSwitch() {
   useEffect(() => applyTheme(choice, systemDark), [choice, systemDark]);
 
   return (
-    <fieldset className="flex rounded-lg border p-0.5">
+    <fieldset className="flex rounded-lg border p-0.5 print:hidden">
       <legend className="sr-only">Theme</legend>
       {CHOICES.map(({ value, label, Icon }) => (
         <Tooltip key={value}>

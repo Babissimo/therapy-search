@@ -75,8 +75,10 @@ export function ResultsSheet({ position, onPositionChange, tabs, scrollRef, onSc
         data-position={position}
         style={{ height: dragHeight === null ? heightAt(position, gap) : `${dragHeight}px` }}
         className={cn(
-          // Clipped, so the footer never shows below a sheet lowered to its header.
+          // Clipped, so the footer never shows below a sheet lowered to its header. Printed, it is the page, however low it
+          // was, its list running on unclipped.
           "absolute inset-x-0 bottom-0 z-20 flex flex-col overflow-hidden rounded-t-2xl border-t bg-background shadow-lg",
+          "print:static print:block print:h-auto! print:overflow-visible print:rounded-none print:border-t-0 print:shadow-none",
           dragHeight === null && "motion-safe:transition-[height] motion-safe:duration-200",
         )}
       >
@@ -87,7 +89,7 @@ export function ResultsSheet({ position, onPositionChange, tabs, scrollRef, onSc
           onPointerCancel={end}
           onClick={raiseForTab}
           // Lowered on a touch screen, where the tabs stand taller, to clear the handle.
-          className="relative flex h-14 shrink-0 cursor-grab touch-none items-center justify-between gap-2 px-4 pointer-coarse:pt-2"
+          className="relative flex h-14 shrink-0 cursor-grab touch-none items-center justify-between gap-2 px-4 pointer-coarse:pt-2 print:hidden"
         >
           <span aria-hidden className="absolute top-1.5 left-1/2 h-1 w-10 -translate-x-1/2 rounded-full bg-muted-foreground/40" />
           {tabs}
@@ -100,7 +102,7 @@ export function ResultsSheet({ position, onPositionChange, tabs, scrollRef, onSc
           ref={scrollRef}
           inert={position === "peek"}
           onScroll={(e) => onScroll?.(e.currentTarget.scrollTop)}
-          className="relative min-h-0 flex-1 overflow-y-auto px-4 pb-4"
+          className="relative min-h-0 flex-1 overflow-y-auto px-4 pb-4 print:overflow-visible print:pb-0"
         >
           {children}
         </div>

@@ -271,6 +271,18 @@ describe("SearchPage", () => {
     expect(toolbar().className).not.toContain("left-14");
   });
 
+  it("lays the search out as blocks on paper, so the list takes the page's width without the map's column", async () => {
+    for (const wide of [true, false]) {
+      screenIs(wide);
+      renderAt(SEARCH);
+      await loaded();
+      const grid = screen.getByRole("button", { name: /^Filters/ }).closest(".grid")!;
+      expect(grid.className).toContain("grid-cols-[auto_minmax(0,1fr)]");
+      expect(grid.className).toContain("print:block");
+      cleanup();
+    }
+  });
+
   it("keeps Load more over the map as an icon while the results are put away", async () => {
     screenIs(true);
     renderAt(SEARCH);

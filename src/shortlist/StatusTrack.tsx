@@ -59,8 +59,9 @@ export function StatusTrack({ therapist, status, listed = true, onChosen, onRemo
 
   return (
     <div ref={root} className="space-y-1.5">
-      {/* The role is explicit because Safari drops a list's role, and with it its name, once Tailwind's preflight removes its markers. */}
-      <ol role="list" aria-label={`Steps with ${therapist.name}`} className="flex items-center px-1">
+      {/* The role is explicit because Safari drops a list's role, and with it its name, once Tailwind's preflight removes its markers.
+          Its dots keep their fill on paper, which a printer would otherwise leave out. */}
+      <ol role="list" aria-label={`Steps with ${therapist.name}`} className="flex items-center px-1 print:[print-color-adjust:exact]">
         {STEPS.map((s, i) => (
           <li key={s} aria-current={i === current ? "step" : undefined} className="flex flex-1 items-center last:flex-none">
             <span className="sr-only">{STATUS_LABEL[s]}</span>
