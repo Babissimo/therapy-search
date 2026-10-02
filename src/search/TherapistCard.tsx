@@ -1,4 +1,4 @@
-import { Armchair, Banknote, MapPin, Video, type LucideIcon } from "lucide-react";
+import { Armchair, Banknote, MapPin, NotebookPen, Video, type LucideIcon } from "lucide-react";
 import type { ComponentProps, ReactNode } from "react";
 import { Link } from "react-router";
 import { classifyLocation } from "@shared/location";
@@ -27,6 +27,8 @@ type Props = {
   action?: ReactNode;
   /** A row across the card above the summary, such as the shortlist's track of where the visitor stands. */
   track?: ReactNode;
+  /** The visitor's note on a shortlisted therapist, whose first line shows under the track. */
+  note?: string;
   /** The fee at the office the card names, once the therapist's profile has been read. */
   fee?: string;
   /** Where the visitor stands with a shortlisted therapist; "To contact" goes unsaid, the filled bookmark saying as much. */
@@ -36,7 +38,7 @@ type Props = {
   onHighlight?: (on: boolean) => void;
 };
 
-export function TherapistCard({ therapist: t, sought, grouped = false, online = false, heading, action, track, fee, status, faded,
+export function TherapistCard({ therapist: t, sought, grouped = false, online = false, heading, action, track, note, fee, status, faded,
   onHighlight }: Props) {
   const profile = useProfileLink();
   const where = grouped || online ? undefined : placeOf(t);
@@ -51,6 +53,8 @@ export function TherapistCard({ therapist: t, sought, grouped = false, online = 
     </span>
   );
   const meets = online && /remote/i.test(t.sessionTypes ?? "") ? undefined : t.sessionTypes;
+  // The first line written; the whole note is on the profile.
+  const noteLine = note?.trim().split("\n", 1)[0];
 
   return (
     <CardLayout
@@ -92,6 +96,15 @@ export function TherapistCard({ therapist: t, sought, grouped = false, online = 
       faded={faded || status === "setAside"}
       action={action}
       track={track}
+      note={
+        noteLine && (
+          <>
+            <NotebookPen aria-hidden className="size-4 shrink-0 text-muted-foreground" />
+            <span className="sr-only">Your notes: </span>
+            <span className="truncate">{noteLine}</span>
+          </>
+        )
+      }
       summary={t.summary}
       tags={t.tags.filter((tag) => sought.has(tag.toLowerCase()))}
     />
@@ -125,12 +138,13 @@ type LayoutProps = ComponentProps<typeof Card> & {
   faded?: boolean;
   action?: ReactNode;
   track?: ReactNode;
+  note?: ReactNode;
   summary?: ReactNode;
   tags?: string[];
 };
 
 /** The card's layout, which the card and its skeleton share. */
-function CardLayout({ heading: Heading = "h2", photo, name, place, meets, fee, status, faded, action, track, summary, tags = [],
+function CardLayout({ heading: Heading = "h2", photo, name, place, meets, fee, status, faded, action, track, note, summary, tags = [],
   className, ...card }: LayoutProps) {
   return (
     // Isolated, so the parts raised over the card's link rise no further than the card, and a list's sticky bar stays above them.
@@ -150,6 +164,7 @@ function CardLayout({ heading: Heading = "h2", photo, name, place, meets, fee, s
         </div>
         {/* Raised as the action is. */}
         {track && <div className="relative z-10">{track}</div>}
+        {note && <p className="flex items-center gap-1.5 text-sm">{note}</p>}
         {summary && <p className="text-base">{summary}</p>}
         {tags.length > 0 && (
           <ul className="flex flex-wrap gap-1.5">

@@ -19,12 +19,22 @@ const therapist = (extra: Partial<Therapist> = {}): Therapist => ({
   ...extra,
 });
 
-type Options = { grouped?: boolean; action?: ReactNode; online?: boolean; fee?: string; status?: Status };
+type Options = { grouped?: boolean; action?: ReactNode; online?: boolean; fee?: string; status?: Status; track?: ReactNode; note?: string };
 
-function renderCard(t: Therapist, sought: string[] = [], { grouped, action, online, fee, status }: Options = {}) {
+function renderCard(t: Therapist, sought: string[] = [], { grouped, action, online, fee, status, track, note }: Options = {}) {
   render(
     <MemoryRouter>
-      <TherapistCard therapist={t} sought={new Set(sought)} grouped={grouped} action={action} online={online} fee={fee} status={status} />
+      <TherapistCard
+        therapist={t}
+        sought={new Set(sought)}
+        grouped={grouped}
+        action={action}
+        online={online}
+        fee={fee}
+        status={status}
+        track={track}
+        note={note}
+      />
     </MemoryRouter>,
   );
 }
@@ -85,6 +95,22 @@ describe("TherapistCard", () => {
     cleanup();
     renderCard(therapist(), [], { status: "contacted" });
     expect(portrait()?.className).not.toMatch(/\bopacity-60\b/);
+  });
+
+  it("gives the first line written of the visitor's note under the track, cut to the card's width", () => {
+    renderCard(therapist(), [], { track: <div>Track</div>, note: "\n  Rang on Tuesday\nCall back Friday" });
+    const text = screen.getByText("Rang on Tuesday");
+    expect(text.className).toMatch(/\btruncate\b/);
+    const line = text.closest("p")!;
+    expect(line.textContent).toBe("Your notes: Rang on Tuesday");
+    expect(line.querySelector("svg")).not.toBeNull();
+    expect(screen.getByText("Track").parentElement?.nextElementSibling).toBe(line);
+    expect(screen.queryByText(/Call back Friday/)).toBeNull();
+    // Not raised over the card's link, so a click on it opens the profile, where the note is written.
+    expect(line.closest("[class*=z-10]")).toBeNull();
+    cleanup();
+    renderCard(therapist(), [], { note: " \n \n" });
+    expect(screen.queryByText(/Your notes/)).toBeNull();
   });
 
   it("keeps a full postcode without its town", () => {

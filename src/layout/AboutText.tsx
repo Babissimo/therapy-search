@@ -21,7 +21,8 @@ export function AboutText() {
       <h3 className="font-medium">Who sees what</h3>
       <ul className="list-disc space-y-1.5 pl-4">
         <li>
-          Your browser keeps your shortlist, your theme and a random number that holds results in the same order, and shares none of them.
+          Your browser keeps your shortlist (with where you stand with each therapist and your notes on them), your theme and a random number
+          that holds results in the same order, and shares none of them.
         </li>
         <li>
           Cloudflare hosts the site and logs your IP address, but never alongside your searches or the profiles you open. It also serves
