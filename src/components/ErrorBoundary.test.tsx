@@ -1,10 +1,14 @@
 // @vitest-environment jsdom
 import { render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { UKCP_ORIGIN } from "@shared/query";
+import { emptyParams, UKCP_ORIGIN } from "@shared/query";
 import { HelpNow } from "@/layout/HelpNow";
+import { UNREADABLE } from "@/lib/api";
+import { NEW_TAB } from "@/lib/newTab";
 import { SITE_NAME } from "@/lib/useTitle";
+import { NO_PLACE } from "@/search/SearchBox";
 import { REPORT_URL } from "@/site";
+import * as plain from "../../worker/plain/pages";
 import indexHtml from "../../index.html?raw";
 import { ErrorBoundary } from "./ErrorBoundary";
 
@@ -70,5 +74,18 @@ describe("ErrorBoundary", () => {
     );
     expect(helpLine(failed.container)).toEqual(help);
     expect(helpLine(new DOMParser().parseFromString(indexHtml, "text/html"))).toEqual(help);
+  });
+});
+
+describe("the plain search's pages", () => {
+  const page = () => new DOMParser().parseFromString(String(plain.searchPage({ online: false, params: emptyParams(), shown: 0 })), "text/html");
+
+  it("say where to turn for help today in HelpNow's words", () => {
+    expect(helpLine(page())).toEqual(helpLine(render(<HelpNow />).container));
+  });
+
+  it("name the site, UKCP's directory and where to report a problem, and say what the app says, in the app's words", () => {
+    expect([plain.SITE_NAME, plain.REPORT_URL, plain.NEW_TAB, plain.NO_PLACE, plain.UNREADABLE]).toEqual([SITE_NAME, REPORT_URL, NEW_TAB, NO_PLACE, UNREADABLE]);
+    expect(page().querySelector(`a[href="${UKCP_ORIGIN}/find-a-therapist/"]`)?.textContent).toBe("find a therapist on the UKCP website");
   });
 });

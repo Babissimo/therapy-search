@@ -12,7 +12,8 @@ import {
 import { ALLOWED } from "../shared/options";
 import { EARLY_SIZE, InvalidParam, asksWhole, batchSize, readParams, toQuery, type SearchParams } from "../shared/query";
 import { CONTACT_DETAIL, PROFILE_HEADER, RESULTS_COUNT, RESULTS_NOTICE } from "../shared/ukcp/markers";
-import { UpstreamError, type SessionStore, type UkcpClient } from "./ukcp/client";
+import { plainSearch, tooLarge } from "./plain/routes";
+import { SLUG, UpstreamError, type SessionStore, type UkcpClient } from "./ukcp/client";
 import { officeDetails } from "./ukcp/offices";
 
 export type RateLimit = { limit(options: { key: string }): Promise<{ success: boolean }> };
@@ -72,8 +73,6 @@ export const PLACE_DOWN = "Couldn't look up that place just now.";
 export const NEAREST_DOWN = "Couldn't find the nearest postcode just now.";
 export const STALE_PAGE = "This page is out of date. Reload it to search.";
 const NO_PROFILE = "This profile isn't on UKCP any more.";
-// UKCP builds slugs from names, so they can carry accents and apostrophes.
-const SLUG = /^[\p{L}\p{N}][\p{L}\p{M}\p{N}'’.-]{2,119}$/u;
 
 /**
  * The entrypoint visitors reach. Their searches arrive in request bodies, which Cloudflare's request analytics never
@@ -143,6 +142,10 @@ export function createGateway(cachedFor: (c: Ctx) => Cached) {
     file.headers.set("Cache-Control", ASSET_CACHE_CONTROL);
     return file;
   });
+
+  // A search that works without the app, for browsers that can't run it, asking the cache as the routes above do.
+  app.use("/plain/*", bodyLimit({ maxSize: BODY_MAX_BYTES, onError: tooLarge }));
+  app.route("/plain", plainSearch(forward));
 
   app.notFound((c) => c.json({ error: "Not found" }, 404));
   app.onError(answerError);
