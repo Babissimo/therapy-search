@@ -181,6 +181,21 @@ describe("ProfilePage's bookmark", () => {
     add();
     expect(store.get().map((entry) => entry.card)).toEqual([CARD]);
   });
+
+  it("puts back where and as they were a therapist removed before the profile opened, with their note", async () => {
+    const store = createShortlistStore(null);
+    store.add(CARD, { status: "consultation" });
+    store.setNote(CARD.slug, "Rang on Tuesday");
+    const before = store.get();
+    store.remove(CARD.slug);
+    renderAt(["/therapist/Test-ABCDEFGH"], PROFILE, { store });
+    await screen.findByRole("heading", { name: "Test Therapist" });
+    add();
+    expect(store.get()).toEqual(before);
+    const steps = await screen.findByRole("list", { name: "Steps with Test Therapist" });
+    expect(steps.querySelector("[aria-current=step]")?.textContent).toBe("Consultation");
+    expect(screen.getByRole<HTMLTextAreaElement>("textbox", { name: "Your notes" }).value).toBe("Rang on Tuesday");
+  });
 });
 
 describe("ProfilePage's status track", () => {
@@ -314,6 +329,20 @@ describe("ProfilePage's notes", () => {
     expect(notes()?.value).toBe("Rang on Tuesday");
   });
 
+  it("keep what was typed as the therapist goes with the box still focused, and come back with it", async () => {
+    const store = createShortlistStore(null);
+    store.add(THERAPIST);
+    renderAt(["/therapist/Test-ABCDEFGH"], PROFILE, { store });
+    const box = await screen.findByRole<HTMLTextAreaElement>("textbox", { name: "Your notes" });
+    act(() => box.focus());
+    fireEvent.change(box, { target: { value: "Rang on Tuesday" } });
+    // Taken off by another tab, say, with the half second not yet up.
+    act(() => store.remove(THERAPIST.slug));
+    expect(notes()).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Add Test Therapist to your shortlist" }));
+    expect(notes()?.value).toBe("Rang on Tuesday");
+  });
+
   it("are not offered for a therapist not shortlisted", async () => {
     renderAt(["/therapist/Test-ABCDEFGH"]);
     await screen.findByRole("heading", { name: "Test Therapist" });
@@ -383,6 +412,23 @@ describe("ProfilePage's contact offer", () => {
     fireEvent.click(screen.getByRole("button", { name: "Yes" }));
     expect(store.get()).toEqual([expect.objectContaining({ rank: 5, status: "contacted", card })]);
     screen.getByText("Test Therapist: Contacted.");
+    expect(await step()).toBe("Contacted");
+  });
+
+  it("puts back a therapist removed earlier as contacted on Yes, in their old place and with their note", async () => {
+    const store = createShortlistStore(null);
+    store.add(THERAPIST, { addedAt: 1, status: "waiting" });
+    store.add({ ...THERAPIST, slug: "Other-ABCDEFGH", name: "Other Therapist" }, { addedAt: 2 });
+    store.setNote(THERAPIST.slug, "Rang on Tuesday");
+    store.remove(THERAPIST.slug);
+    await renderReachable(store);
+    follow("Email: test@example.com");
+    fireEvent.click(screen.getByRole("button", { name: "Yes" }));
+    expect(store.get().map((entry) => [entry.card.name, entry.status, entry.note])).toEqual([
+      ["Other Therapist", undefined, undefined],
+      ["Test Therapist", "contacted", "Rang on Tuesday"],
+    ]);
+    screen.getByText("Test Therapist: Contacted, and added to your shortlist.");
     expect(await step()).toBe("Contacted");
   });
 

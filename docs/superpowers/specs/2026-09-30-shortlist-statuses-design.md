@@ -14,6 +14,7 @@ In scope:
 - Status on result cards (§4.4), and on the profile with the same track and an offer after a contact link (§4.5)
 - Status badges on the shortlist's map (§4.6)
 - A private note per therapist (§4.7)
+- Removed therapists kept for 30 days, so adding one back from anywhere returns them as they were (§3)
 
 Out of scope:
 
@@ -25,7 +26,7 @@ Out of scope:
 ## 2. Constraints
 
 - **Kept in this browser alone.** Statuses and notes are stored with the shortlist in `localStorage` and sent nowhere: no Worker route, no analytics.
-- **The stored format stays at version 1.** The new fields are optional, so a list saved before them reads as everyone "To contact". A tab still running the previous release drops the fields from every entry when it next changes the shortlist; this lasts only while such a tab stays open across the deploy. A new version number would be worse: the previous release reads an unknown version as an empty list, and its next change saves that over the whole shortlist.
+- **The stored format stays at version 1.** The new fields are optional, so a list saved before them reads as everyone "To contact". A tab still running the previous release drops the fields from every entry when it next changes the shortlist; this lasts only while such a tab stays open across the deploy. Removed therapists (§3) sit beside the entries in an optional `removed` field, which the previous release ignores on reading and drops in the same way. A new version number would be worse: the previous release reads an unknown version as an empty list, and its next change saves that over the whole shortlist.
 - **Calm.** A status is shown by its label and icon, never by colour alone. Amber stays reserved for the card and pin under the pointer or selected (results-map §4.6).
 - **Every change by keyboard.** The list reorders by keyboard as it does now, and the status menu (§4.3) reaches every status from any card.
 
@@ -65,12 +66,13 @@ The stored names are fixed here, since renaming one later needs a migration. Eac
 ```ts
 type Status = "contacted" | "waiting" | "consultation" | "seeing" | "setAside";
 type ShortlistEntry = { addedAt: number; rank?: number; status?: Status; note?: string; card: ShortlistCard };
+type Stored = { v: 1; entries: Record<string, ShortlistEntry>; removed?: Record<string, ShortlistEntry & { removedAt: number }> };
 ```
 
 - Choosing "To contact" clears `status`.
 - On reading, an unknown status reads as "To contact", and a note that is not a string as none.
-- A therapist removed and added back while the page is open returns with their status and note as well as their place, as the bookmark already returns their place. `add`'s second argument becomes the whole entry less its card.
-- Marking a therapist who is not shortlisted (§4.5) adds them with that status.
+- A therapist removed is kept, with their place, status, note and card, for 30 days or until the shortlist is cleared. Adding them back by any bookmark, on any page or in any tab, after a reload too, returns them as they were. Those removed 30 days or more before the page loads are forgotten then, in storage as well as on the page.
+- `add`'s second argument, the whole entry less its card, overrides what was kept. Marking a therapist who is not shortlisted (§4.5) adds them with that status, and with their place and note where they were removed.
 
 ## 4. Front end
 
@@ -83,6 +85,7 @@ type ShortlistEntry = { addedAt: number; rank?: number; status?: Status; note?: 
 - The tab's count leaves out those set aside.
 - The empty state adds that each therapist can be marked as the visitor contacts them.
 - A therapist removed from the shortlist stays in place until the tab is left, as now. Only their portrait fades, as a set-aside result's does (§4.4), since the card stays live: the bookmark adds them back as they were (§3). Their track stays, with "Removed from your shortlist" in place of its next-step button and menu.
+- "Clear shortlist" is offered while anyone is listed or kept as removed (§3). Its dialog counts everyone kept as removed among those it forgets. The empty tab offers it too while anyone is kept, under a line saying how many and for how long, so a note left on someone removed can always be forgotten.
 
 ### 4.2 The status track
 
@@ -118,12 +121,13 @@ type ShortlistEntry = { addedAt: number; rank?: number; status?: Status; note?: 
 
 - A plain text area, "Your notes", sits on the profile under the track (§4.5). It saves as the visitor types, half a second after they stop and again when it loses focus, and holds up to 1,000 characters.
 - A shortlist card shows the note's first line, cut to fit, under the track.
-- Only a shortlisted therapist has a note. Removing them removes it, and adding them back while the page is open returns it (§3).
-- The about text's list of what the browser keeps names statuses and notes alongside the shortlist.
+- Only a shortlisted therapist's note is shown or edited. Removing them keeps it with them (§3), along with anything the box saves as it goes, and adding them back returns it.
+- The about text's list of what the browser keeps names statuses and notes alongside the shortlist, and how long they are kept once a therapist is removed.
 
 ## 5. Testing
 
-- **Store:** entries read with and without the new fields; an unknown status and a wrongly typed note; choosing "To contact" clears the status; adding back returns status and note; the note's limit; another tab's changes carry the new fields.
+- **Store:** entries read with and without the new fields; an unknown status and a wrongly typed note; choosing "To contact" clears the status; adding back returns status and note; the note's limit; another tab's changes carry the new fields; a removed therapist kept across a reload and another tab, forgotten after 30 days and by a clear, and a note saved after their removal.
+- **Bookmarks:** a therapist removed elsewhere, added back by a result card's or the profile's bookmark, or by "Yes", returns with their place, status and note.
 - **Tab:** one list in the shortlist's order with those set aside at its foot; "Set aside" starts closed, and its pins leave the map while it is; the tab's count leaves out those set aside; dragging within the list and within "Set aside"; a therapist set aside and brought back returns to their old place; focus and the announcement after a change by menu and by next step; removing and adding back.
 - **Track:** the steps, label and next-step button for each status, the paused step and the grey track; a removed therapist's track saying so in place of its controls; focus once the next-step button goes.
 - **Result cards:** the status line, nothing for "To contact", and the faded portrait when set aside.
@@ -141,3 +145,4 @@ A stack of pull requests, each on the one before:
 4. The profile's track and contact offer (§4.5).
 5. Status badges on the shortlist's map (§4.6).
 6. Notes (§4.7).
+7. Removed therapists kept for 30 days (§3), with "Clear shortlist" on the empty tab while anyone is (§4.1).
