@@ -40,6 +40,8 @@ export type SearchResults = {
   stale: boolean;
   /** The first batch's failure, which shows alone, with nothing else of the search, until it is asked again and answers. */
   failure: Failure;
+  /** Tries the search again, as Try again does, if it failed and `next` asks UKCP the same; one that answered stays as it is. */
+  retrySame: (next: SearchParams) => void;
 };
 
 /**
@@ -55,7 +57,8 @@ export function useResults(params: SearchParams, enabled = true): SearchResults 
     // Without a search, the last one's results would linger in its place.
     placeholderData: enabled ? keepPreviousData : undefined,
   });
-  const failure = useFailure(query, toQuery(params));
+  const key = toQuery(params);
+  const failure = useFailure(query, key);
   const failed = failure.error !== undefined;
   const arrived = query.data !== undefined && !query.isPlaceholderData;
   // A first batch cut from results already loaded comes before the nearest few could.
@@ -73,6 +76,9 @@ export function useResults(params: SearchParams, enabled = true): SearchResults 
     loading: query.isPending && !showsEarly && !failed,
     stale: query.isPlaceholderData && !showsEarly && !failed,
     failure,
+    retrySame: (next) => {
+      if (enabled && toQuery(next) === key) failure.retry();
+    },
   };
 }
 

@@ -18,7 +18,7 @@ type Failing = {
 export type Failure = ReturnType<typeof useFailure>;
 
 /**
- * The error of a query that loaded nothing, kept while it is asked again, by Try again or as the connection returns:
+ * The error of a query that loaded nothing, kept while it is asked again, by `retry` or as the connection returns:
  * asking again puts such a query back to pending, which would swap the error, and the Try again holding focus, for a
  * loading state, or for the last question's answer. Undefined once it answers. `key` names what the query asks, and the
  * error is let go once another is asked, so going back to it loads as usual. Once what loaded takes the error's place, a
@@ -46,16 +46,24 @@ export function useFailure(query: Failing, key: string) {
       if (answered && document.activeElement === document.body) landing.current.focus();
     }
   });
+  // The question `retry` last asked again, until it answers or another is asked.
+  const [retriedFor, setRetriedFor] = useState<string>();
+  if (retriedFor !== undefined && (retriedFor !== key || !error)) setRetriedFor(undefined);
   const retry = () => {
-    if (error) void query.refetch();
+    if (!error) return;
+    setRetriedFor(key);
+    // A query with nothing loaded joins a fetch already on its way, such as the connection's return starts, rather than restarting it.
+    void query.refetch();
   };
-  return { error, retrying: query.isFetching, retry, landing };
+  return { error, retrying: query.isFetching, retried: retriedFor === key, retry, landing };
 }
 
 type Props = {
   error: Error;
   /** True while the retry is on its way. */
   retrying: boolean;
+  /** True once the visitor has asked for it again, by Try again or otherwise. */
+  retried: boolean;
   onRetry: () => void;
   /** Beside Try again, such as a way round the failure. */
   children?: ReactNode;
@@ -65,8 +73,7 @@ type Props = {
  * A request that failed, with a Try again button that keeps keyboard focus through the retry. The alert speaks as it
  * appears; how a retry goes is told beside it, as the alert, still there and unchanged when it fails again, says nothing.
  */
-export function FailedAlert({ error, retrying, onRetry, children }: Props) {
-  const [retried, setRetried] = useState(false);
+export function FailedAlert({ error, retrying, retried, onRetry, children }: Props) {
   return (
     <>
       <Alert variant="destructive">
@@ -80,11 +87,7 @@ export function FailedAlert({ error, retrying, onRetry, children }: Props) {
               className="text-foreground aria-disabled:opacity-50"
               // Not disabled while retrying, which would drop focus; a second press is ignored.
               aria-disabled={retrying}
-              onClick={() => {
-                if (retrying) return;
-                setRetried(true);
-                onRetry();
-              }}
+              onClick={retrying ? undefined : onRetry}
             >
               {retrying && <Loader2 className="motion-safe:animate-spin" aria-hidden />}
               Try again

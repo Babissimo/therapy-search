@@ -29,11 +29,14 @@ type Props = { params: SearchParams; onChange: (next: SearchParams) => void; wid
 /** Therapists working online or by phone, wherever they are. With no place to map, the list takes the page, its filters to its right. */
 export function OnlineView({ params, onChange, wide }: Props) {
   const { key: entry } = useLocation();
-  const drafts = useSearchDrafts(params, onChange);
   const search = onlineSearch(params);
   // As Near me waits for a place, this waits for a filter, asking UKCP for nothing until then.
   const searching = narrowsOnline(params);
   const results = useResults(search, searching);
+  const drafts = useSearchDrafts(params, (next) => {
+    results.retrySame(onlineSearch(next));
+    onChange(next);
+  });
   // Ticks begin a search only once they narrow it; once one shows, any change goes, back to the prompt if need be.
   const firstSearch = searching ? undefined : narrowsOnline;
   useShortlistRefresh(results.therapists);
