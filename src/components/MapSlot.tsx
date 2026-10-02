@@ -22,7 +22,7 @@ export function MapSlot({ children }: { children: ReactNode }) {
 
 function MapFailed() {
   return (
-    // A third of the way down, which on a phone keeps it clear of the search's toolbar above and its sheet half raised below.
+    // A third of the way down, clear of the search's toolbar over the top of the map on wide screens.
     <div className="flex size-full flex-col items-center bg-muted p-3 before:flex-1 after:flex-2">
       {/* Read in its place rather than announced, as the words around a map say what it shows. */}
       <Alert role="note" className="w-auto max-w-xs">

@@ -14,7 +14,6 @@ function Name({ children }: { children: string }) {
 
 /** What testing found not to work well, the most harmful first. Each goes once it is fixed. */
 export const KNOWN_PROBLEMS: ReactNode[] = [
-  "On a short screen, such as a phone held sideways or a window zoomed to 400%, the list of results has very little room.",
   <>
     Older browsers, such as <Name>Safari</Name> on an iPad that can't update past <Name>iPadOS</Name> 15, can't run the
     search. They show a plain page that links to UKCP's own directory instead.

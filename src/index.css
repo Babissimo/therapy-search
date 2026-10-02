@@ -294,6 +294,13 @@
   :focus-visible {
     outline: none;
   }
+  /* What shows on paper alone, such as the list behind the map, would start its entrance there and print its first,
+     faded frame. */
+  *,
+  ::before,
+  ::after {
+    animation: none;
+  }
   h1,
   h2,
   h3 {
