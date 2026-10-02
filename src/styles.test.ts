@@ -22,4 +22,10 @@ describe("index.css", () => {
         "width: max(100%, calc(var(--spacing) * 11)); height: max(100%, calc(var(--spacing) * 11)); translate: -50% -50%; } } ",
     );
   });
+
+  it("stills every animation on paper, so what shows only there prints as it ends rather than as it starts", () => {
+    const source = readFileSync(new URL("./index.css", import.meta.url), "utf8");
+    const print = source.slice(source.indexOf("@media print {"));
+    expect(print).toMatch(/\*,\s*::before,\s*::after \{\s*animation: none;\s*\}/);
+  });
 });
