@@ -40,8 +40,6 @@ export type MapPaneProps = {
   onSearchArea?: (postcode: string) => boolean;
   /** The search reads its location as a place anywhere in the world, so the map isn't kept to the UK. */
   outsideUK?: boolean;
-  /** How much of the map's bottom, in pixels, lies under the results, given the map's height. */
-  coveredBelow?: (height: number) => number;
   /** The search's toolbar lies over the map's top left. */
   underToolbar?: boolean;
 };
@@ -63,7 +61,6 @@ export default function MapPane({
   onDeselect,
   onSearchArea,
   outsideUK,
-  coveredBelow,
   underToolbar,
 }: MapPaneProps) {
   const saved = savedView(entry).map;
@@ -109,7 +106,6 @@ export default function MapPane({
           // With no tiles drawn there is nothing to animate across, and they should load where the frame lands. Nor does it
           // glide for a visitor who asks for less motion.
           instant={!tiles || still}
-          coveredBelow={coveredBelow}
           underToolbar={underToolbar}
           recentres={recentres}
           onFramed={() => {
@@ -122,7 +118,6 @@ export default function MapPane({
           key={framings}
           centre={centre}
           settled={!framing}
-          coveredBelow={coveredBelow}
           onSearch={onSearchArea}
           onRecentre={centre || pins.length > 0 ? recentre : undefined}
         />

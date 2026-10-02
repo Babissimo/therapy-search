@@ -29,15 +29,14 @@ export function milesBetween(a: Point, b: Point): number {
 
 /**
  * Whether the visitor has moved the map on purpose from `framed`, as the search framed it, to a view narrow enough to
- * mean a place other than the search's own `centre`, if it has one. `aim` is the middle of the part of the map in view,
- * where a search from it would be made.
+ * mean a place other than the search's own `centre`, if it has one.
  */
-export function movedElsewhere(view: View, framed: View, aim: Point, centre?: Point): boolean {
+export function movedElsewhere(view: View, framed: View, centre?: Point): boolean {
   const span = spanOf(view);
   if (!meansAPlace(span)) return false;
   const near = (a: Point, b: Point) => milesBetween(a, b) <= Math.max(span / 4, LEAST_MOVE_MILES);
   // The frame takes in every pin, so its middle can lie far from the place searched, which zooming in on is no move.
-  if (centre && near(aim, centre)) return false;
+  if (centre && near(middleOf(view), centre)) return false;
   // Nudges made while looking over the pins are no move to somewhere else, but a frame too wide to mean a place leaves
   // any view that does somewhere new, even one zoomed straight in.
   return !near(middleOf(view), middleOf(framed)) || !meansAPlace(spanOf(framed));

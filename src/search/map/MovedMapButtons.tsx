@@ -20,8 +20,6 @@ type Props = {
   centre?: Point;
   /** False while a search is on its way, whose results will frame the map afresh. */
   settled: boolean;
-  /** How much of the map's bottom, in pixels, lies under something laid over it, given the map's height. */
-  coveredBelow?: (height: number) => number;
   /** Searches at the postcode, answering false when it is the one already searched; absent where there is no search to move. */
   onSearch?: (postcode: string) => boolean;
   /** Frames the search again; absent when there is nothing to frame. */
@@ -33,7 +31,7 @@ type Props = {
  * the postcode nearest the middle of the map in view, where the map shows a search, and to frame it again. It measures
  * the move from the view it mounts on, so its owner mounts it afresh as each search is framed.
  */
-export function MovedMapButtons({ centre, settled, coveredBelow, onSearch, onRecentre }: Props) {
+export function MovedMapButtons({ centre, settled, onSearch, onRecentre }: Props) {
   const near = usePostcodeNear((postcode) => (onSearch?.(postcode) === false ? ALREADY_SEARCHED : undefined), {
     none: NO_POSTCODE_HERE,
     failed: () => AREA_UNKNOWN,
@@ -53,10 +51,8 @@ export function MovedMapButtons({ centre, settled, coveredBelow, onSearch, onRec
     map.on("moveend", moved);
     return () => void map.off("moveend", moved);
   }, [map, dismiss]);
-  const covered = coveredBelow?.(map.getSize().y) ?? 0;
-  // Read as the map lies now, since raising the sheet re-aims the part in view without a move.
   const offers = onSearch !== undefined || onRecentre !== undefined;
-  const wanted = offers && settled && !recentred && movedElsewhere(seen, framed, middleInView(map, covered), centre);
+  const wanted = offers && settled && !recentred && movedElsewhere(seen, framed, centre);
   const shown = usePresence(wanted);
   const group = useRef<HTMLDivElement>(null);
   // Focus on a button goes to the map, rather than dropping, as the search or framing it starts takes the buttons away or
@@ -71,12 +67,10 @@ export function MovedMapButtons({ centre, settled, coveredBelow, onSearch, onRec
   }, [wanted, map]);
   if (!shown) return null;
   return (
-    // Level with the zoom buttons on a wide screen; on a phone, above the sheet, gliding as it does. A resize, which
-    // moves the sheet's top, ends with a moveend, which renders this again.
+    // Level with the zoom buttons on a wide screen.
     <div
       {...shown.props}
-      className="pointer-events-none absolute inset-x-3 z-1000 flex justify-center motion-safe:transition-[bottom] motion-safe:duration-200 fade-in-0 fade-out-0 slide-in-from-bottom-2 slide-out-to-bottom-2 motion-safe:data-entering:animate-in motion-safe:data-leaving:animate-out"
-      style={{ bottom: `calc(${covered}px + 2rem)` }}
+      className="pointer-events-none absolute inset-x-3 bottom-8 z-1000 flex justify-center fade-in-0 fade-out-0 slide-in-from-bottom-2 slide-out-to-bottom-2 motion-safe:data-entering:animate-in motion-safe:data-leaving:animate-out"
     >
       <MapControlContainer className="pointer-events-auto relative flex flex-col items-center gap-1.5">
         {near.problem && (
@@ -91,7 +85,7 @@ export function MovedMapButtons({ centre, settled, coveredBelow, onSearch, onRec
               className="rounded-full px-3 dark:bg-background"
               // Not disabled while looking, which would drop focus; a second press is ignored.
               aria-disabled={near.looking}
-              onClick={() => near.lookNear(() => Promise.resolve(middleInView(map, covered)))}
+              onClick={() => near.lookNear(() => Promise.resolve(map.getCenter()))}
             >
               {near.looking ? <Loader2 aria-hidden className="motion-safe:animate-spin" /> : <Search aria-hidden />}
               Search this area
@@ -123,15 +117,7 @@ export function MovedMapButtons({ centre, settled, coveredBelow, onSearch, onRec
   );
 }
 
-// The whole map, rather than the part in view, so that raising or lowering what covers it is no move.
 function viewOf(map: LeafletMap): View {
   const bounds = map.getBounds();
   return { north: bounds.getNorth(), south: bounds.getSouth(), east: bounds.getEast(), west: bounds.getWest() };
-}
-
-/** The middle of the part of the map in view, above the `covered` pixels at its bottom. */
-function middleInView(map: LeafletMap, covered: number): Point {
-  const { x, y } = map.getSize();
-  const { lat, lng } = map.containerPointToLatLng([x / 2, (y - covered) / 2]);
-  return { lat, lng };
 }
