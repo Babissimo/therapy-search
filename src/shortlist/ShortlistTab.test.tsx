@@ -260,11 +260,23 @@ describe("ShortlistTab", () => {
     fireEvent.click(screen.getByRole("button", { name: "Remove Ann from your shortlist" }));
     expect(names()).toEqual(["Ann"]);
     fireEvent.click(screen.getByRole("button", { name: "Clear shortlist" }));
-    screen.getByText("This forgets the 1 therapist you removed, and where you stood with them, so they can't be put back as they were.");
+    screen.getByText("This forgets the 1 therapist you removed, with your notes and where you stood with them, so they can't be put back as they were.");
     fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Clear shortlist" }));
     expect(screen.queryAllByRole("heading")).toEqual([]);
     expect(screen.queryByRole("button", { name: "Clear shortlist" })).toBeNull();
     expect(store.clears()).toBe(1);
+  });
+
+  it("gives the first line of each therapist's note on their card, as it changes", () => {
+    const store = renderTab({}, card("Ann-AAAAAAAA", "Ann"), card("Bo-BBBBBBBB", "Bo"));
+    act(() => store.setNote("Ann-AAAAAAAA", "Rang on Tuesday\nCall back Friday"));
+    expect(within(entry("Ann")!).getByText("Rang on Tuesday").closest("p")?.textContent).toBe("Your notes: Rang on Tuesday");
+    expect(within(entry("Bo")!).queryByText(/Your notes/)).toBeNull();
+    act(() => store.setNote("Ann-AAAAAAAA", "Booked for Monday"));
+    within(entry("Ann")!).getByText("Booked for Monday");
+    // Her card stays in place, with her note, once she is removed.
+    fireEvent.click(screen.getByRole("button", { name: "Remove Ann from your shortlist" }));
+    within(entry("Ann")!).getByText("Booked for Monday");
   });
 
   it("clears everyone once the visitor confirms, naming how many will go, removed ones too, and gives focus to the empty tab's note", async () => {
@@ -275,7 +287,7 @@ describe("ShortlistTab", () => {
     fireEvent.click(screen.getByRole("button", { name: "Clear shortlist" }));
     const dialog = screen.getByRole("alertdialog", { name: "Clear your shortlist?" });
     const description = screen.getByText(
-      "This removes 2 therapists, and where you stand with them, from this browser, and forgets the 1 therapist you removed. It can't be undone.",
+      "This removes 2 therapists from this browser, with your notes and where you stand with them, and forgets the 1 therapist you removed. It can't be undone.",
     );
     expect(dialog.getAttribute("aria-describedby")).toBe(description.id);
     // The safer choice has focus as the dialog opens.
@@ -318,7 +330,7 @@ describe("ShortlistTab", () => {
     const before = store.get();
     const button = screen.getByRole("button", { name: "Clear shortlist" });
     fireEvent.click(button);
-    screen.getByText("This removes 1 therapist, and where you stand with them, from this browser. It can't be undone.");
+    screen.getByText("This removes 1 therapist from this browser, with your notes and where you stand with them. It can't be undone.");
     fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Cancel" }));
     expect(screen.queryByRole("alertdialog")).toBeNull();
     expect(store.get()).toBe(before);

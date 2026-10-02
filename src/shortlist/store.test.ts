@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from "vitest";
 import type { TherapistCard } from "@shared/types";
-import { createShortlistStore, SHORTLIST_KEY, statusOf } from "./store";
+import { createShortlistStore, NOTE_LIMIT, SHORTLIST_KEY, statusOf } from "./store";
 
 function memory(initial?: unknown) {
   const store = new Map<string, string>(initial === undefined ? [] : [[SHORTLIST_KEY, typeof initial === "string" ? initial : JSON.stringify(initial)]]);
@@ -390,6 +390,7 @@ describe("createShortlistStore", () => {
   it("changes nothing for a therapist who isn't shortlisted", () => {
     const store = createShortlistStore(memory(), clock());
     store.setStatus("a", "contacted");
+    store.setNote("a", "Rang on Tuesday");
     expect(store.get()).toEqual([]);
   });
 
@@ -411,5 +412,81 @@ describe("createShortlistStore", () => {
     createShortlistStore(storage).setStatus("a", "waiting");
     events.dispatchEvent(new StorageEvent("storage", { key: SHORTLIST_KEY, newValue: storage.store.get(SHORTLIST_KEY) }));
     expect(statusOf(store.get()[0]!)).toBe("waiting");
+  });
+
+  it("keeps a note with the therapist, and for the next visit", () => {
+    const storage = memory();
+    const store = createShortlistStore(storage, clock());
+    store.add(card("a"));
+    expect(store.get()[0]?.note).toBeUndefined();
+    store.setNote("a", "Rang on Tuesday\nCall back Friday");
+    expect(store.get()[0]?.note).toBe("Rang on Tuesday\nCall back Friday");
+    expect(createShortlistStore(storage).get()[0]?.note).toBe("Rang on Tuesday\nCall back Friday");
+  });
+
+  it("keeps an emptied note as none", () => {
+    const storage = memory();
+    const store = createShortlistStore(storage, clock());
+    store.add(card("a"));
+    store.setNote("a", "Rang on Tuesday");
+    store.setNote("a", "");
+    expect(store.get()[0]?.note).toBeUndefined();
+    expect(JSON.parse(storage.store.get(SHORTLIST_KEY)!).entries.a).not.toHaveProperty("note");
+  });
+
+  it("holds a note to its limit, as written here or as stored", () => {
+    const store = createShortlistStore(memory(), clock());
+    store.add(card("a"));
+    store.setNote("a", "x".repeat(NOTE_LIMIT + 1));
+    expect(store.get()[0]?.note).toHaveLength(NOTE_LIMIT);
+    const long = { addedAt: 1, note: "y".repeat(NOTE_LIMIT + 200), card: { slug: "x", name: "X", initials: "X", tags: [] } };
+    expect(createShortlistStore(memory({ v: 1, entries: { x: long } })).get()[0]?.note).toHaveLength(NOTE_LIMIT);
+  });
+
+  it("reads a note that isn't a string, or is empty, as none", () => {
+    const entry = (note: unknown) => ({ addedAt: 1, note, card: { slug: "x", name: "X", initials: "X", tags: [] } });
+    const read = (note: unknown) => createShortlistStore(memory({ v: 1, entries: { x: entry(note) } })).get()[0];
+    expect(read("Rang on Tuesday")?.note).toBe("Rang on Tuesday");
+    expect(read(3)?.note).toBeUndefined();
+    expect(read(["Rang"])?.note).toBeUndefined();
+    expect(read("")?.note).toBeUndefined();
+    // The entry itself still reads.
+    expect(read(3)?.card.slug).toBe("x");
+  });
+
+  it("keeps a therapist's note as their status changes, they move, and fresh results update their card", () => {
+    const store = createShortlistStore(memory(), clock());
+    store.add(card("a"));
+    store.add(card("b"));
+    store.setNote("a", "Rang on Tuesday");
+    store.setStatus("a", "contacted");
+    store.move("a", { below: store.get()[0] });
+    store.refresh([card("a", { name: "New name" })]);
+    const a = store.get().find((e) => e.card.slug === "a");
+    expect(a?.note).toBe("Rang on Tuesday");
+    expect(a?.card.name).toBe("New name");
+  });
+
+  it("puts a therapist back with the note they had", () => {
+    const store = createShortlistStore(memory(), clock());
+    store.add(card("a"));
+    store.setStatus("a", "waiting");
+    store.setNote("a", "Rang on Tuesday");
+    const [before] = store.get();
+    store.remove("a");
+    expect(store.get()).toEqual([]);
+    store.add(before!.card, before);
+    expect(store.get()).toEqual([before]);
+  });
+
+  it("follows a note changed in another tab", () => {
+    const storage = memory();
+    const events = new EventTarget();
+    const store = createShortlistStore(storage, clock(), events);
+    store.add(card("a"));
+    store.subscribe(() => {});
+    createShortlistStore(storage).setNote("a", "Booked for Monday");
+    events.dispatchEvent(new StorageEvent("storage", { key: SHORTLIST_KEY, newValue: storage.store.get(SHORTLIST_KEY) }));
+    expect(store.get()[0]?.note).toBe("Booked for Monday");
   });
 });

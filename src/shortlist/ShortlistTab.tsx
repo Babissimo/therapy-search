@@ -184,10 +184,10 @@ function ClearShortlist({ listed, removed, onClear }: ClearProps) {
           <AlertDialogTitle className="text-lg">Clear your shortlist?</AlertDialogTitle>
           <AlertDialogDescription className="text-base">
             {listed > 0
-              ? `This removes ${therapistCount(listed)}, and where you stand with them, from this browser${
+              ? `This removes ${therapistCount(listed)} from this browser, with your notes and where you stand with them${
                   removed > 0 ? `, and forgets the ${therapistCount(removed)} you removed` : ""
                 }. It can't be undone.`
-              : `This forgets the ${therapistCount(removed)} you removed, and where you stood with them, so they can't be put back as they were.`}
+              : `This forgets the ${therapistCount(removed)} you removed, with your notes and where you stood with them, so they can't be put back as they were.`}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
@@ -344,6 +344,7 @@ function SortableEntry({ entry, heading, listed, sought, online, fee, pinKey, ma
           faded={!listed}
           action={<ShortlistButton therapist={card} kept={entry} />}
           track={<StatusTrack therapist={card} status={status} listed={listed} onChosen={onChosen} onRemoved={onRemoved} />}
+          note={entry.note}
           onHighlight={(on) => {
             highlighting.current = on ? onHighlight : undefined;
             onHighlight?.(on ? card.slug : undefined);

@@ -70,6 +70,12 @@ export function useShortlistStatus(slug: string): Status | undefined {
   });
 }
 
+/** The visitor's note on a therapist, or nothing written while they have none or aren't shortlisted. */
+export function useShortlistNote(slug: string): string {
+  const store = useShortlistStore();
+  return useSyncExternalStore(store.subscribe, () => store.get().find((e) => e.card.slug === slug)?.note ?? "");
+}
+
 /**
  * What a polite live region says of a change the visitor made, given once the change is made. It is said until the list next
  * changes, here or in another tab, so the same words said again after an undo are heard again.

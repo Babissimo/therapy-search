@@ -195,10 +195,11 @@ describe("ProfilePage's status track", () => {
 
   it("comes and goes without moving what the visitor reads below it, once the header has stuck", async () => {
     const stick = stickable();
-    const slotted = () => document.querySelector("article > .min-h-11") !== null;
-    // jsdom lays nothing out, so the columns are placed as a browser would: lower by the track's slot (its 44 px and space-y-8's 32) while it is there.
+    const slotted = () => document.querySelector("article .min-h-11") !== null;
+    // jsdom lays nothing out, so the columns are placed as a browser would: lower by the block holding the track and notes (taken here
+    // as 44 px) and space-y-8's 32 while it is there.
     vi.spyOn(HTMLElement.prototype, "offsetTop", "get").mockImplementation(() => (slotted() ? 376 : 300));
-    // Nor does it scroll: the page's scroller, which a browser keeps from going past the page's end, 76 px further while the slot is there.
+    // Nor does it scroll: the page's scroller, which a browser keeps from going past the page's end, 76 px further while the block is there.
     let scrolled = 200;
     const page = {
       get scrollTop() {
@@ -261,6 +262,48 @@ describe("ProfilePage's status track", () => {
     fireEvent.click(bookmark);
     expect(step(await track())).toBe("Consultation");
     expect(screen.queryByText("Removed Test Therapist from your shortlist.")).toBeNull();
+  });
+});
+
+describe("ProfilePage's notes", () => {
+  const THERAPIST: ShortlistCard = { slug: "Test-ABCDEFGH", name: "Test Therapist", initials: "TT", tags: [] };
+  const notes = () => screen.queryByRole<HTMLTextAreaElement>("textbox", { name: "Your notes" });
+
+  it("sit under the track while the therapist is shortlisted, go with them, and come back with them", async () => {
+    const store = createShortlistStore(null);
+    store.add(THERAPIST, { status: "contacted" });
+    store.setNote("Test-ABCDEFGH", "Rang on Tuesday");
+    renderAt(["/therapist/Test-ABCDEFGH"], PROFILE, { store });
+    const steps = await screen.findByRole("list", { name: "Steps with Test Therapist" });
+    expect(notes()?.value).toBe("Rang on Tuesday");
+    expect(steps.compareDocumentPosition(notes()!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(notes()!.closest("header")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Remove Test Therapist from your shortlist" }));
+    expect(notes()).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Add Test Therapist to your shortlist" }));
+    expect(notes()?.value).toBe("Rang on Tuesday");
+  });
+
+  it("keep what was typed as the bookmark removes the therapist, and come back with it", async () => {
+    const store = createShortlistStore(null);
+    store.add(THERAPIST);
+    renderAt(["/therapist/Test-ABCDEFGH"], PROFILE, { store });
+    const box = await screen.findByRole<HTMLTextAreaElement>("textbox", { name: "Your notes" });
+    const remove = screen.getByRole("button", { name: "Remove Test Therapist from your shortlist" });
+    act(() => box.focus());
+    fireEvent.change(box, { target: { value: "Rang on Tuesday" } });
+    // As a click moves focus to the button before it lands, blurring the box with the half second not yet up.
+    act(() => remove.focus());
+    fireEvent.click(remove);
+    expect(notes()).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Add Test Therapist to your shortlist" }));
+    expect(notes()?.value).toBe("Rang on Tuesday");
+  });
+
+  it("are not offered for a therapist not shortlisted", async () => {
+    renderAt(["/therapist/Test-ABCDEFGH"]);
+    await screen.findByRole("heading", { name: "Test Therapist" });
+    expect(notes()).toBeNull();
   });
 });
 
