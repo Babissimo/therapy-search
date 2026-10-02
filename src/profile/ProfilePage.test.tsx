@@ -329,6 +329,20 @@ describe("ProfilePage's notes", () => {
     expect(notes()?.value).toBe("Rang on Tuesday");
   });
 
+  it("keep what was typed as the therapist goes with the box still focused, and come back with it", async () => {
+    const store = createShortlistStore(null);
+    store.add(THERAPIST);
+    renderAt(["/therapist/Test-ABCDEFGH"], PROFILE, { store });
+    const box = await screen.findByRole<HTMLTextAreaElement>("textbox", { name: "Your notes" });
+    act(() => box.focus());
+    fireEvent.change(box, { target: { value: "Rang on Tuesday" } });
+    // Taken off by another tab, say, with the half second not yet up.
+    act(() => store.remove(THERAPIST.slug));
+    expect(notes()).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Add Test Therapist to your shortlist" }));
+    expect(notes()?.value).toBe("Rang on Tuesday");
+  });
+
   it("are not offered for a therapist not shortlisted", async () => {
     renderAt(["/therapist/Test-ABCDEFGH"]);
     await screen.findByRole("heading", { name: "Test Therapist" });

@@ -61,6 +61,12 @@ export function useShortlistEntry(slug: string): ShortlistEntry | undefined {
   return useSyncExternalStore(store.subscribe, () => store.get().find((entry) => entry.card.slug === slug));
 }
 
+/** Whether a therapist is shortlisted; a change to their entry leaves it, and its readers, alone. */
+export function useShortlisted(slug: string): boolean {
+  const store = useShortlistStore();
+  return useSyncExternalStore(store.subscribe, () => store.has(slug));
+}
+
 /** Where the visitor stands with a therapist, or nothing while they aren't shortlisted; a reorder leaves it, and its readers, alone. */
 export function useShortlistStatus(slug: string): Status | undefined {
   const store = useShortlistStore();
