@@ -1,7 +1,8 @@
 import { QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
-import { HashRouter, Link, Route, Routes, useLocation, useParams } from "react-router";
+import { HashRouter, Link, Route, Routes, useLocation, useNavigationType, useParams } from "react-router";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { AccessibilityStatement } from "@/layout/AccessibilityStatement";
 import { SiteLayout } from "@/layout/SiteLayout";
 import { queryClient } from "@/lib/queryClient";
 import { ProfileDrawer } from "@/profile/ProfileDrawer";
@@ -9,6 +10,7 @@ import { ProfilePage } from "@/profile/ProfilePage";
 import { backgroundOf } from "@/profile/profileLink";
 import { ONLINE_PATH } from "@/search/online";
 import { SearchPage } from "@/search/SearchPage";
+import { STATEMENT_PATH } from "@/site";
 
 export function App() {
   return (
@@ -26,6 +28,8 @@ export function App() {
 /** The site's pages; a profile opened from one of them shows in a drawer over it, which stays rendered beneath. */
 export function AppRoutes() {
   const location = useLocation();
+  // Read here, as the Routes below, given a location, report every arrival as a POP.
+  const arrival = useNavigationType();
   const background = backgroundOf(location);
   // The drawer's profile outlasts leaving it, so the drawer slides away still showing it.
   const [drawn, setDrawn] = useState(background && location);
@@ -36,6 +40,7 @@ export function AppRoutes() {
         <Route path="/" element={<SearchPage />} />
         <Route path={ONLINE_PATH} element={<SearchPage />} />
         <Route path="/therapist/:slug" element={<ProfileRoute />} />
+        <Route path={STATEMENT_PATH} element={<AccessibilityStatement followed={arrival === "PUSH"} />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
       {drawn && (

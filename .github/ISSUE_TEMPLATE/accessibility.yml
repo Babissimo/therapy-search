@@ -1,0 +1,26 @@
+# The accessibility statement and the fallback pages link here (REPORT_URL in src/site.ts, and in index.html).
+name: Problem using the site
+description: Something on the site is hard to use, or doesn't work for you.
+title: "Problem: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for telling us. Everything you write here is public, beside your GitHub name, so please leave out anything personal, such as your health or where you live.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What were you trying to do, and what got in the way?
+    validations:
+      required: true
+  - type: input
+    id: where
+    attributes:
+      label: Where on the site?
+      description: For example, the search, a therapist's profile, the shortlist or the filters. Please don't paste the page's address, as it can hold your search.
+  - type: textarea
+    id: using
+    attributes:
+      label: What were you using?
+      description: Optional, and public like the rest. For example, a phone or computer and its browser, and any screen reader, magnifier or voice control if you're happy to say.

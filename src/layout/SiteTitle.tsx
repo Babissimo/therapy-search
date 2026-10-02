@@ -1,5 +1,6 @@
 import { Info } from "lucide-react";
 import { useEffect, useId, useRef, useState, type PointerEvent } from "react";
+import { useLocation } from "react-router";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { AboutText } from "./AboutText";
 
@@ -18,10 +19,24 @@ export function SiteTitle({ as: Title = "h1" }: { as?: "h1" | "p" }) {
   const [shown, setShown] = useState<Shown>(null);
   const timer = useRef<number>(undefined);
   const content = useRef<HTMLDivElement>(null);
-  // Whether the card held focus, which then goes back to the title as it closes; otherwise focus stays where it is.
+  // Whether the card held focus, which then goes back to the title as it closes, unless something outside has taken it
+  // since; otherwise focus stays where it is.
   const focusInside = useRef(false);
   const headingId = useId();
   useEffect(() => () => window.clearTimeout(timer.current), []);
+  const close = () => {
+    window.clearTimeout(timer.current);
+    setShown(null);
+  };
+  // The card belongs to the page it opened over, so going to another, by its statement link or by Back, puts it away. A
+  // search's place or filters changing leaves it be.
+  const { pathname } = useLocation();
+  const page = useRef(pathname);
+  useEffect(() => {
+    if (page.current === pathname) return;
+    page.current = pathname;
+    close();
+  }, [pathname]);
 
   function hover(next: "hover" | null, delay: number) {
     window.clearTimeout(timer.current);
@@ -43,9 +58,7 @@ export function SiteTitle({ as: Title = "h1" }: { as?: "h1" | "p" }) {
     <Popover
       open={shown !== null}
       onOpenChange={(open) => {
-        if (open) return;
-        window.clearTimeout(timer.current);
-        setShown(null);
+        if (!open) close();
       }}
     >
       <Title className="min-w-0 font-heading text-lg font-medium">
@@ -76,7 +89,9 @@ export function SiteTitle({ as: Title = "h1" }: { as?: "h1" | "p" }) {
           if (shown === "pinned") content.current?.focus();
         }}
         onCloseAutoFocus={(e) => {
-          if (!focusInside.current) e.preventDefault();
+          const now = document.activeElement;
+          const taken = now !== null && now !== document.body && !content.current?.contains(now);
+          if (!focusInside.current || taken) e.preventDefault();
           focusInside.current = false;
         }}
         className="max-h-(--radix-popover-content-available-height) w-96 max-w-[calc(100vw-2rem)] gap-3 overflow-y-auto p-4 leading-relaxed"
