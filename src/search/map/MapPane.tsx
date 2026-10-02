@@ -42,6 +42,8 @@ export type MapPaneProps = {
   outsideUK?: boolean;
   /** How much of the map's bottom, in pixels, lies under the results, given the map's height. */
   coveredBelow?: (height: number) => number;
+  /** The search's toolbar lies over the map's top left. */
+  underToolbar?: boolean;
 };
 
 /** The map behind the side bar: the open list's pins, with the search's centre, framed as they are placed, with the view kept for Back. */
@@ -62,6 +64,7 @@ export default function MapPane({
   onSearchArea,
   outsideUK,
   coveredBelow,
+  underToolbar,
 }: MapPaneProps) {
   const saved = savedView(entry).map;
   const restored = saved?.fitKey === fitKey ? saved : undefined;
@@ -107,6 +110,7 @@ export default function MapPane({
           // glide for a visitor who asks for less motion.
           instant={!tiles || still}
           coveredBelow={coveredBelow}
+          underToolbar={underToolbar}
           recentres={recentres}
           onFramed={() => {
             showTiles(true);

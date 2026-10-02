@@ -408,6 +408,7 @@ function SearchView({ params, onChange, wide }: ViewProps) {
                       }
                       outsideUK={params.flags.LocationSearchOutsideUK}
                       coveredBelow={wide ? undefined : (height) => coverOf(sheet, height)}
+                      underToolbar
                     />
                   </MapSlot>
                 </div>
