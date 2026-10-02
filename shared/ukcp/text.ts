@@ -44,6 +44,16 @@ export function initialsOf(name: string): string {
   return ((words[0]?.[0] ?? "") + (words.at(-1)?.[0] ?? "")).toUpperCase();
 }
 
+/** The address in a mailto link, without any ?subject=, and tolerant of a stray percent sign. */
+export function mailtoAddress(href: string): string | undefined {
+  const address = href.slice("mailto:".length).split("?")[0] ?? "";
+  try {
+    return optional(decodeURIComponent(address).trim());
+  } catch {
+    return optional(address.trim());
+  }
+}
+
 /** Only http(s) links reach the page, so a hostile href can never run script. */
 export function safeUrl(url: string | null | undefined): string | undefined {
   return url && /^https?:\/\//i.test(url) ? url : undefined;

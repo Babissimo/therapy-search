@@ -1,6 +1,6 @@
 import type { Office, Profile, ProfileSection } from "../types";
 import { PROFILE_HEADER } from "./markers";
-import { ParseError, initialsOf, multiLine, oneLine, optional, readHtml, safeUrl } from "./text";
+import { ParseError, initialsOf, mailtoAddress, multiLine, oneLine, optional, readHtml, safeUrl } from "./text";
 
 export function parseProfile(html: string, slug: string): Profile {
   const doc = readHtml(html);
@@ -30,16 +30,6 @@ export function parseProfile(html: string, slug: string): Profile {
     practical: sectionsIn(doc.querySelector(".profile-practical-information")),
     offices: [...doc.querySelectorAll(".profile-locations > section")].map(parseOffice),
   };
-}
-
-/** The address in a mailto link, without any ?subject=, and tolerant of a stray percent sign. */
-function mailtoAddress(href: string): string | undefined {
-  const address = href.slice("mailto:".length).split("?")[0] ?? "";
-  try {
-    return optional(decodeURIComponent(address).trim());
-  } catch {
-    return optional(address.trim());
-  }
 }
 
 /** The page repeats the social media icons for each layout it offers, so each link is kept once. */
