@@ -141,6 +141,23 @@
   @apply text-xs font-semibold tracking-[0.12em] uppercase;
 }
 
+/* On a touch screen, a target at least 44px square, as GOV.UK, NHS.UK and Apple ask, centred on a smaller control, which
+   keeps its look and its place. The control must be positioned, and its neighbours far enough off that their targets
+   don't overlap it. */
+@utility touch-target {
+  @media (pointer: coarse) {
+    &::before {
+      content: "";
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: max(100%, --spacing(11));
+      height: max(100%, --spacing(11));
+      translate: -50% -50%;
+    }
+  }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

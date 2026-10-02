@@ -24,7 +24,7 @@ export function ThemeSwitch() {
           <TooltipTrigger asChild>
             {/* The radio is hidden, so its label draws the page's focus outline, a pixel closer to stay within the switch's
                 edge. Under forced colours, where the chosen one's fill is Highlight too, it keeps two pixels clear of it. */}
-            <label className="flex size-7 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-foreground has-checked:bg-muted has-checked:text-foreground has-checked:forced-chosen has-focus-visible:outline-2 has-focus-visible:outline-offset-1 has-focus-visible:outline-foreground forced-colors:has-focus-visible:outline-offset-2 forced-colors:has-focus-visible:outline-[Highlight]">
+            <label className="relative flex size-7 cursor-pointer touch-target pointer-coarse:h-9 pointer-coarse:w-11 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-foreground has-checked:bg-muted has-checked:text-foreground has-checked:forced-chosen has-focus-visible:outline-2 has-focus-visible:outline-offset-1 has-focus-visible:outline-foreground forced-colors:has-focus-visible:outline-offset-2 forced-colors:has-focus-visible:outline-[Highlight]">
               <input
                 type="radio"
                 name="theme"

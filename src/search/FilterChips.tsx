@@ -35,7 +35,9 @@ export function FilterChips({ params, onRemove, onEmptied, className }: Props) {
   return (
     <Morph name="chips">
       {chips.length > 0 && (
-        <GlidingList aria-label="Active filters" className={cn("flex flex-wrap gap-2", className)}>
+        // Padded on a touch screen for the chips' targets, which a row that scrolls would otherwise clip, and drawn out by as
+        // much to keep its place.
+        <GlidingList aria-label="Active filters" className={cn("flex flex-wrap gap-2 pointer-coarse:-my-1.5 pointer-coarse:gap-y-3 pointer-coarse:py-1.5", className)}>
           {chips.map(({ key, item: filter, props }) => (
             <li
               key={key}
@@ -45,7 +47,7 @@ export function FilterChips({ params, onRemove, onEmptied, className }: Props) {
               {/* Filled, as a choice that is on. The secondary slate is the map tiles' own tint, light and dark, and sinks into them. */}
               <Button
                 size="xs"
-                className="h-auto min-h-6 rounded-full py-1 text-left whitespace-normal"
+                className="h-auto min-h-6 rounded-full py-1 text-left whitespace-normal pointer-coarse:min-h-8"
                 aria-label={`Remove ${filter.label}`}
                 onClick={(event) => {
                   handOn(event.currentTarget);

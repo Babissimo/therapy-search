@@ -371,9 +371,10 @@ function StickyHeader({ back, close, bookmark, children }: Exits & { bookmark?: 
         {back}
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0 flex-1">{children}</div>
-          {/* Pulls the last icon out to the content's right edge, past the ghost button's padding. */}
+          {/* Pulls the last icon out to the content's right edge, past the ghost button's padding. On a touch screen a drawer's
+              bookmark and close stand apart, so neither's target takes the other's taps. */}
           {(bookmark || close) && (
-            <div className="-mr-2 flex shrink-0">
+            <div className="-mr-2 flex shrink-0 pointer-coarse:gap-4">
               {bookmark}
               {close}
             </div>
@@ -561,7 +562,7 @@ function OfficeCard({ office, profile, distance }: { office: Office; profile: Pr
       <CardHeader>
         <CardTitle className="flex flex-wrap items-center gap-2">
           {office.mapUrl ? (
-            <a className="inline-flex items-center gap-1.5 underline-offset-4 hover:underline" href={office.mapUrl} target="_blank" rel="noreferrer">
+            <a className="relative inline-flex touch-target items-center gap-1.5 underline-offset-4 hover:underline" href={office.mapUrl} target="_blank" rel="noreferrer">
               <span translate="no">{office.name}</span>
               <ExternalLink aria-hidden className="size-4 text-muted-foreground" />
               <span className="sr-only">, map {NEW_TAB}</span>

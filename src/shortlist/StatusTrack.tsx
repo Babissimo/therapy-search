@@ -76,7 +76,7 @@ export function StatusTrack({ therapist, status, listed = true, onChosen, onRemo
       <div className="flex min-h-7 items-center justify-between gap-2">
         <p className="text-sm text-muted-foreground">{STATUS_LABEL[status]}</p>
         {listed ? (
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 pointer-coarse:gap-2">
             {next && (
               <Button variant="outline" size="sm" onClick={() => step(next.status)}>
                 {next.label}

@@ -50,7 +50,7 @@ export function SearchBox({ params, drafts, onPlaceSearch, onFocus, hold, classN
     <div className={cn("min-w-0", className)}>
       <form
         role="search"
-        className="flex gap-2"
+        className="flex gap-2 pointer-coarse:gap-3"
         onFocus={onFocus}
         onSubmit={(e) => {
           e.preventDefault();
@@ -93,11 +93,12 @@ export function SearchBox({ params, drafts, onPlaceSearch, onFocus, hold, classN
                 setPlaceWanted(undefined);
                 here.locate();
               }}
-              // In the box's end, or beneath the box on touch screens, where it is named on screen. Positioned either way, so
-              // anything placed against the button stays on it rather than spreading over the box.
+              // In the box's end, or beneath the box on touch screens, where it is named on screen, and as far below it as its
+              // target reaches past it. Positioned either way, so anything placed against the button stays on it rather than
+              // spreading over the box.
               className={cn(
                 "absolute top-0.5 right-0.5 text-muted-foreground aria-disabled:opacity-50",
-                "pointer-coarse:relative pointer-coarse:inset-auto pointer-coarse:mt-1",
+                "pointer-coarse:relative pointer-coarse:inset-auto pointer-coarse:mt-2",
               )}
             >
               {here.locating ? <Loader2 aria-hidden className="motion-safe:animate-spin" /> : <LocateFixed aria-hidden />}

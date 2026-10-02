@@ -144,6 +144,12 @@ describe("SearchBox", () => {
     expect(location().className).toContain("pointer-coarse:pr-2.5");
   });
 
+  it("sets Use my location far enough beneath the box on touch screens that its target, 8px past it, stops at the box", () => {
+    geolocation(() => {});
+    renderBox();
+    expect(screen.getByRole("button", { name: "Use my location" }).className).toContain("pointer-coarse:mt-2");
+  });
+
   it("offers no button where the browser can't locate", () => {
     renderBox();
     expect(screen.queryByRole("button", { name: "Use my location" })).toBeNull();
