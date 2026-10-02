@@ -47,6 +47,18 @@ describe("ShortlistButton", () => {
     expect(store.get()).toEqual(before);
   });
 
+  it("puts back where and as they were a therapist removed before it was drawn, as on a profile opened later", () => {
+    const store = clockedStore(null);
+    store.add({ ...JO, summary: "Summary text." });
+    store.setStatus(JO.slug, "consultation");
+    store.setNote(JO.slug, "Rang on Tuesday");
+    const before = store.get();
+    store.remove(JO.slug);
+    renderButton(undefined, store);
+    fireEvent.click(screen.getByRole("button", { name: "Add Jo Bloggs to your shortlist" }));
+    expect(store.get()).toEqual(before);
+  });
+
   it("adds a therapist afresh, with the card it shows, once the shortlist is cleared, forgetting where the visitor stood with them", () => {
     const store = renderButton((seeded) => {
       seeded.add({ ...JO, summary: "Summary from before." });
@@ -71,7 +83,8 @@ describe("ShortlistButton", () => {
     localStorage.removeItem(SHORTLIST_KEY);
     act(() => void window.dispatchEvent(new StorageEvent("storage", { key: SHORTLIST_KEY, newValue: null })));
     fireEvent.click(screen.getByRole("button", { name: "Add Jo Bloggs to your shortlist" }));
-    expect(store.get()).toEqual([{ addedAt: 5001, card: JO }]);
+    // The clock read 5001 as the press removed them.
+    expect(store.get()).toEqual([{ addedAt: 5002, card: JO }]);
   });
 
   it("says what each press did, and says it again once something else has undone it", () => {

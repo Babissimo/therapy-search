@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from "vitest";
 import type { TherapistCard } from "@shared/types";
-import { createShortlistStore, NOTE_LIMIT, SHORTLIST_KEY, statusOf } from "./store";
+import { createShortlistStore, NOTE_LIMIT, REMOVED_DAYS, SHORTLIST_KEY, statusOf } from "./store";
 
 function memory(initial?: unknown) {
   const store = new Map<string, string>(initial === undefined ? [] : [[SHORTLIST_KEY, typeof initial === "string" ? initial : JSON.stringify(initial)]]);
@@ -304,7 +304,8 @@ describe("createShortlistStore", () => {
     store.add(before!.card, before);
     expect(store.get()).toEqual([before]);
     store.add(card("b"), { status: "contacted" });
-    expect(store.get()[0]).toEqual({ addedAt: 1001, status: "contacted", card: { ...card("b"), distance: undefined } });
+    // The clock read 1001 as "a" was removed.
+    expect(store.get()[0]).toEqual({ addedAt: 1002, status: "contacted", card: { ...card("b"), distance: undefined } });
   });
 
   it("clears everyone, with their statuses and order, from storage as well as the page, counting the clear", () => {
@@ -488,5 +489,131 @@ describe("createShortlistStore", () => {
     createShortlistStore(storage).setNote("a", "Booked for Monday");
     events.dispatchEvent(new StorageEvent("storage", { key: SHORTLIST_KEY, newValue: storage.store.get(SHORTLIST_KEY) }));
     expect(store.get()[0]?.note).toBe("Booked for Monday");
+  });
+
+  it("keeps a therapist removed, to put back where and as they were with the card it had, after a reload too", () => {
+    const storage = memory();
+    const store = createShortlistStore(storage, clock());
+    for (const slug of ["a", "b", "c"]) store.add(card(slug));
+    store.move("c", { above: store.get()[2] });
+    store.setStatus("b", "consultation");
+    store.setNote("b", "Rang on Tuesday");
+    const before = store.get();
+    store.remove("b");
+    expect(store.has("b")).toBe(false);
+    expect(store.removedCount()).toBe(1);
+    const reloaded = createShortlistStore(storage, clock(5000));
+    expect(reloaded.removedCount()).toBe(1);
+    reloaded.add(card("b", { name: "Name from a thinner card" }));
+    expect(reloaded.get()).toEqual(before);
+    expect(reloaded.removedCount()).toBe(0);
+  });
+
+  it("puts a removed therapist back with the status given, in their place and with their note", () => {
+    const store = createShortlistStore(memory(), clock());
+    store.add(card("a"));
+    store.add(card("b"));
+    store.setStatus("a", "waiting");
+    store.setNote("a", "Rang on Tuesday");
+    store.remove("a");
+    store.add(card("a"), { status: "contacted" });
+    expect(store.get().map((e) => [e.card.slug, e.status, e.note])).toEqual([
+      ["b", undefined, undefined],
+      ["a", "contacted", "Rang on Tuesday"],
+    ]);
+  });
+
+  it("keeps a note saved after its therapist was removed, for when they are added back", () => {
+    const store = createShortlistStore(memory(), clock());
+    store.add(card("a"));
+    store.remove("a");
+    store.setNote("a", "Rang on Tuesday");
+    expect(store.get()).toEqual([]);
+    store.add(card("a"));
+    expect(store.get()[0]?.note).toBe("Rang on Tuesday");
+  });
+
+  it("follows a removal in another tab, to put the therapist back here as they were", () => {
+    const storage = memory();
+    const events = new EventTarget();
+    const here = createShortlistStore(storage, clock(), events);
+    here.subscribe(() => {});
+    here.add(card("a"));
+    here.setNote("a", "Rang on Tuesday");
+    const before = here.get();
+    createShortlistStore(storage, clock(5000)).remove("a");
+    events.dispatchEvent(new StorageEvent("storage", { key: SHORTLIST_KEY, newValue: storage.store.get(SHORTLIST_KEY) }));
+    expect(here.has("a")).toBe(false);
+    expect(here.removedCount()).toBe(1);
+    here.add(card("a"));
+    expect(here.get()).toEqual(before);
+  });
+
+  it("forgets those removed 30 days or more before the page loads, in storage as well as on the page", () => {
+    const day = 24 * 60 * 60 * 1000;
+    const storage = memory();
+    let t = 0;
+    const earlier = createShortlistStore(storage, () => t);
+    earlier.add(card("a"));
+    earlier.add(card("b"));
+    earlier.setNote("a", "Rang on Tuesday");
+    earlier.remove("a");
+    t = 5 * day;
+    earlier.remove("b");
+    t = REMOVED_DAYS * day - 1;
+    expect(createShortlistStore(storage, () => t).removedCount()).toBe(2);
+    t += 1;
+    const later = createShortlistStore(storage, () => t);
+    expect(later.removedCount()).toBe(1);
+    expect(Object.keys(JSON.parse(storage.store.get(SHORTLIST_KEY)!).removed)).toEqual(["b"]);
+    later.add(card("a"));
+    expect(later.get()[0]).toEqual({ addedAt: t, card: { ...card("a"), distance: undefined } });
+  });
+
+  it("forgets those removed as it clears, here or in another tab", () => {
+    const storage = memory();
+    const events = new EventTarget();
+    const store = createShortlistStore(storage, clock(), events);
+    store.subscribe(() => {});
+    store.add(card("a"));
+    store.setNote("a", "Rang on Tuesday");
+    store.remove("a");
+    store.clear();
+    expect(store.removedCount()).toBe(0);
+    expect(storage.store.has(SHORTLIST_KEY)).toBe(false);
+    store.add(card("a"));
+    expect(store.get()[0]?.note).toBeUndefined();
+    store.remove("a");
+    createShortlistStore(storage).clear();
+    events.dispatchEvent(new StorageEvent("storage", { key: SHORTLIST_KEY, newValue: null }));
+    expect(store.removedCount()).toBe(0);
+  });
+
+  it("reads those removed beside the list, dropping any it can't read or that are listed too", () => {
+    const entry = (slug: string, extra = {}) => ({ addedAt: 1, card: { slug, name: slug, initials: "X", tags: [] }, ...extra });
+    // Only "b" reads: "a" is listed, "c" has no time of removal, "d" no card and "e" another's slug.
+    const removed = {
+      a: entry("a", { removedAt: 2 }),
+      b: entry("b", { removedAt: 2 }),
+      c: entry("c"),
+      d: { removedAt: 2 },
+      e: entry("x", { removedAt: 2 }),
+    };
+    expect(createShortlistStore(memory({ v: 1, entries: { a: entry("a") }, removed }), () => 3).removedCount()).toBe(1);
+    expect(createShortlistStore(memory({ v: 1, entries: {}, removed: "b" })).removedCount()).toBe(0);
+    // As a release before removed therapists were kept wrote it.
+    expect(createShortlistStore(memory({ v: 1, entries: { a: entry("a") } })).removedCount()).toBe(0);
+  });
+
+  it("catches up with those another tab forgot while no one here was subscribed", () => {
+    const storage = memory();
+    const store = createShortlistStore(storage, clock(), new EventTarget());
+    store.add(card("a"));
+    store.remove("a");
+    expect(store.removedCount()).toBe(1);
+    // Another tab, loaded long after, forgets them.
+    createShortlistStore(storage, () => 1001 + REMOVED_DAYS * 24 * 60 * 60 * 1000);
+    store.subscribe(() => {});
+    expect(store.removedCount()).toBe(0);
   });
 });

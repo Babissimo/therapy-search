@@ -6,6 +6,10 @@ export const SHORTLIST_KEY = "shortlist";
 /** The most a note holds. */
 export const NOTE_LIMIT = 1000;
 
+/** How long a removed therapist is kept, to be added back as they were. */
+export const REMOVED_DAYS = 30;
+const DAY = 24 * 60 * 60 * 1000;
+
 /** Where the visitor stands with a shortlisted therapist, in the order a search usually runs through them. */
 export const STATUSES = ["toContact", "contacted", "waiting", "consultation", "seeing", "setAside"] as const;
 export type Status = (typeof STATUSES)[number];
@@ -26,28 +30,36 @@ export type Shortlist = readonly ShortlistEntry[];
 /** The neighbours a therapist is moved between, as listed; either is missing at an end of the list. */
 export type Between = { above?: ShortlistEntry; below?: ShortlistEntry };
 
+/** A therapist taken off the list, with when, kept to be added back as they were. */
+type RemovedEntry = ShortlistEntry & { removedAt: number };
+
 type Entries = ReadonlyMap<string, ShortlistEntry>;
-type Stored = { v: 1; entries: Record<string, ShortlistEntry> };
+type Removed = ReadonlyMap<string, RemovedEntry>;
+type State = { entries: Entries; removed: Removed };
+type Stored = { v: 1; entries: Record<string, ShortlistEntry>; removed: Record<string, RemovedEntry> };
 type KeyValue = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 type Events = Pick<EventTarget, "addEventListener" | "removeEventListener">;
 
 export type ShortlistStore = {
   get: () => Shortlist;
   has: (slug: string) => boolean;
-  /** `place`, the entry a therapist just removed had, puts them back where and as they were, note and all; a status alone adds them with it. */
+  /** Puts anyone removed back where and as they were, note and card and all, with whatever `place` gives over that. */
   add: (card: ShortlistCard, place?: Partial<Omit<ShortlistEntry, "card">>) => void;
+  /** Keeps the therapist for `REMOVED_DAYS`, to be added back as they were. */
   remove: (slug: string) => void;
-  /** Takes everyone off, with their statuses, notes and order, for a browser someone else may use next. */
+  /** Takes everyone off, those removed too, with their statuses, notes and order, for a browser someone else may use next. */
   clear: () => void;
   /**
-   * How many times the list has been cleared, here or in another tab, since the page loaded. Whatever keeps entries of
-   * its own, to put a therapist back, forgets them as this changes.
+   * How many times the list has been cleared, here or in another tab, since the page loaded. Whatever shows removed
+   * therapists of its own, to be put back, lets them go as this changes.
    */
   clears: () => number;
+  /** How many removed therapists are kept to be added back. */
+  removedCount: () => number;
   move: (slug: string, between: Between) => void;
   /** Leaves their place in the order alone, so the visitor's preference carries from one status to the next. */
   setStatus: (slug: string, status: Status) => void;
-  /** Keeps the first `NOTE_LIMIT` characters, and an empty note as none. */
+  /** Keeps the first `NOTE_LIMIT` characters, and an empty note as none, for a removed therapist too. */
   setNote: (slug: string, note: string) => void;
   /** Brings shortlisted therapists' cards up to date from results the site has fetched anyway. */
   refresh: (cards: readonly TherapistCard[]) => void;
@@ -59,10 +71,19 @@ export type ShortlistStore = {
  * where storage is refused it still lasts for the page load. `events` is where another tab's changes are heard.
  */
 export function createShortlistStore(storage: KeyValue | null, now: () => number = Date.now, events?: Events): ShortlistStore {
-  let entries: Entries = stored(storage) ?? new Map();
-  let list = ordered(entries);
+  let { entries, removed } = stored(storage) ?? NOBODY;
   // Whether storage holds the list in memory; once a write is refused, only memory does.
   let persisted = true;
+  // Those removed too long ago are forgotten as the page loads, in storage as well as here.
+  if (removed.size > 0) {
+    const since = now() - REMOVED_DAYS * DAY;
+    const recent = new Map([...removed].filter(([, entry]) => entry.removedAt > since));
+    if (recent.size < removed.size) {
+      removed = recent;
+      persisted = write(storage, entries, removed);
+    }
+  }
+  let list = ordered(entries);
   let clears = 0;
   const listeners = new Set<() => void>();
 
@@ -71,11 +92,14 @@ export function createShortlistStore(storage: KeyValue | null, now: () => number
     for (const listener of listeners) listener();
   };
   // Starts from the list as stored rather than as last heard, so another tab's change not yet heard of survives.
-  const update = (change: (next: Map<string, ShortlistEntry>) => void) => {
-    const next = new Map((persisted && stored(storage)) || entries);
-    change(next);
+  const update = (change: (next: Map<string, ShortlistEntry>, gone: Map<string, RemovedEntry>) => void) => {
+    const from = (persisted && stored(storage)) || { entries, removed };
+    const next = new Map(from.entries);
+    const gone = new Map(from.removed);
+    change(next, gone);
     entries = next;
-    persisted = write(storage, entries);
+    removed = gone;
+    persisted = write(storage, entries, removed);
     notify();
   };
   const onStorage = (event: Event) => {
@@ -85,17 +109,16 @@ export function createShortlistStore(storage: KeyValue | null, now: () => number
     if (key !== SHORTLIST_KEY && key !== null) return;
     // Only a clear takes the list out of storage. Storage is still read, as this tab may have written to it since.
     if (newValue === null) clears += 1;
-    entries = stored(storage) ?? (newValue === null ? new Map() : entries);
+    ({ entries, removed } = stored(storage) ?? (newValue === null ? NOBODY : { entries, removed }));
     notify();
   };
   // What another tab did while no one here was subscribed went unheard, a clear among them, so the first to subscribe
-  // again catches up. Anyone gone from storage meanwhile may have gone in a clear, which this tab can't tell from removals,
-  // so either counts as one.
+  // again catches up. Anyone gone from the list meanwhile may have gone in a clear, so counts as one.
   const catchUp = () => {
     const inStorage = persisted ? stored(storage) : undefined;
-    if (!inStorage || JSON.stringify([...inStorage]) === JSON.stringify([...entries])) return;
-    if ([...entries.keys()].some((slug) => !inStorage.has(slug))) clears += 1;
-    entries = inStorage;
+    if (!inStorage || JSON.stringify([...inStorage.entries, ...inStorage.removed]) === JSON.stringify([...entries, ...removed])) return;
+    if ([...entries.keys()].some((slug) => !inStorage.entries.has(slug))) clears += 1;
+    ({ entries, removed } = inStorage);
     list = ordered(entries);
   };
 
@@ -103,19 +126,28 @@ export function createShortlistStore(storage: KeyValue | null, now: () => number
     get: () => list,
     has: (slug) => entries.has(slug),
     add: (card, place) =>
-      update((next) => {
-        const { addedAt = now(), rank, status, note } = place ?? {};
-        next.set(card.slug, { addedAt, rank, status, note: noteFrom(note), card: cardOf(card) });
+      update((next, gone) => {
+        const kept = gone.get(card.slug);
+        gone.delete(card.slug);
+        const { addedAt = now(), rank, status, note } = { ...kept, ...place };
+        next.set(card.slug, { addedAt, rank, status, note: noteFrom(note), card: cardOf(kept?.card ?? card) });
       }),
-    remove: (slug) => update((next) => void next.delete(slug)),
+    remove: (slug) =>
+      update((next, gone) => {
+        const entry = next.get(slug);
+        if (!entry) return;
+        next.delete(slug);
+        gone.set(slug, { ...entry, removedAt: now() });
+      }),
     // Takes the list out of storage, which leaves nothing behind and is how other tabs know it was cleared.
     clear: () => {
       clears += 1;
-      entries = new Map();
+      ({ entries, removed } = NOBODY);
       persisted = erase(storage);
       notify();
     },
     clears: () => clears,
+    removedCount: () => removed.size,
     move: (slug, between) =>
       update((next) => {
         const entry = next.get(slug);
@@ -134,9 +166,12 @@ export function createShortlistStore(storage: KeyValue | null, now: () => number
         if (entry) next.set(slug, { ...entry, status: status === "toContact" ? undefined : status });
       }),
     setNote: (slug, note) =>
-      update((next) => {
+      update((next, gone) => {
         const entry = next.get(slug);
         if (entry) next.set(slug, { ...entry, note: noteFrom(note) });
+        // A note the profile's box saves as it goes, after its therapist was removed, is kept with them.
+        const kept = gone.get(slug);
+        if (kept) gone.set(slug, { ...kept, note: noteFrom(note) });
       }),
     refresh: (cards) => {
       // Runs whenever results render, so only shortlisted therapists' cards are copied and compared.
@@ -165,6 +200,8 @@ export function createShortlistStore(storage: KeyValue | null, now: () => number
     },
   };
 }
+
+const NOBODY: State = { entries: new Map(), removed: new Map() };
 
 function ordered(entries: Entries): Shortlist {
   return [...entries.values()].sort(byRank);
@@ -224,7 +261,7 @@ function cardOf(t: ShortlistCard): ShortlistCard {
 }
 
 /** The list as stored, or nothing where storage is refused; a value it can't read counts as an empty list. */
-function stored(storage: KeyValue | null): Entries | undefined {
+function stored(storage: KeyValue | null): State | undefined {
   if (!storage) return undefined;
   let raw: string | null;
   try {
@@ -233,23 +270,29 @@ function stored(storage: KeyValue | null): Entries | undefined {
     return undefined;
   }
   const entries = new Map<string, ShortlistEntry>();
+  const removed = new Map<string, RemovedEntry>();
   let value: unknown;
   try {
     value = JSON.parse(raw ?? "null");
   } catch {
-    return entries;
+    return { entries, removed };
   }
-  if (!isRecord(value) || value.v !== 1 || !isRecord(value.entries)) return entries;
+  if (!isRecord(value) || value.v !== 1 || !isRecord(value.entries)) return { entries, removed };
   for (const [slug, item] of Object.entries(value.entries)) {
     const entry = entryFrom(item);
     if (entry?.card.slug === slug) entries.set(slug, entry);
   }
-  return entries;
+  // A list written before removed therapists were kept has none.
+  for (const [slug, item] of Object.entries(isRecord(value.removed) ? value.removed : {})) {
+    const entry = removedFrom(item);
+    if (entry?.card.slug === slug && !entries.has(slug)) removed.set(slug, entry);
+  }
+  return { entries, removed };
 }
 
 /** Whether storage took the list; private browsing can refuse it. */
-function write(storage: KeyValue | null, entries: Entries): boolean {
-  const value: Stored = { v: 1, entries: Object.fromEntries(entries) };
+function write(storage: KeyValue | null, entries: Entries, removed: Removed): boolean {
+  const value: Stored = { v: 1, entries: Object.fromEntries(entries), removed: Object.fromEntries(removed) };
   try {
     storage?.setItem(SHORTLIST_KEY, JSON.stringify(value));
     return storage !== null;
@@ -290,6 +333,12 @@ function entryFrom(value: unknown): ShortlistEntry | undefined {
       tags: c.tags,
     }),
   };
+}
+
+/** A removed therapist's entry as this site wrote it, with when they were removed, or nothing. */
+function removedFrom(value: unknown): RemovedEntry | undefined {
+  const entry = entryFrom(value);
+  return entry && isRecord(value) && typeof value.removedAt === "number" ? { ...entry, removedAt: value.removedAt } : undefined;
 }
 
 /** A status this site stores, or nothing, which reads as "To contact". */
