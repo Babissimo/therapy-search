@@ -316,8 +316,9 @@ function SortableEntry({ entry, heading, listed, sought, online, fee, pinKey, ma
       style={{ transform: CSS.Translate.toString(transform), transition }}
       className={cn(
         "flex items-center gap-1",
-        // Carried over its neighbours, lifted off the list.
-        isDragging && "relative z-10 [&_[data-slot=card]]:shadow-lg",
+        // Carried over its neighbours, lifted off the list; framed in dashes under forced colours, which drop the shadow, clear
+        // of the outline a marked card has there.
+        isDragging && "relative z-10 [&_[data-slot=card]]:shadow-lg forced-colors:outline-2 forced-colors:outline-offset-4 forced-colors:outline-dashed",
       )}
     >
       <IconButton
@@ -334,7 +335,7 @@ function SortableEntry({ entry, heading, listed, sought, online, fee, pinKey, ma
       >
         <GripVertical aria-hidden />
       </IconButton>
-      <div className={cn("min-w-0 flex-1 rounded-xl", marked && "ring-2 ring-highlight")}>
+      <div className={cn("min-w-0 flex-1 rounded-xl", marked && "ring-2 ring-highlight forced-marked")}>
         <TherapistCard
           therapist={card}
           sought={sought}

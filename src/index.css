@@ -173,6 +173,57 @@
 .leaflet-container:focus-visible {
   outline-offset: -2px;
 }
+/* Under forced colours, in the system's colour for a selection, which Chrome gives focus there anyway. A forced-chosen
+   option keeps its own colours there, so it would otherwise keep the page's ink. */
+@media (forced-colors: active) {
+  :focus-visible {
+    outline-color: Highlight;
+  }
+}
+
+/* Forced colours (Windows contrast themes) paint every background as the page's and drop shadows. There, the chosen one
+   of a set of options, such as the open tab, takes the system's colours for a selection. */
+@utility forced-chosen {
+  @media (forced-colors: active) {
+    /* Unforced, as forcing backs text with the page's colour, hiding it on the Highlight. */
+    forced-color-adjust: none;
+    /* Important, to outrank the dark theme's colours. */
+    border-color: Highlight !important;
+    background-color: Highlight !important;
+    color: HighlightText !important;
+    box-shadow: none !important;
+  }
+}
+/* Under forced colours, what a list marks for the pin selected on the map, in place of its amber ring: an outline in the
+   text's colour, heavier than focus's and apart from its colour. */
+@utility forced-marked {
+  @media (forced-colors: active) {
+    outline: 3px solid CanvasText;
+  }
+}
+@media (forced-colors: active) {
+  /* Chrome leaves an icon the colour it is given, which may be the page's, so each takes its text's. Outside any layer,
+     to outrank the icons' colour utilities. */
+  svg.lucide {
+    color: inherit;
+  }
+  /* A menu's edge in place of its shadow: a border, as Radix sets the menu's outline inline. */
+  [role="menu"] {
+    border: 1px solid CanvasText;
+  }
+  [role="menu"] [role="separator"] {
+    background-color: CanvasText;
+  }
+  /* Not outline-hidden's outline, which forced colours draw on every item alike. */
+  [role^="menuitem"] {
+    outline: none;
+  }
+  /* The item the pointer or keyboard is on, in place of its highlight. */
+  [role^="menuitem"]:focus {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
+}
 
 /* Leaflet's own elements, brought in line with the theme. */
 @layer base {

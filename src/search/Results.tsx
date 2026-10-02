@@ -109,7 +109,7 @@ export function Results({ params, results, listRef, pins = [], unplaced = [], se
                 key={key}
                 data-pin={pin?.key}
                 aria-current={marked || undefined}
-                className={cn("rounded-xl fade-in-0 motion-safe:animate-in", marked && t && "ring-2 ring-highlight")}
+                className={cn("rounded-xl fade-in-0 motion-safe:animate-in", marked && t && "ring-2 ring-highlight forced-marked")}
               >
                 {t ? (
                   <ResultCard therapist={t} sought={sought} online={online} fee={feeOf(t)} onHighlight={highlight(t.slug)} />
@@ -167,7 +167,7 @@ function PinGroup({ pin, marked, sought, feeOf, highlight }: PinGroupProps) {
     <div
       role="group"
       aria-labelledby={headingId}
-      className={cn("space-y-3 rounded-xl border p-3 transition-colors", marked && "border-highlight bg-highlight/10 ring-1 ring-highlight")}
+      className={cn("space-y-3 rounded-xl border p-3 transition-colors", marked && "border-highlight bg-highlight/10 ring-1 ring-highlight forced-marked")}
     >
       <h2 id={headingId} className="eyebrow flex items-center gap-1.5 text-primary">
         <MapPin aria-hidden className={cn("size-4 shrink-0", marked ? "text-highlight" : "text-muted-foreground")} />

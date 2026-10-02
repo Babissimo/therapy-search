@@ -1203,6 +1203,8 @@ describe("SearchPage", () => {
     const pin = screen.getByRole("button", { name: `Pin ${key(HOVE)}` });
     fireEvent.click(pin);
     expect(here.closest("li")?.getAttribute("aria-current")).toBe("true");
+    // Outlined as well as ringed, as forced colours drop the ring.
+    expect(here.classList.contains("forced-marked")).toBe(true);
     expect(results().dataset.position).toBe("half");
     expect(screen.getByTestId("map").dataset.selected).toBe(key(HOVE));
     fireEvent.click(pin);
@@ -1212,6 +1214,7 @@ describe("SearchPage", () => {
     fireEvent.click(screen.getByRole("button", { name: `Pin ${key(BRIGHTON)}` }));
     const alone = screen.getByRole("link", { name: "Therapist b" }).closest("li");
     expect(alone?.getAttribute("aria-current")).toBe("true");
+    expect(alone?.classList.contains("forced-marked")).toBe(true);
     fireEvent.click(screen.getByRole("button", { name: "Map away from the pins" }));
     expect(alone?.hasAttribute("aria-current")).toBe(false);
     expect(screen.getByTestId("map").dataset.selected).toBe("");

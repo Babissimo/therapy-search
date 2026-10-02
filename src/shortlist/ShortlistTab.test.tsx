@@ -415,6 +415,12 @@ describe("ShortlistTab", () => {
       ["there", null],
       ["here", "true"],
     ]);
+    // Forced colours drop the ring, and keep an outline.
+    expect(["Ann", "Bo", "Cy"].map((name) => entry(name)!.querySelector(".ring-highlight")?.classList.contains("forced-marked"))).toEqual([
+      true,
+      undefined,
+      true,
+    ]);
   });
 
   it("counts those the map can't place while it shows the shortlist", () => {
