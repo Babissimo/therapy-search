@@ -99,6 +99,12 @@ export function useShortlistClears(): number {
   return useSyncExternalStore(store.subscribe, store.clears);
 }
 
+/** How many removed therapists the shortlist keeps, to be added back as they were. */
+export function useShortlistRemoved(): number {
+  const store = useShortlistStore();
+  return useSyncExternalStore(store.subscribe, store.removedCount);
+}
+
 export function therapistCount(n: number): string {
   return n === 1 ? "1 therapist" : `${n} therapists`;
 }

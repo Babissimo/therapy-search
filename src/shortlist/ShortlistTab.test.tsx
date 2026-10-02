@@ -125,9 +125,42 @@ function stubClipboard<T extends (text: string) => Promise<void>>(writeText: T):
 }
 
 describe("ShortlistTab", () => {
-  it("says how to shortlist someone when the list is empty", () => {
+  it("says how to shortlist someone when the list is empty, with nothing to clear", () => {
     renderTab({});
     screen.getByText(/^Bookmark anyone who might suit you/);
+    expect(screen.queryByRole("button", { name: "Clear shortlist" })).toBeNull();
+  });
+
+  it("offers on the empty tab to forget those removed, saying how many are kept and for how long, then gives focus to the note", async () => {
+    let t = 1000;
+    const store = createShortlistStore(null, () => t++);
+    store.add(card("Ann-AAAAAAAA", "Ann"));
+    store.add(card("Bo-BBBBBBBB", "Bo"));
+    store.setNote("Ann-AAAAAAAA", "Rang on Tuesday");
+    store.remove("Ann-AAAAAAAA");
+    store.remove("Bo-BBBBBBBB");
+    renderTab({ store });
+    screen.getByText(/^Bookmark anyone who might suit you/);
+    screen.getByText("2 therapists you removed are kept for 30 days, in case you add them back.");
+    fireEvent.click(screen.getByRole("button", { name: "Clear shortlist" }));
+    screen.getByText("This forgets the 2 therapists you removed, with your notes and where you stood with them, so they can't be put back as they were.");
+    fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Clear shortlist" }));
+    expect(store.removedCount()).toBe(0);
+    expect(screen.queryByText(/you removed/)).toBeNull();
+    expect(screen.queryByRole("button", { name: "Clear shortlist" })).toBeNull();
+    const note = screen.getByText(/^Bookmark anyone who might suit you/).parentElement;
+    expect(document.activeElement).toBe(note);
+    // The dialog hands focus back once it has gone, which must not take it from the note.
+    await act(() => new Promise((resolve) => setTimeout(resolve)));
+    expect(document.activeElement).toBe(note);
+  });
+
+  it("says so on the empty tab when one therapist removed is kept", () => {
+    const store = createShortlistStore(null);
+    store.add(card("Ann-AAAAAAAA", "Ann"));
+    store.remove("Ann-AAAAAAAA");
+    renderTab({ store });
+    screen.getByText("1 therapist you removed is kept for 30 days, in case you add them back.");
   });
 
   it("lists shortlisted therapists newest first, each linking to their profile", () => {
@@ -332,6 +365,31 @@ describe("ShortlistTab", () => {
     elsewhere.focus();
     act(() => store.clear());
     expect(document.activeElement).toBe(elsewhere);
+  });
+
+  it("counts among those it forgets everyone removed, not only those the tab shows", () => {
+    const store = createShortlistStore(null);
+    store.add(card("Cy-CCCCCCCC", "Cy"));
+    store.remove("Cy-CCCCCCCC");
+    renderTab({ store }, card("Ann-AAAAAAAA", "Ann"));
+    expect(names()).toEqual(["Ann"]);
+    fireEvent.click(screen.getByRole("button", { name: "Clear shortlist" }));
+    screen.getByText(
+      "This removes 1 therapist from this browser, with your notes and where you stand with them, and forgets the 1 therapist you removed. It can't be undone.",
+    );
+  });
+
+  it("offers no clear once nobody is listed or kept, though the tab still shows a card removed here", () => {
+    onTestFinished(() => localStorage.clear());
+    const inBrowser = createShortlistStore(localStorage, Date.now, window);
+    renderTab({ store: inBrowser }, card("Ann-AAAAAAAA", "Ann"));
+    fireEvent.click(screen.getByRole("button", { name: "Remove Ann from your shortlist" }));
+    // A previous release's tab writes the list without anyone removed.
+    const written = JSON.stringify({ v: 1, entries: {} });
+    localStorage.setItem(SHORTLIST_KEY, written);
+    act(() => void window.dispatchEvent(new StorageEvent("storage", { key: SHORTLIST_KEY, newValue: written })));
+    expect(names()).toEqual(["Ann"]);
+    expect(screen.queryByRole("button", { name: "Clear shortlist" })).toBeNull();
   });
 
   it("leaves the shortlist as it was when the visitor cancels, with focus back on the button", async () => {

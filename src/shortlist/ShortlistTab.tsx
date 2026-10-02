@@ -38,8 +38,8 @@ import { useSetAsideOpen } from "./setAside";
 import { ShortlistButton } from "./ShortlistButton";
 import { STATUS_ICON, STATUS_LABEL } from "./status";
 import { StatusTrack } from "./StatusTrack";
-import { byRank, statusOf, type Between, type Shortlist, type ShortlistCard, type ShortlistEntry, type Status } from "./store";
-import { therapistCount, useShortlist, useShortlistAnnouncement, useShortlistClears, useShortlistStore } from "./useShortlist";
+import { byRank, REMOVED_DAYS, statusOf, type Between, type Shortlist, type ShortlistCard, type ShortlistEntry, type Status } from "./store";
+import { therapistCount, useShortlist, useShortlistAnnouncement, useShortlistClears, useShortlistRemoved, useShortlistStore } from "./useShortlist";
 
 type Props = {
   /** The search's terms, which pick out tags as they do in the results. */
@@ -76,28 +76,43 @@ export function ShortlistTab({ sought, online = false, pins = [], unplaced = 0, 
     if (selector) root.current?.querySelector<HTMLElement>(selector)?.focus();
   });
   const empty = shown.length === 0;
+  const removedCount = useShortlistRemoved();
   const note = useRef<HTMLDivElement>(null);
-  // Once a clear, here or in another tab, empties the list, focus left on nothing, as it is when it went with the list's
-  // controls, goes to the note in their place.
-  const wasEmpty = useRef(empty);
+  // Once a clear, here or in another tab, leaves nothing to clear, focus left on nothing, as it is when it went with the
+  // list's controls, goes to the note in their place.
+  const clearable = !empty || removedCount > 0;
+  const wasClearable = useRef(clearable);
   useLayoutEffect(() => {
-    if (empty && !wasEmpty.current && document.activeElement === document.body) note.current?.focus();
-    wasEmpty.current = empty;
-  }, [empty]);
+    if (!clearable && wasClearable.current && document.activeElement === document.body) note.current?.focus();
+    wasClearable.current = clearable;
+  }, [clearable]);
   const listed = new Set(shortlist.map((entry) => entry.card.slug));
   const pinOf = pinsBySlug(pins);
   if (empty) {
     return (
-      <div
-        ref={note}
-        tabIndex={-1}
-        className="-mx-2 flex gap-3 rounded-md p-2 outline-none fade-in-0 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-hidden motion-safe:animate-in"
-      >
-        <Bookmark aria-hidden className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
-        <p className="text-sm">
-          Bookmark anyone who might suit you, from their card or profile, to compare them here, then mark where you stand with each as you
-          get in touch. It's fine to contact a few before choosing one. Your shortlist is kept in this browser only.
-        </p>
+      <div className="space-y-4 fade-in-0 motion-safe:animate-in">
+        <div
+          ref={note}
+          tabIndex={-1}
+          className="-mx-2 flex gap-3 rounded-md p-2 outline-none focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-hidden"
+        >
+          <Bookmark aria-hidden className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
+          <p className="text-sm">
+            Bookmark anyone who might suit you, from their card or profile, to compare them here, then mark where you stand with each as you
+            get in touch. It's fine to contact a few before choosing one. Your shortlist is kept in this browser only.
+          </p>
+        </div>
+        {/* So a note left on someone removed can be forgotten without first shortlisting anyone. */}
+        {removedCount > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 print:hidden">
+            <p className="text-sm text-muted-foreground">
+              {therapistCount(removedCount)} you removed {removedCount === 1 ? "is" : "are"} kept for {REMOVED_DAYS} days, in case you add them back.
+            </p>
+            <div className="-mr-2.5 ml-auto flex">
+              <ClearShortlist listed={0} removed={removedCount} onClear={store.clear} />
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -161,8 +176,8 @@ export function ShortlistTab({ sought, online = false, pins = [], unplaced = 0, 
         {/* Pulled out to the cards' right edge, past the ghost buttons' padding, on a line of their own too. */}
         <div className="-mr-2.5 ml-auto flex">
           {shortlist.length > 0 && <CopyShortlist shortlist={shortlist} onDone={announce} />}
-          {/* Offered while anyone is listed, as a card removed here still shows where the visitor stood with them. */}
-          <ClearShortlist listed={shortlist.length} removed={shown.length - shortlist.length} onClear={store.clear} />
+          {/* Offered while anyone is listed or kept as removed. */}
+          {(shortlist.length > 0 || removedCount > 0) && <ClearShortlist listed={shortlist.length} removed={removedCount} onClear={store.clear} />}
         </div>
       </div>
       {/* Paper has no tabs to say whose list this is. */}
@@ -183,7 +198,7 @@ export function ShortlistTab({ sought, online = false, pins = [], unplaced = 0, 
 type ClearProps = {
   /** How many are on the shortlist. */
   listed: number;
-  /** How many the tab still shows, removed, ready to be added back. */
+  /** How many removed therapists are kept, ready to be added back, whether or not the tab shows them. */
   removed: number;
   onClear: () => void;
 };
