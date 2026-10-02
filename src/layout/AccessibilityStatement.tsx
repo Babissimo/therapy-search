@@ -16,8 +16,9 @@ function Name({ children }: { children: string }) {
 export const KNOWN_PROBLEMS: ReactNode[] = [
   "On a short screen, such as a phone held sideways or a window zoomed to 400%, the list of results has very little room.",
   <>
-    Older browsers, such as <Name>Safari</Name> on an iPad that can't update past <Name>iPadOS</Name> 15, can't run the
-    search. They show a plain page that links to UKCP's own directory instead.
+    Older browsers, such as <Name>Safari</Name> on an iPad that can't update past <Name>iPadOS</Name> 15, and browsers with
+    JavaScript turned off, can't run the full search. They're offered the <a className="underline" href="/plain">plain search</a>{" "}
+    instead, which has no map, shortlist or notes.
   </>,
   <>
     On a touch screen, Filters and Use my location show their names, but some buttons, such as Hide list, the bookmark and the
@@ -57,6 +58,7 @@ export function AccessibilityStatement({ followed = false }: { followed?: boolea
           <li>choose a light or dark theme, or follow your device's</li>
           <li>ask your device for less motion, and have the site keep still</li>
           <li>translate the page in your browser, which leaves names and places as they are</li>
+          <li>search without JavaScript, or in an older browser, with a plain search</li>
           <li>find where to turn for help today, and UKCP's own directory, even when the search won't load</li>
         </ul>
         <p>
