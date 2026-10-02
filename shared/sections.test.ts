@@ -37,6 +37,11 @@ describe("SECTIONS", () => {
   it("says what each school of therapy is, as its titles alone rarely do", () => {
     expect(SECTIONS.TypesOfTherapy?.filter((s) => !s.about)).toEqual([]);
   });
+
+  it("says who the help-with headings that aren't about the visitor's own troubles are for", () => {
+    const explained = SECTIONS.HelpWithAdvanced?.filter((s) => s.about).map((s) => s.heading);
+    expect(explained).toEqual(["Sexual offending", "Online and telephone", "For therapists"]);
+  });
 });
 
 describe("sectionDrift", () => {

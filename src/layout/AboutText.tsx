@@ -2,20 +2,25 @@ import { Link, useMatch } from "react-router";
 import { CONTACT_URL, STATEMENT_PATH } from "@/site";
 import { HelpNow } from "./HelpNow";
 
-/** What the site is, where to turn for help today, and how it treats UKCP, the geocoders and visitors, shown from the site's name. */
+/**
+ * What the site is, in words a reading age of nine can follow, then where to turn for help today, and beneath them how
+ * it treats UKCP, the geocoders and visitors. Shown from the site's name.
+ */
 export function AboutText() {
   // Over the statement itself, the link names the page shown rather than going to it afresh.
   const here = useMatch(STATEMENT_PATH) !== null;
   return (
     <>
+      <p>This site helps you find a therapist in the UK. It shows therapists from UKCP's list, but UKCP does not run this site.</p>
+      <HelpNow />
+      <h3 className="font-medium">How it works</h3>
       <p>
-        An unofficial, simpler way to search the{" "}
+        This site is an unofficial, simpler way to search the{" "}
         <a className="underline" href="https://www.psychotherapy.org.uk/find-a-therapist/">
           UK Council for Psychotherapy's therapist directory
         </a>
-        . It is not run by, affiliated with or endorsed by UKCP.
+        , and is not affiliated with or endorsed by UKCP.
       </p>
-      <HelpNow />
       <p>
         Searches and profiles come from UKCP's site as needed, including profiles read for each card's office, to pin it and show its fee.
         Nothing is copied into a database here. To spare UKCP's servers, each visitor is rate-limited and answers are reused: searches for

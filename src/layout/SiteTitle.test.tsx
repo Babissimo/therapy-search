@@ -29,7 +29,7 @@ describe("SiteTitle", () => {
     fireEvent.pointerEnter(title(), { pointerType: "mouse" });
     expect(about()).toBeNull();
     wait(300);
-    expect(about()?.textContent).toContain("not run by, affiliated with or endorsed by UKCP");
+    expect(about()?.textContent).toContain("This site helps you find a therapist in the UK.");
     // Crossing from the title to the card keeps it open.
     fireEvent.pointerLeave(title(), { pointerType: "mouse" });
     fireEvent.pointerEnter(about()!, { pointerType: "mouse" });
