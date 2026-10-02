@@ -186,6 +186,8 @@ The shortlist lives in this site's `localStorage`, under `shortlist`, as `{ v: 1
 
 We keep copies rather than relaying `Retrieve` (§3.5). A relay would cost an uncached upstream request on every view, since each visitor's ids differ; would allow additions only from profiles; would send the list off the visitor's device; and, with sequential ids, would let anyone walk the register through this site. A visitor's UKCP shortlist sits in storage belonging to UKCP's origin, so it cannot be brought across.
 
+The list can be taken away, from a browser someone else may use next or to talk options through with a GP. The tab copies it as plain text, for an email or a note: those still in mind numbered in the visitor's order, each with where the visitor stands, their place and ways of meeting, their UKCP page, which outlasts this site's links, and the visitor's notes; then those set aside. The copy goes by the Clipboard API, or by a selected field where that is missing or refused, and a live region says whether it went. Printed, the tab comes out under the title "Your shortlist", without its controls, anyone removed or a closed "Set aside".
+
 ## 5. Data shapes
 
 The parsers in `shared/ukcp` turn UKCP's HTML into these shapes. They use only the standard DOM, so the same code runs in the browser and, through jsdom, in the Node scripts and tests.

@@ -117,6 +117,13 @@ function openMenu(name: string) {
 
 const choose = (label: string) => fireEvent.click(screen.getByRole("menuitemradio", { name: label }));
 
+/** jsdom has no clipboard; this one takes text as `writeText` does with it. */
+function stubClipboard<T extends (text: string) => Promise<void>>(writeText: T): T {
+  Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+  onTestFinished(() => void delete (navigator as { clipboard?: unknown }).clipboard);
+  return writeText;
+}
+
 describe("ShortlistTab", () => {
   it("says how to shortlist someone when the list is empty", () => {
     renderTab({});
@@ -338,6 +345,91 @@ describe("ShortlistTab", () => {
     expect(store.get()).toBe(before);
     expect(names()).toEqual(["Ann"]);
     await waitFor(() => expect(document.activeElement).toBe(button));
+  });
+
+  it("copies the shortlist as text, less anyone removed, saying so on the button for a moment and to a screen reader", async () => {
+    const writeText = stubClipboard(vi.fn().mockResolvedValue(undefined));
+    renderTab({ statuses: { "Ann-AAAAAAAA": "contacted" } }, card("Ann-AAAAAAAA", "Ann"), card("Bo-BBBBBBBB", "Bo"), card("Cy-CCCCCCCC", "Cy"));
+    fireEvent.click(screen.getByRole("button", { name: "Remove Bo from your shortlist" }));
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    vi.setSystemTime(new Date(2026, 9, 2));
+    fireEvent.click(screen.getByRole("button", { name: "Copy as text" }));
+    // The copy settles with no timer, which waiting would need.
+    await act(async () => {});
+    screen.getByText("Copied 2 therapists as text, ready to paste.");
+    expect(writeText).toHaveBeenCalledWith(
+      [
+        "My shortlist of UKCP therapists, 2 October 2026",
+        "1. Cy: To contact\nLeeds LS1\nhttps://www.psychotherapy.org.uk/therapist/Cy-CCCCCCCC",
+        "2. Ann: Contacted\nLeeds LS1\nhttps://www.psychotherapy.org.uk/therapist/Ann-AAAAAAAA\n",
+      ].join("\n\n"),
+    );
+    const button = screen.getByRole("button", { name: "Copied" });
+    act(() => vi.advanceTimersByTime(3000));
+    expect(screen.getByRole("button", { name: "Copy as text" })).toBe(button);
+  });
+
+  it("is heard again when the shortlist is copied again", async () => {
+    stubClipboard(vi.fn().mockResolvedValue(undefined));
+    renderTab({}, card("Ann-AAAAAAAA", "Ann"));
+    fireEvent.click(screen.getByRole("button", { name: "Copy as text" }));
+    const said = await screen.findByText("Copied 1 therapist as text, ready to paste.");
+    fireEvent.click(screen.getByRole("button", { name: "Copied" }));
+    // Emptied first, so the same words are a change the live region announces.
+    expect(said.textContent).toBe("");
+    await waitFor(() => expect(said.textContent).toBe("Copied 1 therapist as text, ready to paste."));
+  });
+
+  it("says Copied for the full moment after a second copy, however soon after the first", async () => {
+    stubClipboard(vi.fn().mockResolvedValue(undefined));
+    renderTab({}, card("Ann-AAAAAAAA", "Ann"));
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    fireEvent.click(screen.getByRole("button", { name: "Copy as text" }));
+    await act(async () => {});
+    act(() => vi.advanceTimersByTime(2000));
+    fireEvent.click(screen.getByRole("button", { name: "Copied" }));
+    await act(async () => {});
+    act(() => vi.advanceTimersByTime(2000));
+    screen.getByRole("button", { name: "Copied" });
+    act(() => vi.advanceTimersByTime(1000));
+    screen.getByRole("button", { name: "Copy as text" });
+  });
+
+  it("says when the shortlist couldn't be copied, suggesting printing it", async () => {
+    // Refused, with no other way to copy, as jsdom has no execCommand.
+    stubClipboard(vi.fn().mockRejectedValue(new DOMException("Denied", "NotAllowedError")));
+    renderTab({}, card("Ann-AAAAAAAA", "Ann"));
+    fireEvent.click(screen.getByRole("button", { name: "Copy as text" }));
+    await screen.findByText("Your shortlist couldn't be copied in this browser. You could print it instead.");
+    screen.getByRole("button", { name: "Couldn't copy" });
+  });
+
+  it("offers no copy once everyone is removed, though their cards still show", () => {
+    renderTab({}, card("Ann-AAAAAAAA", "Ann"));
+    screen.getByRole("button", { name: "Copy as text" });
+    fireEvent.click(screen.getByRole("button", { name: "Remove Ann from your shortlist" }));
+    expect(screen.queryByRole("button", { name: "Copy as text" })).toBeNull();
+    screen.getByRole("button", { name: "Clear shortlist" });
+  });
+
+  it("prints as the shortlist under a title of its own, without its controls, anyone removed or a closed Set aside", () => {
+    renderTab(
+      { statuses: { "Ann-AAAAAAAA": "setAside", "Cy-CCCCCCCC": "setAside" } },
+      card("Ann-AAAAAAAA", "Ann"),
+      card("Bo-BBBBBBBB", "Bo"),
+      card("Cy-CCCCCCCC", "Cy"),
+      card("Di-DDDDDDDD", "Di"),
+    );
+    const display = (element: Element | null | undefined) => [...(element?.classList ?? [])].filter((name) => /^(print:)?(hidden|block)$/.test(name));
+    expect(display(screen.getByText("Your shortlist"))).toEqual(["hidden", "print:block"]);
+    expect(display(screen.getByText("Kept in this browser only.").parentElement)).toEqual(["print:hidden"]);
+    const setAside = screen.getByRole("button", { name: /^Set aside, / }).closest("section");
+    expect(display(setAside)).toEqual(["print:hidden"]);
+    openSetAside();
+    expect(display(setAside)).toEqual([]);
+    fireEvent.click(screen.getByRole("button", { name: "Remove Bo from your shortlist" }));
+    expect(display(entry("Bo"))).toEqual(["print:hidden"]);
+    expect(display(entry("Di"))).toEqual([]);
   });
 
   it("moves a therapist by their handle, saying where they are as they go", () => {
