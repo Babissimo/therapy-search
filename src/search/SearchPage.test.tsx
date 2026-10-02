@@ -260,6 +260,8 @@ describe("SearchPage", () => {
     await loaded();
     expect(await screen.findByTestId("map")).toBeTruthy();
     const toolbar = () => screen.getByRole("button", { name: "Filters" }).closest(".absolute")!;
+    // Drawn in the map's cell, right of the side bar's, though it comes first in the page.
+    expect(toolbar().className).toContain("col-start-2");
     fireEvent.click(screen.getByRole("button", { name: "Hide list" }));
     expect(list().closest("[inert]")).not.toBeNull();
     // The toolbar stands aside for the toggle left over the map's top left.
@@ -582,17 +584,38 @@ describe("SearchPage", () => {
     await waitFor(() => expect(filters()).toBeNull());
   });
 
-  it("skips the keyboard past the list to the search box, and to the list when it is put away", async () => {
+  it.each([
+    ["wide", true],
+    ["narrow", false],
+  ])("puts the toolbar first in the page on %s screens, then the list, then the map it is drawn over", async (_, wide) => {
+    screenIs(wide);
+    renderAt(SEARCH);
+    await loaded();
+    const before = (a: Node, b: Node) => Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(before(screen.getByRole("textbox", { name: "Location" }), results())).toBe(true);
+    expect(before(results(), await screen.findByTestId("map"))).toBe(true);
+    expect(screen.getAllByRole("link", { name: /^Skip/ }).map((link) => link.textContent)).toEqual(["Skip to the results"]);
+  });
+
+  it("skips the keyboard past the toolbar to the list, bringing the list back when it is put away", async () => {
     screenIs(true);
     renderAt(SEARCH);
     await loaded();
-    await screen.findByTestId("map");
-    fireEvent.click(screen.getByRole("link", { name: "Skip to the search box" }));
-    expect(document.activeElement).toBe(screen.getByRole("textbox", { name: "Location" }));
     fireEvent.click(screen.getByRole("button", { name: "Hide list" }));
     expect(list().closest("[inert]")).not.toBeNull();
     fireEvent.click(screen.getByRole("link", { name: "Skip to the results" }));
     expect(list().closest("[inert]")).toBeNull();
+    await waitFor(() => expect(document.activeElement).toBe(within(results()).getByRole("tabpanel", { name: /^Results/ })));
+  });
+
+  it("skips the keyboard past the toolbar to the list on a phone, raising the sheet when it is lowered", async () => {
+    screenIs(false);
+    renderAt(SEARCH);
+    await loaded();
+    fireEvent.click(screen.getByRole("button", { name: "Show map" }));
+    expect(results().dataset.position).toBe("peek");
+    fireEvent.click(screen.getByRole("link", { name: "Skip to the results" }));
+    expect(results().dataset.position).toBe("half");
     await waitFor(() => expect(document.activeElement).toBe(within(results()).getByRole("tabpanel", { name: /^Results/ })));
   });
 
@@ -606,15 +629,31 @@ describe("SearchPage", () => {
     await waitFor(() => expect(document.activeElement).toBe(within(results()).getByRole("tabpanel", { name: /^Results/ })));
   });
 
-  it("brings the search box back from beside the shortlist as it skips to it", async () => {
+  it("brings the search box back from beside the shortlist as it skips to it, offered only while the shortlist is open", async () => {
     screenIs(true);
     renderAt(SEARCH);
     await loaded();
+    expect(screen.queryByRole("link", { name: "Skip to the search box" })).toBeNull();
     fireEvent.mouseDown(screen.getByRole("tab", { name: /^Shortlist/ }));
     expect(screen.queryByRole("textbox", { name: "Location" })).toBeNull();
     fireEvent.click(screen.getByRole("link", { name: "Skip to the search box" }));
     await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("textbox", { name: "Location" })));
     expect(within(results()).getByRole("tabpanel", { name: /^Results/ })).toBeTruthy();
+  });
+
+  it("keeps the toolbar as a search begins on wide screens, and the map as the window crosses between wide and narrow", async () => {
+    const resize = screenIs(true);
+    renderAt("/?Languages=Greek");
+    const toolbar = screen.getByRole("navigation", { name: "Where to meet" });
+    fireEvent.change(screen.getByRole("textbox", { name: "Location" }), { target: { value: "Leeds" } });
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+    await loaded();
+    expect(screen.getByRole("navigation", { name: "Where to meet" })).toBe(toolbar);
+    const shown = await screen.findByTestId("map");
+    resize(false);
+    expect(map()).toBe(shown);
+    resize(true);
+    expect(map()).toBe(shown);
   });
 
   it("skips past the prompt to the filters right of it on wide screens, bringing them back from beside the shortlist", async () => {
