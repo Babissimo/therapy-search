@@ -1,8 +1,8 @@
 import { Languages } from "lucide-react";
 import { flushSync } from "react-dom";
+import { FILTER_GROUPS } from "@shared/filterGroups";
 import { Button } from "@/components/ui/button";
 import { focusOnceShown } from "@/layout/SkipLinks";
-import { FILTER_GROUPS } from "./filterGroups";
 
 /** UKCP's name for its languages group, which FilterPanel marks the group's item with. */
 const LANGUAGES = "Languages";

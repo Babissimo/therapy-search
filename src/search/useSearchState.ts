@@ -1,8 +1,9 @@
 import { useCallback, useMemo } from "react";
 import { matchPath, useSearchParams } from "react-router";
+import { onlineSearch } from "@shared/online";
 import { ALLOWED } from "@shared/options";
 import { InvalidParam, readParams, toQuery, type SearchParams } from "@shared/query";
-import { ONLINE_PATH, onlineSearch } from "./online";
+import { ONLINE_PATH } from "./online";
 
 /** The search lives in the query string after the page's `#`, in UKCP's own parameter names. */
 export function useSearchState() {

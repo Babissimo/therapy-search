@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canonicalLocation, classifyLocation, nearestQuery, placeQuery, settlementRank } from "./location";
+import { canonicalLocation, classifyLocation, locationFellBack, nearestQuery, placeQuery, settlementRank } from "./location";
 
 describe("canonicalLocation", () => {
   it("trims, collapses spaces and upper-cases", () => {
@@ -55,5 +55,17 @@ describe("nearestQuery", () => {
   it("rounds a point to three places, spelling each rounded point one way", () => {
     expect(nearestQuery(50.82614, -0.15987)).toBe("lat=50.826&lng=-0.160");
     expect(nearestQuery(-0.0004, 0)).toBe("lat=0.000&lng=0.000");
+  });
+});
+
+describe("locationFellBack", () => {
+  it.each([
+    ["Brightn", "United Kingdom", true],
+    ["Brighton", "Brighton", false],
+    ["", undefined, false],
+    ["UK", "United Kingdom", false],
+    [" united kingdom ", "United Kingdom", false],
+  ])("typed %j, searched %j: %s", (typed, searched, expected) => {
+    expect(locationFellBack(typed, searched)).toBe(expected);
   });
 });

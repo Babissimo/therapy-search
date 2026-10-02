@@ -1,3 +1,4 @@
+import { FILTER_GROUPS, groupName, groupNameInSentence } from "@shared/filterGroups";
 import { TEXT_MAX_LENGTH, type SearchParams } from "@shared/query";
 import type { FilterGroup } from "@shared/types";
 import { HelpTip } from "@/components/HelpTip";
@@ -5,7 +6,6 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CheckboxGroup } from "./CheckboxGroup";
-import { FILTER_GROUPS, groupName, groupNameInSentence } from "./filterGroups";
 import { isChecked, tickedIn } from "./state";
 import { TickedCount } from "./TickedCount";
 import { useDraft, useDraftFilters, type SearchDrafts } from "./useSearchDrafts";
