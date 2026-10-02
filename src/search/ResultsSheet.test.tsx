@@ -33,7 +33,10 @@ function measure(height: number) {
 const tab = () => screen.getByRole("tab", { name: "Shortlist" });
 const header = () => tab().parentElement as HTMLElement;
 
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
 
 describe("ResultsSheet", () => {
   it("lowers to show the map, and rises back to the list", () => {
@@ -59,6 +62,18 @@ describe("ResultsSheet", () => {
     fireEvent.pointerMove(header(), { clientY: 700 });
     fireEvent.pointerUp(header(), { clientY: 700 });
     expect(sheet().dataset.position).toBe("peek");
+  });
+
+  it("stops further below the top at full on touch screens, where Use my location is named beneath the search box", () => {
+    const touch = (query: string) => ({ matches: query === "(pointer: coarse)", media: query, addEventListener() {}, removeEventListener() {} });
+    vi.stubGlobal("matchMedia", touch);
+    render(<Harness start="full" />);
+    expect(sheet().style.height).toBe("calc(100% - 12.5rem)");
+    // Dragged up past full, it stops 12.5rem short of the 800px map area's top.
+    measure(600);
+    fireEvent.pointerDown(header(), { clientY: 300 });
+    fireEvent.pointerMove(header(), { clientY: 0 });
+    expect(sheet().style.height).toBe("600px");
   });
 
   it("settles a flick whose pointer lifts before its one move has rendered", () => {

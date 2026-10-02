@@ -98,10 +98,10 @@ export function FiltersSheetButton({ ticked, ref }: { ticked: number; ref?: Ref<
   );
 }
 
-/** With the number of ticked filters on its corner. */
+/** With the number of ticked filters on its corner, and named on screen on touch screens. */
 export function FiltersButton({ ticked, className, ...props }: Omit<ComponentProps<typeof IconButton>, "label"> & { ticked: number }) {
   return (
-    <IconButton label="Filters" variant="outline" className={cn("relative", className)} {...props}>
+    <IconButton label="Filters" touchLabel variant="outline" className={cn("relative", className)} {...props}>
       <SlidersHorizontal aria-hidden />
       <TickedCount count={ticked} className="absolute -top-1.5 -right-1.5 h-4 min-w-4 px-1 text-[0.625rem]" />
     </IconButton>

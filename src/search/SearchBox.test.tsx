@@ -134,6 +134,16 @@ describe("SearchBox", () => {
     expect(getCurrentPosition).toHaveBeenCalledOnce();
   });
 
+  it("names Use my location on screen beneath the box on touch screens, keeping it in the box's end elsewhere", () => {
+    geolocation(() => {});
+    renderBox();
+    const button = screen.getByRole("button", { name: "Use my location" });
+    // In the flow beneath the box, and still positioned, so nothing placed against it lands on the box.
+    expect(button.className).toContain("pointer-coarse:relative pointer-coarse:inset-auto");
+    expect(button.firstElementChild?.className).toContain("pointer-coarse:not-sr-only");
+    expect(location().className).toContain("pointer-coarse:pr-2.5");
+  });
+
   it("offers no button where the browser can't locate", () => {
     renderBox();
     expect(screen.queryByRole("button", { name: "Use my location" })).toBeNull();

@@ -1105,10 +1105,15 @@ describe("SearchPage", () => {
     expect(within(list()).getByRole("group", { name: "Theme" })).toBeTruthy();
   });
 
-  it("names the filters button's ticks for screen readers", async () => {
-    screenIs(true);
+  it.each([
+    ["wide", true],
+    ["narrow", false],
+  ])("names the filters button's ticks for screen readers after the name it shows on touch screens, on %s screens", async (_, wide) => {
+    screenIs(wide);
     renderAt(`${SEARCH}&Languages=French`);
-    expect(await screen.findByRole("button", { name: "Filters, 1 ticked" })).toBeTruthy();
+    const filters = await screen.findByRole("button", { name: "Filters, 1 ticked" });
+    expect(filters.firstElementChild?.textContent).toBe("Filters");
+    expect(filters.firstElementChild?.className).toContain("pointer-coarse:not-sr-only");
   });
 
   it("counts the therapists the map can't place, whether their location is too vague or matches nothing", async () => {
