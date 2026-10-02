@@ -38,7 +38,7 @@ import { ShortlistButton } from "./ShortlistButton";
 import { STATUS_ICON, STATUS_LABEL } from "./status";
 import { StatusTrack } from "./StatusTrack";
 import { byRank, statusOf, type Shortlist, type ShortlistCard, type ShortlistEntry, type Status } from "./store";
-import { therapistCount, useShortlist, useShortlistClears, useShortlistStore } from "./useShortlist";
+import { therapistCount, useShortlist, useShortlistAnnouncement, useShortlistClears, useShortlistStore } from "./useShortlist";
 
 type Props = {
   /** The search's terms, which pick out tags as they do in the results. */
@@ -65,7 +65,7 @@ export function ShortlistTab({ sought, online = false, pins = [], unplaced = 0, 
   const setAside = shown.filter((entry) => statusOf(entry) === "setAside");
   // A shortlist gathers therapists from any search, so their offices are asked about whatever this one is, while their cards show.
   const { officeOf } = useOffices((setAsideOpen ? [...list, ...setAside] : list).map((entry) => entry.card), true);
-  const [announcement, setAnnouncement] = useState("");
+  const [announcement, announce] = useShortlistAnnouncement();
   const root = useRef<HTMLDivElement>(null);
   // What takes focus once the list has redrawn, when what had it has moved or gone.
   const refocus = useRef<string | undefined>(undefined);
@@ -104,13 +104,14 @@ export function ShortlistTab({ sought, online = false, pins = [], unplaced = 0, 
   // A card stays put unless it goes into or out of "Set aside", when focus follows it there, or to the section's
   // heading while it is closed.
   function changed(therapist: ShortlistCard, from: Status, to: Status) {
-    setAnnouncement(`${therapist.name}: ${STATUS_LABEL[to]}.`);
+    announce(`${therapist.name}: ${STATUS_LABEL[to]}.`);
     if ((from === "setAside") === (to === "setAside")) return;
     refocus.current = to === "setAside" && !setAsideOpen ? "[data-set-aside-toggle]" : `[data-status-menu="${window.CSS.escape(therapist.slug)}"]`;
   }
 
   // Their menu went with them, so focus goes to the bookmark that can put them back.
   function removed(therapist: ShortlistCard) {
+    announce(`Removed ${therapist.name} from your shortlist.`);
     refocus.current = `[data-bookmark="${window.CSS.escape(therapist.slug)}"]`;
   }
 

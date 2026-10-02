@@ -95,7 +95,7 @@ type ShortlistEntry = { addedAt: number; rank?: number; status?: Status; note?: 
 
 - A Radix dropdown menu, added as shadcn's `dropdown-menu` under `src/components/ui/`. Its trigger is an icon button showing the current status's icon and named "Status of Ruth Okafor: contacted".
 - It lists the six statuses as radio items with the current one checked, then a separator and "Remove from shortlist".
-- A change of status, by the menu or the next-step button, is said in a polite live region: "Ruth Okafor: Contacted." A card that moves into or out of "Set aside" takes focus with it, to its menu button there, or to the section's heading while it is closed. Where the next-step button goes, at "Seeing them", focus moves to the menu beside it. Removing a therapist sends focus to the bookmark, which can put them back.
+- A change of status, by the menu or the next-step button, is said in a polite live region: "Ruth Okafor: Contacted.", as is a removal by the menu: "Removed Ruth Okafor from your shortlist." Each is said until the shortlist next changes, so the same words after an undo are heard again. A card that moves into or out of "Set aside" takes focus with it, to its menu button there, or to the section's heading while it is closed. Where the next-step button goes, at "Seeing them", focus moves to the menu beside it. Removing a therapist sends focus to the bookmark, which can put them back.
 
 ### 4.4 Result cards
 

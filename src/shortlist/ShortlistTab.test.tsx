@@ -452,11 +452,19 @@ describe("ShortlistTab", () => {
     expect(onHighlight).toHaveBeenLastCalledWith("Ann-AAAAAAAA");
   });
 
-  it("gives focus to the bookmark that can put back a therapist the menu removed", () => {
+  it("says who the menu removed, again after the bookmark has put them back, and gives focus to that bookmark", () => {
     const store = renderTab({}, card("Ann-AAAAAAAA", "Ann"));
+    const said = () => [...document.querySelectorAll("[aria-live=polite]")].map((region) => region.textContent).filter(Boolean);
     openMenu("Ann");
     fireEvent.click(screen.getByRole("menuitem", { name: "Remove from shortlist" }));
     expect(store.has("Ann-AAAAAAAA")).toBe(false);
-    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Add Ann to your shortlist" }));
+    const bookmark = screen.getByRole("button", { name: "Add Ann to your shortlist" });
+    expect(document.activeElement).toBe(bookmark);
+    expect(said()).toEqual(["Removed Ann from your shortlist."]);
+    fireEvent.click(bookmark);
+    expect(said()).toEqual(["Added Ann to your shortlist."]);
+    openMenu("Ann");
+    fireEvent.click(screen.getByRole("menuitem", { name: "Remove from shortlist" }));
+    expect(said()).toEqual(["Removed Ann from your shortlist."]);
   });
 });

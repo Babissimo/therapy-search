@@ -3,7 +3,7 @@ import { useState } from "react";
 import { IconButton } from "@/components/IconButton";
 import { cn } from "@/lib/utils";
 import type { ShortlistCard, ShortlistEntry } from "./store";
-import { useShortlistEntry, useShortlistStore } from "./useShortlist";
+import { useShortlistAnnouncement, useShortlistEntry, useShortlistStore } from "./useShortlist";
 
 type Props = {
   therapist: ShortlistCard;
@@ -21,16 +21,16 @@ export function ShortlistButton({ therapist, kept, className }: Props) {
   const [last, setLast] = useState(() => ({ entry: entry ?? kept, clears: store.clears() }));
   if (entry && entry !== last.entry) setLast({ entry, clears: store.clears() });
 
-  // Whether the last press here added them. It is said only while it holds, so a press that repeats one undone elsewhere is said again.
-  const [added, setAdded] = useState<boolean>();
-  const said =
-    added !== Boolean(entry) ? "" : added ? `Added ${therapist.name} to your shortlist.` : `Removed ${therapist.name} from your shortlist.`;
+  const [announcement, announce] = useShortlistAnnouncement();
 
   function toggle() {
-    setAdded(!entry);
-    if (entry) return store.remove(therapist.slug);
+    if (entry) {
+      store.remove(therapist.slug);
+      return announce(`Removed ${therapist.name} from your shortlist.`);
+    }
     const place = last.clears === store.clears() ? last.entry : undefined;
     store.add(place?.card ?? therapist, place);
+    announce(`Added ${therapist.name} to your shortlist.`);
   }
 
   return (
@@ -48,7 +48,7 @@ export function ShortlistButton({ therapist, kept, className }: Props) {
       </IconButton>
       {/* Focus stays on the button, whose new name is seldom read out, so the press is said here. */}
       <span aria-live="polite" className="sr-only">
-        {said}
+        {announcement}
       </span>
     </>
   );
