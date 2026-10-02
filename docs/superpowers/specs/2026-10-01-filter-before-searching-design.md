@@ -71,6 +71,7 @@ Until Near me has a place to search:
 - The prompt reads "Start with what matters to you.", as online's does, and asks for ticks first and the place last.
 - The place box moves below the filters, under "Where are you?". On wide screens it sits at the foot of the column right of the prompt; on a phone the filter groups sit in the list under the prompt, since the list is empty until a search, and the place box follows them. The Near me / Online switch stays at the top.
 - When the search begins, the place box moves to the toolbar over the map as it does now.
+- Beneath the prompt, "Find a therapist who speaks your language" opens the Languages group, which UKCP lists late though it is the first question for some, and puts the keyboard in its search box. Online's prompt and the one in §4.2 carry it too.
 
 Online's start screen on a phone sets out its filters the same way, with Show results where Near me has the place box.
 
