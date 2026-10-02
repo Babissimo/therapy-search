@@ -3,6 +3,9 @@ import { safeUrl } from "@shared/ukcp/text";
 
 export const SHORTLIST_KEY = "shortlist";
 
+/** The most a note holds. */
+export const NOTE_LIMIT = 1000;
+
 /** Where the visitor stands with a shortlisted therapist, in the order a search usually runs through them. */
 export const STATUSES = ["toContact", "contacted", "waiting", "consultation", "seeing", "setAside"] as const;
 export type Status = (typeof STATUSES)[number];
@@ -11,8 +14,11 @@ type StoredStatus = Exclude<Status, "toContact">;
 
 /** A card as a search showed it, less its distance, which only meant something from that search's place. */
 export type ShortlistCard = Omit<TherapistCard, "distance">;
-/** `rank` is set once the visitor moves them; until then they are ranked by when they were added. */
-export type ShortlistEntry = { addedAt: number; rank?: number; status?: StoredStatus; card: ShortlistCard };
+/**
+ * `rank` is set once the visitor moves them; until then they are ranked by when they were added. `note` is the visitor's
+ * own, written on the profile.
+ */
+export type ShortlistEntry = { addedAt: number; rank?: number; status?: StoredStatus; note?: string; card: ShortlistCard };
 
 /** Highest rank first: newest first, as UKCP lists its own, until the visitor rearranges it. */
 export type Shortlist = readonly ShortlistEntry[];
@@ -28,10 +34,10 @@ type Events = Pick<EventTarget, "addEventListener" | "removeEventListener">;
 export type ShortlistStore = {
   get: () => Shortlist;
   has: (slug: string) => boolean;
-  /** `place`, the entry a therapist just removed had, puts them back where and as they were; a status alone adds them with it. */
+  /** `place`, the entry a therapist just removed had, puts them back where and as they were, note and all; a status alone adds them with it. */
   add: (card: ShortlistCard, place?: Partial<Omit<ShortlistEntry, "card">>) => void;
   remove: (slug: string) => void;
-  /** Takes everyone off, with their statuses and order, for a browser someone else may use next. */
+  /** Takes everyone off, with their statuses, notes and order, for a browser someone else may use next. */
   clear: () => void;
   /**
    * How many times the list has been cleared, here or in another tab, since the page loaded. Whatever keeps entries of
@@ -41,6 +47,8 @@ export type ShortlistStore = {
   move: (slug: string, between: Between) => void;
   /** Leaves their place in the order alone, so the visitor's preference carries from one status to the next. */
   setStatus: (slug: string, status: Status) => void;
+  /** Keeps the first `NOTE_LIMIT` characters, and an empty note as none. */
+  setNote: (slug: string, note: string) => void;
   /** Brings shortlisted therapists' cards up to date from results the site has fetched anyway. */
   refresh: (cards: readonly TherapistCard[]) => void;
   subscribe: (onChange: () => void) => () => void;
@@ -95,7 +103,10 @@ export function createShortlistStore(storage: KeyValue | null, now: () => number
     get: () => list,
     has: (slug) => entries.has(slug),
     add: (card, place) =>
-      update((next) => void next.set(card.slug, { addedAt: place?.addedAt ?? now(), rank: place?.rank, status: place?.status, card: cardOf(card) })),
+      update((next) => {
+        const { addedAt = now(), rank, status, note } = place ?? {};
+        next.set(card.slug, { addedAt, rank, status, note: noteFrom(note), card: cardOf(card) });
+      }),
     remove: (slug) => update((next) => void next.delete(slug)),
     // Takes the list out of storage, which leaves nothing behind and is how other tabs know it was cleared.
     clear: () => {
@@ -121,6 +132,11 @@ export function createShortlistStore(storage: KeyValue | null, now: () => number
       update((next) => {
         const entry = next.get(slug);
         if (entry) next.set(slug, { ...entry, status: status === "toContact" ? undefined : status });
+      }),
+    setNote: (slug, note) =>
+      update((next) => {
+        const entry = next.get(slug);
+        if (entry) next.set(slug, { ...entry, note: noteFrom(note) });
       }),
     refresh: (cards) => {
       // Runs whenever results render, so only shortlisted therapists' cards are copied and compared.
@@ -262,6 +278,7 @@ function entryFrom(value: unknown): ShortlistEntry | undefined {
     addedAt: value.addedAt,
     rank: typeof value.rank === "number" ? value.rank : undefined,
     status: storedStatus(value.status),
+    note: noteFrom(value.note),
     card: cardOf({
       slug: c.slug,
       name: c.name,
@@ -278,6 +295,11 @@ function entryFrom(value: unknown): ShortlistEntry | undefined {
 /** A status this site stores, or nothing, which reads as "To contact". */
 function storedStatus(value: unknown): StoredStatus | undefined {
   return STATUSES.some((status) => status !== "toContact" && status === value) ? (value as StoredStatus) : undefined;
+}
+
+/** A note as kept: no more than `NOTE_LIMIT` characters, and none where nothing is written or it isn't text. */
+function noteFrom(value: unknown): string | undefined {
+  return typeof value === "string" && value !== "" ? value.slice(0, NOTE_LIMIT) : undefined;
 }
 
 function text(value: unknown): string | undefined {
