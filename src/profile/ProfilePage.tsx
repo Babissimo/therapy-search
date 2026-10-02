@@ -25,6 +25,7 @@ import { ContactList, ContactListSkeleton } from "./ContactList";
 import { ContactOffer } from "./ContactOffer";
 import { isInterestOf, type ShownSection } from "./interests";
 import { nearestOffice } from "./nearestOffice";
+import { NoteField } from "./NoteField";
 import { useOfficePlace } from "./place";
 import { sectionsBySize } from "./sectionsBySize";
 import { matchingTags, useOpeningCard, useSearchMatch } from "./searchedTerms";
@@ -139,14 +140,17 @@ export function ProfileBody({ slug, back, close }: { slug: string } & Exits) {
       </p>
 
       {standing.status && (
-        // At the track's height while its chunk comes, so the profile below stays put.
-        <div className="min-h-11 max-w-sm">
-          <LazyStatusTrack
-            therapist={therapist}
-            status={standing.status}
-            onChosen={(to) => standing.chosen(therapist, to)}
-            onRemoved={() => standing.removed(therapist)}
-          />
+        <div className="max-w-sm space-y-4">
+          {/* At the track's height while its chunk comes, so the profile below stays put. */}
+          <div className="min-h-11">
+            <LazyStatusTrack
+              therapist={therapist}
+              status={standing.status}
+              onChosen={(to) => standing.chosen(therapist, to)}
+              onRemoved={() => standing.removed(therapist)}
+            />
+          </div>
+          <NoteField slug={slug} />
         </div>
       )}
 
