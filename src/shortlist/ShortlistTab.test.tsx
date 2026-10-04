@@ -413,6 +413,35 @@ describe("ShortlistTab", () => {
     expect(document.activeElement).toBe(note);
   });
 
+  it("fades from the list to the empty tab through a view transition, where the browser has one", async () => {
+    // Drawn as a browser draws one: the click returns and the dialog closes, then the update runs, and the new page is drawn before it ends.
+    let pending: () => void;
+    const startViewTransition = vi.fn((update: () => void) => {
+      pending = update;
+      return { ready: Promise.resolve() } as ViewTransition;
+    });
+    Object.defineProperty(document, "startViewTransition", { configurable: true, value: startViewTransition });
+    onTestFinished(() => void Reflect.deleteProperty(document, "startViewTransition"));
+    const store = renderTab({}, card("Ann-AAAAAAAA", "Ann"));
+    fireEvent.click(screen.getByRole("button", { name: "Clear shortlist" }));
+    fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Clear shortlist" }));
+    expect(startViewTransition).toHaveBeenCalledOnce();
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    // Without flushSync the update's render would wait for act to return, and the empty tab wouldn't be drawn by then.
+    let drawn = false;
+    act(() => {
+      pending();
+      drawn = screen.queryByText(/^Bookmark anyone/) !== null;
+    });
+    expect(drawn).toBe(true);
+    expect(store.get()).toEqual([]);
+    const note = screen.getByText(/^Bookmark anyone who might suit you/).parentElement;
+    expect(document.activeElement).toBe(note);
+    // The dialog hands focus back once it has gone, which must not take it from the note.
+    await act(() => new Promise((resolve) => setTimeout(resolve)));
+    expect(document.activeElement).toBe(note);
+  });
+
   it("lets everyone go when another tab clears the list, giving focus to the note if what had it went with them", () => {
     onTestFinished(() => localStorage.clear());
     const inBrowser = createShortlistStore(localStorage, Date.now, window);

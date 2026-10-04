@@ -14,6 +14,7 @@ import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, v
 import { CSS } from "@dnd-kit/utilities";
 import { Bookmark, ChevronDown, ChevronRight, ChevronUp, GripVertical } from "lucide-react";
 import { useId, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from "react";
+import { flushSync } from "react-dom";
 import { GLIDE } from "@/components/GlidingList";
 import { IconButton } from "@/components/IconButton";
 import {
@@ -28,6 +29,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { crossFade } from "@/lib/crossFade";
 import { useMediaQuery } from "@/lib/useMediaQuery";
 import { cn } from "@/lib/utils";
 import { feeText } from "@/search/fee";
@@ -61,6 +63,8 @@ type Props = {
 /** The shortlist beside the search's results, in the visitor's order, with those set aside gathered at its foot. */
 export function ShortlistTab({ sought, online = false, pins = [], unplaced = 0, selected, onHighlight }: Props) {
   const store = useShortlistStore();
+  // Drawn before the callback returns, for the transition to see the page as the clear leaves it.
+  const clear = () => crossFade(() => flushSync(store.clear));
   const shortlist = useShortlist();
   const shown = useShown(shortlist);
   const [setAsideOpen, toggleSetAside] = useSetAsideOpen();
@@ -113,7 +117,7 @@ export function ShortlistTab({ sought, online = false, pins = [], unplaced = 0, 
               {therapistCount(removedCount)} you removed {removedCount === 1 ? "is" : "are"} kept for {REMOVED_DAYS} days, in case you add them back.
             </p>
             <div className="-mr-2.5 ml-auto flex">
-              <ClearShortlist listed={0} removed={removedCount} onClear={store.clear} />
+              <ClearShortlist listed={0} removed={removedCount} onClear={clear} />
             </div>
           </div>
         )}
@@ -183,7 +187,7 @@ export function ShortlistTab({ sought, online = false, pins = [], unplaced = 0, 
         <div className="-mr-2.5 ml-auto flex">
           {shortlist.length > 0 && <CopyShortlist shortlist={shortlist} onDone={announce} />}
           {/* Offered while anyone is listed or kept as removed. */}
-          {(shortlist.length > 0 || removedCount > 0) && <ClearShortlist listed={shortlist.length} removed={removedCount} onClear={store.clear} />}
+          {(shortlist.length > 0 || removedCount > 0) && <ClearShortlist listed={shortlist.length} removed={removedCount} onClear={clear} />}
         </div>
       </div>
       {/* Paper has no tabs to say whose list this is. */}
