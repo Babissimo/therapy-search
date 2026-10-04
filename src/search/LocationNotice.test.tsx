@@ -1,19 +1,7 @@
 // @vitest-environment jsdom
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { LocationNotice, locationFellBack } from "./LocationNotice";
-
-describe("locationFellBack", () => {
-  it.each([
-    ["Brightn", "United Kingdom", true],
-    ["Brighton", "Brighton", false],
-    ["", undefined, false],
-    ["UK", "United Kingdom", false],
-    [" united kingdom ", "United Kingdom", false],
-  ])("typed %j, searched %j: %s", (typed, searched, expected) => {
-    expect(locationFellBack(typed, searched)).toBe(expected);
-  });
-});
+import { LocationNotice } from "./LocationNotice";
 
 describe("LocationNotice", () => {
   it("warns when UKCP didn't recognise the place, marked as a notice that interrupts no one", () => {

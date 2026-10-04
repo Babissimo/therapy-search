@@ -1,5 +1,6 @@
 import { startTransition, useEffect, useId, useMemo, useRef, useState } from "react";
 import { ChevronRight, Info } from "lucide-react";
+import { groupNameInSentence } from "@shared/filterGroups";
 import { sectionsOf } from "@shared/sections";
 import type { FilterField, FilterGroup } from "@shared/types";
 import { HelpTip } from "@/components/HelpTip";
@@ -7,7 +8,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { groupNameInSentence } from "./filterGroups";
 import { isMulti } from "./state";
 import { TickedCount } from "./TickedCount";
 

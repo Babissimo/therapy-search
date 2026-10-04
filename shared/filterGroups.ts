@@ -1,6 +1,6 @@
-import { OPTIONS } from "@shared/options";
-import type { FilterField, FilterGroup, Options } from "@shared/types";
 import { REMOTE_SESSIONS } from "./online";
+import { OPTIONS } from "./options";
+import type { FilterField, FilterGroup, Options } from "./types";
 
 const ADDITIONAL = "Additional Filters";
 const OUTSIDE_UK: FilterField = { name: "LocationSearchOutsideUK", value: "true", label: "Search locations outside the UK" };

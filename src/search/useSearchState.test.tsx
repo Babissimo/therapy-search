@@ -2,7 +2,7 @@
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it } from "vitest";
-import { onlineSearch } from "./online";
+import { onlineSearch } from "@shared/online";
 import { readSearch, useSearchState, viewSearch } from "./useSearchState";
 
 function Page() {

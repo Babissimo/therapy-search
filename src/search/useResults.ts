@@ -9,13 +9,13 @@ import {
   type QueryClient,
   type UseInfiniteQueryResult,
 } from "@tanstack/react-query";
+import { locationFellBack } from "@shared/location";
 import { asksWhole, PAGE_SIZE, toQuery, type SearchParams } from "@shared/query";
 import type { SearchResult, TherapistCard } from "@shared/types";
 import type { Listings } from "@shared/ukcp/parseResults";
 import { useFailure, type Failure } from "@/components/FailedAlert";
 import { api } from "@/lib/api";
 import { FRESH_FOR } from "@/lib/queryClient";
-import { locationFellBack } from "./LocationNotice";
 import { inOrder, orderSeed, settled } from "./order";
 import { withFlag, withPage } from "./state";
 

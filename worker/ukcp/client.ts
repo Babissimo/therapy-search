@@ -7,6 +7,8 @@ const TIMEOUT_MS = 10_000;
 // For more than a batch: UKCP takes about 1.4 ms a result, so its whole register of some 8,500 takes about 12 s.
 const LONG_TIMEOUT_MS = 25_000;
 const TOKEN = /<input[^>]*name="__RequestVerificationToken"[^>]*value="([^"]+)"/;
+/** A profile's slug as UKCP could have made it: from a name, so with accents and apostrophes. */
+export const SLUG = /^[\p{L}\p{N}][\p{L}\p{M}\p{N}'’.-]{2,119}$/u;
 
 export type Fetch = (url: string, init?: RequestInit) => Promise<Response>;
 type Session = { cookie: string; token: string; fetchedAt: number };

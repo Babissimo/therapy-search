@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
+import { locationFellBack } from "@shared/location";
 import { asksWhole, toQuery, type SearchParams } from "@shared/query";
 import { useTitle } from "@/lib/useTitle";
 import { therapistCount } from "@/shortlist/useShortlist";
 import { activeFilters } from "./activeFilters";
-import { locationFellBack } from "./LocationNotice";
 import { reachWithin } from "./reach";
 import type { SearchResults } from "./useResults";
 
