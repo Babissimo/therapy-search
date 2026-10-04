@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Profile } from "@shared/types";
-import { api, ApiError } from "@/lib/api";
+import { api, ApiError, OFFLINE } from "@/lib/api";
 import { ContactList, socialName } from "./ContactList";
 
 const PROFILE: Profile = { slug: "Jo-ABCDEFGH", name: "Jo Bloggs", initials: "JB", languages: [], emailInContact: false, social: [], about: [], practical: [], offices: [] };
@@ -15,6 +15,8 @@ function renderList(profile: Partial<Profile>, onReach?: (link: HTMLAnchorElemen
     </QueryClientProvider>,
   );
 }
+
+const TOO_MANY = "Too many searches in a short time. Wait a minute and try again.";
 
 const href = (name: string) => screen.getByRole("link", { name }).getAttribute("href");
 
@@ -94,11 +96,53 @@ describe("ContactList", () => {
     expect(onPaper("Website: example.invalid/practice (opens in a new tab)")).toEqual(["example.invalid/practice"]);
   });
 
-  it("says why the details couldn't be fetched", async () => {
-    vi.spyOn(api, "contact").mockRejectedValue(new ApiError(429, "Too many searches in a short time. Wait a minute and try again."));
+  it("says why the details couldn't be fetched, and how a retry goes, once each, from a region there before it", async () => {
+    let fail = (_: Error) => {};
+    vi.spyOn(api, "contact").mockImplementation(() => new Promise((_, reject) => (fail = reject)));
     renderList({ contactId: "9239" });
-    await screen.findByText(/Too many searches/);
-    screen.getByRole("button", { name: "Try again" });
+    const said = () => [...document.querySelectorAll("[aria-live]")].map((region) => region.textContent);
+    expect(said()).toEqual([""]);
+    act(() => fail(new ApiError(0, OFFLINE)));
+    await waitFor(() => expect(said()).toEqual([OFFLINE]));
+    const retry = screen.getByRole("button", { name: "Try again" });
+    expect(retry.closest("p")?.textContent).toContain(OFFLINE);
+    fireEvent.click(retry);
+    await waitFor(() => expect(said()).toEqual(["Trying again"]));
+    act(() => fail(new ApiError(429, TOO_MANY)));
+    await waitFor(() => expect(said()).toEqual([TOO_MANY]));
+    expect(retry.closest("p")?.textContent).toContain(TOO_MANY);
+    // The error line shows each failure without saying it too.
+    expect(screen.queryAllByRole("alert")).toEqual([]);
+  });
+
+  it("keeps the keyboard on Try again as the details load again, then hands it to the first of them", async () => {
+    const contact = vi.spyOn(api, "contact").mockRejectedValueOnce(new ApiError(0, OFFLINE));
+    renderList({ contactId: "9239" });
+    const retry = await screen.findByRole("button", { name: "Try again" });
+    let answer = () => {};
+    contact.mockImplementationOnce(() => new Promise((resolve) => (answer = () => resolve({ phone: "01234 567890" }))));
+    act(() => retry.focus());
+    fireEvent.click(retry);
+    await waitFor(() => expect(retry.getAttribute("aria-disabled")).toBe("true"));
+    expect(document.activeElement).toBe(retry);
+    expect(screen.getByText("Trying again")).toBeTruthy();
+    fireEvent.click(retry);
+    expect(contact).toHaveBeenCalledTimes(2);
+    await act(async () => answer());
+    const phone = await screen.findByRole("link", { name: "Telephone: 01234 567890" });
+    expect(document.activeElement).toBe(phone);
+  });
+
+  it("keeps the keyboard on Try again when the details fail again, and says so", async () => {
+    const contact = vi.spyOn(api, "contact").mockRejectedValueOnce(new ApiError(0, OFFLINE));
+    renderList({ contactId: "9239" });
+    const retry = await screen.findByRole("button", { name: "Try again" });
+    contact.mockRejectedValueOnce(new ApiError(429, TOO_MANY));
+    act(() => retry.focus());
+    fireEvent.click(retry);
+    expect(await screen.findByText(TOO_MANY, { selector: "[aria-live]" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Try again" })).toBe(retry);
+    expect(document.activeElement).toBe(retry);
   });
 
   it("tells its caller when the phone or email link is followed, and not the others", async () => {
