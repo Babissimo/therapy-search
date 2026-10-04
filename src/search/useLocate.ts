@@ -32,7 +32,7 @@ export function useLocate(onFound: (postcode: string) => void): Locate {
 }
 
 function currentPosition(): Promise<Point> {
-  // A position up to five minutes old will do, as the Worker rounds it to about 100 metres.
+  // A position up to five minutes old will do, as nearestQuery rounds it to about 100 metres before it is sent.
   return new Promise((resolve, reject) =>
     navigator.geolocation.getCurrentPosition(({ coords }) => resolve({ lat: coords.latitude, lng: coords.longitude }), reject, {
       maximumAge: 5 * 60 * 1000,
