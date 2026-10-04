@@ -7,6 +7,24 @@ import { Sheet, SheetClose, SheetContent, SheetTitle } from "@/components/ui/she
 import { useTitle } from "@/lib/useTitle";
 import { ProfileBody, profileQuery } from "./ProfilePage";
 
+/** On <html> while a drawer is in the page. */
+const PRINTS_ALONE = "data-print-alone-shown";
+/** The drawers in the page, which may overlap as one slides away and the next opens. */
+let drawers = 0;
+
+/**
+ * Marks the page for as long as a drawer is in it, sliding away included, for print to leave out all but the drawer
+ * (index.css), which a browser without :has can't find for itself.
+ */
+function markPage(drawer: HTMLElement | null) {
+  if (!drawer) return;
+  drawers++;
+  document.documentElement.setAttribute(PRINTS_ALONE, "");
+  return () => {
+    if (--drawers === 0) document.documentElement.removeAttribute(PRINTS_ALONE);
+  };
+}
+
 /**
  * A profile opened from the search, in a drawer over it; closing it goes back to the search, just as it was. Going back
  * any other way closes it too, as `open` follows the history.
@@ -40,6 +58,7 @@ export function ProfileDrawer({ slug, open }: { slug: string; open: boolean }) {
         }}
         // Printed, the profile is the whole of what comes out, at its full length (see index.css).
         data-print-alone
+        ref={markPage}
         className="overflow-y-auto data-[side=right]:w-full data-[side=right]:sm:max-w-2xl"
       >
         {/* Names the drawer without heading it a second time, as the profile's name heads it once the profile is in. */}

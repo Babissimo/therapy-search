@@ -256,9 +256,10 @@
    and the boxes a list scrolls in let it run on, with no foot of padding to end the print on a blank page. Outside any
    layer, so these outrank the utilities. */
 @media print {
-  /* A drawer prints alone, at its full length in the page's flow, in place of the page it opened over; other layers that
-     come and go over the page stay off paper. */
-  body:has([data-print-alone]) > :not([data-print-alone], :has([data-print-alone])),
+  /* A drawer prints alone, at its full length in the page's flow, in place of the page it opened over, which it marks
+     while it is there (ProfileDrawer), its dialog portalled straight into the body; other layers that come and go over the
+     page stay off paper. No rule here may use :has, which Firefox lacks before 121, as it would drop the whole rule. */
+  [data-print-alone-shown] body > :not([data-print-alone]),
   [data-slot$="-overlay"],
   [data-slot="sheet-content"]:not([data-print-alone]),
   [data-slot="alert-dialog-content"],

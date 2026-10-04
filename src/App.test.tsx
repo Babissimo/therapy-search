@@ -84,10 +84,17 @@ describe("AppRoutes", () => {
     await waitFor(() => expect(document.activeElement).toBe(card));
   });
 
-  it("marks the drawer to print alone, in place of the search beneath it", async () => {
+  it("marks the drawer to print alone, in place of the search beneath it, and the page while the drawer is there", async () => {
     renderAt("/?Location=Leeds");
     fireEvent.click(await screen.findByRole("link", { name: "Jo Bloggs" }));
-    expect((await screen.findByRole("dialog", { name: "Jo Bloggs" })).hasAttribute("data-print-alone")).toBe(true);
+    const drawer = await screen.findByRole("dialog", { name: "Jo Bloggs" });
+    expect(drawer.hasAttribute("data-print-alone")).toBe(true);
+    // Print hides the body's other children, which the drawer must not be among.
+    expect(drawer.parentElement).toBe(document.body);
+    expect(document.documentElement.hasAttribute("data-print-alone-shown")).toBe(true);
+    fireEvent.click(within(drawer).getByRole("button", { name: "Close" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(document.documentElement.hasAttribute("data-print-alone-shown")).toBe(false);
   });
 
   it("names the drawer, and the page while it is open, after the therapist", async () => {
