@@ -549,6 +549,27 @@ describe("createShortlistStore", () => {
     expect(here.get()).toEqual(before);
   });
 
+  it("leaves a therapist another tab added back as they are, though this tab had yet to hear of it", () => {
+    const storage = memory();
+    const there = createShortlistStore(storage, clock());
+    there.add(card("a"));
+    there.add(card("b"));
+    there.setStatus("a", "consultation");
+    there.setNote("a", "Rang on Tuesday");
+    there.remove("a");
+    // This tab loads with them removed, and hears nothing more.
+    const here = createShortlistStore(storage, clock(5000));
+    there.add(card("a"));
+    const before = there.get();
+    here.add(card("a"));
+    expect(here.get()).toEqual(before);
+    here.add(card("a"), { status: "contacted" });
+    expect(here.get().map((e) => [e.card.slug, e.status, e.note])).toEqual([
+      ["b", undefined, undefined],
+      ["a", "contacted", "Rang on Tuesday"],
+    ]);
+  });
+
   it("forgets those removed 30 days or more before the page loads, in storage as well as on the page", () => {
     const day = 24 * 60 * 60 * 1000;
     const storage = memory();

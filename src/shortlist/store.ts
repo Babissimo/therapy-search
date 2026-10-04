@@ -43,7 +43,10 @@ type Events = Pick<EventTarget, "addEventListener" | "removeEventListener">;
 export type ShortlistStore = {
   get: () => Shortlist;
   has: (slug: string) => boolean;
-  /** Puts anyone removed back where and as they were, note and card and all, with whatever `place` gives over that. */
+  /**
+   * Puts anyone removed back where and as they were, note and card and all, with whatever `place` gives over that. Anyone
+   * listed already keeps what they have the same way.
+   */
   add: (card: ShortlistCard, place?: Partial<Omit<ShortlistEntry, "card">>) => void;
   /** Keeps the therapist for `REMOVED_DAYS`, to be added back as they were. */
   remove: (slug: string) => void;
@@ -127,7 +130,8 @@ export function createShortlistStore(storage: KeyValue | null, now: () => number
     has: (slug) => entries.has(slug),
     add: (card, place) =>
       update((next, gone) => {
-        const kept = gone.get(card.slug);
+        // Listed already, as by another tab this one has yet to hear from, they are not started afresh.
+        const kept = next.get(card.slug) ?? gone.get(card.slug);
         gone.delete(card.slug);
         const { addedAt = now(), rank, status, note } = { ...kept, ...place };
         next.set(card.slug, { addedAt, rank, status, note: noteFrom(note), card: cardOf(kept?.card ?? card) });
