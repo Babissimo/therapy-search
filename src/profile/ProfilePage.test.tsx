@@ -241,11 +241,36 @@ describe("ProfilePage's status track", () => {
     expect(step(await track())).toBe("To contact");
   });
 
+  it("rolls the track and notes up as they were, saying the therapist was removed, until the roll ends", async () => {
+    // As a browser times the fold at the top of the profile; jsdom times nothing otherwise.
+    const style = document.createElement("style");
+    style.textContent = "article > .grid { transition-duration: 200ms; }";
+    document.head.append(style);
+    onTestFinished(() => style.remove());
+    const store = createShortlistStore(null);
+    store.add(THERAPIST, { status: "contacted" });
+    store.setNote(THERAPIST.slug, "Rang on Tuesday");
+    renderAt(["/therapist/Test-ABCDEFGH"], PROFILE, { store });
+    const steps = await track();
+    const fold = steps.closest("article > .grid")!;
+    expect(fold.hasAttribute("inert")).toBe(false);
+    fireEvent.click(screen.getByRole("button", { name: "Remove Test Therapist from your shortlist" }));
+    expect(fold.hasAttribute("inert")).toBe(true);
+    expect(step(await track())).toBe("Contacted");
+    within(fold as HTMLElement).getByText("Removed from your shortlist");
+    expect(within(fold as HTMLElement).queryByRole("button", { name: /^Status of / })).toBeNull();
+    expect(within(fold as HTMLElement).getByRole<HTMLTextAreaElement>("textbox", { name: "Your notes" }).value).toBe("Rang on Tuesday");
+    fireEvent.transitionEnd(fold);
+    expect(screen.queryByRole("list", { name: "Steps with Test Therapist" })).toBeNull();
+    expect(screen.queryByRole("textbox", { name: "Your notes" })).toBeNull();
+  });
+
   it("comes and goes without moving what the visitor reads below it, once the header has stuck", async () => {
     const stick = stickable();
-    const slotted = () => document.querySelector("article .min-h-11") !== null;
+    // Folded, it takes no room: once the header has stuck it folds at once, whatever it still holds for that moment.
+    const slotted = () => document.querySelector("article .min-h-11")?.closest("[inert]") === null;
     // jsdom lays nothing out, so the columns are placed as a browser would: lower by the block holding the track and notes (taken here
-    // as 44 px) and space-y-8's 32 while it is there.
+    // as 44 px) and the section's own pb-8, 32 inside the fold, while it is there.
     vi.spyOn(HTMLElement.prototype, "offsetTop", "get").mockImplementation(() => (slotted() ? 376 : 300));
     // Nor does it scroll: the page's scroller, which a browser keeps from going past the page's end, 76 px further while the block is there.
     let scrolled = 200;

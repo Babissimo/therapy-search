@@ -11,8 +11,10 @@ import { Badge, TAG } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Unfold } from "@/components/Unfold";
 import { api } from "@/lib/api";
 import { NEW_TAB } from "@/lib/newTab";
+import { useLast } from "@/lib/useLast";
 import { useStuck } from "@/lib/useStuck";
 import { useTitle } from "@/lib/useTitle";
 import { cn } from "@/lib/utils";
@@ -126,20 +128,7 @@ export function ProfileBody({ slug, back, close }: { slug: string } & Exits) {
         {standing.announcement}
       </p>
 
-      {standing.status && (
-        <div className="max-w-sm space-y-4">
-          {/* At the track's height while its chunk comes, so the profile below stays put. */}
-          <div className="min-h-11">
-            <LazyStatusTrack
-              therapist={therapist}
-              status={standing.status}
-              onChosen={(to) => standing.chosen(therapist, to)}
-              onRemoved={() => standing.removed(therapist)}
-            />
-          </div>
-          <NoteField slug={slug} />
-        </div>
-      )}
+      <StandingSection key={slug} slug={slug} therapist={therapist} standing={standing} />
 
       <HeldPlace above={standing.status !== undefined}>
         <Columns
@@ -299,6 +288,40 @@ function Columns({ main, aside, besideLong }: { main?: ReactNode; aside?: ReactN
       {main && <div className="space-y-8">{main}</div>}
       {aside && <aside className={cn("space-y-8", besideLong && "@4xl:col-2")}>{aside}</aside>}
     </div>
+  );
+}
+
+type StandingProps = { slug: string; therapist: ShortlistCard; standing: ReturnType<typeof useStanding> };
+
+/**
+ * Where the visitor stands with the therapist, and their notes, unrolled while they are shortlisted. Taken off, they roll up
+ * as they were, the track saying so. Once the header has stuck they come and go at once, for `HeldPlace` to keep the visitor's
+ * place, where unrolling would push the text being read.
+ */
+function StandingSection({ slug, therapist, standing }: StandingProps) {
+  const status = useLast(standing.status);
+  return (
+    // Its gap below is inside what folds, as space-y-8's would stay while it is folded. Wider than the column by a focus
+    // ring either side, which the fold's clipping would otherwise cut.
+    <Unfold open={standing.status !== undefined} className="-mx-1.5 mb-0 [header[data-stuck]~&]:duration-0">
+      {status && (
+        <div className="px-1.5 pb-8">
+          <div className="max-w-sm space-y-4">
+            {/* At the track's height while its chunk comes, so the profile below stays put. */}
+            <div className="min-h-11">
+              <LazyStatusTrack
+                therapist={therapist}
+                status={status}
+                listed={standing.status !== undefined}
+                onChosen={(to) => standing.chosen(therapist, to)}
+                onRemoved={() => standing.removed(therapist)}
+              />
+            </div>
+            <NoteField slug={slug} />
+          </div>
+        </div>
+      )}
+    </Unfold>
   );
 }
 

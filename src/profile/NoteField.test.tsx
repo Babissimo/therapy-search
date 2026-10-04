@@ -5,10 +5,12 @@ import { createShortlistStore, type ShortlistStore } from "@/shortlist/store";
 import { ShortlistContext } from "@/shortlist/useShortlist";
 import { NoteField } from "./NoteField";
 
+const JO = { slug: "jo", name: "Jo Cole", initials: "JC", tags: [] };
+
 /** The box for a shortlisted therapist, with `note` kept for them before it draws. */
 function renderField(note?: string) {
   const store = createShortlistStore(null);
-  store.add({ slug: "jo", name: "Jo Cole", initials: "JC", tags: [] });
+  store.add(JO);
   if (note !== undefined) store.setNote("jo", note);
   const view = render(
     <ShortlistContext.Provider value={store}>
@@ -101,6 +103,49 @@ describe("NoteField", () => {
     act(() => vi.advanceTimersByTime(500));
     expect(noteOf(store)).toBeUndefined();
     expect(box.value).toBe("");
+  });
+
+  it("keeps what it holds, and its count, once the therapist is removed, writing nothing", () => {
+    vi.useFakeTimers();
+    const { store, box } = renderField("x".repeat(950));
+    const region = document.querySelector("[aria-live=polite]")!;
+    expect(region.textContent).toBe("50 characters left.");
+    const setNote = vi.spyOn(store, "setNote");
+    act(() => store.remove("jo"));
+    expect(box.value).toBe("x".repeat(950));
+    expect(region.textContent).toBe("50 characters left.");
+    act(() => vi.runOnlyPendingTimers());
+    expect(setNote).not.toHaveBeenCalled();
+    // The removed entry still has its note, for when they are added back.
+    act(() => void store.add(JO));
+    expect(noteOf(store)).toBe("x".repeat(950));
+    expect(box.value).toBe("x".repeat(950));
+  });
+
+  it("saves what was typed and not yet saved with a therapist removed, as the box goes", () => {
+    const { store, box, view } = renderField("Rang");
+    fireEvent.change(box, { target: { value: "Rang on Tuesday" } });
+    act(() => store.remove("jo"));
+    expect(box.value).toBe("Rang on Tuesday");
+    view.unmount();
+    store.add(JO);
+    expect(noteOf(store)).toBe("Rang on Tuesday");
+  });
+
+  it("saves what was typed once the therapist is removed when typing rests, once", () => {
+    vi.useFakeTimers();
+    const { store, box, view } = renderField("Rang");
+    act(() => store.remove("jo"));
+    fireEvent.change(box, { target: { value: "Rang on Tuesday" } });
+    const setNote = vi.spyOn(store, "setNote");
+    act(() => vi.advanceTimersByTime(500));
+    expect(setNote).toHaveBeenCalledExactlyOnceWith("jo", "Rang on Tuesday");
+    // What was saved is the note last seen, so leaving saves nothing more.
+    fireEvent.blur(box);
+    view.unmount();
+    expect(setNote).toHaveBeenCalledOnce();
+    store.add(JO);
+    expect(noteOf(store)).toBe("Rang on Tuesday");
   });
 
   it("takes a note saved elsewhere, as by another tab", () => {
