@@ -152,12 +152,15 @@ describe("ProfilePage's header", () => {
     expect(email.closest("header")).not.toBeNull();
   });
 
-  it("stands its bookmark apart from a drawer's close button on a touch screen, where each takes a target wider than itself", async () => {
+  it("puts its bookmark on a line of its own under the header on a touch screen, where it is named on screen, leaving a drawer's close button beside the name", async () => {
     renderAt(["/therapist/Test-ABCDEFGH"], PROFILE, { close: <button type="button">Close</button> });
-    const bookmark = await screen.findByRole("button", { name: "Add Test Therapist to your shortlist" });
-    const close = screen.getByRole("button", { name: "Close" });
+    const bookmark = (await screen.findByRole("button", { name: "Add Test Therapist to your shortlist" })).parentElement!;
+    const close = screen.getByRole("button", { name: "Close" }).parentElement!;
+    // Side by side with a mouse; on a touch screen each joins the header's row, which wraps, the bookmark last.
     expect(close.parentElement).toBe(bookmark.parentElement);
-    expect(close.parentElement?.classList.contains("pointer-coarse:gap-4")).toBe(true);
+    expect(close.parentElement?.classList.contains("pointer-coarse:contents")).toBe(true);
+    expect(close.parentElement?.parentElement?.classList.contains("pointer-coarse:flex-wrap")).toBe(true);
+    expect(["pointer-coarse:order-last", "pointer-coarse:basis-full"].map((c) => bookmark.classList.contains(c))).toEqual([true, true]);
   });
 
   it("marks itself stuck once its scroller clips it at the top, for its photo to shrink", async () => {

@@ -34,11 +34,13 @@ export function ResultsPanel({ open, onOpenChange, toggleRef, tabs, masthead, sc
       <IconButton
         ref={toggleRef}
         label={open ? "Hide list" : "Show list"}
+        // Named whole over the map, but beside the masthead by its first word alone, which leaves the site's name two lines.
+        touchLabel={open ? "Hide" : true}
         variant={open ? "ghost" : "outline"}
         aria-expanded={open}
         aria-controls={id}
         onClick={() => onOpenChange(!open)}
-        className={cn("absolute top-3 left-4 z-10", !open && "shadow-md dark:bg-background dark:hover:bg-muted")}
+        className={cn("absolute top-3 left-4 z-10 pointer-coarse:px-2", !open && "shadow-md dark:bg-background dark:hover:bg-muted")}
       >
         {open ? <PanelLeftClose aria-hidden /> : <PanelLeftOpen aria-hidden />}
       </IconButton>
@@ -55,8 +57,8 @@ export function ResultsPanel({ open, onOpenChange, toggleRef, tabs, masthead, sc
       >
         {/* Rows are divided by the top border of the one beneath, so the top row's height is all its own. */}
         <div className="flex w-96 shrink-0 flex-col border-r bg-background print:block print:w-full print:border-r-0">
-          {/* Centred on the toggle, leaving room for it on the left. */}
-          <div inert={!open} className="grid min-h-14 items-center pr-4 pl-14 print:pl-4">
+          {/* Centred on the toggle, leaving room for it on the left, wider on a touch screen, where it is named on screen. */}
+          <div inert={!open} className="grid min-h-14 items-center pr-4 pl-14 pointer-coarse:pl-24 print:pl-4">
             {masthead}
           </div>
           <section aria-label="Results and shortlist" className="flex min-h-0 flex-1 flex-col border-t print:block">

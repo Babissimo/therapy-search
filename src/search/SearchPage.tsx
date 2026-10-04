@@ -579,7 +579,8 @@ function Toolbar({
           // As wide as beside the list (a w-96 column less its border and p-3), so nothing in it shifts as it moves onto the
           // map and back.
           overMap && "lg:right-auto lg:w-[calc(24rem-1.5rem-1px)]",
-          besideToggle && "left-14",
+          // Further on a touch screen, where the toggle is named on screen.
+          besideToggle && "left-14 pointer-coarse:left-32",
         )}
         // Escape anywhere in the toolbar puts away the filters open over the map, unless it has just closed something open
         // within it, such as help, or cleared a search box, which says nothing of it.

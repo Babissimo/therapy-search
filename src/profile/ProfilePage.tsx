@@ -358,14 +358,15 @@ function StickyHeader({ back, close, bookmark, children }: Exits & { bookmark?: 
     >
       <div className="space-y-2 border-b py-3">
         {back}
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex items-start justify-between gap-4 pointer-coarse:flex-wrap pointer-coarse:gap-y-2">
           <div className="min-w-0 flex-1">{children}</div>
-          {/* Pulls the last icon out to the content's right edge, past the ghost button's padding. On a touch screen a drawer's
-              bookmark and close stand apart, so neither's target takes the other's taps. */}
+          {/* Pulls the last icon out to the content's right edge, past the ghost button's padding. On a touch screen, where the
+              bookmark is named on screen, it takes a line of its own under the rest, its icon in line with the photo's edge,
+              leaving the close button beside the name. */}
           {(bookmark || close) && (
-            <div className="-mr-2 flex shrink-0 pointer-coarse:gap-4">
-              {bookmark}
-              {close}
+            <div className="-mr-2 flex shrink-0 pointer-coarse:contents">
+              {bookmark && <div className="flex pointer-coarse:order-last pointer-coarse:-ml-2.5 pointer-coarse:basis-full">{bookmark}</div>}
+              {close && <div className="flex pointer-coarse:-mr-2">{close}</div>}
             </div>
           )}
         </div>

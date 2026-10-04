@@ -29,6 +29,22 @@ describe("IconButton", () => {
     expect(within(screen.getByRole("button", { name: "Search" })).getByText("Search").className).toBe("sr-only");
   });
 
+  it("shows only the words asked for on touch screens, which start its name, keeping the rest of its label in its name", () => {
+    render(
+      <TooltipProvider>
+        <IconButton label="Add Jo Cole to your shortlist" touchLabel="Add">
+          <svg aria-hidden />
+        </IconButton>
+      </TooltipProvider>,
+    );
+    const button = screen.getByRole("button", { name: "Add Jo Cole to your shortlist" });
+    const [shown, rest] = button.children;
+    expect([shown?.textContent, shown?.className]).toEqual(["Add", expect.stringContaining("pointer-coarse:not-sr-only")]);
+    expect([rest?.textContent, rest?.className]).toEqual(["Jo Cole to your shortlist", "sr-only"]);
+    act(() => button.focus());
+    expect(screen.getByRole("tooltip").closest("[data-slot=tooltip-content]")?.className).toContain("pointer-coarse:hidden");
+  });
+
   it("leaves its tooltip to pointers that hover when it shows its label on touch screens", () => {
     renderButtons();
     act(() => screen.getByRole("button", { name: /^Filters/ }).focus());
