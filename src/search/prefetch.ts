@@ -5,13 +5,17 @@ import { ONLINE_PATH } from "./online";
 import { placed } from "./state";
 import { prefetchResults } from "./useResults";
 import { viewSearch } from "./useSearchState";
+import { WIDE } from "./wide";
 
 /** The map's code, in a chunk of its own: Leaflet is large, and a visit that never searches near a place never needs it. */
 export const loadMap = () => import("./map/MapPane");
 
-/** Starts fetching the map's code ahead of a search that will show it. A failure shows when the map itself asks. */
+/**
+ * Starts fetching the map's code ahead of a search that will show it beside the list. Where the list leads, the code
+ * waits until the visitor asks for the map. A failure shows when the map itself asks.
+ */
 export function warmMap(): void {
-  loadMap().catch(() => {});
+  if (window.matchMedia(WIDE).matches) loadMap().catch(() => {});
 }
 
 /**

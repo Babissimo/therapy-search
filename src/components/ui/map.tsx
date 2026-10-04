@@ -260,6 +260,10 @@ function MapBounds({ bounds }: { bounds?: LatLngBoundsLiteral }) {
 
 const zoomLevels = (map: LeafletMap) => ({ zoom: map.getZoom(), min: map.getMinZoom(), max: map.getMaxZoom() });
 
+// Secondary's slate matches the tinted tiles and vanishes into them, so over the map a button takes the toolbar's surface:
+// the page's background, opaque in dark mode too, with a border and a shadow.
+const OVER_TILES = "shadow-md dark:bg-background dark:hover:bg-muted";
+
 function MapZoomControl({ className }: { className?: string }) {
   const map = useMap();
   const [{ zoom, min, max }, setLevels] = useState(() => zoomLevels(map));
@@ -278,8 +282,8 @@ function MapZoomControl({ className }: { className?: string }) {
         <Button
           type="button"
           size="icon-sm"
-          variant="secondary"
-          className="border"
+          variant="outline"
+          className={OVER_TILES}
           aria-label="Zoom in"
           title="Zoom in"
           disabled={zoom >= max}
@@ -290,8 +294,8 @@ function MapZoomControl({ className }: { className?: string }) {
         <Button
           type="button"
           size="icon-sm"
-          variant="secondary"
-          className="border"
+          variant="outline"
+          className={OVER_TILES}
           aria-label="Zoom out"
           title="Zoom out"
           disabled={zoom <= min}
