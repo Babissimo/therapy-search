@@ -6,6 +6,9 @@ import { useShortlistNote, useShortlistStore } from "@/shortlist/useShortlist";
 /** How long typing rests before the note is saved. */
 const SAVE_AFTER = 500;
 
+/** How few characters may be left before the box says how many. */
+const COUNT_WITHIN = 100;
+
 /** The visitor's own notes on a shortlisted therapist, kept with the shortlist and saved as they type. */
 export function NoteField({ slug }: { slug: string }) {
   const store = useShortlistStore();
@@ -19,6 +22,9 @@ export function NoteField({ slug }: { slug: string }) {
   }
   const box = useId();
   const hint = useId();
+  const left = NOTE_LIMIT - draft.length;
+  // From the note as saved, which follows the typing once it rests, so a screen reader hears the count at a pause, not at every key.
+  const leftSaved = NOTE_LIMIT - saved.length;
 
   const flush = () => {
     if (draft !== saved) store.setNote(slug, draft);
@@ -51,14 +57,24 @@ export function NoteField({ slug }: { slug: string }) {
         id={box}
         aria-describedby={hint}
         maxLength={NOTE_LIMIT}
+        // Enhanced spellcheck in Chrome and Edge sends what is typed to Google or Microsoft.
+        spellCheck={false}
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
         onBlur={flush}
-        className="md:text-base"
+        // Grows with the note to about seven lines, then scrolls.
+        className="max-h-48 md:text-base"
       />
       <p id={hint} className="text-sm text-muted-foreground">
-        Saved as you type, in this browser only.
+        Saved as you type, in this browser only.{left <= COUNT_WITHIN && ` ${charactersLeft(left)}`}
+      </p>
+      <p aria-live="polite" className="sr-only">
+        {leftSaved <= COUNT_WITHIN && charactersLeft(leftSaved)}
       </p>
     </div>
   );
+}
+
+function charactersLeft(count: number): string {
+  return `${count} ${count === 1 ? "character" : "characters"} left.`;
 }
