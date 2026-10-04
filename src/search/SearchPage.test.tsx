@@ -59,6 +59,7 @@ vi.mock("./map/MapPane", async () => {
     onSearchArea?: (postcode: string) => boolean;
     outsideUK?: boolean;
     coveredBelow?: (height: number) => number;
+    underToolbar?: boolean;
   };
   return {
     default: ({
@@ -75,6 +76,7 @@ vi.mock("./map/MapPane", async () => {
       onSearchArea,
       outsideUK,
       coveredBelow,
+      underToolbar,
     }: Props) => {
       if (mapChunk.fails) throw new TypeError("Failed to fetch dynamically imported module");
       const slug = useSyncExternalStore(highlight.subscribe, highlight.get);
@@ -93,6 +95,7 @@ vi.mock("./map/MapPane", async () => {
           "data-outside-uk": String(Boolean(outsideUK)),
           // As much of an 800px map as the sheet covers.
           "data-covered": coveredBelow?.(800) ?? "",
+          "data-under-toolbar": String(Boolean(underToolbar)),
         },
         pins.map((pin) =>
           createElement(
@@ -113,11 +116,14 @@ vi.mock("./map/MapPane", async () => {
   };
 });
 
-/** Sets how wide the screen is; the function returned resizes it, telling the page as a real window would. */
+/**
+ * Sets whether the screen is wide and tall enough for the list to sit beside the map; the function returned resizes it,
+ * telling the page as a real window would.
+ */
 function screenIs(wide: boolean) {
   const listeners = new Set<() => void>();
   vi.stubGlobal("matchMedia", (query: string) => ({
-    matches: wide && query === "(min-width: 64rem)",
+    matches: wide && query === "(min-width: 64rem) and (min-height: 31rem)",
     media: query,
     addEventListener: (_: string, listener: () => void) => listeners.add(listener),
     removeEventListener: (_: string, listener: () => void) => listeners.delete(listener),
@@ -272,15 +278,25 @@ describe("SearchPage", () => {
   });
 
   it("lays the search out as blocks on paper, so the list takes the page's width without the map's column", async () => {
-    for (const wide of [true, false]) {
-      screenIs(wide);
-      renderAt(SEARCH);
-      await loaded();
-      const grid = screen.getByRole("button", { name: /^Filters/ }).closest(".grid")!;
-      expect(grid.className).toContain("grid-cols-[auto_minmax(0,1fr)]");
-      expect(grid.className).toContain("print:block");
-      cleanup();
-    }
+    screenIs(true);
+    renderAt(SEARCH);
+    await loaded();
+    const grid = screen.getByRole("button", { name: /^Filters/ }).closest(".grid")!;
+    expect(grid.className).toContain("grid-cols-[auto_minmax(0,1fr)]");
+    expect(grid.className).toContain("print:block");
+  });
+
+  it("prints the list where it leads, though the map shows in its place on screen", async () => {
+    screenIs(false);
+    renderAt(SEARCH);
+    await loaded();
+    fireEvent.click(screen.getByRole("button", { name: "Map" }));
+    await screen.findByTestId("map");
+    // Hidden from the screen alone.
+    const panel = screen.getByRole("tabpanel", { name: "Results" });
+    expect(panel.closest("[hidden]")).toBeNull();
+    expect(panel.closest(".not-print\\:hidden")).not.toBeNull();
+    expect(panel.closest(".flex")?.className).toContain("print:block");
   });
 
   it("keeps Load more over the map as an icon while the results are put away", async () => {
@@ -411,19 +427,24 @@ describe("SearchPage", () => {
     screenIs(false);
     renderAt("/?Location=Leeds&Languages=French");
     await loaded();
+    fireEvent.click(screen.getByRole("button", { name: "Map" }));
     expect(await screen.findByTestId("map")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Show map" }));
+    fireEvent.click(screen.getByRole("button", { name: "List" }));
     fireEvent.change(screen.getByRole("textbox", { name: "Location" }), { target: { value: "" } });
     fireEvent.click(screen.getByRole("button", { name: /^Filters/ }));
     fireEvent.click(await screen.findByRole("button", { name: "Clear all filters" }));
     fireEvent.click(screen.getByRole("button", { name: "Close" }));
     expect(within(results()).getByText(/^Tick anything that matters to you/)).toBeTruthy();
     expect(screen.queryByTestId("map")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Map" })).toBeNull();
     fireEvent.change(screen.getByRole("textbox", { name: "Location" }), { target: { value: "York" } });
     fireEvent.click(screen.getByRole("button", { name: "Search" }));
     fireEvent.click(screen.getByRole("button", { name: "Search without filters" }));
-    expect(results().dataset.position).toBe("full");
     await loaded();
+    // Drawn again only once asked for.
+    await mapLoads();
+    expect(screen.queryByTestId("map")).toBeNull();
+    expect(screen.getByRole("button", { name: "Map" })).toBeTruthy();
   });
 
   it("asks for a place rather than searching with the box emptied, leaving the search as it was", async () => {
@@ -491,8 +512,10 @@ describe("SearchPage", () => {
     screenIs(wide);
     renderAt(SEARCH);
     await loaded();
+    if (!wide) fireEvent.click(screen.getByRole("button", { name: "Map" }));
     expect(await screen.findByText("The map couldn't load.")).toBeTruthy();
     expect(screen.queryByTestId("map")).toBeNull();
+    if (!wide) fireEvent.click(screen.getByRole("button", { name: "List" }));
     fireEvent.click(screen.getByRole("button", { name: "Load more" }));
     expect(await within(results()).findByText(/^24 of 30/)).toBeTruthy();
     fireEvent.change(screen.getByRole("textbox", { name: "Location" }), { target: { value: "York" } });
@@ -503,13 +526,26 @@ describe("SearchPage", () => {
     expect(screen.getByText("The map couldn't load.")).toBeTruthy();
   });
 
-  it("keeps Load more beneath the list rather than at its end", async () => {
+  it("keeps Load more beneath the list rather than at its end on wide screens", async () => {
     screenIs(true);
     renderAt(SEARCH);
     await loaded();
     const more = screen.getByRole("button", { name: "Load more" });
     expect(results().contains(more)).toBe(true);
     expect(list().contains(more)).toBe(false);
+  });
+
+  it("puts Load more at the list's end where the list leads, scrolling with it, and only beside the results", async () => {
+    screenIs(false);
+    shortlist.add(therapist("a"));
+    renderAt(SEARCH);
+    await loaded();
+    const more = screen.getByRole("button", { name: "Load more" });
+    expect(list().contains(more)).toBe(true);
+    const last = within(results()).getAllByRole("link", { name: /^Therapist p/ }).at(-1)!;
+    expect(last.compareDocumentPosition(more) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    pick(/^Shortlist/);
+    expect(screen.queryByRole("button", { name: "Load more" })).toBeNull();
   });
 
   it("names the searched place under the list's heading", async () => {
@@ -530,13 +566,58 @@ describe("SearchPage", () => {
     expect(heading.nextElementSibling?.textContent).toBe("Leeds, UK");
   });
 
-  it("lays the results over the map on narrow screens, starting on the list", async () => {
+  it("leads with the list on narrow screens, drawing the map in its place only once asked for, by a button that keeps the keyboard", async () => {
     screenIs(false);
     renderAt(SEARCH);
     await loaded();
-    expect(results().dataset.position).toBe("full");
-    fireEvent.click(screen.getByRole("button", { name: "Show map" }));
-    expect(results().dataset.position).toBe("peek");
+    await mapLoads();
+    expect(screen.queryByTestId("map")).toBeNull();
+    const column = list();
+    // As a browser lays it out, with the map as tall as the window below the tabs.
+    Object.defineProperty(column, "scrollHeight", { configurable: true, value: 1200 });
+    const toggle = screen.getByRole("button", { name: "Map" });
+    act(() => toggle.focus());
+    fireEvent.click(toggle);
+    expect(await screen.findByRole("region", { name: "Map of results" })).toBe(map());
+    expect(toggle.textContent).toBe("List");
+    expect(document.activeElement).toBe(toggle);
+    // In the list's place, scrolled to, with the site's name and the toolbar above it.
+    expect(column.scrollTop).toBe(1200);
+    expect(screen.getByRole("textbox", { name: "Location" })).toBeTruthy();
+    expect(screen.getByRole("tabpanel", { name: "Results" }).closest(".not-print\\:hidden")).not.toBeNull();
+    fireEvent.click(toggle);
+    expect(toggle.textContent).toBe("Map");
+    expect(document.activeElement).toBe(toggle);
+    expect(screen.getByRole("tabpanel", { name: "Results" }).closest(".not-print\\:hidden")).toBeNull();
+    // Kept, hidden, to come back as it was left.
+    expect(map().closest("[hidden]")).not.toBeNull();
+    fireEvent.click(toggle);
+    expect(map().closest("[hidden]")).toBeNull();
+  });
+
+  it("scrolls the list back to where it was as it comes back from behind the map", async () => {
+    screenIs(false);
+    renderAt(SEARCH);
+    await loaded();
+    const column = list();
+    column.scrollTop = 400;
+    fireEvent.scroll(column);
+    fireEvent.click(screen.getByRole("button", { name: "Map" }));
+    // As a browser does, with the list hidden and nothing left to scroll.
+    column.scrollTop = 0;
+    fireEvent.scroll(column);
+    fireEvent.click(screen.getByRole("button", { name: "List" }));
+    expect(column.scrollTop).toBe(400);
+  });
+
+  it("frames the map clear of the toolbar only where the toolbar lies over it", async () => {
+    const resize = screenIs(true);
+    renderAt(SEARCH);
+    await loaded();
+    expect((await screen.findByTestId("map")).dataset.underToolbar).toBe("true");
+    resize(false);
+    fireEvent.click(screen.getByRole("button", { name: "Map" }));
+    expect((await screen.findByTestId("map")).dataset.underToolbar).toBe("false");
   });
 
   it("opens the filters beneath the search box on wide screens", async () => {
@@ -596,16 +677,27 @@ describe("SearchPage", () => {
     await waitFor(() => expect(filters()).toBeNull());
   });
 
-  it.each([
-    ["wide", true],
-    ["narrow", false],
-  ])("puts the toolbar first in the page on %s screens, then the list, then the map it is drawn over", async (_, wide) => {
-    screenIs(wide);
+  it("puts the toolbar first in the page on wide screens, then the list, then the map it is drawn over", async () => {
+    screenIs(true);
     renderAt(SEARCH);
     await loaded();
     const before = (a: Node, b: Node) => Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
     expect(before(screen.getByRole("textbox", { name: "Location" }), results())).toBe(true);
     expect(before(results(), await screen.findByTestId("map"))).toBe(true);
+    expect(screen.getAllByRole("link", { name: /^Skip/ }).map((link) => link.textContent)).toEqual(["Skip to the results"]);
+  });
+
+  it("puts the toolbar first in the page on narrow screens, then the tabs and the map's button, then the list, then the map", async () => {
+    screenIs(false);
+    renderAt(SEARCH);
+    await loaded();
+    const before = (a: Node, b: Node) => Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+    const toggle = screen.getByRole("button", { name: "Map" });
+    expect(before(screen.getByRole("textbox", { name: "Location" }), screen.getByRole("tablist"))).toBe(true);
+    expect(before(screen.getByRole("tablist"), toggle)).toBe(true);
+    expect(before(toggle, screen.getByRole("tabpanel", { name: "Results" }))).toBe(true);
+    fireEvent.click(toggle);
+    expect(before(screen.getByRole("tabpanel", { name: "Results" }), await screen.findByTestId("map"))).toBe(true);
     expect(screen.getAllByRole("link", { name: /^Skip/ }).map((link) => link.textContent)).toEqual(["Skip to the results"]);
   });
 
@@ -620,15 +712,21 @@ describe("SearchPage", () => {
     await waitFor(() => expect(document.activeElement).toBe(within(results()).getByRole("tabpanel", { name: /^Results/ })));
   });
 
-  it("skips the keyboard past the toolbar to the list on a phone, raising the sheet when it is lowered", async () => {
+  it("skips the keyboard to the list on a phone, or from the shortlist to the search box, bringing the list back from behind the map", async () => {
     screenIs(false);
     renderAt(SEARCH);
     await loaded();
-    fireEvent.click(screen.getByRole("button", { name: "Show map" }));
-    expect(results().dataset.position).toBe("peek");
+    fireEvent.click(screen.getByRole("button", { name: "Map" }));
     fireEvent.click(screen.getByRole("link", { name: "Skip to the results" }));
-    expect(results().dataset.position).toBe("half");
+    expect(screen.getByRole("button", { name: "Map" })).toBeTruthy();
     await waitFor(() => expect(document.activeElement).toBe(within(results()).getByRole("tabpanel", { name: /^Results/ })));
+    // The box is above the map as it is above the list, so the map stays.
+    pick(/^Shortlist/);
+    fireEvent.click(screen.getByRole("button", { name: "Map" }));
+    fireEvent.click(screen.getByRole("link", { name: "Skip to the search box" }));
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("textbox", { name: "Location" })));
+    expect(screen.getByRole("button", { name: "List" })).toBeTruthy();
+    expect(screen.getByRole("tab", { name: "Results" }).getAttribute("aria-selected")).toBe("true");
   });
 
   it("brings the results' tab forward as it skips to them from the shortlist's", async () => {
@@ -653,19 +751,29 @@ describe("SearchPage", () => {
     expect(within(results()).getByRole("tabpanel", { name: /^Results/ })).toBeTruthy();
   });
 
-  it("keeps the toolbar as a search begins on wide screens, and the map as the window crosses between wide and narrow", async () => {
-    const resize = screenIs(true);
+  it("keeps the toolbar as a search begins on wide screens", async () => {
+    screenIs(true);
     renderAt("/?Languages=Greek");
     const toolbar = screen.getByRole("navigation", { name: "Where to meet" });
     fireEvent.change(screen.getByRole("textbox", { name: "Location" }), { target: { value: "Leeds" } });
     fireEvent.click(screen.getByRole("button", { name: "Search" }));
     await loaded();
     expect(screen.getByRole("navigation", { name: "Where to meet" })).toBe(toolbar);
-    const shown = await screen.findByTestId("map");
-    resize(false);
-    expect(map()).toBe(shown);
+  });
+
+  it("draws the map beside the list as the window widens, and only once asked for as it narrows again", async () => {
+    const resize = screenIs(false);
+    renderAt(SEARCH);
+    await loaded();
+    fireEvent.click(screen.getByRole("button", { name: "Map" }));
+    expect(await screen.findByTestId("map")).toBeTruthy();
     resize(true);
-    expect(map()).toBe(shown);
+    expect(screen.queryByRole("button", { name: /^(Map|List)$/ })).toBeNull();
+    expect(await screen.findByTestId("map")).toBeTruthy();
+    resize(false);
+    await mapLoads();
+    expect(screen.queryByTestId("map")).toBeNull();
+    expect(screen.getByRole("button", { name: "Map" })).toBeTruthy();
   });
 
   it("skips past the prompt to the filters right of it on wide screens, bringing them back from beside the shortlist", async () => {
@@ -956,8 +1064,9 @@ describe("SearchPage", () => {
     const tab = screen.getByRole("tab", { name: "Results" });
     expect(tab.getAttribute("aria-selected")).toBe("true");
     expect(document.activeElement).toBe(tab);
-    expect(results().dataset.position).toBe("full");
     await loaded();
+    await mapLoads();
+    expect(screen.queryByTestId("map")).toBeNull();
   });
 
   it("holds a phone's ticks until the filters sheet is put away, by Show results or otherwise", async () => {
@@ -1118,11 +1227,45 @@ describe("SearchPage", () => {
     list().scrollTop = 400;
     fireEvent.scroll(list());
     resize(false);
-    expect(results().dataset.position).toBe("full");
     expect(list().scrollTop).toBe(400);
     resize(true);
-    expect(results().dataset.position).toBeUndefined();
     expect(list().scrollTop).toBe(400);
+  });
+
+  it("keeps the keyboard on its control as the window crosses between wide and narrow, or else on the open tab", async () => {
+    const resize = screenIs(true);
+    renderAt(SEARCH);
+    await loaded();
+    act(() => screen.getByRole("textbox", { name: "Location" }).focus());
+    resize(false);
+    expect(document.activeElement).toBe(screen.getByRole("textbox", { name: "Location" }));
+    act(() => screen.getByRole("link", { name: "Therapist p1-3" }).focus());
+    resize(true);
+    expect(document.activeElement).toBe(screen.getByRole("link", { name: "Therapist p1-3" }));
+    resize(false);
+    act(() => screen.getByRole("button", { name: "Map" }).focus());
+    resize(true);
+    expect(document.activeElement).toBe(screen.getByRole("tab", { name: "Results" }));
+  });
+
+  it("keeps the shortlist's tab in the keyboard's hold as the window crosses between narrow and wide", async () => {
+    const resize = screenIs(false);
+    renderAt(SEARCH);
+    await loaded();
+    pick(/^Shortlist/);
+    act(() => screen.getByRole("tab", { name: /^Shortlist/ }).focus());
+    resize(true);
+    expect(document.activeElement).toBe(screen.getByRole("tab", { name: /^Shortlist/ }));
+  });
+
+  it("keeps the keyboard clear of the tabs stuck over the list where it leads", async () => {
+    screenIs(false);
+    renderAt(SEARCH);
+    await loaded();
+    // A browser scrolls what takes focus into view this far below the column's top, which the tabs fill.
+    const margins = screen.getByRole("tabpanel", { name: "Results" }).closest(".p-4")!.className;
+    expect(margins).toContain("[&_*]:scroll-mt-14");
+    expect(margins).toContain("pointer-coarse:[&_*]:scroll-mt-17");
   });
 
   it("heads an invalid search link with the site's name, marked as an error", () => {
@@ -1144,7 +1287,7 @@ describe("SearchPage", () => {
     expect(screen.getByRole("group", { name: "Theme" }).closest("[inert]")).not.toBeNull();
   });
 
-  it("heads the list in the sheet with the site's name and theme switch on narrow screens", async () => {
+  it("heads the list with the site's name and theme switch on narrow screens", async () => {
     screenIs(false);
     renderAt(SEARCH);
     await loaded();
@@ -1186,38 +1329,27 @@ describe("SearchPage", () => {
     expect(names()).toEqual(["Therapist a", "Therapist c", "Therapist b"]);
   });
 
-  it("tells the map how much of it the sheet covers on narrow screens, counting the list as lowered to show the map", async () => {
-    screenIs(false);
-    placeByDistrict();
-    renderAt(SEARCH, [therapist("a", "Hove BN3")]);
-    const pin = await screen.findByRole("button", { name: `Pin ${key(HOVE)}` });
-    expect(results().dataset.position).toBe("full");
-    expect(screen.getByTestId("map").dataset.covered).toBe("56");
-    fireEvent.click(screen.getByRole("button", { name: "Show map" }));
-    fireEvent.click(pin);
-    expect(results().dataset.position).toBe("half");
-    expect(screen.getByTestId("map").dataset.covered).toBe("400");
-  });
-
-  it("leaves the map wholly uncovered on wide screens", async () => {
-    screenIs(true);
+  it.each([
+    ["wide", true],
+    ["narrow", false],
+  ])("leaves the map wholly uncovered on %s screens", async (_, wide) => {
+    screenIs(wide);
     renderAt(SEARCH);
     await loaded();
-    expect(screen.getByTestId("map").dataset.covered).toBe("");
+    if (!wide) fireEvent.click(screen.getByRole("button", { name: "Map" }));
+    expect((await screen.findByTestId("map")).dataset.covered).toBe("");
   });
 
-  it("marks a selected pin's place in the list until the pin is activated again or the map clicked off it, raising the sheet halfway", async () => {
-    screenIs(false);
+  it("marks a selected pin's place in the list until the pin is activated again or the map clicked off it", async () => {
+    screenIs(true);
     placeByDistrict();
     renderAt(SEARCH, [therapist("a", "BRIGHTON BN3"), therapist("b", "BRIGHTON BN1"), therapist("c", "Hove BN3")]);
-    fireEvent.click(screen.getByRole("button", { name: "Show map" }));
     const here = await within(results()).findByRole("group", { name: "BN3 2 therapists" });
-    const pin = screen.getByRole("button", { name: `Pin ${key(HOVE)}` });
+    const pin = await screen.findByRole("button", { name: `Pin ${key(HOVE)}` });
     fireEvent.click(pin);
     expect(here.closest("li")?.getAttribute("aria-current")).toBe("true");
     // Outlined as well as ringed, as forced colours drop the ring.
     expect(here.classList.contains("forced-marked")).toBe(true);
-    expect(results().dataset.position).toBe("half");
     expect(screen.getByTestId("map").dataset.selected).toBe(key(HOVE));
     fireEvent.click(pin);
     expect(here.closest("li")?.hasAttribute("aria-current")).toBe(false);
@@ -1230,6 +1362,63 @@ describe("SearchPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "Map away from the pins" }));
     expect(alone?.hasAttribute("aria-current")).toBe(false);
     expect(screen.getByTestId("map").dataset.selected).toBe("");
+  });
+
+  it("brings the list back at a chosen pin's place on narrow screens, the keyboard on the first name there, keeping the map as it was", async () => {
+    screenIs(false);
+    placeByDistrict();
+    renderAt(SEARCH, [therapist("a", "BRIGHTON BN3"), therapist("b", "BRIGHTON BN1"), therapist("c", "Hove BN3")]);
+    const here = await within(results()).findByRole("group", { name: "BN3 2 therapists" });
+    fireEvent.click(screen.getByRole("button", { name: "Map" }));
+    const pin = await screen.findByRole("button", { name: `Pin ${key(HOVE)}` });
+    act(() => pin.focus());
+    fireEvent.click(pin);
+    expect(screen.getByRole("button", { name: "Map" })).toBeTruthy();
+    expect(map().closest("[hidden]")).not.toBeNull();
+    expect(here.closest("li")?.getAttribute("aria-current")).toBe("true");
+    expect(here.classList.contains("forced-marked")).toBe(true);
+    expect(document.activeElement).toBe(within(here).getByRole("link", { name: "Therapist a" }));
+    // Behind the list, the map keeps the pin chosen, whatever its pins hear.
+    fireEvent.click(within(map()).getByRole("button", { name: "Map away from the pins", hidden: true }));
+    expect(here.closest("li")?.getAttribute("aria-current")).toBe("true");
+    fireEvent.click(screen.getByRole("button", { name: "Map" }));
+    expect(map().dataset.selected).toBe(key(HOVE));
+    // Chosen again, it brings the list back to it again.
+    act(() => (document.activeElement as HTMLElement).blur());
+    fireEvent.click(pin);
+    expect(screen.getByRole("button", { name: "Map" })).toBeTruthy();
+    expect(document.activeElement).toBe(within(here).getByRole("link", { name: "Therapist a" }));
+    fireEvent.click(screen.getByRole("button", { name: "Map" }));
+    fireEvent.click(screen.getByRole("button", { name: "Map away from the pins" }));
+    expect(here.closest("li")?.hasAttribute("aria-current")).toBe(false);
+  });
+
+  it("says what the map's button shows on each press, and nothing as it appears, a pin brings the list back or the layout changes", async () => {
+    const resize = screenIs(false);
+    placeByDistrict();
+    renderAt(SEARCH, [therapist("a", "Hove BN3")]);
+    const status = screen.getAllByRole("status").find((el) => el.tagName === "P")!;
+    await waitFor(() => expect(status.textContent).toBe("1 therapist near Leeds."));
+    // Its own region, beside it, so a press is said without the search's status saying it again.
+    const said = () => screen.getByRole("button", { name: /^(Map|List)$/ }).nextElementSibling!;
+    expect(said().getAttribute("aria-live")).toBe("polite");
+    expect(said().textContent).toBe("");
+    fireEvent.click(screen.getByRole("button", { name: "Map" }));
+    expect(said().textContent).toBe("Showing the map.");
+    fireEvent.click(screen.getByRole("button", { name: "List" }));
+    expect(said().textContent).toBe("Showing the list.");
+    fireEvent.click(screen.getByRole("button", { name: "Map" }));
+    expect(said().textContent).toBe("Showing the map.");
+    fireEvent.click(await screen.findByRole("button", { name: `Pin ${key(HOVE)}` }));
+    expect(screen.getByRole("button", { name: "Map" })).toBeTruthy();
+    expect(said().textContent).toBe("");
+    // Emptied, so the same words are heard again.
+    fireEvent.click(screen.getByRole("button", { name: "Map" }));
+    expect(said().textContent).toBe("Showing the map.");
+    expect(status.textContent).toBe("1 therapist near Leeds.");
+    resize(true);
+    resize(false);
+    expect(said().textContent).toBe("");
   });
 
   it("scrolls a selected pin's place into view, unless it is in view already", async () => {
@@ -1413,19 +1602,21 @@ describe("SearchPage", () => {
     expect(within(map()).getByRole("button", { name: "Search this area" })).toBeTruthy();
   });
 
-  it("puts the search over the map away on a phone while the shortlist is open", async () => {
+  it("puts the search away on a phone while the shortlist is open, offering no search on its map", async () => {
     screenIs(false);
     renderAt("/?Location=Leeds&Languages=French");
     await loaded();
-    await screen.findByTestId("map");
     pick(/^Shortlist/);
     expect(screen.queryByRole("textbox", { name: "Location" })).toBeNull();
     expect(screen.queryByRole("button", { name: /^Filters/ })).toBeNull();
     expect(screen.queryByRole("button", { name: "Remove French" })).toBeNull();
-    expect(within(map()).queryByRole("button", { name: "Search this area" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Map" }));
+    expect(within(await screen.findByTestId("map")).queryByRole("button", { name: "Search this area" })).toBeNull();
     pick("Results");
-    expect(screen.getByRole("textbox", { name: "Location" })).toBeTruthy();
     expect(within(map()).getByRole("button", { name: "Search this area" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "List" }));
+    expect(screen.getByRole("textbox", { name: "Location" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Remove French" })).toBeTruthy();
   });
 
   it("gives the shortlist the page before a search on wide screens, the filters beside the prompt standing aside", () => {
@@ -1574,26 +1765,28 @@ describe("SearchPage", () => {
     ]);
   });
 
-  it("raises a lowered sheet halfway to mark a shortlist pin's therapists, starting the list at them", async () => {
+  it("brings the shortlist back at a shortlist pin's therapists on narrow screens, starting below its tabs", async () => {
     screenIs(false);
     placeByDistrict();
     shortlist.add(therapist("c", "Hove BN3"));
     renderAt(SEARCH, [therapist("a", "BRIGHTON BN1")]);
     await within(results()).findByRole("link", { name: "Therapist a" });
     pick(/^Shortlist/);
-    fireEvent.click(screen.getByRole("button", { name: "Show map" }));
+    const column = list();
+    const bar = results().querySelector<HTMLElement>("[data-list-tabs]")!;
+    fireEvent.click(screen.getByRole("button", { name: "Map" }));
     const pin = await screen.findByRole("button", { name: `Pin ${key(HOVE)}` });
     const scrollTo = vi.fn();
-    Object.defineProperty(list(), "scrollTo", { value: scrollTo });
+    Object.defineProperty(column, "scrollTo", { value: scrollTo });
+    Object.defineProperty(bar, "offsetHeight", { value: 49 });
     const box = (top: number, bottom: number) => ({ top, bottom }) as DOMRect;
     vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
-      return this === list() ? box(100, 500) : box(700, 900);
+      return this === column ? box(100, 500) : this === bar ? box(100, 149) : box(700, 900);
     });
     fireEvent.click(pin);
-    expect(results().dataset.position).toBe("half");
     expect(screen.getByRole("tab", { name: /^Shortlist/ }).getAttribute("aria-selected")).toBe("true");
     expect(screen.getByRole("link", { name: "Therapist c" }).closest("li")?.getAttribute("aria-current")).toBe("true");
-    expect(scrollTo).toHaveBeenLastCalledWith({ top: 700 - 100 - 8, behavior: "auto" });
+    expect(scrollTo).toHaveBeenLastCalledWith({ top: 700 - 100 - 49 - 8, behavior: "auto" });
   });
 
   it("marks a shortlist pin's therapists in the shortlist, which stays open, until the pin is activated again", async () => {
@@ -1665,17 +1858,36 @@ describe("SearchPage", () => {
     expect(await screen.findByText("Kept in this browser only · 1 not on the map.")).toBeTruthy();
   });
 
-  it("raises a lowered sheet to show the tab picked, or the one already open", async () => {
+  it("keeps the map in the list's place on narrow screens as the tabs change, mapping the one picked", async () => {
     screenIs(false);
-    renderAt(SEARCH);
-    await loaded();
-    fireEvent.click(screen.getByRole("button", { name: "Show map" }));
+    placeByDistrict();
+    shortlist.add(therapist("c", "Hove BN3"));
+    renderAt(SEARCH, [therapist("a", "BRIGHTON BN1")]);
+    await within(results()).findByRole("link", { name: "Therapist a" });
+    fireEvent.click(screen.getByRole("button", { name: "Map" }));
+    await waitFor(() => expect(mapPins()).toEqual([`Pin ${key(BRIGHTON)}: a`]));
     pick(/^Shortlist/);
-    expect(results().dataset.position).toBe("full");
-    expect(screen.getByRole("tabpanel", { name: /^Shortlist/ }).textContent).toMatch(/^Bookmark anyone who might suit you/);
-    fireEvent.click(screen.getByRole("button", { name: "Show map" }));
+    await waitFor(() => expect(mapPins()).toEqual([`Pin ${key(HOVE)}: c`]));
+    expect(screen.getByRole("region", { name: "Map of your shortlist" })).toBe(map());
+    expect(map().dataset.showsStatuses).toBe("true");
+    expect(screen.getByRole("button", { name: "List" })).toBeTruthy();
+  });
+
+  it("looks up the shortlist's places on narrow screens only once the map is drawn", async () => {
+    screenIs(false);
+    placeByDistrict();
+    shortlist.add(therapist("c", "Worthing BN11"));
+    renderAt(SEARCH, [therapist("a", "BRIGHTON BN1")]);
+    await within(results()).findByRole("link", { name: "Therapist a" });
+    const looked = () => vi.mocked(api.place).mock.calls.map(([text]) => text);
+    // The results' own, by which the list groups them.
+    await waitFor(() => expect(looked()).toEqual(["BRIGHTON BN1"]));
     pick(/^Shortlist/);
-    expect(results().dataset.position).toBe("full");
+    expect(screen.getByText("Kept in this browser only.")).toBeTruthy();
+    expect(looked()).toEqual(["BRIGHTON BN1"]);
+    fireEvent.click(screen.getByRole("button", { name: "Map" }));
+    await waitFor(() => expect(mapPins()).toEqual([`Pin ${key(BRIGHTON)}: c`]));
+    expect(looked()).toEqual(["BRIGHTON BN1", "WORTHING BN11"]);
   });
 
   it("keeps the shortlist in a tab beside the prompt before a search", async () => {
@@ -1981,6 +2193,15 @@ describe("SearchPage online", () => {
     expect(list().scrollTop).toBe(400);
   });
 
+  it("keeps the keyboard on its control as the window crosses between wide and narrow", async () => {
+    const resize = screenIs(true);
+    renderAt(GREEK);
+    await loaded();
+    act(() => screen.getByRole("tab", { name: "Results" }).focus());
+    resize(false);
+    expect(document.activeElement).toBe(screen.getByRole("tab", { name: "Results" }));
+  });
+
   it("returns to the shortlist at its own place after Back from a profile opened from it", async () => {
     screenIs(true);
     shortlist.add(therapist("a"));
@@ -2207,15 +2428,26 @@ describe("SearchPage's view transitions", () => {
     await waitFor(() => expect(started).toEqual([["morph"], ["morph"]]));
   });
 
-  it.each([
-    { screen: "wide", wide: true },
-    { screen: "narrow", wide: false },
-  ])("leaves the tabs unanimated over the map on $screen screens, as nothing moves", async ({ wide }) => {
-    screenIs(wide);
+  it("leaves the tabs unanimated over the map on wide screens, as nothing moves", async () => {
+    screenIs(true);
     renderAt(SEARCH);
     await loaded();
     pick(/^Shortlist/);
     expect(screen.getByRole("tab", { name: /^Shortlist/ }).getAttribute("aria-selected")).toBe("true");
     expect(started).toEqual([]);
+  });
+
+  it("animates the list into the toolbar's place as the shortlist opens beside a search on narrow screens, not with the map in its place", async () => {
+    screenIs(false);
+    renderAt(SEARCH);
+    await loaded();
+    pick(/^Shortlist/);
+    await waitFor(() => expect(started).toEqual([["morph"]]));
+    pick(/^Results/);
+    await waitFor(() => expect(started).toEqual([["morph"], ["morph"]]));
+    fireEvent.click(screen.getByRole("button", { name: "Map" }));
+    pick(/^Shortlist/);
+    expect(screen.getByRole("tab", { name: /^Shortlist/ }).getAttribute("aria-selected")).toBe("true");
+    expect(started).toEqual([["morph"], ["morph"]]);
   });
 });

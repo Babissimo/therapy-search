@@ -1,3 +1,4 @@
+import { List, MapIcon } from "lucide-react";
 import { Tabs } from "radix-ui";
 import { lazy, useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { Link, useLocation, useMatch } from "react-router";
@@ -36,7 +37,6 @@ import { Prompt } from "./Prompt";
 import { Results } from "./Results";
 import { ResultsPanel } from "./ResultsPanel";
 import { ResultsStatus } from "./ResultsStatus";
-import { coverOf, ResultsSheet, type SheetPosition } from "./ResultsSheet";
 import { SEARCH_BOX_ID, SearchBox } from "./SearchBox";
 import { placed, tickedFilters } from "./state";
 import { useResults } from "./useResults";
@@ -47,13 +47,22 @@ import { useRememberedScroll, useRememberedTab } from "./viewMemory";
 // Fetched as the place box takes focus, so it is usually here by the time a first search's results are.
 const MapPane = lazy(loadMap);
 
-/** Wide enough for the results to sit beside the map rather than over it. */
-const WIDE = "(min-width: 64rem)";
+/**
+ * Wide enough for the list to sit beside the map, and tall enough for the side bar to show a whole card under its tabs.
+ * Below either, the list leads and the map waits behind a button.
+ */
+const WIDE = "(min-width: 64rem) and (min-height: 31rem)";
 
 const NO_CENTRE = { settled: true };
 
 /** Space left above a selected pin's entry as it scrolls into view. */
 const REVEAL_GAP_PX = 8;
+
+/**
+ * Where the list leads, whether the map shows in its place, and if not, whether it has since the page was last laid out:
+ * it is drawn only once asked for, then kept.
+ */
+type PhoneMap = "unasked" | "shown" | "hidden";
 
 /** What the map shows of the list that is open. */
 type MapView = Pick<MapPaneProps, "label" | "fitKey" | "centre" | "centreSettled" | "pins" | "marksShortlist" | "showsStatuses" | "placing">;
@@ -62,6 +71,7 @@ export function SearchPage() {
   const { params, error, update } = useSearchState();
   const online = useMatch(ONLINE_PATH) !== null;
   const wide = useMediaQuery(WIDE);
+  useKeyboardAcross(wide);
   if (!params) {
     return (
       <div className="m-4 space-y-4">
@@ -84,6 +94,28 @@ export function SearchPage() {
       {online ? <OnlineView params={onlineParams(params)} onChange={update} wide={wide} /> : <SearchView params={params} onChange={update} wide={wide} />}
     </Morph>
   );
+}
+
+/**
+ * Crossing the breakpoint draws the toolbar and the list afresh elsewhere in the page, taking away the control the keyboard
+ * was on. The keyboard goes to the same control in its new place, known by its id or link, or else to the open tab.
+ */
+function useKeyboardAcross(wide: boolean) {
+  // Read as the page is drawn for the other side, while the control is still there.
+  const [crossed, setCrossed] = useState<{ wide: boolean; from: Element | null }>({ wide, from: null });
+  if (crossed.wide !== wide) setCrossed({ wide, from: document.activeElement });
+  useLayoutEffect(() => {
+    const { from } = crossed;
+    const now = document.activeElement;
+    if (!from || from.isConnected || (now && now !== document.body)) return;
+    const href = from.getAttribute("href");
+    const twins = from.id ? [document.getElementById(from.id)] : [...document.querySelectorAll("a[href]")].filter((a) => href && a.getAttribute("href") === href);
+    for (const control of [...twins, document.querySelector('[role="tab"][aria-selected="true"]')]) {
+      if (!(control instanceof HTMLElement) || control.closest("[hidden], [inert]")) continue;
+      control.focus();
+      if (document.activeElement === control) return;
+    }
+  }, [crossed]);
 }
 
 type ViewProps = { params: SearchParams; onChange: (next: SearchParams) => void; wide: boolean };
@@ -112,8 +144,12 @@ function SearchView({ params, onChange, wide }: ViewProps) {
   // A new search replaces the history entry, so it begins on the results.
   const [tab, setTab] = useRememberedTab(entry);
   const shortlistOpen = tab === "shortlist";
+  const [phoneMap, setPhoneMap] = useState<PhoneMap>("unasked");
+  // Beside the list on wide screens; where the list leads, once asked for.
+  const mapDrawn = searching && (wide || phoneMap !== "unasked");
+  const mapInView = wide || phoneMap === "shown";
   // Beside a search, the map shows whichever list is open, framing each afresh as its tab opens.
-  const mapsShortlist = searching && shortlistOpen;
+  const mapsShortlist = mapDrawn && shortlistOpen;
   const [setAsideOpen] = useSetAsideOpen();
   // As the tab lists them, the map shows those set aside only while their section is open.
   const shortlisted = useShortlistIf(mapsShortlist)
@@ -144,31 +180,33 @@ function SearchView({ params, onChange, wide }: ViewProps) {
   // Whether the filters are open beneath the search box over the map. Right of the prompt on wide screens they show
   // regardless, and stay open over the map when the keyword starts a search; a search for a place puts them away.
   const [filtersOpen, setFiltersOpen] = useState(!searching && wide);
-  const [sheet, setSheet] = useState<SheetPosition>("full");
   // The place a search from the start was held back for while the page asks for a filter first, and whether the visitor
   // chose to search one without, which stops the asking for as long as Near me stays open.
   const [heldAt, setHeldAt] = useState<string>();
   const [unfiltered, setUnfiltered] = useState(false);
-  const layout = searching ? "search" : wide ? "prompt beside filters" : "prompt";
+  const layout = searching ? (wide ? "search beside map" : "search list first") : wide ? "prompt beside filters" : "prompt";
   const [laidOutFor, setLaidOutFor] = useState(layout);
   if (laidOutFor !== layout) {
     setLaidOutFor(layout);
-    // A search opens on its list.
-    if (searching) {
-      setSheet("full");
-      setHeldAt(undefined);
-    } else setFiltersOpen(wide);
+    // Each layout opens on its list, with the map drawn afresh: where the list leads, once asked for.
+    setPhoneMap("unasked");
+    if (searching) setHeldAt(undefined);
+    else setFiltersOpen(wide);
   }
-  // The shortlist keeps its place apart from the results', under a key of its own.
-  const scroll = useRememberedScroll(shortlistOpen ? `${entry} shortlist` : entry, shortlistOpen || !searching || !results.loading);
+  // The shortlist keeps its place apart from the results', under a key of its own. Behind the map, the list waits to be
+  // scrolled back as it shows again.
+  const listReady = (shortlistOpen || !searching || !results.loading) && phoneMap !== "shown";
+  const scroll = useRememberedScroll(shortlistOpen ? `${entry} shortlist` : entry, listReady);
   const listRef = useRef<HTMLUListElement>(null);
   const panelToggleRef = useRef<HTMLButtonElement>(null);
   // Whether the list was showing when a pin was selected, so it can glide to the pin's entry rather than jump.
   const listShowing = useRef(false);
+  // Whether the pin's entry takes the keyboard, as the map it was chosen on gives way to the list.
+  const handOver = useRef(false);
   const tabsRef = useRef<HTMLDivElement>(null);
   const wasSearching = useRef(searching);
-  // On a phone the toolbar leaves the list for the map as a search begins, so the keyboard, dropped with the box it was in,
-  // goes to the new search's open tab rather than the top of the page.
+  // As a search begins, the place box beneath the filters gives way to the toolbar's, so the keyboard, dropped with the box
+  // it was in, goes to the new search's open tab rather than the top of the page.
   useLayoutEffect(() => {
     if (searching && !wasSearching.current && document.activeElement === document.body) {
       tabsRef.current?.querySelector<HTMLElement>('[aria-selected="true"]')?.focus();
@@ -177,15 +215,23 @@ function SearchView({ params, onChange, wide }: ViewProps) {
   }, [searching]);
 
   function select(pin: Pin) {
+    // Where the list leads, the map gives way to it at the pin's place, even a pin chosen already, and stays as it was for
+    // the button to bring back.
+    if (!wide) {
+      setSelection({ fitKey: mapView.fitKey, pinKey: pin.key });
+      listShowing.current = false;
+      handOver.current = true;
+      setPhoneMap("hidden");
+      return;
+    }
     // Activating the selected pin lets it go.
     if (pin.key === selected?.key) {
       setSelection(undefined);
       return;
     }
     setSelection({ fitKey: mapView.fitKey, pinKey: pin.key });
-    listShowing.current = wide ? panelOpen : sheet !== "peek";
-    if (wide) setPanelOpen(true);
-    else if (sheet === "peek") setSheet("half");
+    listShowing.current = panelOpen;
+    setPanelOpen(true);
   }
 
   function pickTab(value: string) {
@@ -194,16 +240,16 @@ function SearchView({ params, onChange, wide }: ViewProps) {
       // A selected pin belongs to the list the map was showing, which lets it go.
       setSelection(undefined);
     };
-    // Beside or above the prompt, the toolbar comes and goes with the shortlist, so the list glides into its place. Over
-    // the map, nothing moves.
-    if (!searching) startMorph(pick);
+    // Beside or above the prompt, and atop the list where it leads, the toolbar comes and goes with the shortlist, so the
+    // list glides into its place. Over the map, or with the map in the list's place, nothing moves.
+    if (!searching || (!wide && phoneMap !== "shown")) startMorph(pick);
     else pick();
   }
 
   const aside = useRef<HTMLDivElement>(null);
-  // Past the toolbar to the list, put away or not, and while the toolbar stands aside for the shortlist, which it otherwise
-  // comes before, back to its search box. Before a search on wide screens, past the prompt to the filters right of it, as
-  // online's start offers. Each brings the results' tab forward.
+  // Past the toolbar to the list, put away, behind the map or not, and while the toolbar stands aside for the shortlist,
+  // which it otherwise comes before, back to its search box. Before a search on wide screens, past the prompt to the
+  // filters right of it, as online's start offers. Each brings the results' tab forward.
   const skips: Skip[] = searching
     ? [
         ...(shortlistOpen
@@ -222,7 +268,7 @@ function SearchView({ params, onChange, wide }: ViewProps) {
           onSkip: () => {
             if (tab !== "results") pickTab("results");
             if (wide) setPanelOpen(true);
-            else if (sheet === "peek") setSheet("half");
+            else if (phoneMap === "shown") setPhoneMap("hidden");
             // The results' panel, which ListPanels draws first.
             focusOnceShown(() => scroll.ref.current?.querySelector<HTMLElement>('[role="tabpanel"]'));
           },
@@ -239,24 +285,34 @@ function SearchView({ params, onChange, wide }: ViewProps) {
       ];
 
   const selectedKey = selected?.key;
-  // After the render that opens the panel or raises the sheet, so the list is there to scroll. The entry is the open
-  // tab's, as the results keep theirs, hidden, while the shortlist shows.
+  // After the render that opens the panel or brings the list back from behind the map, so the list is there to scroll,
+  // and again for each choice of a pin, even the one chosen already. The entry is the open tab's, as the results keep
+  // theirs, hidden, while the shortlist shows.
   useEffect(() => {
     const list = scroll.ref.current;
     const entry = selectedKey === undefined ? null : list?.querySelector<HTMLElement>(`[role="tabpanel"]:not([hidden]) [data-pin="${selectedKey}"]`);
-    if (list && entry) reveal(list, entry, listShowing.current);
-  }, [scroll.ref, selectedKey]);
+    const handing = handOver.current;
+    handOver.current = false;
+    if (!list || !entry) return;
+    reveal(list, entry, listShowing.current);
+    // The first name there, already in view.
+    if (handing) entry.querySelector("a")?.focus({ preventScroll: true });
+  }, [scroll.ref, selectedKey, selection]);
 
   const list = (
-    <Results
-      params={params}
-      results={results}
-      listRef={listRef}
-      pins={pins}
-      unplaced={unplaced}
-      selected={mapsShortlist ? undefined : selected}
-      onHighlight={highlight.set}
-    />
+    <>
+      <Results
+        params={params}
+        results={results}
+        listRef={listRef}
+        pins={pins}
+        unplaced={unplaced}
+        selected={mapsShortlist ? undefined : selected}
+        onHighlight={highlight.set}
+      />
+      {/* Where the list leads, it is the page, so the button comes at its end, as online's does. */}
+      {!wide && <LoadMore results={results} listRef={listRef} placing={placing || moving} atEnd />}
+    </>
   );
   // A place searched from the start with nothing that would make a chip waits for a filter, unless the visitor says not to.
   const hold = (place: string) => {
@@ -310,21 +366,42 @@ function SearchView({ params, onChange, wide }: ViewProps) {
   );
   const footer =
     tab === "results" ? (
-      <LoadMore
-        results={results}
-        listRef={listRef}
-        placing={placing || moving}
-        folded={wide ? !panelOpen : undefined}
-        toggleRef={panelToggleRef}
-      />
+      <LoadMore results={results} listRef={listRef} placing={placing || moving} folded={!panelOpen} toggleRef={panelToggleRef} />
     ) : undefined;
   const tabs = <ListTabs ref={tabsRef} />;
+  const mapToggle = searching && !wide && <MapToggle shown={phoneMap === "shown"} onToggle={() => setPhoneMap(phoneMap === "shown" ? "hidden" : "shown")} />;
+  const map = (
+    <MapSlot>
+      <MapPane
+        {...mapView}
+        entry={entry}
+        highlight={highlight}
+        selected={selected}
+        onSelect={select}
+        // Kept as the map hides behind the list, where the pointer leaving its pin would otherwise let it go.
+        onDeselect={() => mapInView && setSelection(undefined)}
+        onSearchArea={
+          mapsShortlist
+            ? undefined
+            : (postcode) => {
+                if (samePostcode(postcode, params.text.Location)) return false;
+                drafts.applyAt(postcode);
+                setFiltersOpen(false);
+                return true;
+              }
+        }
+        outsideUK={params.flags.LocationSearchOutsideUK}
+        underToolbar={wide}
+      />
+    </MapSlot>
+  );
   const toolbar = (placement: Placement) => (
     <Toolbar
       placement={placement}
       params={params}
       drafts={drafts}
       wide={wide}
+      searching={searching}
       // The side bar's toggle, left over the top left as the side bar hides, moves the toolbar aside.
       besideToggle={wide && searching && !panelOpen}
       // Nothing in it acts on the shortlist. Hidden rather than unmounted, it keeps what is typed or open in it for the results.
@@ -336,27 +413,36 @@ function SearchView({ params, onChange, wide }: ViewProps) {
   );
 
   // Before a search the list takes the page, as online's does, with the toolbar right of it on wide screens and atop it on
-  // a phone; a search gives the page to the map, the list beside or over it. On wide screens the toolbar keeps its place in
-  // the tree as it moves over the map, so what is typed, open or in focus in it stays; on a phone its filters' sheet does.
+  // a phone; on wide screens a search gives the page to the map, the list beside it, and the toolbar keeps its place in the
+  // tree as it moves over the map, so what is typed, open or in focus in it stays. On a phone the list leads throughout,
+  // the toolbar atop it, and the map waits behind the button beside its tabs.
   return (
     <FiltersSheet phone={!wide} params={params} drafts={drafts}>
       {/* The tabs' root spans the page, around wherever their list and panels sit. */}
       <Tabs.Root value={tab} onValueChange={pickTab} asChild>
         <div className="group/tabs flex min-h-0 flex-1 print:block">
           {(searching || wide) && <SkipLinks skips={skips} />}
-          {/* Apart from the list, which goes inert as it is put away over the map, and stays put as it moves between the side
-              bar and the sheet. There before a search starts, as a live region is heard only once it is there. */}
+          {/* Apart from the list, which goes inert as it is put away beside the map or hides behind it, and stays put as the
+              list moves between layouts. There before a search starts, as a live region is heard only once it is there. */}
           <ResultsStatus params={params} results={results} searching={searching} />
-          {!searching && (
-            <ListColumn wide={wide} tabs={tabs} top={!wide && toolbar("list")} topHidden={shortlistOpen} scroll={scroll}>
+          {(!searching || !wide) && (
+            <ListColumn
+              wide={wide}
+              tabs={tabs}
+              top={!wide && toolbar("list")}
+              topHidden={shortlistOpen}
+              scroll={scroll}
+              toggle={mapToggle}
+              map={!wide && mapDrawn && map}
+              mapShown={phoneMap === "shown"}
+            >
               {lists}
             </ListColumn>
           )}
-          {(searching || wide) && (
+          {wide && (
             // Before a search it holds the toolbar alone, so it goes with it, leaving the shortlist the page. With a search it
             // holds the toolbar, the list and the map, in the order the keyboard takes them: the map in the second column with
-            // the toolbar drawn over it, and the side bar in the first, or on a phone the sheet over them both. Paper, without
-            // the map, gives the list the page's width.
+            // the toolbar drawn over it, and the side bar in the first. Paper, without the map, gives the list the page's width.
             <div
               ref={aside}
               hidden={!searching && shortlistOpen}
@@ -366,7 +452,7 @@ function SearchView({ params, onChange, wide }: ViewProps) {
               )}
             >
               {toolbar(searching ? "map" : "aside")}
-              {searching && wide && (
+              {searching && (
                 <ResultsPanel
                   open={panelOpen}
                   onOpenChange={setPanelOpen}
@@ -380,44 +466,38 @@ function SearchView({ params, onChange, wide }: ViewProps) {
                   {lists}
                 </ResultsPanel>
               )}
-              {searching && !wide && (
-                <ResultsSheet position={sheet} onPositionChange={setSheet} tabs={tabs} scrollRef={scroll.ref} onScroll={scroll.save} footer={footer}>
-                  <Masthead className="pb-3 pointer-coarse:pt-2" />
-                  {lists}
-                </ResultsSheet>
-              )}
-              {/* In the same place in the tree on any screen, so the map stays as the window crosses between wide and narrow. */}
-              {searching && (
-                <div className="col-start-2 row-start-1">
-                  <MapSlot>
-                    <MapPane
-                      {...mapView}
-                      entry={entry}
-                      highlight={highlight}
-                      selected={selected}
-                      onSelect={select}
-                      onDeselect={() => setSelection(undefined)}
-                      onSearchArea={
-                        mapsShortlist
-                          ? undefined
-                          : (postcode) => {
-                              if (samePostcode(postcode, params.text.Location)) return false;
-                              drafts.applyAt(postcode);
-                              setFiltersOpen(false);
-                              return true;
-                            }
-                      }
-                      outsideUK={params.flags.LocationSearchOutsideUK}
-                      coveredBelow={wide ? undefined : (height) => coverOf(sheet, height)}
-                    />
-                  </MapSlot>
-                </div>
-              )}
+              {searching && <div className="col-start-2 row-start-1">{map}</div>}
             </div>
           )}
         </div>
       </Tabs.Root>
     </FiltersSheet>
+  );
+}
+
+/** Beside the tabs where the list leads, and as tall, it stays put as it changes, keeping the keyboard. */
+function MapToggle({ shown, onToggle }: { shown: boolean; onToggle: () => void }) {
+  // What the last press showed, said while it shows. A pin brings the list back unsaid, as the name it focuses is read out.
+  const [pressed, setPressed] = useState<boolean>();
+  return (
+    <>
+      <Button
+        type="button"
+        variant="outline"
+        className="pointer-coarse:h-11"
+        onClick={() => {
+          setPressed(!shown);
+          onToggle();
+        }}
+      >
+        {shown ? <List data-icon="inline-start" aria-hidden /> : <MapIcon data-icon="inline-start" aria-hidden />}
+        {shown ? "List" : "Map"}
+      </Button>
+      {/* Focus stays on the button, whose new name is seldom read out, so the press is said here. */}
+      <span aria-live="polite" className="sr-only">
+        {pressed === shown ? (shown ? "Showing the map." : "Showing the list.") : ""}
+      </span>
+    </>
   );
 }
 
@@ -427,28 +507,34 @@ function samePostcode(postcode: string, location: string): boolean {
   return squeezed(postcode) === squeezed(location);
 }
 
-/** Scrolls the list to put `entry` just below its top, unless it is already wholly in view. */
+/**
+ * Scrolls the list to put `entry` just below its top, or below the tabs where they stay at its top as it scrolls, unless
+ * it is already wholly in view.
+ */
 function reveal(list: HTMLElement, entry: HTMLElement, glide: boolean) {
   const view = list.getBoundingClientRect();
+  const tabs = list.querySelector<HTMLElement>("[data-list-tabs]");
   const { top, bottom } = entry.getBoundingClientRect();
-  if (top >= view.top && bottom <= view.bottom) return;
+  if (top >= (tabs?.getBoundingClientRect().bottom ?? view.top) && bottom <= view.bottom) return;
   const smooth = glide && !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  list.scrollTo({ top: list.scrollTop + top - view.top - REVEAL_GAP_PX, behavior: smooth ? "smooth" : "auto" });
+  list.scrollTo({ top: list.scrollTop + top - view.top - (tabs?.offsetHeight ?? 0) - REVEAL_GAP_PX, behavior: smooth ? "smooth" : "auto" });
 }
 
-/** Where the toolbar stands: over the map, or before a search right of the list on wide screens and atop it on a phone. */
+/** Where the toolbar stands: over the map on wide screens, or right of the list there before a search, or atop the list on a phone. */
 type Placement = "map" | "aside" | "list";
 
 /**
  * The switch to online, search box, filters and active-filter chips. Over the map, the buttons the map offers once moved,
  * to search there or recentre, are placed to keep clear of it, so a change to its inset, width or height moves them too.
- * Beside the list the filters stay open, as online's do, with the place box, given as `placeStep`, at their foot.
+ * Beside the list the filters stay open, as online's do, with the place box, given as `placeStep`, at their foot. Atop the
+ * list on a phone, the filters open in a sheet.
  */
 function Toolbar({
   placement,
   params,
   drafts,
   wide,
+  searching,
   besideToggle,
   hidden,
   filtersOpen,
@@ -457,6 +543,7 @@ function Toolbar({
 }: Omit<ViewProps, "onChange"> & {
   placement: Placement;
   drafts: SearchDrafts;
+  searching: boolean;
   besideToggle: boolean;
   hidden: boolean;
   filtersOpen: boolean;
@@ -515,7 +602,7 @@ function Toolbar({
           <div className={cn("pointer-events-auto flex w-full flex-col gap-2 rounded-xl border bg-background p-2", overMap && "shadow-md")}>
             <ModeSwitch online={false} params={params} drafts={drafts} />
             {/* Before a search the place box follows the filters instead. */}
-            {overMap && (
+            {searching && (
               <div className="flex items-start gap-2 pointer-coarse:gap-3">
                 {/* A search for a place puts the filters away to show where it is; ticks and the keyword leave them open for more. */}
                 <Morph name="place">
