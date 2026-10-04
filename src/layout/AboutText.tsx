@@ -31,8 +31,8 @@ export function AboutText() {
       <ul className="list-disc space-y-1.5 pl-4">
         <li>
           Your browser keeps your shortlist (with where you stand with each therapist and your notes on them), your theme and a random number
-          that holds results in the same order, and shares none of them. Anyone you remove from your shortlist is kept for {REMOVED_DAYS} days,
-          in case you add them back, unless you clear it.
+          that holds results in the same order, and shares none of them. Anyone you remove from your shortlist is kept in case you add them
+          back, until you clear it or open this site {REMOVED_DAYS} days or more after removing them.
         </li>
         <li>
           Cloudflare hosts the site and logs your IP address, but never alongside your searches or the profiles you open. It also serves

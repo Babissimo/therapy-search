@@ -21,4 +21,10 @@ describe("AboutText", () => {
     expect(screen.getByText(/searches for 15 minutes \(online ones for 6 hours\), profiles for an hour/)).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Who sees what" })).toBeTruthy();
   });
+
+  it("says the browser keeps those removed from the shortlist until it is cleared or the site is opened 30 days on", () => {
+    render(<AboutText />, { wrapper: MemoryRouter });
+    screen.getByText(/Anyone you remove from your shortlist is kept in case you add them back, until you clear it or open this site 30 days or more/);
+    screen.getByText(/or open this site 30 days or more after removing them\.$/);
+  });
 });

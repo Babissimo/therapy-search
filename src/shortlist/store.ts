@@ -48,7 +48,7 @@ export type ShortlistStore = {
    * listed already keeps what they have the same way. Returns where the visitor then stands with them.
    */
   add: (card: ShortlistCard, place?: Partial<Omit<ShortlistEntry, "card">>) => Status;
-  /** Keeps the therapist for `REMOVED_DAYS`, to be added back as they were. */
+  /** Keeps the therapist, to be added back as they were, until the list is cleared or a page loads `REMOVED_DAYS` days or more after. */
   remove: (slug: string) => void;
   /** Takes everyone off, those removed too, with their statuses, notes and order, for a browser someone else may use next. */
   clear: () => void;
