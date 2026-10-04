@@ -3,7 +3,7 @@ import { queryOptions, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, Diamond, ExternalLink, MapPin } from "lucide-react";
 import type { Office, Profile, ProfileSection } from "@shared/types";
 import { BackButton } from "@/components/BackButton";
-import { FailedAlert, useFailure } from "@/components/FailedAlert";
+import { FailedAlert, FailureStatus, useFailure } from "@/components/FailedAlert";
 import { MapSlot } from "@/components/MapSlot";
 import { Portrait } from "@/components/Portrait";
 import { SkeletonText } from "@/components/SkeletonText";
@@ -57,17 +57,30 @@ export function ProfileBody({ slug, back, close }: { slug: string } & Exits) {
   const isMatch = useSearchMatch();
   const card = useOpeningCard(slug);
   const standing = useStanding(slug);
+  // Says each failure, and how its retry goes, once, for the alert, which keeps quiet. First in the failure's return and the
+  // skeleton's, so it stays in place from the one to the other and is heard.
+  const said = <FailureStatus failure={failure} />;
 
   if (failure.error) {
     return (
-      <div className="space-y-4">
-        <StickyHeader back={back} close={close} />
-        <FailedAlert error={failure.error} retrying={failure.retrying} retried={failure.retried} onRetry={failure.retry} />
-      </div>
+      <>
+        {said}
+        <div className="space-y-4">
+          <StickyHeader back={back} close={close} />
+          <FailedAlert error={failure.error} retrying={failure.retrying} retried={failure.retried} onRetry={failure.retry} quiet />
+        </div>
+      </>
     );
   }
   const profile = query.data;
-  if (profile === undefined) return <ProfileSkeleton back={back} close={close} />;
+  if (profile === undefined) {
+    return (
+      <>
+        {said}
+        <ProfileSkeleton back={back} close={close} />
+      </>
+    );
+  }
 
   const matches = matchingTags(profile, isMatch);
   const { long, short } = sectionsBySize(profile);

@@ -107,9 +107,25 @@ describe("ProfilePage's way back", () => {
 
   it("is there when the profile can't be shown, beside the reason", async () => {
     renderAt(["/?Location=Leeds", "/therapist/Test-ABCDEFGH"], new ApiError(404, "This profile isn't on UKCP any more."));
-    await screen.findByText("This profile isn't on UKCP any more.");
+    await screen.findByText("This profile isn't on UKCP any more.", { selector: "[data-slot=alert-description] > div" });
     fireEvent.click(screen.getByRole("button", { name: "Back to results" }));
     await screen.findByText("Search page");
+  });
+
+  it("says why the profile couldn't be shown, and how a retry goes, once each, from a region there before it", async () => {
+    renderAt(["/therapist/Test-ABCDEFGH"], new ApiError(503, "UKCP answered 503."));
+    const said = () => [...document.querySelectorAll("[aria-live]")].map((region) => region.textContent);
+    expect(said()).toEqual([""]);
+    await waitFor(() => expect(said()).toEqual(["UKCP answered 503."]));
+    let fail = (_: Error) => {};
+    vi.mocked(api.profile).mockImplementation(() => new Promise((_, reject) => (fail = reject)));
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    await waitFor(() => expect(said()).toEqual(["Trying again"]));
+    act(() => fail(new ApiError(404, "This profile isn't on UKCP any more.")));
+    await waitFor(() => expect(said()).toEqual(["This profile isn't on UKCP any more."]));
+    expect(screen.getByText("This profile isn't on UKCP any more.", { selector: "[data-slot=alert-description] > div" })).toBeTruthy();
+    // The alert shows each failure without saying it too.
+    expect(screen.queryAllByRole("alert")).toEqual([]);
   });
 
   it("tries a failed profile again, and hands the keyboard to the therapist's name once it arrives", async () => {
