@@ -162,9 +162,18 @@ describe("useResults near a place", () => {
     const { result } = renderHook(() => useResults(near("Leeds")), { wrapper: withClient() });
     // The twelve sent reach 0.3 miles, where three more are still to come.
     await waitFor(() => expect(shown(result.current.therapists)).toEqual(expectedNear.slice(0, 10)));
-    expect([result.current.loading, result.current.first?.total]).toEqual([false, 30]);
+    expect([result.current.loading, result.current.partial, result.current.first?.total]).toEqual([false, true, 30]);
     await release();
     await waitFor(() => expect(shown(result.current.therapists)).toEqual(expectedNear.slice(0, 12)));
+    expect(result.current.partial).toBe(false);
+  });
+
+  it("counts the nearest few whole when they fill the first page their batch will show", async () => {
+    answerLater();
+    answerEarly(24);
+    const { result } = renderHook(() => useResults(near("Leeds")), { wrapper: withClient() });
+    await waitFor(() => expect(shown(result.current.therapists)).toEqual(expectedNear.slice(0, 12)));
+    expect(result.current.partial).toBe(false);
   });
 
   it("waits for the batch while the nearest few all share one distance", async () => {

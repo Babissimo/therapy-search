@@ -23,7 +23,6 @@ export const KNOWN_PROBLEMS: ReactNode[] = [
     On a touch screen, Filters and Use my location show their names, but some buttons, such as Hide list, the bookmark and the
     status menu, still show only an icon.
   </>,
-  "A screen reader can hear a search's count twice: first for the nearest few therapists, then for all of them.",
   "On a profile, if contact details fail to load, pressing Try again loses the keyboard's place.",
   "If you ask your device for less motion while a map is showing, the map keeps moving until you reload the page.",
 ];
