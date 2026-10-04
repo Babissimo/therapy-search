@@ -266,8 +266,9 @@ describe("SearchPage", () => {
     expect(toolbar().className).toContain("col-start-2");
     fireEvent.click(screen.getByRole("button", { name: "Hide list" }));
     expect(list().closest("[inert]")).not.toBeNull();
-    // The toolbar stands aside for the toggle left over the map's top left.
+    // The toolbar stands aside for the toggle left over the map's top left, further on a touch screen, which names it.
     expect(toolbar().className).toContain("left-14");
+    expect(toolbar().className).toContain("pointer-coarse:left-32");
     fireEvent.click(screen.getByRole("button", { name: "Show list" }));
     expect(list().closest("[inert]")).toBeNull();
     expect(toolbar().className).not.toContain("left-14");
@@ -310,6 +311,18 @@ describe("SearchPage", () => {
     expect(await within(results()).findByText(/^24 of 30/)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Show list" }));
     expect(more.className).not.toContain("w-8");
+  });
+
+  it("keeps Load more's name on screen beside its icon over the map on a touch screen, which has no tooltip to name it by", async () => {
+    screenIs(true);
+    renderAt(SEARCH);
+    await loaded();
+    fireEvent.click(screen.getByRole("button", { name: "Hide list" }));
+    const more = screen.getByRole("button", { name: "Load more" });
+    expect(more.className).toContain("pointer-coarse:w-auto");
+    const name = within(more).getByText("Load more");
+    expect(name.className).toContain("invisible");
+    expect(name.className).toContain("pointer-coarse:visible");
   });
 
   it("names Load more in a tooltip only while it is folded to its icon", async () => {

@@ -45,6 +45,12 @@ describe("StatusMenu", () => {
     screen.getByRole("button", { name: "Status of Jo Bloggs: contacted" });
   });
 
+  it("shows the first word of its name on a touch screen, which has no tooltip to name it by", () => {
+    renderMenu(shortlisted);
+    const button = screen.getByRole("button", { name: "Status of Jo Bloggs: to contact" });
+    expect([...button.querySelectorAll(".pointer-coarse\\:not-sr-only")].map((span) => span.textContent)).toEqual(["Status"]);
+  });
+
   it("offers every status in order, then taking the therapist off the shortlist", () => {
     const onRemoved = vi.fn();
     const store = renderMenu(shortlisted, { onRemoved });

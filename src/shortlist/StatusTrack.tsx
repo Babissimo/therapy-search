@@ -74,10 +74,12 @@ export function StatusTrack({ therapist, status, listed = true, onChosen, onRemo
           </li>
         ))}
       </ol>
-      <div className="flex min-h-7 items-center justify-between gap-2">
+      {/* On a touch screen the menu is named on screen too, as wide as its target, so where the row lacks the room the buttons
+          go under the status, and under each other far enough apart that no one's target takes another's taps. */}
+      <div className="flex min-h-7 items-center justify-between gap-2 pointer-coarse:flex-wrap pointer-coarse:gap-y-2">
         <p className="text-sm text-muted-foreground">{STATUS_LABEL[status]}</p>
         {listed ? (
-          <div className="flex items-center gap-1 pointer-coarse:gap-2">
+          <div className="flex items-center gap-1 pointer-coarse:flex-wrap pointer-coarse:gap-y-4">
             {next && (
               <Button variant="outline" size="sm" onClick={() => step(next.status)}>
                 {next.label}

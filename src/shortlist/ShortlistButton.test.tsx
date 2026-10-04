@@ -34,6 +34,16 @@ describe("ShortlistButton", () => {
     expect(store.get()).toEqual([]);
   });
 
+  it("says what a press does on a touch screen, in the first word of its name, beside the therapist's own", () => {
+    renderButton();
+    // The words a touch screen shows, which a tooltip names elsewhere.
+    const shown = (name: string) =>
+      [...screen.getByRole("button", { name }).querySelectorAll(".pointer-coarse\\:not-sr-only")].map((span) => span.textContent);
+    expect(shown("Add Jo Bloggs to your shortlist")).toEqual(["Add"]);
+    fireEvent.click(screen.getByRole("button", { name: "Add Jo Bloggs to your shortlist" }));
+    expect(shown("Remove Jo Bloggs from your shortlist")).toEqual(["Remove"]);
+  });
+
   it("puts a therapist it removed back in the place and with the card they had", () => {
     const store = renderButton((seeded) => {
       seeded.add({ ...JO, summary: "Summary text." }, { addedAt: 42 });

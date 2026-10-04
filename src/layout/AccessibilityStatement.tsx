@@ -19,10 +19,6 @@ export const KNOWN_PROBLEMS: ReactNode[] = [
     JavaScript turned off, can't run the full search. They're offered the <a className="underline" href="/plain">plain search</a>{" "}
     instead, which has no map, shortlist or notes.
   </>,
-  <>
-    On a touch screen, Filters and Use my location show their names, but some buttons, such as Hide list, the bookmark and the
-    status menu, still show only an icon.
-  </>,
 ];
 
 /**

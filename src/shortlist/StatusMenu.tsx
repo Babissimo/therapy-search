@@ -41,6 +41,8 @@ export function StatusMenu({ therapist, onChosen, onRemoved }: Props) {
         {/* Marked by slug, for a list to give it focus once the therapist has moved. */}
         <IconButton
           label={`Status of ${therapist.name}: ${STATUS_LABEL[status].toLowerCase()}`}
+          // Beside the status it changes, which the track spells out.
+          touchLabel="Status"
           variant="ghost"
           size="icon-sm"
           data-status-menu={therapist.slug}

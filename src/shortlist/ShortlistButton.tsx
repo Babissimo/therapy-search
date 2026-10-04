@@ -26,6 +26,8 @@ export function ShortlistButton({ therapist, className }: Props) {
     <>
       <IconButton
         label={listed ? `Remove ${therapist.name} from your shortlist` : `Add ${therapist.name} to your shortlist`}
+        // Beside their name, which says who.
+        touchLabel={listed ? "Remove" : "Add"}
         variant="ghost"
         size="icon-sm"
         className={className}

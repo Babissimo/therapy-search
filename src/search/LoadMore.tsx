@@ -16,7 +16,7 @@ type Props = {
   atEnd?: boolean;
   /**
    * Given in the side bar, whose hiding leaves the button in view over the map, shrunk to its icon like the side bar's
-   * toggle: true while the side bar is hidden.
+   * toggle, and like it still named on a touch screen: true while the side bar is hidden.
    */
   folded?: boolean;
   /** The side bar's toggle, where the keyboard carries on once the last page is in while the list is hidden. */
@@ -58,7 +58,9 @@ export function LoadMore({ results: { query }, listRef, placing = false, atEnd =
               // Against the side bar's outer box, so the clip that hides the rest leaves it in view, over its place in the
               // strip: as wide as the strip within (the side bar's w-96 less its border and p-4), or folded to an icon.
               "visible absolute bottom-4 left-4 z-10 motion-safe:duration-200 motion-reduce:transition-colors",
-              folded ? "w-8 gap-0 shadow-md dark:bg-background dark:hover:bg-muted" : "w-[calc(22rem-1px)]",
+              folded
+                ? "w-8 gap-0 shadow-md dark:bg-background dark:hover:bg-muted pointer-coarse:w-auto pointer-coarse:gap-1.5"
+                : "w-[calc(22rem-1px)]",
             ]
           : "w-full",
       )}
@@ -73,12 +75,13 @@ export function LoadMore({ results: { query }, listRef, placing = false, atEnd =
       }}
     >
       <Icon className={cn(query.isFetchingNextPage && "motion-safe:animate-spin")} aria-hidden />
-      {/* Shrinks away when folded, then hides, so find in page passes over it. */}
+      {/* Shrinks away when folded, then hides, so find in page passes over it; except on a touch screen, which has no tooltip
+          to name the icon by. */}
       <span
         className={cn(
           docked && [
             "overflow-hidden motion-safe:transition-[max-width,opacity,visibility] motion-safe:duration-200",
-            folded ? "invisible max-w-0 opacity-0" : "max-w-24",
+            folded ? "invisible max-w-0 opacity-0 pointer-coarse:visible pointer-coarse:max-w-24 pointer-coarse:opacity-100" : "max-w-24",
           ],
         )}
       >
