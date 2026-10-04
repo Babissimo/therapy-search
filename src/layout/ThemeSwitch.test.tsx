@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
+import { readFileSync } from "node:fs";
 import { act, fireEvent, render, screen } from "@testing-library/react";
+import { compile } from "tailwindcss";
 import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
@@ -77,6 +79,27 @@ describe("ThemeSwitch", () => {
     }
   });
 
+  it("draws the chosen theme and keyboard focus from the radio's own state, without :has, which Firefox lacks before 121", async () => {
+    await renderSwitch();
+    const classes: string[] = [];
+    for (const name of ["Light", "System", "Dark"]) {
+      const radio = screen.getByRole("radio", { name });
+      expect(radio.classList.contains("peer")).toBe(true);
+      // A later sibling, which is all a peer variant reaches.
+      expect(radio.nextElementSibling?.classList.contains("peer-checked:bg-muted")).toBe(true);
+      const label = radio.closest("label")!;
+      classes.push(...[label, ...label.querySelectorAll("*")].flatMap((element) => [...element.classList]));
+    }
+    const css = await compiled(classes);
+    expect(css).not.toContain(":has(");
+    // The rule holding each declaration, by its selector.
+    const selector = (declaration: string) => css.match(new RegExp(`([^{}]+)\\{[^{}]*${declaration.replace(/[()]/g, "\\$&")}`))?.[1]?.trim();
+    expect(selector("background-color: var(--color-muted)")).toContain(":where(.peer):checked ~ *");
+    expect(selector("background-color: Highlight")).toContain(":where(.peer):checked ~ *");
+    expect(selector("outline-width: 2px")).toContain(":where(.peer):focus-visible ~ *");
+    expect(selector("outline-color: Highlight")).toContain(":where(.peer):focus-visible ~ *");
+  });
+
   it("forgets the pick on returning to system", async () => {
     localStorage.setItem("theme", "light");
     systemDark = true;
@@ -121,6 +144,15 @@ describe("ThemeSwitch", () => {
     expect(isDark()).toBe(true);
   });
 });
+
+/** The CSS Tailwind writes for `classes`, with index.css's forced-chosen utility and the theme's colours they use. */
+async function compiled(classes: string[]): Promise<string> {
+  const source = readFileSync(`${import.meta.dirname}/../index.css`, "utf8");
+  const chosen = source.match(/@utility forced-chosen \{\n[\s\S]*?\n\}\n/)?.[0];
+  if (!chosen) throw new Error("index.css has no forced-chosen utility");
+  const theme = "@theme { --spacing: 0.25rem; --color-muted: #eee; --color-foreground: #111; --color-muted-foreground: #666; }";
+  return (await compile(`${theme}\n@tailwind utilities;\n${chosen}`)).build(classes);
+}
 
 /** Gives jsdom the browser's view transitions, whose update a test runs itself, each skipped as in a hidden tab. */
 function withViewTransitions() {

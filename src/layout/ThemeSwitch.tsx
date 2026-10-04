@@ -22,9 +22,7 @@ export function ThemeSwitch() {
       {CHOICES.map(({ value, label, Icon }) => (
         <Tooltip key={value}>
           <TooltipTrigger asChild>
-            {/* The radio is hidden, so its label draws the page's focus outline, a pixel closer to stay within the switch's
-                edge. Under forced colours, where the chosen one's fill is Highlight too, it keeps two pixels clear of it. */}
-            <label className="relative flex size-7 cursor-pointer touch-target pointer-coarse:h-9 pointer-coarse:w-11 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-foreground has-checked:bg-muted has-checked:text-foreground has-checked:forced-chosen has-focus-visible:outline-2 has-focus-visible:outline-offset-1 has-focus-visible:outline-foreground forced-colors:has-focus-visible:outline-offset-2 forced-colors:has-focus-visible:outline-[Highlight]">
+            <label className="relative flex size-7 cursor-pointer touch-target pointer-coarse:h-9 pointer-coarse:w-11">
               <input
                 type="radio"
                 name="theme"
@@ -37,9 +35,14 @@ export function ThemeSwitch() {
                     chooseTheme(value);
                   })
                 }
-                className="sr-only"
+                className="peer sr-only"
               />
-              <Icon aria-hidden className="size-4" />
+              {/* The radio is hidden, so this draws its state, read from beside it as Firefox before 121 has no :has: the
+                  chosen fill, and the page's focus outline a pixel closer to stay within the switch's edge. Under forced
+                  colours, where the chosen one's fill is Highlight too, the outline keeps two pixels clear of it. */}
+              <span className="flex flex-1 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-foreground peer-checked:bg-muted peer-checked:text-foreground peer-checked:forced-chosen peer-focus-visible:outline-2 peer-focus-visible:outline-offset-1 peer-focus-visible:outline-foreground forced-colors:peer-focus-visible:outline-offset-2 forced-colors:peer-focus-visible:outline-[Highlight]">
+                <Icon aria-hidden className="size-4" />
+              </span>
               <span className="sr-only">{label}</span>
             </label>
           </TooltipTrigger>
