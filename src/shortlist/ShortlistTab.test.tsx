@@ -93,6 +93,55 @@ function layOutEntries() {
   });
 }
 
+/**
+ * jsdom lays nothing out and animates nothing: here each card and the "Set aside" heading stands 200px below the one
+ * before it, in the tab's order, and a glide begun holds its node that far from there, as in a browser, until it is cancelled.
+ * `glides` gives each glide begun as what glided and the translate it glided from, `focused` what had focus as it began,
+ * `finish` ends every glide running, as 200ms does, `trace` lists each reading of a card's place and each glide cancelled,
+ * in order, and `scroll` scrolls the page, and the tab with it, that far.
+ */
+function layOutGlides() {
+  let scrolled = 0;
+  const holding = new Map<Element, number>();
+  const trace: string[] = [];
+  vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+    const at = [...document.querySelectorAll("[data-glide]")].indexOf(this);
+    if (at !== -1) trace.push("read");
+    return at === -1 ? new DOMRect(0, -scrolled) : new DOMRect(0, at * 200 + (holding.get(this) ?? 0) - scrolled, 300, 180);
+  });
+  const focused: Element[] = [];
+  const begun: { playState: string; release: () => void }[] = [];
+  const animate = vi.fn(function (this: HTMLElement, { translate }: { translate: string[] }) {
+    focused.push(document.activeElement!);
+    holding.set(this, parseFloat(translate[0]!.split(" ")[1]!));
+    const glide = {
+      playState: "running",
+      release: () => void holding.delete(this),
+      cancel: () => {
+        trace.push("cancel");
+        glide.playState = "idle";
+        glide.release();
+      },
+    };
+    begun.push(glide);
+    return glide;
+  });
+  Object.defineProperty(Element.prototype, "animate", { value: animate, configurable: true });
+  onTestFinished(() => void delete (Element.prototype as Partial<Element>).animate);
+  return {
+    glides: () => animate.mock.calls.map((call, i) => [(animate.mock.contexts[i] as HTMLElement).dataset.glide, (call as unknown[])[0]]),
+    focused: () => focused,
+    trace,
+    finish: () => {
+      for (const glide of begun.filter((glide) => glide.playState === "running")) {
+        glide.playState = "finished";
+        glide.release();
+      }
+    },
+    scroll: (by: number) => void (scrolled = by),
+  };
+}
+
 /** Picks a therapist up by their handle, as a keyboard does, then presses each key in turn. */
 function moveByKeys(name: string, ...codes: string[]) {
   const handle = screen.getByRole("button", { name: `Move ${name}` });
@@ -743,6 +792,145 @@ describe("ShortlistTab", () => {
     expect(names()).toEqual(["Bo", "Ann"]);
     expect(document.activeElement).toBe(screen.getByRole("button", { name: "Status of Ann: set aside" }));
     expect(onHighlight).toHaveBeenLastCalledWith("Ann-AAAAAAAA");
+  });
+
+  it("glides a therapist set aside into the open section from where they stood, and the cards and heading they pass", () => {
+    renderTab({ statuses: { "Bo-BBBBBBBB": "setAside" } }, card("Ann-AAAAAAAA", "Ann"), card("Bo-BBBBBBBB", "Bo"), card("Cy-CCCCCCCC", "Cy"));
+    openSetAside();
+    const { glides, focused } = layOutGlides();
+    // Cy, Ann, the heading, then Bo; Cy goes to the head of those set aside, before Bo.
+    openMenu("Cy");
+    choose("Set aside");
+    expect(names()).toEqual(["Ann", "Cy", "Bo"]);
+    expect(glides()).toEqual([
+      ["Ann-AAAAAAAA", { translate: ["0 200px", "0 0"] }],
+      ["set-aside", { translate: ["0 200px", "0 0"] }],
+      ["Cy-CCCCCCCC", { translate: ["0 -400px", "0 0"], zIndex: [1, 1] }],
+    ]);
+    // Focus is given to Cy's new place before the glide holds them back from it, so it scrolls the tab to where they land.
+    expect(focused()[0]).toBe(screen.getByRole("button", { name: "Status of Cy: set aside" }));
+  });
+
+  it("glides a therapist brought back from the open section to their place in the list, and the cards and heading they pass", () => {
+    renderTab(
+      { statuses: { "Bo-BBBBBBBB": "setAside", "Dee-DDDDDDDD": "setAside" } },
+      card("Dee-DDDDDDDD", "Dee"),
+      card("Ann-AAAAAAAA", "Ann"),
+      card("Bo-BBBBBBBB", "Bo"),
+      card("Cy-CCCCCCCC", "Cy"),
+    );
+    openSetAside();
+    const { glides } = layOutGlides();
+    // Cy, Ann, the heading, Bo, then Dee; Bo goes back between Cy and Ann, passing the heading, and Ann and the heading each drop a place.
+    fireEvent.click(screen.getByRole("button", { name: "Consider again, Bo" }));
+    expect(names()).toEqual(["Cy", "Bo", "Ann", "Dee"]);
+    // Bo, who comes before Ann and the heading, is raised over them as they pass, and is positioned for that to take.
+    expect(glides()).toEqual([
+      ["Bo-BBBBBBBB", { translate: ["0 400px", "0 0"], zIndex: [1, 1] }],
+      ["Ann-AAAAAAAA", { translate: ["0 -200px", "0 0"] }],
+      ["set-aside", { translate: ["0 -200px", "0 0"] }],
+    ]);
+    expect(document.querySelector("[data-glide='Bo-BBBBBBBB']")!.classList.contains("relative")).toBe(true);
+  });
+
+  it("measures each card from the top of the tab, so the scroll a focus causes is not taken for movement", () => {
+    renderTab({ statuses: { "Bo-BBBBBBBB": "setAside" } }, card("Ann-AAAAAAAA", "Ann"), card("Bo-BBBBBBBB", "Bo"), card("Cy-CCCCCCCC", "Cy"));
+    openSetAside();
+    const { glides, scroll } = layOutGlides();
+    // Giving focus to a therapist's new place scrolls the page to them.
+    const focus = HTMLElement.prototype.focus;
+    vi.spyOn(HTMLElement.prototype, "focus").mockImplementation(function (this: HTMLElement, options?: FocusOptions) {
+      if (this.matches("[data-status-menu]")) scroll(300);
+      focus.call(this, options);
+    });
+    openMenu("Cy");
+    choose("Set aside");
+    expect(glides()).toEqual([
+      ["Ann-AAAAAAAA", { translate: ["0 200px", "0 0"] }],
+      ["set-aside", { translate: ["0 200px", "0 0"] }],
+      ["Cy-CCCCCCCC", { translate: ["0 -400px", "0 0"], zIndex: [1, 1] }],
+    ]);
+  });
+
+  it("goes on from where a glide still running shows when another change comes within it", () => {
+    renderTab({ statuses: { "Bo-BBBBBBBB": "setAside" } }, card("Ann-AAAAAAAA", "Ann"), card("Bo-BBBBBBBB", "Bo"), card("Cy-CCCCCCCC", "Cy"));
+    openSetAside();
+    const { glides } = layOutGlides();
+    openMenu("Cy");
+    choose("Set aside");
+    // Held by the first glides, Ann, the heading and Cy show at 200, 400 and 0 as Ann is set aside too.
+    openMenu("Ann");
+    choose("Set aside");
+    expect(names()).toEqual(["Cy", "Bo", "Ann"]);
+    // Cy, who was raised, stays so as the new glide goes on from where theirs showed, beside Ann, who is raised now.
+    expect(glides().slice(3)).toEqual([
+      ["set-aside", { translate: ["0 400px", "0 0"] }],
+      ["Cy-CCCCCCCC", { translate: ["0 -200px", "0 0"], zIndex: [1, 1] }],
+      ["Bo-BBBBBBBB", { translate: ["0 200px", "0 0"] }],
+      ["Ann-AAAAAAAA", { translate: ["0 -400px", "0 0"], zIndex: [1, 1] }],
+    ]);
+  });
+
+  it("lets go of every glide still running before it reads where any card stands", () => {
+    renderTab({ statuses: { "Bo-BBBBBBBB": "setAside" } }, card("Ann-AAAAAAAA", "Ann"), card("Bo-BBBBBBBB", "Bo"), card("Cy-CCCCCCCC", "Cy"));
+    openSetAside();
+    const { trace } = layOutGlides();
+    openMenu("Cy");
+    choose("Set aside");
+    trace.length = 0;
+    openMenu("Ann");
+    choose("Set aside");
+    // A read between two cancels would make the browser lay the tab out again.
+    const first = trace.indexOf("cancel");
+    expect(first).toBeGreaterThan(-1);
+    expect(trace.slice(first, trace.lastIndexOf("cancel") + 1)).not.toContain("read");
+  });
+
+  it("does not raise a card again for a change after its glide has ended", () => {
+    renderTab({ statuses: { "Bo-BBBBBBBB": "setAside" } }, card("Ann-AAAAAAAA", "Ann"), card("Bo-BBBBBBBB", "Bo"), card("Cy-CCCCCCCC", "Cy"));
+    openSetAside();
+    const { glides, finish } = layOutGlides();
+    openMenu("Cy");
+    choose("Set aside");
+    finish();
+    openMenu("Ann");
+    choose("Set aside");
+    expect(glides().slice(3)).toEqual([
+      ["set-aside", { translate: ["0 200px", "0 0"] }],
+      ["Cy-CCCCCCCC", { translate: ["0 200px", "0 0"] }],
+      ["Bo-BBBBBBBB", { translate: ["0 200px", "0 0"] }],
+      ["Ann-AAAAAAAA", { translate: ["0 -600px", "0 0"], zIndex: [1, 1] }],
+    ]);
+  });
+
+  it("closes up those after a therapist set aside while the section is closed, and glides nothing as a status moves no one", () => {
+    renderTab({}, card("Ann-AAAAAAAA", "Ann"), card("Bo-BBBBBBBB", "Bo"), card("Cy-CCCCCCCC", "Cy"));
+    const { glides } = layOutGlides();
+    fireEvent.click(screen.getByRole("button", { name: "Mark contacted, Bo" }));
+    expect(glides()).toEqual([]);
+    openMenu("Bo");
+    choose("Set aside");
+    expect(glides()).toEqual([["Ann-AAAAAAAA", { translate: ["0 200px", "0 0"] }]]);
+  });
+
+  it("moves cards at once under reduced motion", () => {
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: query === "(prefers-reduced-motion: reduce)",
+      media: query,
+      onchange: null,
+      addListener() {},
+      removeListener() {},
+      addEventListener() {},
+      removeEventListener() {},
+      dispatchEvent: () => false,
+    }));
+    onTestFinished(() => void vi.unstubAllGlobals());
+    renderTab({}, card("Ann-AAAAAAAA", "Ann"), card("Bo-BBBBBBBB", "Bo"));
+    const { glides } = layOutGlides();
+    openMenu("Bo");
+    choose("Set aside");
+    expect(names()).toEqual(["Ann"]);
+    expect(glides()).toEqual([]);
   });
 
   it("says who the menu removed, again after the bookmark has put them back, and gives focus to that bookmark", () => {

@@ -7,7 +7,7 @@ type Props = ComponentProps<"ul">;
 type Spot = { x: number; y: number; dx: number; dy: number };
 
 /** In the side bar's time, as the page's Morphs. */
-const GLIDE = { duration: 200, easing: "cubic-bezier(0.4, 0, 0.2, 1)" };
+export const GLIDE = { duration: 200, easing: "cubic-bezier(0.4, 0, 0.2, 1)" };
 
 /**
  * A list whose items glide to new places rather than jumping there: those after one that goes close up the room it leaves,

@@ -13,7 +13,8 @@ import {
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Bookmark, ChevronDown, ChevronRight, ChevronUp, GripVertical } from "lucide-react";
-import { useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useId, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from "react";
+import { GLIDE } from "@/components/GlidingList";
 import { IconButton } from "@/components/IconButton";
 import {
   AlertDialog,
@@ -76,6 +77,8 @@ export function ShortlistTab({ sought, online = false, pins = [], unplaced = 0, 
     refocus.current = undefined;
     if (selector) root.current?.querySelector<HTMLElement>(selector)?.focus();
   });
+  // After the refocusing above, so a focus scrolls the tab to where a card lands, not where it glides from.
+  const glide = useGlide(root);
   const empty = shown.length === 0;
   const removedCount = useShortlistRemoved();
   const note = useRef<HTMLDivElement>(null);
@@ -123,6 +126,8 @@ export function ShortlistTab({ sought, online = false, pins = [], unplaced = 0, 
   function changed(therapist: ShortlistCard, from: Status, to: Status) {
     announce(`${therapist.name}: ${STATUS_LABEL[to]}.`);
     if ((from === "setAside") === (to === "setAside")) return;
+    // Where each card stands before the list redraws, for it to glide from there.
+    glide(therapist.slug);
     refocus.current = to === "setAside" && !setAsideOpen ? "[data-set-aside-toggle]" : `[data-status-menu="${window.CSS.escape(therapist.slug)}"]`;
   }
 
@@ -242,7 +247,7 @@ function SetAsideSection({ count, open, onToggle, children }: SectionProps) {
   return (
     // Closed, it stays off paper, which would have its heading over no one.
     <section className={cn("space-y-2", !open && "print:hidden")}>
-      <h2>
+      <h2 data-glide="set-aside">
         {/* Marked for the list to give it focus when a therapist is set aside while it is closed. */}
         <button
           type="button"
@@ -364,19 +369,21 @@ function SortableEntry({ entry, heading, listed, sought, online, fee, pinKey, ma
   // A layout effect, so the highlight is given up before the list gives focus to the card's new place.
   useLayoutEffect(() => () => highlighting.current?.(undefined), []);
   return (
-    // Marked by pin, so the page can bring a selected pin's therapists into view.
+    // Marked by pin, so the page can bring a selected pin's therapists into view, and by slug, for it to glide to a new place.
+    // Positioned, for a z-index to raise a card as it glides.
     <li
       ref={setNodeRef}
       data-pin={pinKey}
+      data-glide={card.slug}
       aria-current={marked || undefined}
       style={{ transform: CSS.Translate.toString(transform), transition }}
       className={cn(
-        "flex items-center gap-1",
+        "relative flex items-center gap-1",
         // Off the shortlist, so off paper too.
         !listed && "print:hidden",
         // Carried over its neighbours, lifted off the list; framed in dashes under forced colours, which drop the shadow, clear
         // of the outline a marked card has there.
-        isDragging && "relative z-10 [&_[data-slot=card]]:shadow-lg forced-colors:outline-2 forced-colors:outline-offset-4 forced-colors:outline-dashed",
+        isDragging && "z-10 [&_[data-slot=card]]:shadow-lg forced-colors:outline-2 forced-colors:outline-offset-4 forced-colors:outline-dashed",
       )}
     >
       {/* Move up and Move down are marked by slug, for the list to give one of them focus once the card has moved. On a touch
@@ -487,4 +494,56 @@ function useShown(shortlist: Shortlist): Shortlist {
     setShown([...shortlist, ...removed].sort(byRank));
   }
   return shown;
+}
+
+/**
+ * Marks where each card, and the "Set aside" heading, stands in the tab, for the next draw to glide each from there to where
+ * it puts them, as a status moves a card into or out of "Set aside". The card whose status it was is raised over those it
+ * passes, which a card brought back from below would otherwise glide beneath, and stays raised if another change restarts its
+ * glide. Under reduced motion they move at once.
+ */
+function useGlide(root: RefObject<HTMLElement | null>): (raised: string) => void {
+  const stood = useRef<{ tops: Map<string, number>; raised: string } | undefined>(undefined);
+  const [glides] = useState(() => new WeakMap<Element, { animation: Animation; raised: boolean }>());
+  useLayoutEffect(() => {
+    const before = stood.current;
+    stood.current = undefined;
+    if (!before) return;
+    const elements = gliders(root.current);
+    // Every glide still running is let go before anything is measured, to read where each card lands in one pass over the layout;
+    // the mark was where it showed, so the new one goes on from there.
+    const carried = new Set<Element>();
+    for (const element of elements) {
+      const running = glides.get(element);
+      if (running?.raised && running.animation.playState === "running") carried.add(element);
+      running?.animation.cancel();
+    }
+    const tops = topsIn(root.current, elements);
+    elements.forEach((element, i) => {
+      const slug = element.dataset.glide!;
+      const from = before.tops.get(slug);
+      const by = from === undefined ? 0 : from - tops[i]!;
+      if (!by) return;
+      const raised = slug === before.raised || carried.has(element);
+      const animation = element.animate({ translate: [`0 ${by}px`, "0 0"], ...(raised && { zIndex: [1, 1] }) }, GLIDE);
+      glides.set(element, { animation, raised });
+    });
+  });
+  return (raised) => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const elements = gliders(root.current);
+    const tops = topsIn(root.current, elements);
+    stood.current = { tops: new Map(elements.map((element, i) => [element.dataset.glide!, tops[i]!])), raised };
+  };
+}
+
+/** What glides in the tab: each card, by slug, and the "Set aside" heading. */
+function gliders(root: HTMLElement | null): HTMLElement[] {
+  return [...(root?.querySelectorAll<HTMLElement>("[data-glide]") ?? [])];
+}
+
+/** How far down the tab each element stands, so a scroll, such as a focus can cause, moves nothing. */
+function topsIn(root: HTMLElement | null, elements: HTMLElement[]): number[] {
+  const top = root?.getBoundingClientRect().top ?? 0;
+  return elements.map((element) => element.getBoundingClientRect().top - top);
 }
