@@ -1,10 +1,5 @@
+import { parseMiles } from "@shared/order";
 import type { TherapistCard } from "@shared/types";
-
-/** The miles in a card's distance, such as "0.6 miles from Brighton". */
-export function parseMiles(distance: string | undefined): number | undefined {
-  const match = /^([\d.]+)\s+miles?\b/i.exec(distance ?? "");
-  return match ? Number(match[1]) : undefined;
-}
 
 /** The furthest of UKCP's distances among the loaded cards. UKCP measures to each therapist's address and lists them nearest first. */
 export function reachMiles(loaded: TherapistCard[]): number | undefined {

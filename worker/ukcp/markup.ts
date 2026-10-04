@@ -19,6 +19,8 @@ const WINDOWS_1252 = [
 ];
 const TAG = /<!--[\s\S]*?-->|<(\/?)([a-z][a-z0-9]*)\b[^>]*>/gi;
 const VOID = new Set(["area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track", "wbr"]);
+// attribute's pattern for each name it is asked for, built once, since building one costs several times using it.
+const ATTRIBUTES = new Map<string, RegExp>();
 
 /** An element found in a page: its tag's name and attributes, and what it holds. */
 export type Element = { name: string; open: string; inner: string };
@@ -48,7 +50,11 @@ function stripTags(html: string): string {
 
 /** An attribute's value from an element's opening tag, as written in single or double quotes. */
 export function attribute(open: string, name: string): string | undefined {
-  const value = new RegExp(`\\s${name}=(["'])([\\s\\S]*?)\\1`, "i").exec(open)?.[2];
+  let pattern = ATTRIBUTES.get(name);
+  // Either quote spelled out rather than matched back, as V8 runs a case-insensitive backreference many times slower.
+  if (!pattern) ATTRIBUTES.set(name, (pattern = new RegExp(`\\s${name}=(?:"([^"]*)"|'([^']*)')`, "i")));
+  const m = pattern.exec(open);
+  const value = m?.[1] ?? m?.[2];
   return value === undefined ? undefined : decode(value);
 }
 
