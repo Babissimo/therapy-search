@@ -91,6 +91,8 @@ UKCP's own profile page leaves its contact details empty until its script asks f
 - When the app is late, in the note that shows after 10 seconds.
 - In a browser below the floor, at once, in place of "Loading the search".
 
+The page the error boundary shows when drawing the app fails offers it too.
+
 ### 5.2 Telling older browsers apart
 
 The floor, from the built bundle (`npm run build`, 2 October 2026):

@@ -54,6 +54,13 @@ describe("AccessibilityStatement", () => {
     expect(within(section("What doesn't work well yet")).getAllByRole("listitem")).toHaveLength(KNOWN_PROBLEMS.length);
   });
 
+  it("says older browsers and those without JavaScript get the plain search, and links to it", () => {
+    renderStatement();
+    expect(screen.getByText("search without JavaScript, or in an older browser, with a plain search")).toBeTruthy();
+    const plain = within(section("What doesn't work well yet")).getByRole("link", { name: "plain search" });
+    expect([plain.getAttribute("href"), plain.closest("li")?.textContent]).toEqual(["/plain", expect.stringContaining("which has no map, shortlist or notes")]);
+  });
+
   it("says how to report a problem, that reports are public, and where else to find a therapist meanwhile", () => {
     renderStatement();
     const reporting = section("Reporting a problem");
