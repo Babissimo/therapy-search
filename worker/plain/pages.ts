@@ -19,8 +19,11 @@ export const UNREADABLE = "UKCP's pages have changed, so this site can't read th
 export const NEEDS_FILTER = "To search online, choose a filter or type a keyword. Type of session alone leaves thousands of therapists.";
 export const INVALID = "This search has something UKCP's form doesn't offer, perhaps from an older page. Check it and search again.";
 
-/** A plain search as the visitor set it: where to meet, the search, and how many results came before this page. */
-export type Asked = { online: boolean; params: SearchParams; shown: number };
+/**
+ * A plain search as the visitor set it: where to meet, the search, and how many results came before this page, with the
+ * seed of its order once it has been sent.
+ */
+export type Asked = { online: boolean; params: SearchParams; shown: number; seed?: number };
 /** What's wrong with a search, by where it is said: beside the place box, beside the filters, or of the search as a whole. */
 export type Problems = { place?: string; filters?: string; search?: string };
 
@@ -138,8 +141,9 @@ ${filters ? html`<li><a href="#filters">${filters}</a></li>` : ""}
 }
 
 /** The search, its fields named for UKCP's parameters as the API's are, with `level` the filters' heading level. */
-function searchForm({ online, params }: Asked, { place, filters }: Problems, level: 2 | 3): Html {
+function searchForm({ online, params, seed }: Asked, { place, filters }: Problems, level: 2 | 3): Html {
   return html`<form method="post" action="/plain">
+${seedField(seed)}
 <fieldset>
 <legend>Where to meet</legend>
 <div class="choice"><input type="radio" id="near" name="mode" value="near"${checked(!online)}> <label for="near">Near me</label></div>
@@ -214,15 +218,20 @@ ${card.summary ? html`<p>${card.summary}</p>` : ""}
 </li>`;
 }
 
-/** The next page's button, its form carrying the search and how many results have been shown. */
-function moreForm({ online, params }: Asked, shown: number): Html {
+/** The next page's button, its form carrying the search, its seed and how many results have been shown. */
+function moreForm({ online, params, seed }: Asked, shown: number): Html {
   const fields = [...new URLSearchParams(toQuery({ ...params, page: 1 }))];
   return html`<form method="post" action="/plain">
 <input type="hidden" name="mode" value="${online ? "online" : "near"}">
 ${fields.map(([name, value]) => html`<input type="hidden" name="${name}" value="${value}">`)}
+${seedField(seed)}
 <input type="hidden" name="shown" value="${shown}">
 <p><button type="submit">More results</button></p>
 </form>`;
+}
+
+function seedField(seed: number | undefined): Html | "" {
+  return seed === undefined ? "" : html`<input type="hidden" name="seed" value="${seed}">`;
 }
 
 function sectionOf({ heading, paragraphs, items, details }: ProfileSection): Html {

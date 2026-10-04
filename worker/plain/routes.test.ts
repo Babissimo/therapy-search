@@ -1,6 +1,7 @@
 import { JSDOM } from "jsdom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { FILTER_GROUPS, groupName } from "../../shared/filterGroups";
+import { readSeed } from "../../shared/order";
 import { BATCH_SIZE, UKCP_ORIGIN, WHOLE_SET_SIZE } from "../../shared/query";
 import { fixture } from "../../shared/ukcp/__fixtures__";
 import { createCache, createGateway, TOO_MANY, UPSTREAM_DOWN, type Env, type PlaceFinder } from "../app";
@@ -9,9 +10,10 @@ import { INVALID, NEEDS_FILTER, NEW_TAB, NO_PLACE, UNREADABLE } from "./pages";
 
 const bytes = (text: string) => new TextEncoder().encode(text);
 
-function listing(n: number, { name = `Therapist ${n}`, summary = `Summary ${n}.` } = {}) {
+/** A card of UKCP's results, `miles` from the place searched, or with no distance where null. */
+function listing(n: number, { name = `Therapist ${n}`, summary = `Summary ${n}.`, miles = n / 10 as number | null } = {}) {
   return `<div class="profile-listing margin-b-md"><a href="therapist/Therapist-${n}-ABCDEFGH" class="light-anchor">
-  <h2>${name}</h2><span class="profile-listing-locations"><strong>Bristol BS${n}</strong> (0.${n} miles from Bristol)</span>
+  <h2>${name}</h2><span class="profile-listing-locations"><strong>Bristol BS${n}</strong>${miles === null ? "" : ` (${miles} miles from Bristol)`}</span>
   <span class="profile-listing-contact-session-type">In-person&nbsp;&amp;&nbsp;Remote</span><p class="pt-2">${summary}</p></a></div>`;
 }
 
@@ -47,6 +49,31 @@ function setup({ allow = true, client = {} as Partial<UkcpClient> } = {}) {
   const post = (path: string, body: string | Record<string, string>, headers?: Record<string, string>) =>
     request(path, { method: "POST", body: new URLSearchParams(body).toString(), headers: { "Content-Type": "application/x-www-form-urlencoded", ...headers } });
   return { request, post, asked, forwarded, stub, limit };
+}
+
+/**
+ * UKCP's 30 cards nearest first, `miles` of each from the place, those alike in a new order on every call, as UKCP
+ * reshuffles them about once a minute and an expired batch is fetched again.
+ */
+function reshuffling(miles: (n: number) => number) {
+  let calls = 0;
+  return vi.fn(async () => {
+    calls++;
+    const order = Array.from({ length: 30 }, (_, i) => i + 1).toSorted((a, b) => miles(a) - miles(b) || ((a + calls) % 5) - ((b + calls) % 5) || a - b);
+    return bytes(results(30, { cards: order.map((n) => listing(n, { miles: miles(n) })).join("\n") }));
+  });
+}
+
+/** The names on each page of a search, following More results to the last. */
+async function pageThrough(post: ReturnType<typeof setup>["post"], search: string): Promise<string[][]> {
+  const pages: string[][] = [];
+  for (let body = search; body !== ""; ) {
+    const { doc } = await read(await post("/plain", body));
+    pages.push([...doc.querySelectorAll(".results h2")].map((h) => h.textContent ?? ""));
+    const more = [...doc.querySelectorAll<HTMLFormElement>("form")].find((f) => f.textContent?.includes("More results"));
+    body = more ? sent(more) : "";
+  }
+  return pages;
 }
 
 async function read(res: Response) {
@@ -118,7 +145,7 @@ describe("POST /plain near a place", () => {
     const { post, asked } = setup();
     let doc = (await read(await post("/plain", "Location=Bristol&KeywordFilter=grief"))).doc;
     const more = () => [...doc.querySelectorAll<HTMLFormElement>("form")].find((f) => f.textContent?.includes("More results"));
-    expect(sent(more()!)).toBe("mode=near&Location=Bristol&KeywordFilter=grief&shown=12");
+    expect(sent(more()!)).toMatch(/^mode=near&Location=Bristol&KeywordFilter=grief&seed=\d+&shown=12$/);
     doc = (await read(await post("/plain", sent(more()!)))).doc;
     expect(doc.querySelector("main > p")?.textContent).toMatch(/^Showing 13 to 24/);
     expect(doc.querySelector(".results h2")?.textContent).toBe("Therapist 13");
@@ -126,6 +153,40 @@ describe("POST /plain near a place", () => {
     expect(doc.querySelector("main > p")?.textContent).toMatch(/^Showing 25 to 30/);
     expect(more()).toBeUndefined();
     expect(new Set(asked())).toEqual(new Set(["/api/search?Location=Bristol&KeywordFilter=grief"]));
+  });
+
+  it("pages through a batch the same way however UKCP reshuffles it between pages", async () => {
+    // Five at each distance, so a page ends among those alike.
+    const { post, stub } = setup({ client: { search: reshuffling((n) => Math.ceil(n / 5) / 10) } });
+    const pages = await pageThrough(post, "Location=Bristol&seed=7");
+    const shown = pages.flat();
+    expect([shown.length, new Set(shown).size]).toEqual([30, 30]);
+    const tiers = shown.map((name) => Math.ceil(Number(name.replace("Therapist ", "")) / 5));
+    expect(tiers).toEqual(tiers.toSorted((a, b) => a - b));
+    expect(await pageThrough(post, "Location=Bristol&seed=7")).toEqual(pages);
+    expect(stub.search).toHaveBeenCalledTimes(6);
+  });
+
+  it("orders a search by the seed its forms carry, another seed giving another order", async () => {
+    const { post } = setup({ client: { search: reshuffling(() => 0.5) } });
+    const { doc } = await read(await post("/plain", "Location=Bristol&seed=7"));
+    expect(doc.querySelector<HTMLInputElement>("#search + form input[name=seed]")?.value).toBe("7");
+    const [seven, eight] = [await pageThrough(post, "Location=Bristol&seed=7"), await pageThrough(post, "Location=Bristol&seed=8")];
+    expect(seven[0]).toEqual([...doc.querySelectorAll(".results h2")].map((h) => h.textContent));
+    expect(new Set(eight.flat())).toEqual(new Set(seven.flat()));
+    expect(eight[0]).not.toEqual(seven[0]);
+  });
+
+  it("draws a seed for a search sent without one, or with one no seed could be", async () => {
+    const { request, post } = setup();
+    expect((await read(await request("/plain"))).doc.querySelector("input[name=seed]")).toBeNull();
+    for (const seed of ["", "&seed=-1", "&seed=4294967296", "&seed=1.5", "&seed=seven"]) {
+      const { doc } = await read(await post("/plain", `Location=Bristol${seed}`));
+      const carried = [...doc.querySelectorAll<HTMLInputElement>("input[name=seed]")].map((input) => input.value);
+      expect(carried).toHaveLength(2);
+      expect(new Set(carried).size).toBe(1);
+      expect(readSeed(carried[0])).toBeDefined();
+    }
   });
 
   it("asks for the next batch once a page lies beyond the first", async () => {
@@ -177,6 +238,19 @@ describe("POST /plain online", () => {
     expect(doc.querySelector("main > p")?.textContent).toBe("Showing 1 to 12. Change your search");
     // How they meet goes unsaid where it is remote, as every therapist here works remotely.
     expect([...doc.querySelectorAll(".results > li:first-child p")].map((p) => p.textContent)).toEqual(["Bristol BS1", "Summary 1."]);
+  });
+
+  it("lists the whole set in UKCP's order, reading no further into it than the page shown", async () => {
+    // A card no page could read, after those the first page shows.
+    const broken = listing(31, { miles: null }).replace('href="therapist/Therapist-31-ABCDEFGH"', 'href="/"');
+    const sent = [...Array.from({ length: 30 }, (_, i) => listing(30 - i, { miles: null })), broken].join("\n");
+    const { post } = setup({ client: { search: vi.fn(async () => bytes(results(30, { cards: sent, place: "" }))) } });
+    const res = await post("/plain", "mode=online&Languages=Welsh&seed=7");
+    expect(res.status).toBe(200);
+    const { doc } = await read(res);
+    expect([...doc.querySelectorAll(".results h2")].map((h) => h.textContent)).toEqual(Array.from({ length: 12 }, (_, i) => `Therapist ${30 - i}`));
+    // Its forms carry the seed all the same, for a search changed to near a place.
+    expect([...doc.querySelectorAll<HTMLInputElement>("input[name=seed]")].map((input) => input.value)).toEqual(["7", "7"]);
   });
 
   it("wants a filter besides type of session, said beside the filters, without asking the cache", async () => {

@@ -2,6 +2,7 @@ import { Hono, type Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { locationFellBack } from "../../shared/location";
 import { narrowsOnline, onlineSearch } from "../../shared/online";
+import { newSeed, readSeed } from "../../shared/order";
 import { ALLOWED } from "../../shared/options";
 import { InvalidParam, PAGE_SIZE, batchSize, emptyParams, readParams, toQuery, type SearchParams } from "../../shared/query";
 import type { ContactDetails } from "../../shared/types";
@@ -34,12 +35,15 @@ export function plainSearch(forward: Forward) {
   plain.post("/", async (c) => {
     const form = await formOf(c);
     const online = form.get("mode") === "online";
+    // A search's first page draws the seed of its order, which its forms carry on, so its pages, and the searches refined
+    // from it, keep one order.
+    const seed = readSeed(form.get("seed")) ?? newSeed();
     let asked: Asked;
     try {
-      asked = { online, params: readParams(form, ALLOWED), shown: shownOf(form) };
+      asked = { online, params: readParams(form, ALLOWED), shown: shownOf(form), seed };
     } catch (error) {
       if (!(error instanceof InvalidParam)) throw error;
-      return page(c, searchPage({ online, params: leniently(form), shown: 0 }, { search: INVALID }), 400);
+      return page(c, searchPage({ online, params: leniently(form), shown: 0, seed }, { search: INVALID }), 400);
     }
     const { params, shown } = asked;
     if (!online && params.text.Location === "") return page(c, searchPage(asked, { place: NO_PLACE }));
@@ -53,7 +57,9 @@ export function plainSearch(forward: Forward) {
     if (!res.ok) return page(c, searchPage(asked, { search: await errorOf(res) }), res.status as ContentfulStatusCode);
     let results: Results;
     try {
-      results = readResults(await res.text(), shown - (batch - 1) * size, PAGE_SIZE);
+      // Ordering a whole online set of thousands would take more CPU than a request has, so it keeps UKCP's order, which
+      // the cache holds for 6 hours.
+      results = readResults(await res.text(), shown - (batch - 1) * size, PAGE_SIZE, online ? undefined : seed);
     } catch (error) {
       return unreadable(c, error, searchPage(asked, { search: UNREADABLE }));
     }

@@ -16,7 +16,7 @@ In scope:
 Out of scope:
 
 - The map, the shortlist, notes and copying the list, which need the app.
-- The per-browser order of results (it needs storage) and the app's preference for cards with a photo and summary, which lives in the app (§3.3).
+- Keeping one order of results per browser, which needs storage, and the app's preference for cards with a photo and summary (§3.3).
 - Fees and office pins on result cards, which each cost an office lookup; the profile gives every office's fee (§4).
 - Photos, Use my location, social links and the help-with typeahead.
 - The filter-first prompt of filter-before-searching §4.2: the plain form sets its filters out on the same page as the place.
@@ -28,7 +28,7 @@ Out of scope:
 - **One way to UKCP.** The plain routes ask the cached entrypoint by the canonical URLs the app's routes use, so they share its cache entries, its rate limits (`UPSTREAM_LIMIT` for searches and profiles, nothing new) and the body limit. Nothing is asked of UKCP that a visitor didn't ask for, and Nominatim isn't asked at all: UKCP places the typed text itself.
 - **UKCP's text is untrusted.** Every value from UKCP or the visitor goes through Hono's `html` template, which escapes it, links are built only from checked slugs, numbers and http(s) URLs, and each page's Content-Security-Policy allows no script at all.
 - **Old browsers read it.** HTML any browser renders, with `details` the newest element. CSS without custom properties, `oklch`, `color-mix`, `@property`, nesting or `:has`, inline in each page. No script.
-- **The Worker is on the free plan,** with about 10 ms of CPU a request. It reads a results page only as far as the cards it shows, by pattern, as `worker/ukcp/offices.ts` reads offices; it has no DOM parser.
+- **The Worker is on the free plan,** with 10 ms of CPU a request; a Worker that keeps going over has its requests cut off (error 1102). It reads a results page by pattern, as `worker/ukcp/offices.ts` reads offices, since it has no DOM parser, and reads a card whole only once it is shown. Near a place it reads every card's slug and distance in the batch of 480 to put them in order (§3.3), about 3 ms a page. Online it reads only as far as the page shown, keeping UKCP's order, since ordering a whole set of thousands would take about 14 ms a page. A first online page then costs under 1 ms besides decoding the body (2 to 6 ms for a set of 5,200), but a deep page of such a set reads nearly all of it, 8 to 11 ms, and goes over: only someone paging hundreds of results into the broadest online searches meets that.
 - **The app stays as it is** for browsers that can run it.
 
 ## 3. The plain search
@@ -58,8 +58,10 @@ To share the app's names and help, the filter groups, the online rules (`onlineS
 
 - **Near me** needs a place, or says "Type a town or postcode to search." beside the box.
 - **Online** asks what the app's online view asks (`onlineSearch`), and needs a filter besides type of session by the app's rule (`narrowsOnline`), or says so beside the Filters heading.
-- The Worker asks the cached entrypoint for the batch holding the page: batches of 480 near a place and the whole set online, under the URLs the app asks for them by. A page shows 12 results, as the app's Load more does, and More results is a button whose form carries the search and how many have been shown.
-- Results come in UKCP's order: nearest first near a place, and shuffled online. The cache keeps one answer for 15 minutes near a place and 6 hours online, so a visitor paging through sees one order; a page asked for once the entry has gone may repeat or skip someone at the same distance.
+- The Worker asks the cached entrypoint for the batch holding the page: batches of 480 near a place and the whole set online, under the URLs the app asks for them by. A page shows 12 results, as the app's Load more does, and More results is a button whose form carries the search, its seed and how many have been shown.
+- Near a place, results come in the app's order (`shared/order.ts`): nearest first, by UKCP's miles, and among those at the same distance by the rank a seed gives each slug. A plain page shows no photo and reads a card whole only once it is shown, so the app's preference for cards with a photo and summary, which would mean reading every card of a batch, is left out. A search's first page draws its seed at random, and More results and the results page's own search form carry it back in their bodies, so a search keeps one order across its pages and as it is refined, while a search begun afresh draws another. UKCP reshuffles those at the same distance about once a minute, and the cache keeps a batch at most 15 minutes, so the Worker orders each batch before taking a page from it, and a batch fetched again pages as it did before.
+- Online, results come in UKCP's shuffled order, since ordering a whole set would take more CPU than a request has (§2). The cache keeps the set at most 6 hours, so its pages repeat or skip someone only when that entry expires, or the cache drops it, while someone is paging through. Its forms carry the seed all the same, so a search changed to Near me keeps it.
+- UKCP chooses each batch near a place by distance, so a batch fetched again holds the same therapists, except where several share the distance at which it ends. Those can move between it and the next batch when the two come from different shuffles, to be shown twice or not at all. Only a search of more than 480 results has such an end, and only a visitor paging past it meets it.
 - When UKCP didn't recognise the place and searched the whole UK instead, the page says so beside the box ("UKCP didn't recognise "Brightn". Try a town or a postcode.") and shows no results, which would come from anywhere.
 - Too many searches and UKCP not responding give the Worker's own messages at the top of the form. A results page the Worker can't read says so and points to UKCP.
 
@@ -111,7 +113,7 @@ The page offers the plain search rather than going to it, so the visitor sees wh
 
 ## 7. Testing
 
-- Worker: the form, a search near a place and online, More results, each error, escaping (a therapist named `<script>`), the cache and rate limit path, nothing searched in a URL the cache is asked by, the cross-site refusal, and the profile with and without contact details.
+- Worker: the form, a search near a place and online, More results, paging through a batch UKCP reshuffles between pages, each error, escaping (a therapist named `<script>`), the cache and rate limit path, nothing searched in a URL the cache is asked by, the cross-site refusal, and the profile with and without contact details.
 - Readers: the fixtures read as the browser's parsers read them.
 - The help-now line and the site's name and links held to the app's.
 - `index.html`: the offers, and the gate marking a browser that lacks either feature.

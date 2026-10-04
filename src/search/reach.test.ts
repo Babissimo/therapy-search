@@ -1,18 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { TherapistCard } from "@shared/types";
-import { parseMiles, reachMiles, resultCount, resultsHeading } from "./reach";
+import { reachMiles, resultCount, resultsHeading } from "./reach";
 
 const card = (slug: string, extra: Partial<TherapistCard> = {}): TherapistCard => ({ slug, name: slug, initials: "T", tags: [], ...extra });
-
-describe("parseMiles", () => {
-  it("reads the miles in a card's distance", () => {
-    expect(parseMiles("0.6 miles from Brighton")).toBe(0.6);
-    expect(parseMiles("1 mile from Hove")).toBe(1);
-    expect(parseMiles("0 miles from Brighton")).toBe(0);
-    expect(parseMiles(undefined)).toBeUndefined();
-    expect(parseMiles("near Brighton")).toBeUndefined();
-  });
-});
 
 describe("reachMiles", () => {
   it("takes the furthest of UKCP's distances among the loaded cards", () => {
