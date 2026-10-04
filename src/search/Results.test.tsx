@@ -115,6 +115,24 @@ describe("Results", () => {
     expect(said(WHOLE)).toEqual([]);
   });
 
+  it("says a search near a place is slow while the nearest few fall short of the first page, as their count waits for the rest", async () => {
+    vi.useFakeTimers();
+    const batches = answerBatches();
+    const answer = batches.getMockImplementation()!;
+    batches.mockImplementation(() => new Promise(() => {}));
+    vi.spyOn(api, "searchEarly").mockImplementation(async (query) => {
+      const batch = await answer(query);
+      return { ...batch, to: 7, listings: batch.listings.slice(0, 7) };
+    });
+    renderResults(leeds);
+    await act(() => vi.advanceTimersByTimeAsync(100));
+    expect(screen.getByRole("heading", { name: "7 results within 0.1 miles" })).toBeTruthy();
+    await act(() => vi.advanceTimersByTimeAsync(4800));
+    expect(said(WAITING)).toEqual([]);
+    await act(() => vi.advanceTimersByTimeAsync(100));
+    expect(said(WAITING).sort()).toEqual(["note", "status"]);
+  });
+
   it("says so too while the next search's answer is slow, over the dimmed list", async () => {
     const search = answerBatches();
     const view = renderResults(leeds);
@@ -207,6 +225,35 @@ describe("Results", () => {
     await act(async () => release());
     expect(await screen.findByRole("button", { name: "Load more" })).toBeTruthy();
     expect(cards()).toHaveLength(12);
+  });
+
+  it.each([
+    ["as soon as the nearest few fill the first page", 12, "12 therapists within 0.1 miles of Leeds."],
+    ["only once the first batch is in when the nearest few fall short of the first page", 7, ""],
+  ])("says a search near a place found its first page once, %s", async (_, nearest, early) => {
+    let release!: () => void;
+    const released = new Promise<void>((resolve) => (release = resolve));
+    const batches = answerBatches();
+    const answer = batches.getMockImplementation()!;
+    batches.mockImplementation(async (query) => {
+      await released;
+      return answer(query);
+    });
+    vi.spyOn(api, "searchEarly").mockImplementation(async (query) => {
+      const batch = await answer(query);
+      return { ...batch, to: nearest, listings: batch.listings.slice(0, nearest) };
+    });
+    renderResults(leeds);
+    const status = screen.getByRole("status");
+    const said: string[] = [];
+    new MutationObserver(() => said.push(status.textContent ?? "")).observe(status, { childList: true, characterData: true, subtree: true });
+    await screen.findByRole("heading", { name: `${nearest} results within 0.1 miles` });
+    await act(async () => {});
+    expect(status.textContent).toBe(early);
+    await act(async () => release());
+    await screen.findByRole("button", { name: "Load more" });
+    await waitFor(() => expect(status.textContent).toBe("12 therapists within 0.1 miles of Leeds."));
+    expect(said.filter(Boolean)).toEqual(["12 therapists within 0.1 miles of Leeds."]);
   });
 
   it("heads a searched place's list with how many have loaded and how far out they reach, over the place", async () => {

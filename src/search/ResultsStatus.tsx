@@ -40,17 +40,23 @@ export function ResultsStatus({ params, results, online = false, searching = tru
   );
 }
 
-/** Why a search is taking a while, once it has, for the list to show and the status region to say. */
-export function useSlowLine(params: SearchParams, { loading, stale }: SearchResults, searching = true): string | undefined {
+/**
+ * Why a search is taking a while, once it has, for the list to show and the status region to say. A partial page waits
+ * with it, as the status region says nothing of one until its batch is in.
+ */
+export function useSlowLine(params: SearchParams, { loading, stale, partial }: SearchResults, searching = true): string | undefined {
   const whole = asksWhole(params);
-  const slow = useSlow(searching && (loading || stale), whole ? SLOW_WHOLE_MS : SLOW_MS);
+  const slow = useSlow(searching && (loading || stale || partial), whole ? SLOW_WHOLE_MS : SLOW_MS);
   if (!slow) return undefined;
   return whole ? "Getting every result. The first time can take a few seconds." : "Still waiting for UKCP. A slow connection can take a while.";
 }
 
-/** What a search found once its results are in, as the page's title names it and a screen reader is told it. */
-function foundLines(params: SearchParams, { first, therapists, searchedPlace, loading, stale }: SearchResults, online: boolean) {
-  if (loading || stale || first === undefined) return undefined;
+/**
+ * What a search found once its first page is settled, as the page's title names it and a screen reader is told it. The
+ * nearest few, when they make that page, are told as they come, and their batch goes on to say the same.
+ */
+function foundLines(params: SearchParams, { first, therapists, searchedPlace, loading, stale, partial }: SearchResults, online: boolean) {
+  if (loading || stale || partial || first === undefined) return undefined;
   const typed = params.text.Location.trim();
   const fellBack = locationFellBack(typed, first.locationSearched);
   // UKCP names the place in full, such as "Brighton, Brighton and Hove, UK".
