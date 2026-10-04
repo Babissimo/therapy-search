@@ -325,6 +325,13 @@
   .tiles-dark {
     filter: grayscale(1) contrast(0.85) brightness(1.3) sepia(1) hue-rotate(125deg) saturate(1);
   }
+  /* Every map is made to fade its tiles in, step by step in their inline opacity, which this outranks while the visitor
+     asks for less motion. */
+  @media (prefers-reduced-motion: reduce) {
+    .leaflet-tile {
+      opacity: 1 !important;
+    }
+  }
   /* As wide as its words up to a measure, past which a long name and place wrap rather than run off a narrow map. */
   .leaflet-tooltip {
     @apply w-max! max-w-64! rounded-md! border-none! bg-foreground! px-3! py-1.5! whitespace-normal! text-background! shadow-none!;

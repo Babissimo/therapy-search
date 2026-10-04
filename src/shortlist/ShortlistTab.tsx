@@ -27,6 +27,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { useMediaQuery } from "@/lib/useMediaQuery";
 import { cn } from "@/lib/utils";
 import { feeText } from "@/search/fee";
 import { pinsBySlug, type Pin } from "@/search/map/pins";
@@ -280,10 +281,12 @@ type ListProps = {
 function SortableList({ entries, shown, children }: ListProps) {
   const store = useShortlistStore();
   const announcements = useAnnouncements(entries);
+  const still = useMediaQuery("(prefers-reduced-motion: reduce)");
   const sensors = useSensors(
     // A press on the handle that barely moves isn't a drag, so a stray click announces no pick-up and put-down.
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+    // A card carried past the list's edge scrolls the list along, gliding unless the visitor asks for less motion.
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates, scrollBehavior: still ? "instant" : "smooth" }),
   );
 
   function onDragEnd({ active, over }: DragEndEvent) {
@@ -349,9 +352,12 @@ type EntryProps = {
 function SortableEntry({ entry, heading, listed, sought, online, fee, pinKey, marked, onHighlight, onUp, onDown, onChosen, onRemoved }: EntryProps) {
   const { card } = entry;
   const status = statusOf(entry);
+  // The cards a drag passes glide aside, and the one let go glides into place, unless the visitor asks for less motion.
+  const still = useMediaQuery("(prefers-reduced-motion: reduce)");
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
     id: card.slug,
     disabled: { draggable: !listed },
+    transition: still ? null : undefined,
   });
   // The callback holding this card's highlight, while it does: an unmounted card gets no blur or pointer-leave to give it up.
   const highlighting = useRef<EntryProps["onHighlight"]>(undefined);

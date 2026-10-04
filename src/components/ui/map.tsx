@@ -3,7 +3,7 @@ import "leaflet.markercluster/dist/MarkerCluster.css";
 import L, { type DivIcon, type LatLngBoundsLiteral, type LatLngExpression, type Map as LeafletMap, type Marker, type MarkerCluster, type MarkerClusterGroupOptions } from "leaflet";
 import type {} from "leaflet.markercluster";
 import { MinusIcon, PlusIcon } from "lucide-react";
-import { useEffect, useRef, useState, type ComponentProps, type ReactNode, type Ref } from "react";
+import { useEffect, useImperativeHandle, useRef, useState, type ComponentProps, type ReactNode, type Ref } from "react";
 import {
   MapContainer,
   Marker as LeafletMarker,
@@ -37,24 +37,13 @@ function Map({
   /** One of several maps on the page, whose credits keep one place in the Tab order between them (SharedCredits). */
   sharedCredits?: boolean;
 }) {
-  // Leaflet reads these once, as the map is made.
   const still = useReducedMotion();
   return (
-    <MapContainer
-      zoom={zoom}
-      maxZoom={maxZoom}
-      zoomControl={false}
-      zoomAnimation={!still}
-      fadeAnimation={!still}
-      markerZoomAnimation={!still}
-      inertia={!still}
-      className={cn("size-full", className)}
-      {...props}
-    >
+    <MapContainer zoom={zoom} maxZoom={maxZoom} zoomControl={false} className={cn("size-full", className)} {...props}>
       <FollowSize />
       <DataCreditsOnly />
       {sharedCredits && <SharedCredits />}
-      {still && <StillPans />}
+      {still && <KeepStill />}
       {children}
     </MapContainer>
   );
@@ -65,14 +54,28 @@ function useReducedMotion(): boolean {
   return useMediaQuery("(prefers-reduced-motion: reduce)");
 }
 
-/** Leaflet glides any pan shorter than the map, such as an arrow key's, unless each call asks otherwise; no option stops it. */
-function StillPans() {
+/**
+ * Leaflet reads its options for motion only as a map is made, and a map made without zoom animation can't take it up
+ * later. So every map is made to move, and kept still for as long as the visitor asks for less motion, however often they
+ * change their mind: each zoom and pan lands at once, and a drag or a pinch stops where it is let go. Tiles show without
+ * fading in (index.css).
+ */
+function KeepStill() {
   const map = useMap();
   useEffect(() => {
-    const glide = map.panBy;
-    map.panBy = (offset, options) => glide.call(map, offset, { ...options, animate: false });
+    const { setView, panBy } = map;
+    const { inertia, zoomAnimation } = map.options;
+    // Every zoom, and any pan shorter than the map, such as an arrow key's, glides unless its call asks otherwise.
+    map.setView = (center, zoom, options) => setView.call(map, center, zoom, { ...options, animate: false });
+    map.panBy = (offset, options) => panBy.call(map, offset, { ...options, animate: false });
+    // Read as each drag and pinch ends.
+    map.options.inertia = false;
+    map.options.zoomAnimation = false;
     return () => {
-      map.panBy = glide;
+      map.setView = setView;
+      map.panBy = panBy;
+      map.options.inertia = inertia;
+      map.options.zoomAnimation = zoomAnimation;
     };
   }, [map]);
   return null;
@@ -198,17 +201,28 @@ function elementIcon(html: HTMLElement, [width, height]: [number, number], stand
 
 function MapMarkerClusterGroup({
   icon,
+  ref,
   ...props
 }: Omit<MarkerClusterGroupOptions, "iconCreateFunction"> & {
   children: ReactNode;
   icon?: (markers: Marker[]) => DivIcon;
   ref?: Ref<L.MarkerClusterGroup>;
 }) {
+  const still = useReducedMotion();
+  const group = useRef<L.MarkerClusterGroup>(null);
+  useImperativeHandle(ref, () => group.current!, []);
+  // The group takes one of its two ways to split and merge clusters, gliding or not, as it is made, by `animate`; a later
+  // change of mind swaps in the other.
+  useEffect(() => {
+    const ways = group.current as unknown as Record<"_noAnimation" | "_withAnimation", object>;
+    L.Util.extend(ways, still ? ways._noAnimation : ways._withAnimation);
+  }, [still]);
   return (
     <MarkerClusterGroup
+      ref={group}
       showCoverageOnHover={false}
       spiderfyOnMaxZoom={false}
-      animate={!useReducedMotion()}
+      animate={!still}
       iconCreateFunction={icon ? (cluster: MarkerCluster) => icon(cluster.getAllChildMarkers()) : undefined}
       {...props}
     />

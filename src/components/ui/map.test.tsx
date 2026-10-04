@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import L from "leaflet";
 import { createRef } from "react";
 import { TileLayer, useMapEvents } from "react-leaflet";
@@ -231,24 +231,69 @@ describe("Map", () => {
     expect(map.current!.getSize()).toEqual(L.point(400, 400));
   });
 
-  it("zooms, pans, fades and splits clusters without gliding for a visitor who asks for less motion", () => {
-    vi.stubGlobal("matchMedia", (query: string) => ({ matches: query === "(prefers-reduced-motion: reduce)", media: query, addEventListener() {}, removeEventListener() {} }));
-    sizeElements({ width: 400, height: 400 });
-    const map = createRef<L.Map>();
-    const cluster = createRef<L.MarkerClusterGroup>();
-    render(
-      <Map ref={map} center={[51.5, -0.1]} zoom={10} style={{ height: 400, width: 400 }}>
-        <MapMarkerClusterGroup ref={cluster}>{null}</MapMarkerClusterGroup>
-      </Map>,
-    );
-    const { zoomAnimation, fadeAnimation, markerZoomAnimation, inertia } = map.current!.options;
-    expect([zoomAnimation, fadeAnimation, markerZoomAnimation, inertia]).toEqual([false, false, false, false]);
-    expect((cluster.current!.options as L.MarkerClusterGroupOptions).animate).toBe(false);
-    // An arrow key's pan, which would otherwise end a quarter of a second later.
-    const moved = vi.fn();
-    map.current!.on("moveend", moved);
-    map.current!.panBy([50, 0]);
-    expect(moved).toHaveBeenCalledOnce();
+  describe("for a visitor who asks for less motion", () => {
+    /** Asks for less motion or not, as `reduce` says, until the returned function changes the setting mid-visit. */
+    function askForLessMotion(reduce: boolean) {
+      const listeners = new Set<() => void>();
+      vi.stubGlobal("matchMedia", (query: string) => ({
+        get matches() {
+          return query === "(prefers-reduced-motion: reduce)" && reduce;
+        },
+        media: query,
+        addEventListener: (_: string, listener: () => void) => listeners.add(listener),
+        removeEventListener: (_: string, listener: () => void) => listeners.delete(listener),
+      }));
+      return (next: boolean) => {
+        reduce = next;
+        act(() => listeners.forEach((listener) => listener()));
+      };
+    }
+
+    /** A map with a cluster group, and whether each kind of motion is still: a zoom's, a drag's and pinch's ends, and the clusters'. */
+    function renderMap() {
+      sizeElements({ width: 400, height: 400 });
+      // Leaflet zooms by setView, which says whether to glide.
+      const setView = vi.spyOn(L.Map.prototype, "setView");
+      const map = createRef<L.Map>();
+      const cluster = createRef<L.MarkerClusterGroup>();
+      render(
+        <Map ref={map} center={[51.5, -0.1]} zoom={10} style={{ height: 400, width: 400 }}>
+          <MapMarkerClusterGroup ref={cluster}>{null}</MapMarkerClusterGroup>
+        </Map>,
+      );
+      const ways = L.MarkerClusterGroup.prototype as unknown as Record<"_noAnimation", { _animationZoomIn: unknown }>;
+      const still = () => {
+        map.current!.zoomIn();
+        const { inertia, zoomAnimation } = map.current!.options;
+        return {
+          zoom: setView.mock.lastCall?.[2]?.animate === false,
+          ends: !inertia && !zoomAnimation,
+          clusters: (cluster.current as unknown as { _animationZoomIn: unknown })._animationZoomIn === ways._noAnimation._animationZoomIn,
+        };
+      };
+      return { map, still };
+    }
+
+    it("zooms, pans and splits clusters at once, and stops a drag or a pinch where it is let go, from the moment they ask", () => {
+      const change = askForLessMotion(false);
+      const { map, still } = renderMap();
+      expect(still()).toEqual({ zoom: false, ends: false, clusters: false });
+      change(true);
+      expect(still()).toEqual({ zoom: true, ends: true, clusters: true });
+      // An arrow key's pan, which would otherwise end a quarter of a second later.
+      const moved = vi.fn();
+      map.current!.on("moveend", moved);
+      map.current!.panBy([50, 0]);
+      expect(moved).toHaveBeenCalledOnce();
+    });
+
+    it("moves again once they no longer ask", () => {
+      const change = askForLessMotion(true);
+      const { still } = renderMap();
+      expect(still()).toEqual({ zoom: true, ends: true, clusters: true });
+      change(false);
+      expect(still()).toEqual({ zoom: false, ends: false, clusters: false });
+    });
   });
 });
 

@@ -103,6 +103,25 @@ function moveByKeys(name: string, ...codes: string[]) {
   for (const code of codes) fireEvent.keyDown(handle, { code });
 }
 
+/** A visitor not asking for less motion, until the returned function changes their setting mid-visit. */
+function motionSetting() {
+  const listeners = new Set<() => void>();
+  let reduce = false;
+  vi.stubGlobal("matchMedia", (query: string) => ({
+    get matches() {
+      return query === "(prefers-reduced-motion: reduce)" && reduce;
+    },
+    media: query,
+    addEventListener: (_: string, listener: () => void) => listeners.add(listener),
+    removeEventListener: (_: string, listener: () => void) => listeners.delete(listener),
+  }));
+  onTestFinished(() => void vi.unstubAllGlobals());
+  return (next: boolean) => {
+    reduce = next;
+    act(() => listeners.forEach((listener) => listener()));
+  };
+}
+
 /** What dnd-kit's live regions say, the list and "Set aside" each having one, run together: enough while only one of them has spoken. */
 const announced = () =>
   screen
@@ -504,6 +523,37 @@ describe("ShortlistTab", () => {
     expect(names()).toEqual(["Bo", "Ann", "Cy"]);
     expect(store.get().map((e) => e.card.name)).toEqual(["Bo", "Ann", "Cy"]);
     expect(announced()).toBe("Cy put down at number 3 of 3.");
+  });
+
+  it("moves the cards a drag passes at once, from the moment the visitor asks for less motion", () => {
+    const askForLessMotion = motionSetting();
+    layOutEntries();
+    renderTab({}, card("Ann-AAAAAAAA", "Ann"), card("Bo-BBBBBBBB", "Bo"), card("Cy-CCCCCCCC", "Cy"));
+    moveByKeys("Cy", "ArrowDown");
+    expect(entry("Bo")!.style.transition).toMatch(/^transform \d+ms/);
+    askForLessMotion(true);
+    expect(entry("Bo")!.style.transition).toBe("");
+  });
+
+  it("scrolls the list along with a card carried past its edge, gliding only while the visitor doesn't ask for less motion", () => {
+    const askForLessMotion = motionSetting();
+    layOutEntries();
+    renderTab({}, card("Ann-AAAAAAAA", "Ann"), card("Bo-BBBBBBBB", "Bo"), card("Cy-CCCCCCCC", "Cy"));
+    // A scroller showing the first card and a half.
+    const list = entry("Cy")!.parentElement!;
+    list.style.overflowY = "auto";
+    Object.defineProperties(list, { clientHeight: { value: 300 }, scrollHeight: { value: 600 } });
+    list.getBoundingClientRect = () => new DOMRect(0, 0, 300, 300);
+    // dnd-kit scrolls to a place or by an amount, as the move goes.
+    const scroll = vi.fn();
+    Object.assign(list, { scrollTo: scroll, scrollBy: scroll });
+    moveByKeys("Cy", "ArrowDown");
+    expect(scroll).toHaveBeenLastCalledWith(expect.objectContaining({ behavior: "smooth" }));
+    fireEvent.keyDown(button("Move Cy"), { code: "Escape" });
+    askForLessMotion(true);
+    moveByKeys("Cy", "ArrowDown");
+    expect(scroll).toHaveBeenCalledTimes(2);
+    expect(scroll).toHaveBeenLastCalledWith(expect.objectContaining({ behavior: "instant" }));
   });
 
   it("keeps a removed therapist's place as others move past, but can't move them", () => {
