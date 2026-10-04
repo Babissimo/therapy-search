@@ -236,7 +236,8 @@ describe("ShortlistTab", () => {
     expect(names()).toEqual(["Bo", "Ann"]);
     expect(screen.getByRole("link", { name: "Ann" }).getAttribute("href")).toBe("/therapist/Ann-AAAAAAAA");
     screen.getByText("Kept in this browser only.");
-    screen.getByText("About Ann.");
+    // The summary is the profile's to give: the card holds where the visitor stands instead.
+    expect(screen.queryByText("About Ann.")).toBeNull();
   });
 
   it("picks out the tags the search asked for, as the results do", () => {

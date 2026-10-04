@@ -440,6 +440,7 @@ function SortableEntry({ entry, heading, listed, sought, online, fee, pinKey, ma
           heading={heading}
           fee={fee}
           faded={!listed}
+          brief
           action={<ShortlistButton therapist={card} />}
           track={<StatusTrack therapist={card} status={status} listed={listed} onChosen={onChosen} onRemoved={onRemoved} />}
           note={entry.note}
