@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { locationFellBack } from "@shared/location";
 import { asksWhole, toQuery, type SearchParams } from "@shared/query";
+import type { Failure } from "@/components/FailedAlert";
 import { useTitle } from "@/lib/useTitle";
 import { therapistCount } from "@/shortlist/useShortlist";
 import { activeFilters } from "./activeFilters";
@@ -21,16 +22,16 @@ type Props = {
 };
 
 /**
- * A search's status region, out of sight, which tells a screen reader what each search found, as it names the page, and
- * why one is taking a while. It must sit outside anything made inert, such as the list put away over the map. Its
- * `aria-live` keeps a modal's aria-hidden off it, so ticks in the phone's filters sheet are heard, provided it is there as
- * the modal opens.
+ * A search's status region, out of sight, which tells a screen reader what each search found, as it names the page, why
+ * one is taking a while, and why one failed, which the list's alert leaves to it. It must sit outside anything made inert,
+ * such as the list put away over the map. Its `aria-live` keeps a modal's aria-hidden off it, so ticks in the phone's
+ * filters sheet are heard, provided it is there as the modal opens.
  */
 export function ResultsStatus({ params, results, online = false, searching = true }: Props) {
   const found = searching ? foundLines(params, results, online) : undefined;
   useTitle(found?.title);
   const slow = useSlowLine(params, results, searching);
-  const said = useSaid(found?.said ?? "", toQuery(params));
+  const said = useSaid(failedLine(results.failure) ?? found?.said ?? "", toQuery(params));
   return (
     // Always there, since a screen reader announces changes to a region it already knows.
     <p role="status" aria-live="polite" className="sr-only">
@@ -62,6 +63,12 @@ function foundLines(params: SearchParams, { first, therapists, searchedPlace, lo
   const title = `${count === 0 ? "No therapists" : therapistCount(count)}${where}`;
   if (first.total === 0) return { title, said: activeFilters(params).length > 0 ? `${title}. Remove a filter to see more.` : `${title}.` };
   return { title, said: fellBack ? `${title}. UKCP didn't recognise "${typed}".` : `${title}.` };
+}
+
+/** Why a search failed, or, while it is asked again, that it is being tried again. */
+function failedLine({ error, retrying }: Failure): string | undefined {
+  if (!error) return undefined;
+  return retrying ? "Trying again" : error.message;
 }
 
 /** Whether `waiting` has lasted `ms`. */

@@ -368,6 +368,29 @@ describe("SearchPage", () => {
     expect(status.closest("[inert]")).toBeNull();
   });
 
+  it.each([
+    ["behind the map on a phone", false, "Map", () => screen.findByTestId("map")],
+    ["behind a phone's filters", false, "Filters", () => screen.findByRole("dialog")],
+    ["with the list put away beside the map", true, "Hide list", async () => {}],
+    ["with the list in view", true, undefined, async () => {}],
+  ])("says a search failed %s, and says it once", async (_, wide, away, gone) => {
+    screenIs(wide);
+    answer([]);
+    let fail = (_: Error) => {};
+    vi.mocked(api.search).mockImplementationOnce(() => new Promise((_, reject) => (fail = reject)));
+    renderPage(SEARCH);
+    if (away) fireEvent.click(screen.getByRole("button", { name: away }));
+    await gone();
+    act(() => fail(new Error("UKCP answered 503.")));
+    const status = screen.getAllByRole("status").find((el) => el.tagName === "P")!;
+    await waitFor(() => expect(status.textContent).toBe("UKCP answered 503."));
+    expect(status.closest('[inert], [hidden], [aria-hidden="true"]')).toBeNull();
+    // Shown in the list, which leaves the saying to the status region.
+    const list = screen.getByRole("region", { name: "Results and shortlist", hidden: true });
+    expect(within(list).getByText("UKCP answered 503.").closest('[role="alert"], [aria-live]')).toBeNull();
+    expect(screen.queryAllByRole("alert", { hidden: true })).toEqual([]);
+  });
+
   it("asks for a search in place of the results, with no map, when there is nothing to search for", async () => {
     screenIs(true);
     renderAt("/");

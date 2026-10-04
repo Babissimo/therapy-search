@@ -549,7 +549,7 @@ describe("Results", () => {
     search.mockRejectedValueOnce(new ApiError(0, TOO_MANY));
     renderResults(leeds);
     const retry = await screen.findByRole("button", { name: "Try again" });
-    expect(screen.getByRole("alert").textContent).toContain(TOO_MANY);
+    await waitFor(() => expect(screen.getByRole("status").textContent).toBe(TOO_MANY));
     let release = () => {};
     search.mockImplementationOnce(async (query) => {
       await new Promise<void>((resolve) => (release = resolve));
@@ -584,7 +584,7 @@ describe("Results", () => {
       onlineManager.setOnline(true);
     });
     await waitFor(() => expect(search).toHaveBeenCalledTimes(2));
-    expect(screen.getByRole("alert").textContent).toContain(OFFLINE);
+    expect(document.querySelector('[data-slot="alert"]')?.textContent).toContain(OFFLINE);
     expect(document.activeElement).toBe(retry);
     await act(async () => release());
     const heading = await screen.findByRole("heading", { name: "12 results within 0.1 miles" });
