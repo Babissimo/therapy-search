@@ -1,5 +1,5 @@
 import { Hono, type Context } from "hono";
-import type { ContentfulStatusCode } from "hono/utils/http-status";
+import type { ContentfulStatusCode, RedirectStatusCode } from "hono/utils/http-status";
 import { locationFellBack } from "../../shared/location";
 import { narrowsOnline, onlineSearch } from "../../shared/online";
 import { newSeed, readSeed } from "../../shared/order";
@@ -29,6 +29,15 @@ const HEADERS = {
  */
 export function plainSearch(forward: Forward) {
   const plain = new Hono<{ Bindings: Env }>();
+
+  // An address here with a trailing slash leads to the one without, leaving any query behind. A form sent to one goes on
+  // with its body, by a 307 since some browsers this serves predate 308, and is checked where it lands.
+  plain.use("*", async (c, next) => {
+    if (!c.req.path.endsWith("/")) return next();
+    // As sent, so its percent-encoding stays; one spelling "plain" itself in escapes goes to the search.
+    const to = new URL(c.req.url).pathname.replace(/\/+$/, "");
+    return redirect(c, to.startsWith("/plain") ? to : "/plain", c.req.method === "GET" || c.req.method === "HEAD" ? 301 : 307);
+  });
 
   plain.get("/", (c) => page(c, searchPage({ online: false, params: emptyParams(), shown: 0 })));
 
@@ -97,7 +106,7 @@ export function plainSearch(forward: Forward) {
   });
 
   // A profile is reached by its form alone; its address leads to a new search.
-  plain.get("/therapist", (c) => c.redirect("/plain", 303));
+  plain.get("/therapist", (c) => redirect(c, "/plain", 303));
   plain.all("*", (c) => page(c, messagePage("Page not found", "There's no page at this address."), 404));
 
   plain.onError((error, c) => {
@@ -115,6 +124,12 @@ export function tooLarge(c: Ctx) {
 
 function page(c: Ctx, body: Html, status: ContentfulStatusCode = 200) {
   return c.html(body, status, HEADERS);
+}
+
+/** A redirect the edge keeps no more than a page. */
+function redirect(c: Ctx, to: string, status: RedirectStatusCode) {
+  c.header("Cache-Control", HEADERS["Cache-Control"]);
+  return c.redirect(to, status);
 }
 
 /** A page UKCP has changed so far that it can't be read, said as such; any other error goes on to the error page. */
