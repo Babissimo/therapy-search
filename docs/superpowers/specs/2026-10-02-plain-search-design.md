@@ -39,7 +39,7 @@ Out of scope:
 - `POST /plain`: a page of results, or the form saying what's wrong.
 - `POST /plain/therapist`: a profile (§4).
 
-Each answers `text/html; charset=utf-8` with `Cache-Control: private, no-cache`, so Back reaches a page of results without sending its form again while nothing is kept at the edge, and a CSP of `default-src 'none'` with inline styles. Other paths under `/plain` answer a plain "page not found". `run_worker_first` in `wrangler.jsonc` gains `/plain` and `/plain/*`.
+Each answers `text/html; charset=utf-8` with `Cache-Control: private, no-cache`, so Back reaches a page of results without sending its form again while nothing is kept at the edge, and a CSP of `default-src 'none'` with inline styles. An address under `/plain` with a trailing slash leads to the one without it, spelt as sent, by a 301, or for a form by a 307, which the browser follows with the same body, so the body limit and the same-site check apply where it lands; the query, which nothing here reads, is left behind. Redirects are marked `private, no-cache` as the pages are. Other paths under `/plain` answer a plain "page not found". `run_worker_first` in `wrangler.jsonc` gains `/plain` and `/plain/*`.
 
 ### 3.2 The form
 
@@ -113,7 +113,7 @@ The page offers the plain search rather than going to it, so the visitor sees wh
 
 ## 7. Testing
 
-- Worker: the form, a search near a place and online, More results, paging through a batch UKCP reshuffles between pages, each error, escaping (a therapist named `<script>`), the cache and rate limit path, nothing searched in a URL the cache is asked by, the cross-site refusal, and the profile with and without contact details.
+- Worker: the form, a search near a place and online, More results, paging through a batch UKCP reshuffles between pages, each error, escaping (a therapist named `<script>`), the cache and rate limit path, nothing searched in a URL the cache is asked by, the cross-site refusal, an address with a trailing slash, and the profile with and without contact details.
 - Readers: the fixtures read as the browser's parsers read them.
 - The help-now line and the site's name and links held to the app's.
 - `index.html`: the offers, and the gate marking a browser that lacks either feature.

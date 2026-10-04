@@ -382,8 +382,45 @@ describe("POST /plain/therapist", () => {
   it("leads a visit by address alone, or to any other page here, back to the search", async () => {
     const { request } = setup();
     const res = await request("/plain/therapist");
-    expect([res.status, res.headers.get("Location")]).toEqual([303, "/plain"]);
+    expect([res.status, res.headers.get("Location"), res.headers.get("Cache-Control")]).toEqual([303, "/plain", "private, no-cache"]);
     const missing = await request("/plain/nothing");
     expect([missing.status, (await read(missing)).doc.querySelector("main a[href='/plain']")?.textContent]).toEqual([404, "Start a new search"]);
+  });
+});
+
+describe("an address with a trailing slash", () => {
+  it("leads a visit under /plain to the address without it, its query left behind, kept by no cache", async () => {
+    const { request, forwarded } = setup();
+    for (const [path, to] of [
+      ["/plain/", "/plain"],
+      ["/plain/therapist/", "/plain/therapist"],
+      ["/plain//?Location=Bristol", "/plain"],
+      ["/plain/Bristol%20BS1/", "/plain/Bristol%20BS1"],
+      // Hono routes this here as /plain//evil.example/; the address it leads to stays under /plain.
+      ["/pl%61in//evil.example/", "/plain"],
+    ] as const) {
+      const res = await request(path);
+      expect([res.status, res.headers.get("Location"), res.headers.get("Cache-Control")]).toEqual([301, to, "private, no-cache"]);
+    }
+    expect((await request("/plain/", { method: "HEAD" })).status).toBe(301);
+    expect(forwarded).not.toHaveBeenCalled();
+  });
+
+  it("sends a form under /plain on to the address without it, where it is checked as ever", async () => {
+    const { post, forwarded } = setup();
+    for (const [path, to] of [["/plain/", "/plain"], ["/plain/therapist/", "/plain/therapist"]] as const) {
+      const res = await post(path, "slug=Test-Therapist-1-TESTID01", { "sec-fetch-site": "cross-site" });
+      expect([res.status, res.headers.get("Location"), res.headers.get("Cache-Control")]).toEqual([307, to, "private, no-cache"]);
+    }
+    // A browser sends the form again, with the same body and the same site, to the address it was given.
+    expect((await post("/plain/therapist", "slug=Test-Therapist-1-TESTID01", { "sec-fetch-site": "cross-site" })).status).toBe(403);
+    expect((await post("/plain/", `KeywordFilter=${"a".repeat(70_000)}`)).status).toBe(413);
+    expect(forwarded).not.toHaveBeenCalled();
+  });
+
+  it("is left to the routes elsewhere on the Worker", async () => {
+    const { request } = setup();
+    const res = await request("/api/search/");
+    expect([res.status, res.headers.get("Location")]).toEqual([410, null]);
   });
 });
