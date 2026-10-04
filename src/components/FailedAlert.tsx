@@ -15,16 +15,16 @@ type Failing = {
 };
 
 /** A query's failure as the page shows it, with what Try again calls on. */
-export type Failure = ReturnType<typeof useFailure>;
+export type Failure = ReturnType<typeof useFailure<HTMLHeadingElement>>;
 
 /**
  * The error of a query that loaded nothing, kept while it is asked again, by `retry` or as the connection returns:
  * asking again puts such a query back to pending, which would swap the error, and the Try again holding focus, for a
  * loading state, or for the last question's answer. Undefined once it answers. `key` names what the query asks, and the
  * error is let go once another is asked, so going back to it loads as usual. Once what loaded takes the error's place, a
- * keyboard left on the page carries on from `landing`, the heading of it.
+ * keyboard left on the page carries on from `landing`, the first of it, such as its heading.
  */
-export function useFailure(query: Failing, key: string) {
+export function useFailure<Landing extends HTMLElement = HTMLHeadingElement>(query: Failing, key: string) {
   // Pending again forgets the error, so the last one is held here, for its question and until that is answered.
   const [last, setLast] = useState<{ error: Error; key: string }>();
   let held = last;
@@ -34,7 +34,7 @@ export function useFailure(query: Failing, key: string) {
   // Asked again, with nothing of its own to show yet.
   const again = held !== undefined && query.isFetching && (query.data === undefined || query.isPlaceholderData);
   const error = (query.isLoadingError ? query.error : again ? held?.error : undefined) ?? undefined;
-  const landing = useRef<HTMLHeadingElement>(null);
+  const landing = useRef<Landing>(null);
   // The question whose error was in view, until `landing` is drawn in its place, which may be after a loading state. The
   // keyboard goes there only for the same question's answer, not another's.
   const shownFor = useRef<string>(undefined);
@@ -56,6 +56,18 @@ export function useFailure(query: Failing, key: string) {
     void query.refetch();
   };
   return { error, retrying: query.isFetching, retried: retriedFor === key, retry, landing };
+}
+
+/**
+ * What a quiet alert or error line leaves unsaid of `failure`: its error, "Trying again" while it is asked again, and the
+ * error once more if that fails. Drawn before the failure, as a screen reader hears only a live region already there.
+ */
+export function FailureStatus({ failure: { error, retrying } }: { failure: Pick<Failure, "error" | "retrying"> }) {
+  return (
+    <p aria-live="polite" className="sr-only">
+      {error ? (retrying ? "Trying again" : error.message) : ""}
+    </p>
+  );
 }
 
 type Props = {

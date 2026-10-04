@@ -1,9 +1,10 @@
 import type { ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { AtSign, ExternalLink, Globe, Mail, Phone, type LucideIcon } from "lucide-react";
+import { AtSign, ExternalLink, Globe, Loader2, Mail, Phone, type LucideIcon } from "lucide-react";
 import { ukcpProfileAddress, ukcpProfileUrl } from "@shared/query";
 import type { Profile } from "@shared/types";
 import { ErrorLine } from "@/components/ErrorLine";
+import { FailureStatus, useFailure } from "@/components/FailedAlert";
 import { SkeletonText } from "@/components/SkeletonText";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
@@ -44,6 +45,8 @@ export function ContactList({ profile, onReach }: Props) {
     staleTime: Infinity,
     gcTime: Infinity,
   });
+  // Held while asked again, so Try again keeps the keyboard until the first of the details takes it.
+  const failure = useFailure<HTMLAnchorElement>(contact, contactId ?? "");
   const { phone, website } = contact.data ?? {};
   const email = profile.email ?? (profile.emailInContact ? contact.data?.email : undefined);
 
@@ -58,10 +61,13 @@ export function ContactList({ profile, onReach }: Props) {
 
   return (
     <div className="space-y-1">
+      {/* Says each failure, and how its retry goes, once, for the error line, which keeps quiet. */}
+      <FailureStatus failure={failure} />
       <ContactRow>
-        {items.map((item) => (
+        {items.map((item, i) => (
           <li key={item.href} className="shrink-0 @lg:max-w-full @lg:min-w-0 @lg:shrink print:max-w-full print:min-w-0 print:shrink">
             <a
+              ref={i === 0 ? failure.landing : undefined}
               href={item.href}
               title={item.title}
               aria-label={nameOf(item)}
@@ -85,18 +91,26 @@ export function ContactList({ profile, onReach }: Props) {
             </a>
           </li>
         ))}
-        {contact.isLoading && (
+        {contact.isLoading && !failure.error && (
           <li className="shrink-0">
             <SkeletonText className="w-36" />
             <span className="sr-only">Loading contact details</span>
           </li>
         )}
       </ContactRow>
-      {contact.error && (
+      {failure.error && (
         // Clear, on a touch screen, of the links' targets above.
-        <ErrorLine className="pointer-coarse:pt-6">
-          {contact.error.message}{" "}
-          <Button variant="link" size="sm" className="h-auto p-0" onClick={() => contact.refetch()}>
+        <ErrorLine className="pointer-coarse:pt-6" quiet>
+          {failure.error.message}{" "}
+          <Button
+            variant="link"
+            size="sm"
+            className="h-auto p-0 aria-disabled:opacity-50"
+            // Not disabled while retrying, which would drop focus; a second press is ignored.
+            aria-disabled={failure.retrying}
+            onClick={failure.retrying ? undefined : failure.retry}
+          >
+            {failure.retrying && <Loader2 className="motion-safe:animate-spin" aria-hidden />}
             Try again
           </Button>
         </ErrorLine>
