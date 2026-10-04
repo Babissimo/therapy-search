@@ -2,6 +2,8 @@ import { Bookmark, List } from "lucide-react";
 import type { ReactNode, Ref } from "react";
 import { Morph } from "@/components/Morph";
 import { TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Unfold } from "@/components/Unfold";
+import { useLast } from "@/lib/useLast";
 import { CountBadge } from "@/shortlist/CountBadge";
 import { usePreloadShortlistTab } from "@/shortlist/LazyShortlistTab";
 import { statusOf } from "@/shortlist/store";
@@ -15,6 +17,8 @@ export type ListTab = "results" | "shortlist";
  */
 export function ListTabs({ ref }: { ref?: Ref<HTMLDivElement> }) {
   const count = useShortlist().filter((entry) => statusOf(entry) !== "setAside").length;
+  // The count as it last stood above none, for the badge to show as it folds away.
+  const badge = useLast(count || undefined);
   usePreloadShortlistTab();
   return (
     <Morph name="list-tabs">
@@ -26,7 +30,10 @@ export function ListTabs({ ref }: { ref?: Ref<HTMLDivElement> }) {
         <TabsTrigger value="shortlist">
           <Bookmark data-icon="inline-start" aria-hidden />
           Shortlist
-          {count > 0 && <CountBadge count={count} />}
+          {/* Pulled back over the trigger's gap, which the badge opens again inside what folds, so none is left once it has gone. */}
+          <Unfold open={count > 0} across className="-ml-1.5">
+            {badge !== undefined && <CountBadge count={badge} className="ml-1.5" />}
+          </Unfold>
         </TabsTrigger>
       </TabsList>
     </Morph>
