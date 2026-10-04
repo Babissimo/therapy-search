@@ -179,6 +179,14 @@ describe("TherapistCard", () => {
     expect(screen.getAllByRole("listitem").map((li) => li.textContent)).toEqual(["Trauma", "EMDR"]);
   });
 
+  it("lets a town or tag longer than the card's column wrap, breaking a long word, rather than run out of the card", () => {
+    const town = "Llanfairpwllgwyngyllgogerychwyrndrobwllllantysiliogogogoch";
+    renderCard(therapist({ location: town, distance: undefined, tags: ["Psychotherapeuticcounselling"] }), ["psychotherapeuticcounselling"]);
+    // Beside the pin's icon, a flex item shrinks below its longest word only once its minimum width is lifted.
+    expect(screen.getByText(town).parentElement?.classList.contains("min-w-0")).toBe(true);
+    expect(screen.getByText("Psychotherapeuticcounselling").className).toContain("whitespace-normal wrap-anywhere");
+  });
+
   it("shows no tags for a search that asks for none", () => {
     renderCard(therapist());
     expect(screen.queryByRole("list")).toBeNull();

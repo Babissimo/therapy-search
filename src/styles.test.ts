@@ -28,4 +28,10 @@ describe("index.css", () => {
     const print = source.slice(source.indexOf("@media print {"));
     expect(print).toMatch(/\*,\s*::before,\s*::after \{\s*animation: none;\s*\}/);
   });
+
+  it("breaks a word longer than its column anywhere on the page, and lets a map's tooltip wrap to a measure", () => {
+    const source = readFileSync(new URL("./index.css", import.meta.url), "utf8");
+    expect(source).toMatch(/html \{\s*@apply [^;]*\bwrap-break-word\b/);
+    expect(source).toMatch(/\.leaflet-tooltip \{\s*@apply [^;]*\bw-max! max-w-64!.*\bwhitespace-normal!/);
+  });
 });

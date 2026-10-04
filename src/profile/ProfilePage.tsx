@@ -7,7 +7,7 @@ import { FailedAlert, useFailure } from "@/components/FailedAlert";
 import { MapSlot } from "@/components/MapSlot";
 import { Portrait } from "@/components/Portrait";
 import { SkeletonText } from "@/components/SkeletonText";
-import { Badge } from "@/components/ui/badge";
+import { Badge, TAG } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -95,7 +95,7 @@ export function ProfileBody({ slug, back, close }: { slug: string } & Exits) {
             profile.location && (
               <span className="flex gap-1.5">
                 <MapPin aria-hidden className="mt-0.5 size-4 shrink-0" />
-                {profile.location}
+                <span className="min-w-0">{profile.location}</span>
               </span>
             )
           }
@@ -282,7 +282,7 @@ function Identity({ photo, name, location, contacts, headingRef }: IdentityProps
  */
 function Columns({ main, aside, besideLong }: { main?: ReactNode; aside?: ReactNode; besideLong: boolean }) {
   return (
-    <div className={cn("grid gap-8", besideLong && "@4xl:grid-cols-[minmax(0,var(--container-reading))_20rem] @4xl:justify-between")}>
+    <div className={cn("grid grid-cols-1 gap-8", besideLong && "@4xl:grid-cols-[minmax(0,var(--container-reading))_20rem] @4xl:justify-between")}>
       {main && <div className="space-y-8">{main}</div>}
       {aside && <aside className={cn("space-y-8", besideLong && "@4xl:col-2")}>{aside}</aside>}
     </div>
@@ -394,7 +394,7 @@ function ShortSections({ besideLong, children }: { besideLong: boolean; children
   if (children.length === 0) return null;
   const first = besideLong ? "@4xl:first:border-t-0 @4xl:first:pt-0" : "first:border-t-0 first:pt-0 @xl:nth-2:border-t-0 @xl:nth-2:pt-0";
   return (
-    <div className={cn("grid gap-8 @xl:grid-cols-2", besideLong && "@4xl:grid-cols-1")}>
+    <div className={cn("grid grid-cols-1 gap-8 @xl:grid-cols-2", besideLong && "@4xl:grid-cols-1")}>
       {children.map((section, i) => (
         <div key={i} className={cn("border-t pt-8 print:break-inside-avoid", first)}>
           {section}
@@ -403,10 +403,6 @@ function ShortSections({ besideLong, children }: { besideLong: boolean; children
     </div>
   );
 }
-
-// A badge keeps to one line at a fixed height, and a tag as long as a college's name runs past a narrow column, so these
-// wrap; the thinner padding keeps a one-line tag at the badge's height.
-const TAG = "h-auto py-px whitespace-normal";
 
 // Therapists write at length about themselves, and visitors read it closely, so it is set for reading.
 const READING = "max-w-reading text-[1.0625rem] leading-relaxed";
@@ -536,15 +532,19 @@ function OfficeCard({ office, profile, distance }: { office: Office; profile: Pr
   return (
     <Card className={cn(distance && "ring-primary")}>
       <CardHeader>
-        <CardTitle className="flex flex-wrap items-center gap-2">
+        <CardTitle className="flex min-w-0 flex-wrap items-center gap-2">
           {office.mapUrl ? (
-            <a className="relative inline-flex touch-target items-center gap-1.5 underline-offset-4 hover:underline" href={office.mapUrl} target="_blank" rel="noreferrer">
-              <span translate="no">{office.name}</span>
-              <ExternalLink aria-hidden className="size-4 text-muted-foreground" />
+            <a className="relative inline-flex min-w-0 touch-target items-center gap-1.5 underline-offset-4 hover:underline" href={office.mapUrl} target="_blank" rel="noreferrer">
+              <span translate="no" className="min-w-0">
+                {office.name}
+              </span>
+              <ExternalLink aria-hidden className="size-4 shrink-0 text-muted-foreground" />
               <span className="sr-only">, map {NEW_TAB}</span>
             </a>
           ) : (
-            <span translate="no">{office.name}</span>
+            <span translate="no" className="min-w-0">
+              {office.name}
+            </span>
           )}
           {office.isMain && <Badge variant="outline">Main address</Badge>}
           {distance && (

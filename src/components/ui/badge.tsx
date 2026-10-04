@@ -45,4 +45,9 @@ function Badge({
   )
 }
 
-export { Badge, badgeVariants }
+// A badge keeps to one line at a fixed height, and a tag of UKCP's, as long as a college's name or holding one long word,
+// runs past a narrow column, so a tag wraps, breaking a word if it must; the thinner padding keeps a one-line tag at the
+// badge's height.
+const TAG = "h-auto py-px whitespace-normal wrap-anywhere"
+
+export { Badge, badgeVariants, TAG }
