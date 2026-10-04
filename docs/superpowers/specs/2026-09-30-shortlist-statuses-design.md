@@ -15,6 +15,7 @@ In scope:
 - Status badges on the shortlist's map (§4.6)
 - A private note per therapist (§4.7)
 - Removed therapists kept for 30 days, so adding one back from anywhere returns them as they were (§3)
+- Motion as the shortlist changes: the profile's track and notes, the tab's count, the track itself, a card moving into or out of "Set aside", and a clear (§4.8)
 
 Out of scope:
 
@@ -78,7 +79,7 @@ type Stored = { v: 1; entries: Record<string, ShortlistEntry>; removed?: Record<
 
 ### 4.1 The shortlist tab
 
-- The shortlist is one list in its own order, of full cards as now, reordered by dragging their handles (#63). Each card carries the status track (§4.2) under its place and session types, above its summary.
+- The shortlist is one list in its own order, of cards as the results draw them, reordered by dragging their handles (#63). Each card carries the status track (§4.2) under its place and session types, in place of its summary: the visitor read it to shortlist them, the profile has it in full, and the track and note are what the tab is for.
 - Those set aside leave the list for a "Set aside" section at its foot, under a heading with its icon, label and count that opens and closes it. It starts closed, and the choice lasts for the page load. Within it they keep the shortlist's order and can be dragged as the list's cards are.
 - The order is global, so a therapist set aside and later given another status returns to their old place in the list.
 - The shortlist's map shows the list and, while it is open, the "Set aside" section, so closing it takes those pins off the map, and the "not on the map" count follows.
@@ -96,7 +97,7 @@ type Stored = { v: 1; entries: Record<string, ShortlistEntry>; removed?: Record<
 
 ### 4.3 The status menu
 
-- A Radix dropdown menu, added as shadcn's `dropdown-menu` under `src/components/ui/`. Its trigger is an icon button showing the current status's icon and named "Status of Ruth Okafor: contacted".
+- A Radix dropdown menu, added as shadcn's `dropdown-menu` under `src/components/ui/`. Its trigger is outlined as the next-step button beside it is, showing the current status's icon and a chevron, with the word "Status" between them on a touch screen, so it reads as a button that opens a menu, and is named "Status of Ruth Okafor: contacted".
 - It lists the six statuses as radio items with the current one checked, then a separator and "Remove from shortlist".
 - A change of status, by the menu or the next-step button, is said in a polite live region: "Ruth Okafor: Contacted.", as is a removal by the menu: "Removed Ruth Okafor from your shortlist." A bookmark says its own presses beside it, and an add-back that returns a therapist with a status past "To contact" names it: "Added Ruth Okafor back to your shortlist: Set aside." Each is said until the shortlist next changes, so the same words after an undo are heard again. A card that moves into or out of "Set aside" takes focus with it, to its menu button there, or to the section's heading while it is closed. Where the next-step button goes, at "Seeing them", focus moves to the menu beside it. Removing a therapist sends focus to the bookmark, which can put them back.
 
@@ -124,16 +125,27 @@ type Stored = { v: 1; entries: Record<string, ShortlistEntry>; removed?: Record<
 - Only a shortlisted therapist's note is shown or edited. Removing them keeps it with them (§3), along with anything the box saves as it goes, and adding them back returns it.
 - The about text's list of what the browser keeps names statuses and notes alongside the shortlist, and how long they are kept once a therapist is removed, as §3 puts it: until the shortlist is cleared or the site is opened 30 days or more after the removal.
 
+### 4.8 Motion
+
+Each change below moves in the side bar's time, 200 ms, as the page's other glides do, and happens at once under reduced motion. None of it plays as a page or the tab first draws.
+
+- **The profile's track and notes** (§4.5, §4.7) unroll to their height as the therapist is shortlisted and roll up as they are taken off, drawn as they were and out of reach while they go. Once the header has stuck they come and go at once, the profile below held where the visitor is reading as now: unrolling there would push the text down under them.
+- **The tab's count** unfolds beside "Shortlist" as the first therapist is listed and folds away as the last goes, the tab widening and narrowing with it.
+- **The track** (§4.2) fills its line and steps up to a new status and drains them going back, and the status's label and the next step's words fade in as they change.
+- **A card set aside or brought back** glides from its old place to its new one while "Set aside" is open, and the cards and heading after it close up or make room; while it is closed, those after it close up. Dragging and the move buttons are unchanged.
+- **Clearing the shortlist** fades the tab from the list to the empty tab, where the browser can draw a view transition, and clears it at once where it can't.
+
 ## 5. Testing
 
 - **Store:** entries read with and without the new fields; an unknown status and a wrongly typed note; choosing "To contact" clears the status; adding back returns status and note; the note's limit; another tab's changes carry the new fields; a removed therapist kept across a reload and another tab, forgotten after 30 days and by a clear, and a note saved after their removal; an add in a tab that has not heard another tab add the therapist back.
 - **Bookmarks:** a therapist removed elsewhere, added back by a result card's or the profile's bookmark, or by "Yes", returns with their place, status and note; an add-back names a status past "To contact".
-- **Tab:** one list in the shortlist's order with those set aside at its foot; "Set aside" starts closed, and its pins leave the map while it is; the tab's count leaves out those set aside; dragging within the list and within "Set aside"; a therapist set aside and brought back returns to their old place; focus and the announcement after a change by menu and by next step; removing and adding back.
-- **Track:** the steps, label and next-step button for each status, the paused step and the grey track; a removed therapist's track saying so in place of its controls; focus once the next-step button goes.
+- **Tab:** one list in the shortlist's order with those set aside at its foot; "Set aside" starts closed, and its pins leave the map while it is; the tab's count leaves out those set aside; dragging within the list and within "Set aside"; a therapist set aside and brought back returns to their old place; focus and the announcement after a change by menu and by next step; removing and adding back; cards without their summaries.
+- **Track:** the steps, label and next-step button for each status, the paused step and the grey track; a removed therapist's track saying so in place of its controls; focus once the next-step button goes; the menu's trigger outlined, with its chevron.
 - **Result cards:** the status line, nothing for "To contact", and the faded portrait when set aside.
 - **Profile:** the track after the header; the contact offer after phone and email but not a website; "Yes" for a therapist not yet shortlisted adds them as "Contacted"; the note box's count near its limit, and its spellcheck off.
 - **Map:** `pinIcon`'s badge and accessible name for each status, and none on a stacked pin.
-- **Manual:** a pass in the browser in both themes, on a wide window and in the sheet at phone width: the cards' tracks, the menu and next step, dragging by pointer, touch and keyboard, "Set aside" opening and closing, the profile's track and the map's badges.
+- **Motion:** what unfolds kept while it folds until its transition ends, and gone at once where nothing times the fold; the tab's count unfolding and folding; the tab's glides from where each card and the heading stood, and none under reduced motion; a clear drawn through a view transition where the browser has one.
+- **Manual:** a pass in the browser in both themes, on a wide window and in the sheet at phone width: the cards' tracks, the menu and next step, dragging by pointer, touch and keyboard, "Set aside" opening and closing, the profile's track and the map's badges; each motion in §4.8, and none with reduced motion on.
 
 ## 6. Delivery
 
@@ -147,3 +159,4 @@ A stack of pull requests, each on the one before:
 6. Notes (§4.7).
 7. Removed therapists kept for 30 days (§3), with "Clear shortlist" on the empty tab while anyone is (§4.1).
 8. Loose ends: an add that starts nobody afresh and every page forgetting those due (§3), an add-back naming its status (§4.3), and the note box's height, count and spellcheck, with the about text's exact wording (§4.7).
+9. Motion (§4.8), the status menu's outlined trigger (§4.3), and shortlist cards without their summaries (§4.1).
