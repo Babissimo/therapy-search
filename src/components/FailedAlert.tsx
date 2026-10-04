@@ -67,16 +67,18 @@ type Props = {
   onRetry: () => void;
   /** Beside Try again, such as a way round the failure. */
   children?: ReactNode;
+  /** Silent, for a page that says the failure, and how its retry goes, from a live region there before the failure. */
+  quiet?: boolean;
 };
 
 /**
  * A request that failed, with a Try again button that keeps keyboard focus through the retry. The alert speaks as it
  * appears; how a retry goes is told beside it, as the alert, still there and unchanged when it fails again, says nothing.
  */
-export function FailedAlert({ error, retrying, retried, onRetry, children }: Props) {
+export function FailedAlert({ error, retrying, retried, onRetry, children, quiet = false }: Props) {
   return (
     <>
-      <Alert variant="destructive">
+      <Alert variant="destructive" role={quiet ? undefined : "alert"}>
         <AlertDescription className="space-y-3">
           <div>{error.message}</div>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
@@ -96,9 +98,11 @@ export function FailedAlert({ error, retrying, retried, onRetry, children }: Pro
           </div>
         </AlertDescription>
       </Alert>
-      <p aria-live="polite" className="sr-only">
-        {retrying ? "Trying again" : retried ? error.message : ""}
-      </p>
+      {!quiet && (
+        <p aria-live="polite" className="sr-only">
+          {retrying ? "Trying again" : retried ? error.message : ""}
+        </p>
+      )}
     </>
   );
 }
