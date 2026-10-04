@@ -1,6 +1,7 @@
 import { Bookmark } from "lucide-react";
 import { IconButton } from "@/components/IconButton";
 import { cn } from "@/lib/utils";
+import { STATUS_LABEL } from "./status";
 import type { ShortlistCard } from "./store";
 import { useShortlistAnnouncement, useShortlisted, useShortlistStore } from "./useShortlist";
 
@@ -17,9 +18,13 @@ export function ShortlistButton({ therapist, className }: Props) {
       store.remove(therapist.slug);
       return announce(`Removed ${therapist.name} from your shortlist.`);
     }
-    // The store puts back anyone it kept as removed where and as they were.
-    store.add(therapist);
-    announce(`Added ${therapist.name} to your shortlist.`);
+    // The store puts back anyone it kept as removed where and as they were, so a status past "To contact" is theirs from before.
+    const status = store.add(therapist);
+    announce(
+      status === "toContact"
+        ? `Added ${therapist.name} to your shortlist.`
+        : `Added ${therapist.name} back to your shortlist: ${STATUS_LABEL[status]}.`,
+    );
   }
 
   return (

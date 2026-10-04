@@ -112,4 +112,19 @@ describe("ShortlistButton", () => {
     fireEvent.click(screen.getByRole("button", { name: "Remove Jo Bloggs from your shortlist" }));
     expect(region.textContent).toBe("Removed Jo Bloggs from your shortlist.");
   });
+
+  it("names where a therapist it adds back stands, where that is past To contact", () => {
+    const store = clockedStore(null);
+    store.add(JO);
+    store.remove(JO.slug);
+    renderButton(undefined, store);
+    const region = document.querySelector("[aria-live=polite]")!;
+    const press = () => fireEvent.click(screen.getByRole("button", { name: /^(Add|Remove) Jo Bloggs/ }));
+    press();
+    expect(region.textContent).toBe("Added Jo Bloggs to your shortlist.");
+    act(() => store.setStatus(JO.slug, "setAside"));
+    press();
+    press();
+    expect(region.textContent).toBe("Added Jo Bloggs back to your shortlist: Set aside.");
+  });
 });

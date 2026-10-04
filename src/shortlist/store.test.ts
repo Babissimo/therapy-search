@@ -523,6 +523,16 @@ describe("createShortlistStore", () => {
     ]);
   });
 
+  it("says where an add leaves the therapist", () => {
+    const store = createShortlistStore(memory(), clock());
+    expect(store.add(card("a"))).toBe("toContact");
+    store.setStatus("a", "waiting");
+    store.remove("a");
+    expect(store.add(card("a"))).toBe("waiting");
+    store.remove("a");
+    expect(store.add(card("a"), { status: "contacted" })).toBe("contacted");
+  });
+
   it("keeps a note saved after its therapist was removed, for when they are added back", () => {
     const store = createShortlistStore(memory(), clock());
     store.add(card("a"));
