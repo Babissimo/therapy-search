@@ -39,17 +39,18 @@ const currentStep = () =>
 
 /**
  * The track as drawn: a dot per step (● done, ‖ paused, ○ still to come), each followed by the line to the next (━ filled,
- * ─ not), reading a part as filled by `fill`, its class.
+ * ─ not), reading a dot as done by `fill`, its class, and a line as filled where its fill, carrying `fill`, spans it.
  */
 const drawn = (fill = "bg-primary") => {
-  const filled = (part: Element | null) => part?.classList.contains(fill);
+  const filled = (part: Element | null | undefined) => part?.classList.contains(fill);
   return within(screen.getByRole("list", { name: "Steps with Jo Bloggs" }))
     .getAllByRole("listitem")
     .map((step) => {
       // The dot comes before the line, and the last step has no line.
       const dot = step.querySelector("svg.lucide-pause") ? "‖" : filled(step.querySelector("span[aria-hidden]")) ? "●" : "○";
       const line = step.querySelector("span.flex-1");
-      return dot + (line ? (filled(line) ? "━" : "─") : "");
+      const spans = line?.firstElementChild?.classList.contains("scale-x-100") && filled(line.firstElementChild);
+      return dot + (line ? (spans ? "━" : "─") : "");
     })
     .join("");
 };
@@ -83,8 +84,9 @@ describe("StatusTrack", () => {
     renderTrack("waiting");
     expect(drawn("forced-colors:bg-[CanvasText]")).toBe("●━‖─○─○");
     const list = screen.getByRole("list", { name: "Steps with Jo Bloggs" });
-    const ahead = [...list.querySelectorAll("span.flex-1")].filter((line) => line.classList.contains("forced-colors:bg-[GrayText]"));
-    expect(ahead).toHaveLength(2);
+    // Each line is the disabled text's colour, the text's filling it as far as the path has come.
+    const lines = [...list.querySelectorAll("span.flex-1")];
+    expect(lines.filter((line) => line.classList.contains("forced-colors:bg-[GrayText]"))).toHaveLength(3);
   });
 
   it("moves the therapist on a step at a time, saying so each time", () => {
@@ -97,6 +99,30 @@ describe("StatusTrack", () => {
     expect(statusOf(store.get()[0]!)).toBe("consultation");
     expect(currentStep()).toBe("Consultation");
     expect(onChosen).toHaveBeenLastCalledWith("consultation");
+  });
+
+  it("eases each dot and line to where the path now reaches, rather than jumping", () => {
+    renderTrack("contacted");
+    const list = screen.getByRole("list", { name: "Steps with Jo Bloggs" });
+    for (const dot of list.querySelectorAll("li > span[aria-hidden]:not(.flex-1)")) expect(dot.className).toMatch(/motion-safe:transition-colors/);
+    for (const line of list.querySelectorAll("span.flex-1")) {
+      expect(line.firstElementChild?.className).toMatch(/\borigin-left\b/);
+      expect(line.firstElementChild?.className).toMatch(/motion-safe:transition-\[scale\]/);
+    }
+  });
+
+  it("fades in the words for a new status, though not as the track first draws", () => {
+    renderTrack("toContact");
+    // On the side bar's curve, which `animate-in` takes from `ease-in-out`.
+    const fades = (element: Element | null | undefined) => /motion-safe:animate-in.*motion-safe:ease-in-out/.test(element?.className ?? "");
+    expect(fades(screen.getByText("To contact", { selector: "p" }))).toBe(false);
+    expect(fades(screen.getByText("Mark contacted"))).toBe(false);
+    const button = screen.getByRole("button", { name: "Mark contacted, Jo Bloggs" });
+    fireEvent.click(button);
+    expect(fades(screen.getByText("Contacted", { selector: "p" }))).toBe(true);
+    expect(fades(screen.getByText("Consultation booked"))).toBe(true);
+    // The button stays the one pressed, keeping focus, as only its words are drawn anew.
+    expect(screen.getByRole("button", { name: "Consultation booked, Jo Bloggs" })).toBe(button);
   });
 
   it("returns a therapist set aside to the start of the path", () => {
@@ -139,6 +165,8 @@ describe("StatusTrack", () => {
     expect(["flex-wrap", "gap-2"].map((c) => buttons.parentElement!.classList.contains(c))).toEqual([true, true]);
     // Under each other with room for both targets on a touch screen.
     expect(["flex-wrap", "pointer-coarse:gap-y-4"].map((c) => buttons.classList.contains(c))).toEqual([true, true]);
+    // To the right, line by line, where they stand on a card wide enough for them.
+    expect(["ml-auto", "justify-end"].map((c) => buttons.classList.contains(c))).toEqual([true, true]);
   });
 
   it("shows where a therapist taken off the shortlist stood, saying they were removed, with nothing to change it", () => {

@@ -82,6 +82,26 @@ describe("StatusMenu", () => {
     expect(onChosen).not.toHaveBeenCalled();
   });
 
+  it("is drawn as an outlined button with a chevron, as one that opens a menu", () => {
+    renderMenu(shortlisted);
+    const trigger = screen.getByRole("button", { name: "Status of Jo Bloggs: to contact" });
+    expect(trigger.dataset.variant).toBe("outline");
+    expect(trigger.dataset.size).toBe("sm");
+    expect(trigger.getAttribute("aria-haspopup")).toBe("menu");
+    expect(trigger.querySelector("svg.lucide-circle")).not.toBeNull();
+    expect(trigger.querySelector("svg.lucide-chevron-down")).not.toBeNull();
+  });
+
+  it("keeps its chevron after the word a touch screen shows, which is ordered last", () => {
+    renderMenu(shortlisted);
+    const trigger = screen.getByRole("button", { name: "Status of Jo Bloggs: to contact" });
+    const [word, chevron] = [trigger.querySelector(".pointer-coarse\\:order-last")!, trigger.querySelector("svg.lucide-chevron-down")!];
+    expect(word.textContent).toBe("Status");
+    // Equal orders fall back to the order in the page, where the word comes first.
+    expect(chevron.classList.contains("order-last")).toBe(true);
+    expect(word.compareDocumentPosition(chevron) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it("shows nothing for a therapist who isn't shortlisted", () => {
     renderMenu();
     expect(screen.queryByRole("button")).toBeNull();

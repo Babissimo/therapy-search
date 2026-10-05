@@ -36,10 +36,12 @@ type Props = {
   status?: Status;
   /** Fades the portrait as "Set aside" does, for a therapist taken off the shortlist whose card stays to add them back. */
   faded?: boolean;
+  /** Leaves out the summary, for the shortlist's cards, which hold where the visitor stands in its place. */
+  brief?: boolean;
   onHighlight?: (on: boolean) => void;
 };
 
-export function TherapistCard({ therapist: t, sought, grouped = false, online = false, heading, action, track, note, fee, status, faded,
+export function TherapistCard({ therapist: t, sought, grouped = false, online = false, heading, action, track, note, fee, status, faded, brief,
   onHighlight }: Props) {
   const profile = useProfileLink();
   const where = grouped || online ? undefined : placeOf(t);
@@ -109,7 +111,7 @@ export function TherapistCard({ therapist: t, sought, grouped = false, online = 
           </>
         )
       }
-      summary={t.summary}
+      summary={brief ? undefined : t.summary}
       tags={t.tags.filter((tag) => sought.has(tag.toLowerCase()))}
     />
   );

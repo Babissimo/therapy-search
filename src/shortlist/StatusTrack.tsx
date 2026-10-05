@@ -1,5 +1,5 @@
 import { Pause } from "lucide-react";
-import { useLayoutEffect, useRef } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { STATUS_LABEL } from "./status";
@@ -47,6 +47,10 @@ export function StatusTrack({ therapist, status, listed = true, onChosen, onRemo
     toMenu.current = false;
     root.current?.querySelector<HTMLElement>("[data-status-menu]")?.focus();
   });
+  // Once the status changes here, the words saying it fade in as they change; as the track first draws they are simply there.
+  const [shown, setShown] = useState({ status, changed: false });
+  if (status !== shown.status) setShown({ status, changed: true });
+  const fadeIn = shown.changed && "fade-in-0 motion-safe:animate-in motion-safe:duration-200 motion-safe:ease-in-out";
   // "Waiting list" pauses at "Contacted"; "Set aside" stands at no step.
   const current = STEPS.indexOf(status === "waiting" ? "contacted" : status);
   const next = NEXT_STEP[status];
@@ -66,23 +70,45 @@ export function StatusTrack({ therapist, status, listed = true, onChosen, onRemo
           <li key={s} aria-current={i === current ? "step" : undefined} className="flex flex-1 items-center last:flex-none">
             <span className="sr-only">{STATUS_LABEL[s]}</span>
             {status === "waiting" && i === current ? (
-              <Pause aria-hidden className="size-3 fill-current text-primary" />
+              <Pause aria-hidden className={cn("size-3 fill-current text-primary", fadeIn && "zoom-in-50", fadeIn)} />
             ) : (
-              <span aria-hidden className={cn("size-2.5 rounded-full", i <= current ? TAKEN : "border-[1.5px] border-control")} />
+              <span
+                aria-hidden
+                className={cn(
+                  "size-2.5 rounded-full border-[1.5px] motion-safe:transition-colors motion-safe:duration-200",
+                  i <= current ? cn(TAKEN, "border-primary") : "border-control",
+                )}
+              />
             )}
-            {i < STEPS.length - 1 && <span aria-hidden className={cn("mx-1 h-0.5 flex-1 rounded-full", i < current ? TAKEN : AHEAD)} />}
+            {i < STEPS.length - 1 && (
+              <span aria-hidden className={cn("mx-1 h-0.5 flex-1 overflow-hidden rounded-full", AHEAD)}>
+                {/* Filled from the left as the path reaches the next step, and drained back as it leaves it. */}
+                <span
+                  className={cn(
+                    "block h-full origin-left motion-safe:transition-[scale] motion-safe:duration-200",
+                    TAKEN,
+                    i < current ? "scale-x-100" : "scale-x-0",
+                  )}
+                />
+              </span>
+            )}
           </li>
         ))}
       </ol>
-      {/* Where the row lacks the room, zoomed in or on a touch screen, where the menu is named on screen too, the buttons go under
-          the status, and under each other; on a touch screen far enough apart that no one's target takes another's taps. */}
+      {/* Where the row lacks the room the buttons go under the status, to its right, and under each other; on a touch screen far
+          enough apart that no one's target takes another's taps. */}
       <div className="flex min-h-7 flex-wrap items-center justify-between gap-2">
-        <p className="text-sm text-muted-foreground">{STATUS_LABEL[status]}</p>
+        <p key={status} className={cn("text-sm text-muted-foreground", fadeIn)}>
+          {STATUS_LABEL[status]}
+        </p>
         {listed ? (
-          <div className="flex flex-wrap items-center gap-1 pointer-coarse:gap-y-4">
+          <div className="ml-auto flex flex-wrap items-center justify-end gap-1 pointer-coarse:gap-y-4">
             {next && (
               <Button variant="outline" size="sm" onClick={() => step(next.status)}>
-                {next.label}
+                {/* Its words drawn anew, the button kept, so focus stays on it. */}
+                <span key={next.label} className={cn(fadeIn)}>
+                  {next.label}
+                </span>
                 {/* Each card has one, so the name tells them apart. */}
                 <span className="sr-only">
                   , <span translate="no">{therapist.name}</span>
@@ -92,7 +118,7 @@ export function StatusTrack({ therapist, status, listed = true, onChosen, onRemo
             <StatusMenu therapist={therapist} onChosen={onChosen} onRemoved={onRemoved} />
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground">Removed from your shortlist</p>
+          <p className="ml-auto text-sm text-muted-foreground">Removed from your shortlist</p>
         )}
       </div>
     </div>

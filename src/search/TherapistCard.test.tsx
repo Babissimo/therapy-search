@@ -19,9 +19,18 @@ const therapist = (extra: Partial<Therapist> = {}): Therapist => ({
   ...extra,
 });
 
-type Options = { grouped?: boolean; action?: ReactNode; online?: boolean; fee?: string; status?: Status; track?: ReactNode; note?: string };
+type Options = {
+  grouped?: boolean;
+  action?: ReactNode;
+  online?: boolean;
+  fee?: string;
+  status?: Status;
+  track?: ReactNode;
+  note?: string;
+  brief?: boolean;
+};
 
-function renderCard(t: Therapist, sought: string[] = [], { grouped, action, online, fee, status, track, note }: Options = {}) {
+function renderCard(t: Therapist, sought: string[] = [], { grouped, action, online, fee, status, track, note, brief }: Options = {}) {
   render(
     <MemoryRouter>
       <TherapistCard
@@ -34,6 +43,7 @@ function renderCard(t: Therapist, sought: string[] = [], { grouped, action, onli
         status={status}
         track={track}
         note={note}
+        brief={brief}
       />
     </MemoryRouter>,
   );
@@ -120,6 +130,12 @@ describe("TherapistCard", () => {
     cleanup();
     renderCard(therapist(), [], { note: " \n \n" });
     expect(screen.queryByText(/Your notes/)).toBeNull();
+  });
+
+  it("leaves out the summary when brief, as the shortlist's cards are", () => {
+    renderCard(therapist(), [], { brief: true });
+    expect(screen.queryByText("Summary text.")).toBeNull();
+    screen.getByRole("link", { name: "Test Therapist 1" });
   });
 
   it("keeps a full postcode without its town", () => {

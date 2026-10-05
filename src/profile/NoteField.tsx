@@ -1,7 +1,7 @@
 import { useEffect, useEffectEvent, useId, useState } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { NOTE_LIMIT } from "@/shortlist/store";
-import { useShortlistNote, useShortlistStore } from "@/shortlist/useShortlist";
+import { useShortlisted, useShortlistNote, useShortlistStore } from "@/shortlist/useShortlist";
 
 /** How long typing rests before the note is saved. */
 const SAVE_AFTER = 500;
@@ -12,22 +12,28 @@ const COUNT_WITHIN = 100;
 /** The visitor's own notes on a shortlisted therapist, kept with the shortlist and saved as they type. */
 export function NoteField({ slug }: { slug: string }) {
   const store = useShortlistStore();
+  const listed = useShortlisted(slug);
   const saved = useShortlistNote(slug);
   const [draft, setDraft] = useState(saved);
-  // The note as last saved, here or in another tab; a change to it replaces what the box holds.
+  // The note as last saved, here or in another tab; a change to it replaces what the box holds. Off the list the note reads as none,
+  // which is no change to take: the box keeps what it holds, and saves against the note it last saw.
   const [seen, setSeen] = useState(saved);
-  if (saved !== seen) {
+  if (listed && saved !== seen) {
     setSeen(saved);
     setDraft(saved);
   }
+  const kept = listed ? saved : seen;
   const box = useId();
   const hint = useId();
   const left = NOTE_LIMIT - draft.length;
   // From the note as saved, which follows the typing once it rests, so a screen reader hears the count at a pause, not at every key.
-  const leftSaved = NOTE_LIMIT - saved.length;
+  const leftSaved = NOTE_LIMIT - kept.length;
 
   const flush = () => {
-    if (draft !== saved) store.setNote(slug, draft);
+    if (draft === kept) return;
+    store.setNote(slug, draft);
+    // Nothing is read back once off the list, so what was saved is the note last seen.
+    if (!listed) setSeen(draft);
   };
   // For the timer and the leaving, which want the draft as last drawn.
   const save = useEffectEvent(flush);
