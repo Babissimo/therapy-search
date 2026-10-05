@@ -1,3 +1,4 @@
+import { ChevronDown } from "lucide-react";
 import { IconButton } from "@/components/IconButton";
 import {
   DropdownMenu,
@@ -38,16 +39,19 @@ export function StatusMenu({ therapist, onChosen, onRemoved }: Props) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        {/* Marked by slug, for a list to give it focus once the therapist has moved. */}
+        {/* Marked by slug, for a list to give it focus once the therapist has moved. Outlined as the next step's button beside it,
+            its chevron saying it opens a menu. */}
         <IconButton
           label={`Status of ${therapist.name}: ${STATUS_LABEL[status].toLowerCase()}`}
           // Beside the status it changes, which the track spells out.
           touchLabel="Status"
-          variant="ghost"
-          size="icon-sm"
+          variant="outline"
+          size="sm"
           data-status-menu={therapist.slug}
         >
           <Icon aria-hidden />
+          {/* After the words a touch screen shows, which come last. */}
+          <ChevronDown aria-hidden data-icon="inline-end" className="order-last text-muted-foreground" />
         </IconButton>
       </DropdownMenuTrigger>
       {/* As wide as its longest item, where shadcn's matches the trigger's width. */}

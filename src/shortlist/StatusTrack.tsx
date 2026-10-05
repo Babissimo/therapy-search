@@ -95,14 +95,14 @@ export function StatusTrack({ therapist, status, listed = true, onChosen, onRemo
           </li>
         ))}
       </ol>
-      {/* Where the row lacks the room, zoomed in or on a touch screen, where the menu is named on screen too, the buttons go under
-          the status, and under each other; on a touch screen far enough apart that no one's target takes another's taps. */}
+      {/* Where the row lacks the room the buttons go under the status, to its right, and under each other; on a touch screen far
+          enough apart that no one's target takes another's taps. */}
       <div className="flex min-h-7 flex-wrap items-center justify-between gap-2">
         <p key={status} className={cn("text-sm text-muted-foreground", fadeIn)}>
           {STATUS_LABEL[status]}
         </p>
         {listed ? (
-          <div className="flex flex-wrap items-center gap-1 pointer-coarse:gap-y-4">
+          <div className="ml-auto flex flex-wrap items-center justify-end gap-1 pointer-coarse:gap-y-4">
             {next && (
               <Button variant="outline" size="sm" onClick={() => step(next.status)}>
                 {/* Its words drawn anew, the button kept, so focus stays on it. */}
@@ -118,7 +118,7 @@ export function StatusTrack({ therapist, status, listed = true, onChosen, onRemo
             <StatusMenu therapist={therapist} onChosen={onChosen} onRemoved={onRemoved} />
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground">Removed from your shortlist</p>
+          <p className="ml-auto text-sm text-muted-foreground">Removed from your shortlist</p>
         )}
       </div>
     </div>

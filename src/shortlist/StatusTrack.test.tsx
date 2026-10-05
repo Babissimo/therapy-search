@@ -165,6 +165,8 @@ describe("StatusTrack", () => {
     expect(["flex-wrap", "gap-2"].map((c) => buttons.parentElement!.classList.contains(c))).toEqual([true, true]);
     // Under each other with room for both targets on a touch screen.
     expect(["flex-wrap", "pointer-coarse:gap-y-4"].map((c) => buttons.classList.contains(c))).toEqual([true, true]);
+    // To the right, line by line, where they stand on a card wide enough for them.
+    expect(["ml-auto", "justify-end"].map((c) => buttons.classList.contains(c))).toEqual([true, true]);
   });
 
   it("shows where a therapist taken off the shortlist stood, saying they were removed, with nothing to change it", () => {
