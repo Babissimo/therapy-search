@@ -12,6 +12,7 @@ import {
 import { ALLOWED } from "../shared/options";
 import { EARLY_SIZE, InvalidParam, asksWhole, batchSize, readParams, toQuery, type SearchParams } from "../shared/query";
 import { CONTACT_DETAIL, PROFILE_HEADER, RESULTS_COUNT, RESULTS_NOTICE } from "../shared/ukcp/markers";
+import { mcpEndpoint } from "./mcp/routes";
 import { plainSearch, tooLarge } from "./plain/routes";
 import { SLUG, UpstreamError, type SessionStore, type UkcpClient } from "./ukcp/client";
 import { officeDetails } from "./ukcp/offices";
@@ -27,6 +28,8 @@ export type Env = {
   EARLY_LIMIT: RateLimit;
   UKCP_SESSION: SessionStore;
   SITE_URL: string;
+  /** "on" serves MCP for AI assistants at /mcp; anything else, or nothing, leaves it off. */
+  MCP_ENDPOINT?: string;
 };
 export type PlaceFinder = {
   lookup(text: string, options: PlaceOptions): Promise<PlaceLookup>;
@@ -35,6 +38,8 @@ export type PlaceFinder = {
 /** The cached entrypoint, as the gateway reaches it. */
 export type Cached = { fetch(request: Request): Promise<Response> };
 type Ctx = Context<{ Bindings: Env }>;
+/** Asks the cached entrypoint for a canonical path, counting a miss against `key`'s allowance: the visitor's own unless given. */
+export type Forward = (c: Ctx, path: string, key?: string) => Promise<Response>;
 
 const SEARCH_MAX_AGE = 15 * 60;
 // A search without a location is asked for whole, UKCP's heaviest answer, and the browser orders it, so the entry's age
@@ -147,12 +152,14 @@ export function createGateway(cachedFor: (c: Ctx) => Cached) {
   app.use("/plain/*", bodyLimit({ maxSize: BODY_MAX_BYTES, onError: tooLarge }));
   app.route("/plain", plainSearch(forward));
 
+  // MCP for AI assistants, asking the cache as the routes above do.
+  app.route("/mcp", mcpEndpoint(forward, BODY_MAX_BYTES));
+
   app.notFound((c) => c.json({ error: "Not found" }, 404));
   app.onError(answerError);
 
-  /** Asks the cached entrypoint, which counts a miss against the visitor's allowance. */
-  async function forward(c: Ctx, path: string): Promise<Response> {
-    const key = rateKey(c.req.header("cf-connecting-ip") ?? "unknown");
+  /** Asks the cached entrypoint, which counts a miss against `key`'s allowance: the visitor's own unless given. */
+  async function forward(c: Ctx, path: string, key = rateKey(c.req.header("cf-connecting-ip") ?? "unknown")): Promise<Response> {
     const res = await cachedFor(c).fetch(new Request(CACHE_ORIGIN + path, { headers: { [RATE_KEY]: key } }));
     // Copied, since a response from another entrypoint arrives with its headers fixed.
     return new Response(res.body, res);

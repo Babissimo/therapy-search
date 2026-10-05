@@ -7,15 +7,13 @@ import { ALLOWED } from "../../shared/options";
 import { InvalidParam, PAGE_SIZE, batchSize, emptyParams, readParams, toQuery, type SearchParams } from "../../shared/query";
 import type { ContactDetails } from "../../shared/types";
 import { ParseError } from "../../shared/ukcp/text";
-import type { Env } from "../app";
+import type { Env, Forward } from "../app";
 import { SLUG } from "../ukcp/client";
 import { readContact, readProfile, type PlainProfile } from "../ukcp/profile";
 import { readResults, type Results } from "../ukcp/results";
 import { INVALID, NEEDS_FILTER, NO_PLACE, UNREADABLE, messagePage, profilePage, resultsPage, searchPage, unrecognised, type Asked, type Html } from "./pages";
 
 type Ctx = Context<{ Bindings: Env }>;
-/** Asks the cached entrypoint for a canonical path, as the gateway's own routes do. */
-export type Forward = (c: Ctx, path: string) => Promise<Response>;
 
 // Back reaches a page of results without sending its form again, and the edge keeps none of them. No page runs script.
 const HEADERS = {

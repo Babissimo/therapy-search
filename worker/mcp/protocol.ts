@@ -81,7 +81,7 @@ export function mcpApp(serverFor: (c: Ctx) => McpServer) {
 
 /** The answer to a body too large to read, for the gateway's body limit to give. */
 export function rpcTooLarge(c: Context) {
-  return c.json(failure(null, INVALID_REQUEST, "That request is too large."), 413);
+  return c.json(failure(null, INVALID_REQUEST, "That request is too large."), 413, { "Cache-Control": "no-store" });
 }
 
 /** A request's reply: legacy when it opens with `initialize` or names a legacy version, modern when it names the modern one. */

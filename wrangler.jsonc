@@ -3,7 +3,11 @@
   "name": "therapy-search",
   "main": "worker/index.ts",
   "compatibility_date": "2026-09-27",
-  "assets": { "binding": "ASSETS", "not_found_handling": "single-page-application", "run_worker_first": ["/api/*", "/assets/*", "/plain", "/plain/*"] },
+  "assets": {
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*", "/assets/*", "/plain", "/plain/*", "/mcp"]
+  },
   // Cached answers outlive a deploy; LOOKUP_VERSION and OFFICE_VERSION in worker/app.ts retire lookup answers a change makes wrong.
   // Covers both entrypoints. Visitors' searches are POSTs, which are never cached, so the default entrypoint runs for each
   // one and its cache holds only built files; CachedApi's holds the answers, keyed on canonical URLs.
@@ -20,6 +24,7 @@
   // Wrangler turns workers.dev off once routes are set. It stays on because a visitor's shortlist and notes live in
   // localStorage, which belongs to the origin they first used.
   "workers_dev": true,
-  "vars": { "SITE_URL": "https://therapysearch.babissimo.net" },
+  // MCP_ENDPOINT "on" serves MCP for AI assistants at /mcp. It stays "off" until UKCP agrees to it.
+  "vars": { "SITE_URL": "https://therapysearch.babissimo.net", "MCP_ENDPOINT": "off" },
   "observability": { "enabled": false }
 }

@@ -2,7 +2,7 @@
  * Where to turn today, as a therapist found here is usually weeks from a first session. It holds in each of the UK's four
  * nations: 111's mental health option answers in England, Scotland and Wales, and Northern Ireland, which has no 111, has
  * Lifeline. Shout answers by text, for anyone who can't talk. Names and numbers are kept from machine translation, as a
- * caller needs them as they are. index.html's fallback page carries a copy.
+ * caller needs them as they are. index.html's fallback page, the plain pages and the MCP server's instructions carry copies.
  */
 export function HelpNow({ className }: { className?: string }) {
   return (
