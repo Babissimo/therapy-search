@@ -23,6 +23,22 @@ describe("index.css", () => {
     );
   });
 
+  it("keeps :has out of print's rules, which Firefox before 121 would drop whole, printing the page beneath a drawer", () => {
+    // Comments aside, which may name it.
+    const source = readFileSync(new URL("./index.css", import.meta.url), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+    // The print block, to its closing brace.
+    const start = source.indexOf("@media print {");
+    let depth = 0;
+    let end = start;
+    for (; end < source.length; end++) {
+      if (source[end] === "{") depth++;
+      if (source[end] === "}" && --depth === 0) break;
+    }
+    const print = source.slice(start, end + 1);
+    expect(print).not.toContain(":has(");
+    expect(print).toMatch(/\[data-print-alone-shown\] body > :not\(\[data-print-alone\]\),/);
+  });
+
   it("stills every animation on paper, so what shows only there prints as it ends rather than as it starts", () => {
     const source = readFileSync(new URL("./index.css", import.meta.url), "utf8");
     const print = source.slice(source.indexOf("@media print {"));
