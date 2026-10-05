@@ -43,7 +43,7 @@ const TEXT = { type: "string" };
 const THERAPIST = {
   type: "object",
   properties: {
-    id: { type: "string", description: "Their id on UKCP's register." },
+    id: { type: "string", description: "Their id, for get_therapist." },
     name: TEXT,
     place: { type: "string", description: "The town and postcode district of their office nearest the search." },
     distance: TEXT,
@@ -64,7 +64,8 @@ export function searchDefinition(): ToolDefinition {
     description:
       "Searches the UK Council for Psychotherapy's register through this unofficial site, which UKCP does not run. It finds therapists near a " +
       `UK place, or working online or by phone, and gives up to ${PER_PAGE} short results at a time, with a link that opens the same search on ` +
-      "the site, where the person sees every result, a map and each therapist's contact details. Give few filters, as most narrow the list. " +
+      "the site, where the person sees every result, a map and each therapist's contact details. Use get_therapist for one therapist's full " +
+      "profile. Give few filters, as most narrow the list. " +
       `Searches pass through the site to UKCP; the site keeps no record of who asked what. This is a directory, not a support service. ${HELP_NOW}`,
     inputSchema: {
       type: "object",
