@@ -239,22 +239,21 @@ describe("useResults near a place", () => {
     await waitFor(() => expect(result.current.failure.error).toBeDefined());
     search.mockImplementation(() => new Promise(() => {}));
     act(() => result.current.retrySame(near("York")));
-    expect([search.mock.calls.length, result.current.failure.retried]).toEqual([1, false]);
+    expect(search.mock.calls.length).toBe(1);
     act(() => result.current.retrySame(near("Leeds")));
     await waitFor(() => expect(result.current.failure.retrying).toBe(true));
-    expect([search.mock.calls.length, result.current.failure.retried]).toEqual([2, true]);
+    expect(search.mock.calls.length).toBe(2);
   });
 
-  it("counts the same search asked for as a retry while the connection's return is already trying it again", async () => {
+  it("asks UKCP nothing more when the same search is asked for while the connection's return is already trying it again", async () => {
     const search = vi.spyOn(api, "search").mockRejectedValue(new Error("UKCP is down"));
     const { result } = renderHook(() => useResults(near("Leeds")), { wrapper: withClient() });
     await waitFor(() => expect(result.current.failure.error).toBeDefined());
     search.mockImplementation(() => new Promise(() => {}));
     act(() => void result.current.query.refetch());
     await waitFor(() => expect(result.current.failure.retrying).toBe(true));
-    expect(result.current.failure.retried).toBe(false);
     act(() => result.current.retrySame(near("Leeds")));
-    expect([search.mock.calls.length, result.current.failure.retried]).toEqual([2, true]);
+    expect(search.mock.calls.length).toBe(2);
   });
 
   it("asks nothing again of a search that answered, or of one that failed and is no longer asked for", async () => {

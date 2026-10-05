@@ -46,20 +46,15 @@ export function useFailure<Landing extends HTMLElement = HTMLHeadingElement>(que
       if (answered && document.activeElement === document.body) landing.current.focus();
     }
   });
-  // The question `retry` last asked again, until it answers or another is asked.
-  const [retriedFor, setRetriedFor] = useState<string>();
-  if (retriedFor !== undefined && (retriedFor !== key || !error)) setRetriedFor(undefined);
   const retry = () => {
-    if (!error) return;
-    setRetriedFor(key);
     // A query with nothing loaded joins a fetch already on its way, such as the connection's return starts, rather than restarting it.
-    void query.refetch();
+    if (error) void query.refetch();
   };
-  return { error, retrying: query.isFetching, retried: retriedFor === key, retry, landing };
+  return { error, retrying: query.isFetching, retry, landing };
 }
 
 /**
- * What a quiet alert or error line leaves unsaid of `failure`: its error, "Trying again" while it is asked again, and the
+ * What a failure's alert or quiet error line leaves unsaid: its error, "Trying again" while it is asked again, and the
  * error once more if that fails. Drawn before the failure, as a screen reader hears only a live region already there.
  */
 export function FailureStatus({ failure: { error, retrying } }: { failure: Pick<Failure, "error" | "retrying"> }) {
@@ -74,47 +69,37 @@ type Props = {
   error: Error;
   /** True while the retry is on its way. */
   retrying: boolean;
-  /** True once the visitor has asked for it again, by Try again or otherwise. */
-  retried: boolean;
   onRetry: () => void;
   /** Beside Try again, such as a way round the failure. */
   children?: ReactNode;
-  /** Silent, for a page that says the failure, and how its retry goes, from a live region there before the failure. */
-  quiet?: boolean;
 };
 
 /**
- * A request that failed, with a Try again button that keeps keyboard focus through the retry. The alert speaks as it
- * appears; how a retry goes is told beside it, as the alert, still there and unchanged when it fails again, says nothing.
+ * A request that failed, with a Try again button that keeps keyboard focus through the retry. It says nothing itself: its
+ * page says the failure, and how a retry goes, from a live region there before it, such as `FailureStatus`.
  */
-export function FailedAlert({ error, retrying, retried, onRetry, children, quiet = false }: Props) {
+export function FailedAlert({ error, retrying, onRetry, children }: Props) {
   return (
-    <>
-      <Alert variant="destructive" role={quiet ? undefined : "alert"}>
-        <AlertDescription className="space-y-3">
-          <div>{error.message}</div>
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="text-foreground aria-disabled:opacity-50"
-              // Not disabled while retrying, which would drop focus; a second press is ignored.
-              aria-disabled={retrying}
-              onClick={retrying ? undefined : onRetry}
-            >
-              {retrying && <Loader2 className="motion-safe:animate-spin" aria-hidden />}
-              Try again
-            </Button>
-            {children}
-          </div>
-        </AlertDescription>
-      </Alert>
-      {!quiet && (
-        <p aria-live="polite" className="sr-only">
-          {retrying ? "Trying again" : retried ? error.message : ""}
-        </p>
-      )}
-    </>
+    // Without the role="alert" a destructive alert has by default.
+    <Alert variant="destructive" role={undefined}>
+      <AlertDescription className="space-y-3">
+        <div>{error.message}</div>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="text-foreground aria-disabled:opacity-50"
+            // Not disabled while retrying, which would drop focus; a second press is ignored.
+            aria-disabled={retrying}
+            onClick={retrying ? undefined : onRetry}
+          >
+            {retrying && <Loader2 className="motion-safe:animate-spin" aria-hidden />}
+            Try again
+          </Button>
+          {children}
+        </div>
+      </AlertDescription>
+    </Alert>
   );
 }

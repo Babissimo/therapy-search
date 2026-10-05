@@ -51,7 +51,7 @@ export function Results({ params, results, listRef, pins = [], unplaced = [], se
     </p>
   );
   if (failure.error) {
-    return <ResultsError error={failure.error} params={params} retrying={failure.retrying} retried={failure.retried} onRetry={failure.retry} />;
+    return <ResultsError error={failure.error} params={params} retrying={failure.retrying} onRetry={failure.retry} />;
   }
   if (loading) {
     return (
