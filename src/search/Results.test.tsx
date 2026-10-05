@@ -609,6 +609,8 @@ describe("Results", () => {
     renderResults(leeds);
     const retry = await screen.findByRole("button", { name: "Try again" });
     await waitFor(() => expect(screen.getByRole("status").textContent).toBe(TOO_MANY));
+    // The alert shows the failure without saying it too.
+    expect(screen.queryAllByRole("alert")).toEqual([]);
     let release = () => {};
     search.mockImplementationOnce(async (query) => {
       await new Promise<void>((resolve) => (release = resolve));

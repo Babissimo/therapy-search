@@ -69,7 +69,7 @@ export function ProfileBody({ slug, back, close }: { slug: string } & Exits) {
         {said}
         <div className="space-y-4">
           <StickyHeader back={back} close={close} />
-          <FailedAlert error={failure.error} retrying={failure.retrying} retried={failure.retried} onRetry={failure.retry} quiet />
+          <FailedAlert error={failure.error} retrying={failure.retrying} onRetry={failure.retry} />
         </div>
       </>
     );
