@@ -131,13 +131,14 @@ describe("StatusTrack", () => {
     screen.getByText("Waiting list", { selector: "p" });
   });
 
-  it("lets its buttons wrap under the status on a touch screen, where the menu is named on screen, their targets kept apart", () => {
+  it("lets its buttons wrap under the status where they need the room, their targets kept apart on a touch screen", () => {
     renderTrack("waiting");
     const buttons = screen.getByRole("button", { name: "Status of Jo Bloggs: waiting list" }).parentElement!;
     expect(buttons.contains(screen.getByRole("button", { name: "Consultation booked, Jo Bloggs" }))).toBe(true);
-    // Close under the status, which takes no taps, and under each other with room for both targets.
-    expect(["pointer-coarse:flex-wrap", "pointer-coarse:gap-y-2"].map((c) => buttons.parentElement!.classList.contains(c))).toEqual([true, true]);
-    expect(["pointer-coarse:flex-wrap", "pointer-coarse:gap-y-4"].map((c) => buttons.classList.contains(c))).toEqual([true, true]);
+    // On any pointer, as zoomed in with a mouse the row is as narrow as on a phone; close under the status, which takes no taps.
+    expect(["flex-wrap", "gap-2"].map((c) => buttons.parentElement!.classList.contains(c))).toEqual([true, true]);
+    // Under each other with room for both targets on a touch screen.
+    expect(["flex-wrap", "pointer-coarse:gap-y-4"].map((c) => buttons.classList.contains(c))).toEqual([true, true]);
   });
 
   it("shows where a therapist taken off the shortlist stood, saying they were removed, with nothing to change it", () => {
