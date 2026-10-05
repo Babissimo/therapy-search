@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { MemoryRouter, useLocation } from "react-router";
+import { MemoryRouter, useLocation, useNavigate } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Profile } from "@shared/types";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -27,14 +27,25 @@ function Url() {
   return <output data-testid="url">{pathname + search}</output>;
 }
 
-function renderAt(url: string, shortlist = createShortlistStore(null)) {
+/** Moves through the history by `delta` entries, as the browser's Back and Forward do. */
+let travel: (delta: number) => void;
+
+function Travel() {
+  const navigate = useNavigate();
+  travel = (delta) => act(() => void navigate(delta));
+  return null;
+}
+
+/** The app at `url`, or at the last of several, with those before it to go Back to. */
+function renderAt(url: string | string[], shortlist = createShortlistStore(null)) {
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
       <ShortlistContext.Provider value={shortlist}>
         <TooltipProvider>
-          <MemoryRouter initialEntries={[url]}>
+          <MemoryRouter initialEntries={[url].flat()}>
             <AppRoutes />
             <Url />
+            <Travel />
           </MemoryRouter>
         </TooltipProvider>
       </ShortlistContext.Provider>
@@ -102,6 +113,24 @@ describe("AppRoutes", () => {
     expect(document.title).toBe("Jo Bloggs - Find a UKCP therapist (unofficial)");
     fireEvent.click(within(drawer).getByRole("button", { name: "Close" }));
     await waitFor(() => expect(document.title).toBe("1 therapist near Leeds - Find a UKCP therapist (unofficial)"));
+  });
+
+  it("names the page after a drawer that Forward opens again, though the search beneath was drawn afresh while it was shut", async () => {
+    const title = (name: string) => `${name} - Find a UKCP therapist (unofficial)`;
+    renderAt(["/online?Languages=Greek", "/?Location=Leeds"]);
+    fireEvent.click(await screen.findByRole("link", { name: "Jo Bloggs" }));
+    const drawer = await screen.findByRole("dialog", { name: "Jo Bloggs" });
+    await waitFor(() => expect(document.title).toBe(title("Jo Bloggs")));
+    fireEvent.click(within(drawer).getByRole("button", { name: "Close" }));
+    await waitFor(() => expect(document.title).toBe(title("1 therapist near Leeds")));
+    // Online and Near me are drawn by different views, so each Back or Forward between them draws the search afresh.
+    travel(-1);
+    await waitFor(() => expect(document.title).toBe(title("1 therapist working online or by phone")));
+    travel(1);
+    await waitFor(() => expect(document.title).toBe(title("1 therapist near Leeds")));
+    travel(1);
+    expect(await screen.findByRole("dialog", { name: "Jo Bloggs" })).toBeTruthy();
+    expect(document.title).toBe(title("Jo Bloggs"));
   });
 
   it("names a profile's own page after the therapist", async () => {

@@ -17,7 +17,7 @@ export function ProfileDrawer({ slug, open }: { slug: string; open: boolean }) {
   const [opener] = useState(() => document.activeElement);
   // The drawer, and the page while it is open, take the therapist's name once their profile is in.
   const name = useQuery(profileQuery(slug)).data?.name;
-  useTitle(open ? name : undefined);
+  useTitle(name, open);
   // The close button lives in the profile's header, which stays in view as the drawer scrolls.
   const close = (
     <SheetClose asChild>

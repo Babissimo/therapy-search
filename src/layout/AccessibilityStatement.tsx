@@ -27,7 +27,6 @@ export const KNOWN_PROBLEMS: ReactNode[] = [
   "A screen reader can hear a search's count twice: first for the nearest few therapists, then for all of them.",
   "On a profile, if contact details fail to load, pressing Try again loses the keyboard's place.",
   "If you ask your device for less motion while a map is showing, the map keeps moving until you reload the page.",
-  "Now and then, the page's title names the search rather than the profile open over it.",
 ];
 
 /**
