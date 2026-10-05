@@ -53,7 +53,7 @@ afterEach(() => vi.restoreAllMocks());
 describe("search_therapists near a place", () => {
   it("is listed", async () => {
     const { result } = (await (await setup().rpc("tools/list")).json()) as { result: { tools: { name: string }[] } };
-    expect(result.tools.map((tool) => tool.name)).toEqual(["search_therapists"]);
+    expect(result.tools.map((tool) => tool.name)).toEqual(["search_therapists", "get_therapist"]);
   });
 
   it("asks the cache for UKCP's nearest 48 by the app's URL, under the assistants' allowance, and gives the first 10", async () => {
