@@ -4,7 +4,7 @@ import { BackButton } from "@/components/BackButton";
 import { useTitle } from "@/lib/useTitle";
 import { REPORT_URL } from "@/site";
 
-/** When the site was last tested, which found the problems listed. */
+/** When the site was last tested. */
 const TESTED_ON = "1 October 2026";
 
 /** A product's name, which a browser translating the page would otherwise turn into an ordinary word. */
@@ -12,13 +12,14 @@ function Name({ children }: { children: string }) {
   return <span translate="no">{children}</span>;
 }
 
-/** What testing found not to work well, the most harmful first. Each goes once it is fixed. */
+/** What is known not to work well, the most harmful first. Each goes once it is fixed. */
 export const KNOWN_PROBLEMS: ReactNode[] = [
   <>
     Older browsers, such as <Name>Safari</Name> on an iPad that can't update past <Name>iPadOS</Name> 15, and browsers with
     JavaScript turned off, can't run the full search. They're offered the <a className="underline" href="/plain">plain search</a>{" "}
     instead, which has no map, shortlist or notes.
   </>,
+  <>On a screen 320 pixels wide, or zoomed in to 400%, some words, such as therapists' names, break part-way through to fit narrow columns.</>,
 ];
 
 /**
@@ -60,7 +61,7 @@ export function AccessibilityStatement({ followed = false }: { followed?: boolea
       </div>
 
       <Section heading="What doesn't work well yet">
-        <p>When we tested the site on {TESTED_ON}, we found these problems. We take each off this list once it is fixed.</p>
+        <p>These are the problems we know of. We take each off this list once it is fixed.</p>
         <ul className={LIST}>
           {KNOWN_PROBLEMS.map((problem, i) => (
             <li key={i}>{problem}</li>
@@ -109,7 +110,10 @@ export function AccessibilityStatement({ followed = false }: { followed?: boolea
           <Name>JAWS</Name>, <Name>NVDA</Name>, <Name>VoiceOver</Name>, <Name>TalkBack</Name> or <Name>Dragon</Name>. Nor have
           we tried it in <Name>Firefox</Name> or <Name>Safari</Name>, or on older phones and tablets.
         </p>
-        <p>The site partly meets WCAG 2.2 at level AA. Some of the problems above are where it falls short.</p>
+        <p>
+          We don't know of anywhere the site falls short of WCAG 2.2 at level AA, but until it has been tried with the assistive
+          technology and browsers above, we can't say it fully meets it.
+        </p>
       </Section>
 
       <Section heading="About this statement">
@@ -118,7 +122,7 @@ export function AccessibilityStatement({ followed = false }: { followed?: boolea
           so it doesn't have to. We publish one anyway, so you know what works, what doesn't yet, and that we want to hear
           about problems.
         </p>
-        <p>This statement was prepared on 1 October 2026.</p>
+        <p>This statement was prepared on 1 October 2026. It was last reviewed on 5 October 2026.</p>
       </Section>
     </article>
   );
