@@ -216,7 +216,7 @@ function MapMarkerClusterGroup({
 }
 
 function MapTooltip({ className, ...props }: TooltipProps & { ref?: Ref<L.Tooltip> }) {
-  return <Tooltip direction="top" opacity={1} className={cn("w-fit text-xs", className)} {...props} />;
+  return <Tooltip direction="top" opacity={1} className={cn("text-xs", className)} {...props} />;
 }
 
 /** The furthest out a map can zoom and still show `limits` whole. */

@@ -443,6 +443,18 @@ describe("Results", () => {
     expect(document.activeElement).toBe(elsewhere);
   });
 
+  it("heads a pin's box with its place and count in one box beside the pin, which a long place wraps within", async () => {
+    const therapists = ["a", "b"].map((slug) => ({ slug, name: `Therapist ${slug}`, initials: "T", location: "Leeds LS1", tags: [] }));
+    vi.spyOn(api, "search").mockResolvedValue(listed({ total: 2, from: 1, to: 2, notices: [], therapists }));
+    const view = renderResults(leeds);
+    await screen.findByRole("link", { name: "Therapist a" });
+    view.rerender(leeds, { pins: [{ key: "LS1", point: { lat: 53.8, lng: -1.55 }, therapists, kind: "outcode" }] });
+    const heading = screen.getByRole("group").querySelector("h2")!;
+    const words = heading.lastElementChild!;
+    expect(words.className).toBe("min-w-0");
+    expect(words.textContent).toBe("Leeds LS1 · 2 therapists");
+  });
+
   it("shows each card only the tags the search asked for, in a pin's box too", async () => {
     const tagged = (slug: string) => ({ slug, name: `Therapist ${slug}`, initials: "T", tags: ["Anxiety", "Trauma"] });
     const therapists = ["a", "b", "c"].map(tagged);

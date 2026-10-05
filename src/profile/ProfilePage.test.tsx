@@ -589,6 +589,21 @@ describe("ProfilePage's content", () => {
     expect(screen.queryByRole("link", { name: /London Office/ })).toBeNull();
   });
 
+  it("lets a place, an office's name and the columns shrink below a word longer than they are, for it to break", async () => {
+    const town = "Llanfairpwllgwyngyllgogerychwyrndrobwllllantysiliogogogoch";
+    const mapped = { ...office(`${town} Office`, "£70"), mapUrl: "https://maps.example/?q=Llanfair" };
+    const about = [{ heading: "About Me", items: [], details: [], paragraphs: ["Words."] }];
+    const practical = [{ ...section("Working with Children", []), paragraphs: ["Short words."] }];
+    renderAt(["/therapist/Test-ABCDEFGH"], { ...PROFILE, location: town, about, practical, offices: [mapped, office("London Office", "£70")] });
+    // Each a flex or grid item, which shrinks below its longest word only once its minimum width is lifted.
+    expect((await screen.findByText(town)).classList.contains("min-w-0")).toBe(true);
+    const link = screen.getByRole("link", { name: `${town} Office, map (opens in a new tab)` });
+    expect([link, link.firstElementChild!, link.parentElement!].map((e) => e.classList.contains("min-w-0"))).toEqual([true, true, true]);
+    expect(screen.getByText("London Office").classList.contains("min-w-0")).toBe(true);
+    expect(screen.getByText("Words.").closest(".grid")?.classList.contains("grid-cols-1")).toBe(true);
+    expect(screen.getByText("Short words.").closest(".grid")?.classList.contains("grid-cols-1")).toBe(true);
+  });
+
   it("puts first the office the visitor's search measured to, marked with the distance its card gave", async () => {
     vi.spyOn(api, "place").mockResolvedValue({ found: false, reason: "not-found" });
     const card: TherapistCard = { slug: "Test-ABCDEFGH", name: "Test Therapist", initials: "TT", location: "Brighton BN1", distance: "0.1 miles from Brighton", tags: [] };

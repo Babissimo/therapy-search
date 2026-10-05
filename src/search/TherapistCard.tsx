@@ -6,7 +6,7 @@ import { ukcpProfileAddress } from "@shared/query";
 import type { TherapistCard as Therapist } from "@shared/types";
 import { Portrait } from "@/components/Portrait";
 import { SkeletonText } from "@/components/SkeletonText";
-import { Badge } from "@/components/ui/badge";
+import { Badge, TAG } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
@@ -46,9 +46,9 @@ export function TherapistCard({ therapist: t, sought, grouped = false, online = 
   // UKCP's "0.2 miles from E8 3DQ" repeats the searched place, which the list already names.
   const away = online ? undefined : t.distance?.replace(/\bfrom\b.*$/, "away");
   // The place is left as it is by a browser translating the page, which would read Bath or Reading as words. One span,
-  // so the line wraps as one beside its pin.
+  // so the line wraps as one beside its pin, as narrow as the column however long a town's name.
   const place = (where || away) && (
-    <span>
+    <span className="min-w-0">
       {where && <span translate="no">{where}</span>}
       {where && away ? ` (${away})` : away}
     </span>
@@ -184,7 +184,9 @@ function CardLayout({ heading: Heading = "h2", photo, name, printed, place, meet
           <ul className="flex flex-wrap gap-1.5">
             {tags.map((tag) => (
               <li key={tag}>
-                <Badge variant="secondary">{tag}</Badge>
+                <Badge variant="secondary" className={TAG}>
+                  {tag}
+                </Badge>
               </li>
             ))}
           </ul>
