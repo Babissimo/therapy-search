@@ -71,8 +71,8 @@ type Stored = { v: 1; entries: Record<string, ShortlistEntry>; removed?: Record<
 
 - Choosing "To contact" clears `status`.
 - On reading, an unknown status reads as "To contact", and a note that is not a string as none.
-- A therapist removed is kept, with their place, status, note and card, for 30 days or until the shortlist is cleared. Adding them back by any bookmark, on any page or in any tab, after a reload too, returns them as they were. Those removed 30 days or more before the page loads are forgotten then, in storage as well as on the page.
-- `add`'s second argument, the whole entry less its card, overrides what was kept. Marking a therapist who is not shortlisted (§4.5) adds them with that status, and with their place and note where they were removed.
+- A therapist removed is kept, with their place, status, note and card, until the shortlist is cleared or the site is opened 30 days or more after their removal. Adding them back by any bookmark, on any page or in any tab, after a reload too, returns them as they were. A browser expires nothing of itself, so whichever page of the site loads, the accessibility statement included, forgets those removed 30 days or more before, in storage as well as on the page; a page left open keeps them until it loads again.
+- `add`'s second argument, the whole entry less its card, overrides what was kept. Marking a therapist who is not shortlisted (§4.5) adds them with that status, and with their place and note where they were removed. A therapist already listed, as when another tab added them back a moment before, keeps what they have the same way, so an add in a tab that has not yet heard of it starts nobody afresh.
 
 ## 4. Front end
 
@@ -98,7 +98,7 @@ type Stored = { v: 1; entries: Record<string, ShortlistEntry>; removed?: Record<
 
 - A Radix dropdown menu, added as shadcn's `dropdown-menu` under `src/components/ui/`. Its trigger is an icon button showing the current status's icon and named "Status of Ruth Okafor: contacted".
 - It lists the six statuses as radio items with the current one checked, then a separator and "Remove from shortlist".
-- A change of status, by the menu or the next-step button, is said in a polite live region: "Ruth Okafor: Contacted.", as is a removal by the menu: "Removed Ruth Okafor from your shortlist." Each is said until the shortlist next changes, so the same words after an undo are heard again. A card that moves into or out of "Set aside" takes focus with it, to its menu button there, or to the section's heading while it is closed. Where the next-step button goes, at "Seeing them", focus moves to the menu beside it. Removing a therapist sends focus to the bookmark, which can put them back.
+- A change of status, by the menu or the next-step button, is said in a polite live region: "Ruth Okafor: Contacted.", as is a removal by the menu: "Removed Ruth Okafor from your shortlist." A bookmark says its own presses beside it, and an add-back that returns a therapist with a status past "To contact" names it: "Added Ruth Okafor back to your shortlist: Set aside." Each is said until the shortlist next changes, so the same words after an undo are heard again. A card that moves into or out of "Set aside" takes focus with it, to its menu button there, or to the section's heading while it is closed. Where the next-step button goes, at "Seeing them", focus moves to the menu beside it. Removing a therapist sends focus to the bookmark, which can put them back.
 
 ### 4.4 Result cards
 
@@ -119,19 +119,19 @@ type Stored = { v: 1; entries: Record<string, ShortlistEntry>; removed?: Record<
 
 ### 4.7 Notes
 
-- A plain text area, "Your notes", sits on the profile under the track (§4.5). It saves as the visitor types, half a second after they stop and again when it loses focus, and holds up to 1,000 characters.
+- A plain text area, "Your notes", sits on the profile under the track (§4.5). It saves as the visitor types, half a second after they stop and again when it loses focus, and holds up to 1,000 characters. It grows with the note to about seven lines, then scrolls. Within 100 characters of the limit its hint says how many are left, which a screen reader hears once typing rests. Spellcheck is off, since Chrome's and Edge's enhanced spellcheck send what is typed to Google or Microsoft.
 - A shortlist card shows the note's first line, cut to fit, under the track.
 - Only a shortlisted therapist's note is shown or edited. Removing them keeps it with them (§3), along with anything the box saves as it goes, and adding them back returns it.
-- The about text's list of what the browser keeps names statuses and notes alongside the shortlist, and how long they are kept once a therapist is removed.
+- The about text's list of what the browser keeps names statuses and notes alongside the shortlist, and how long they are kept once a therapist is removed, as §3 puts it: until the shortlist is cleared or the site is opened 30 days or more after the removal.
 
 ## 5. Testing
 
-- **Store:** entries read with and without the new fields; an unknown status and a wrongly typed note; choosing "To contact" clears the status; adding back returns status and note; the note's limit; another tab's changes carry the new fields; a removed therapist kept across a reload and another tab, forgotten after 30 days and by a clear, and a note saved after their removal.
-- **Bookmarks:** a therapist removed elsewhere, added back by a result card's or the profile's bookmark, or by "Yes", returns with their place, status and note.
+- **Store:** entries read with and without the new fields; an unknown status and a wrongly typed note; choosing "To contact" clears the status; adding back returns status and note; the note's limit; another tab's changes carry the new fields; a removed therapist kept across a reload and another tab, forgotten after 30 days and by a clear, and a note saved after their removal; an add in a tab that has not heard another tab add the therapist back.
+- **Bookmarks:** a therapist removed elsewhere, added back by a result card's or the profile's bookmark, or by "Yes", returns with their place, status and note; an add-back names a status past "To contact".
 - **Tab:** one list in the shortlist's order with those set aside at its foot; "Set aside" starts closed, and its pins leave the map while it is; the tab's count leaves out those set aside; dragging within the list and within "Set aside"; a therapist set aside and brought back returns to their old place; focus and the announcement after a change by menu and by next step; removing and adding back.
 - **Track:** the steps, label and next-step button for each status, the paused step and the grey track; a removed therapist's track saying so in place of its controls; focus once the next-step button goes.
 - **Result cards:** the status line, nothing for "To contact", and the faded portrait when set aside.
-- **Profile:** the track after the header; the contact offer after phone and email but not a website; "Yes" for a therapist not yet shortlisted adds them as "Contacted".
+- **Profile:** the track after the header; the contact offer after phone and email but not a website; "Yes" for a therapist not yet shortlisted adds them as "Contacted"; the note box's count near its limit, and its spellcheck off.
 - **Map:** `pinIcon`'s badge and accessible name for each status, and none on a stacked pin.
 - **Manual:** a pass in the browser in both themes, on a wide window and in the sheet at phone width: the cards' tracks, the menu and next step, dragging by pointer, touch and keyboard, "Set aside" opening and closing, the profile's track and the map's badges.
 
@@ -146,3 +146,4 @@ A stack of pull requests, each on the one before:
 5. Status badges on the shortlist's map (§4.6).
 6. Notes (§4.7).
 7. Removed therapists kept for 30 days (§3), with "Clear shortlist" on the empty tab while anyone is (§4.1).
+8. Loose ends: an add that starts nobody afresh and every page forgetting those due (§3), an add-back naming its status (§4.3), and the note box's height, count and spellcheck, with the about text's exact wording (§4.7).

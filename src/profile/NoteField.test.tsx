@@ -25,11 +25,32 @@ afterEach(() => {
 });
 
 describe("NoteField", () => {
-  it("is named Your notes, says when and where it saves, and holds up to 1,000 characters", () => {
+  it("is named Your notes, says when and where it saves, holds up to 1,000 characters and leaves spelling unchecked", () => {
     const { box } = renderField();
     expect(document.getElementById(box.getAttribute("aria-describedby")!)?.textContent).toBe("Saved as you type, in this browser only.");
     expect(box.maxLength).toBe(1000);
     expect(box.value).toBe("");
+    // Enhanced spellcheck in Chrome and Edge sends what is typed to Google or Microsoft.
+    expect(box.getAttribute("spellcheck")).toBe("false");
+  });
+
+  it("counts the characters left once 100 or fewer remain, which a screen reader hears as typing rests", () => {
+    vi.useFakeTimers();
+    const { box } = renderField();
+    const hint = () => document.getElementById(box.getAttribute("aria-describedby")!)?.textContent;
+    const region = document.querySelector("[aria-live=polite]")!;
+    fireEvent.change(box, { target: { value: "x".repeat(899) } });
+    expect(hint()).toBe("Saved as you type, in this browser only.");
+    fireEvent.change(box, { target: { value: "x".repeat(900) } });
+    expect(hint()).toBe("Saved as you type, in this browser only. 100 characters left.");
+    expect(region.textContent).toBe("");
+    act(() => vi.advanceTimersByTime(500));
+    expect(region.textContent).toBe("100 characters left.");
+    fireEvent.change(box, { target: { value: "x".repeat(999) } });
+    expect(hint()).toBe("Saved as you type, in this browser only. 1 character left.");
+    expect(region.textContent).toBe("100 characters left.");
+    act(() => vi.advanceTimersByTime(500));
+    expect(region.textContent).toBe("1 character left.");
   });
 
   it("shows the note kept for the therapist", () => {

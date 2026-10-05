@@ -8,8 +8,13 @@ export const ShortlistContext = createContext<ShortlistStore | null>(null);
 
 let browserStore: ShortlistStore | undefined;
 
+/** The store kept in this browser, made the first time it is asked for. */
+export function browserShortlist(): ShortlistStore {
+  return (browserStore ??= createShortlistStore(browserStorage(), Date.now, window));
+}
+
 export function useShortlistStore(): ShortlistStore {
-  return useContext(ShortlistContext) ?? (browserStore ??= createShortlistStore(browserStorage(), Date.now, window));
+  return useContext(ShortlistContext) ?? browserShortlist();
 }
 
 export function useShortlist(): Shortlist {

@@ -523,6 +523,16 @@ describe("createShortlistStore", () => {
     ]);
   });
 
+  it("says where an add leaves the therapist", () => {
+    const store = createShortlistStore(memory(), clock());
+    expect(store.add(card("a"))).toBe("toContact");
+    store.setStatus("a", "waiting");
+    store.remove("a");
+    expect(store.add(card("a"))).toBe("waiting");
+    store.remove("a");
+    expect(store.add(card("a"), { status: "contacted" })).toBe("contacted");
+  });
+
   it("keeps a note saved after its therapist was removed, for when they are added back", () => {
     const store = createShortlistStore(memory(), clock());
     store.add(card("a"));
@@ -547,6 +557,27 @@ describe("createShortlistStore", () => {
     expect(here.removedCount()).toBe(1);
     here.add(card("a"));
     expect(here.get()).toEqual(before);
+  });
+
+  it("leaves a therapist another tab added back as they are, though this tab had yet to hear of it", () => {
+    const storage = memory();
+    const there = createShortlistStore(storage, clock());
+    there.add(card("a"));
+    there.add(card("b"));
+    there.setStatus("a", "consultation");
+    there.setNote("a", "Rang on Tuesday");
+    there.remove("a");
+    // This tab loads with them removed, and hears nothing more.
+    const here = createShortlistStore(storage, clock(5000));
+    there.add(card("a"));
+    const before = there.get();
+    here.add(card("a"));
+    expect(here.get()).toEqual(before);
+    here.add(card("a"), { status: "contacted" });
+    expect(here.get().map((e) => [e.card.slug, e.status, e.note])).toEqual([
+      ["b", undefined, undefined],
+      ["a", "contacted", "Rang on Tuesday"],
+    ]);
   });
 
   it("forgets those removed 30 days or more before the page loads, in storage as well as on the page", () => {

@@ -43,9 +43,12 @@ type Events = Pick<EventTarget, "addEventListener" | "removeEventListener">;
 export type ShortlistStore = {
   get: () => Shortlist;
   has: (slug: string) => boolean;
-  /** Puts anyone removed back where and as they were, note and card and all, with whatever `place` gives over that. */
-  add: (card: ShortlistCard, place?: Partial<Omit<ShortlistEntry, "card">>) => void;
-  /** Keeps the therapist for `REMOVED_DAYS`, to be added back as they were. */
+  /**
+   * Puts anyone removed back where and as they were, note and card and all, with whatever `place` gives over that. Anyone
+   * listed already keeps what they have the same way. Returns where the visitor then stands with them.
+   */
+  add: (card: ShortlistCard, place?: Partial<Omit<ShortlistEntry, "card">>) => Status;
+  /** Keeps the therapist, to be added back as they were, until the list is cleared or a page loads `REMOVED_DAYS` days or more after. */
   remove: (slug: string) => void;
   /** Takes everyone off, those removed too, with their statuses, notes and order, for a browser someone else may use next. */
   clear: () => void;
@@ -125,13 +128,16 @@ export function createShortlistStore(storage: KeyValue | null, now: () => number
   return {
     get: () => list,
     has: (slug) => entries.has(slug),
-    add: (card, place) =>
+    add: (card, place) => {
       update((next, gone) => {
-        const kept = gone.get(card.slug);
+        // Listed already, as by another tab this one has yet to hear from, they are not started afresh.
+        const kept = next.get(card.slug) ?? gone.get(card.slug);
         gone.delete(card.slug);
         const { addedAt = now(), rank, status, note } = { ...kept, ...place };
         next.set(card.slug, { addedAt, rank, status, note: noteFrom(note), card: cardOf(kept?.card ?? card) });
-      }),
+      });
+      return statusOf(entries.get(card.slug)!);
+    },
     remove: (slug) =>
       update((next, gone) => {
         const entry = next.get(slug);
