@@ -3,12 +3,13 @@ import type { Env, Forward } from "../app";
 import { SITE_NAME } from "../plain/pages";
 import { INSTRUCTIONS } from "./instructions";
 import type { McpServer } from "./protocol";
+import { searchDefinition, searchTherapists } from "./search";
 import type { Tool, ToolContext } from "./tool";
 
 /** Every assistant's calls share one allowance, as nothing tells the people behind them apart. */
 export const MCP_RATE_KEY = "mcp";
 
-const TOOLS: Tool[] = [];
+const TOOLS: Tool[] = [{ definition: searchDefinition, run: searchTherapists }];
 
 /** The server an assistant reaches at /mcp, asking the cache under the shared allowance. */
 export function therapistServer(c: Context<{ Bindings: Env }>, forward: Forward): McpServer {
