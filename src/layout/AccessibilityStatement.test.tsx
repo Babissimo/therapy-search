@@ -77,7 +77,8 @@ describe("AccessibilityStatement", () => {
     expect(tested).toContain("On 1 October 2026");
     expect(tested).toContain("WCAG) 2.2, at level AA");
     expect(tested).toMatch(/haven't yet tested the site with people who use screen readers/);
-    expect(screen.getByText("This statement was prepared on 1 October 2026.")).toBeTruthy();
+    expect(tested).toContain("we can't say it fully meets it");
+    expect(screen.getByText("This statement was prepared on 1 October 2026. It was last reviewed on 5 October 2026.")).toBeTruthy();
   });
 
   it("keeps the names of browsers and assistive technology from machine translation", () => {
