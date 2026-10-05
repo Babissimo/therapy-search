@@ -41,6 +41,10 @@ On a slow connection Wrangler can give up before its first request to Cloudflare
 NODE_OPTIONS="--network-family-autoselection-attempt-timeout=5000 --dns-result-order=ipv4first" npm run deploy
 ```
 
+The MCP endpoint for AI assistants, `/mcp` (spec `docs/superpowers/specs/2026-10-05-mcp-server-design.md`), is off until UKCP
+agrees to it, and answers 404 meanwhile. `"MCP_ENDPOINT": "on"` in `wrangler.jsonc` turns it on; to try it locally, put
+`MCP_ENDPOINT=on` in `.dev.vars`.
+
 ## Keeping up with UKCP
 
 The filter panel's options come from `shared/options.json`, taken from UKCP's search form (spec §3.2). A daily workflow checks UKCP's pages

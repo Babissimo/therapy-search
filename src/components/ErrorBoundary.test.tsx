@@ -8,6 +8,7 @@ import { NEW_TAB } from "@/lib/newTab";
 import { SITE_NAME } from "@/lib/useTitle";
 import { NO_PLACE } from "@/search/SearchBox";
 import { REPORT_URL } from "@/site";
+import { HELP_NOW } from "../../worker/mcp/instructions";
 import * as plain from "../../worker/plain/pages";
 import indexHtml from "../../index.html?raw";
 import mainSource from "../main.tsx?raw";
@@ -65,10 +66,11 @@ describe("ErrorBoundary", () => {
     expect(indexHtml).toContain(`href="${REPORT_URL}"`);
   });
 
-  it("says where to turn for help today in HelpNow's words, when drawing fails and on index.html's page, loading or not", () => {
+  it("says where to turn for help today in HelpNow's words, when drawing fails, on index.html's page, loading or not, and to assistants", () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     const help = helpLine(render(<HelpNow />).container);
     expect(help.numbers).toHaveLength(5);
+    expect(HELP_NOW).toBe(help.words);
     const failed = render(
       <ErrorBoundary>
         <Broken />
