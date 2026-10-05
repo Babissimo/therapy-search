@@ -7,6 +7,7 @@ import { UNREADABLE, unrecognised } from "../plain/pages";
 import { readResults, type Card, type Results } from "../ukcp/results";
 import { HELP_NOW } from "./instructions";
 import type { ToolDefinition, ToolResult } from "./protocol";
+import { scrubbed } from "./scrub";
 import { errorOf, refusal, structured, type ToolContext } from "./tool";
 
 /** Each list the tool takes, by its argument's name, as the UKCP parameter it is sent as. */
@@ -190,7 +191,17 @@ function readArguments(given: Record<string, unknown>): { params: SearchParams; 
   }
 }
 
-/** A card as the tool gives it; readResults has already left out its phone number. */
+/** A card as the tool gives it; readResults has already left out its phone number, and all but the id is scrubbed of contact details. */
 function therapistOf(card: Card) {
-  return { id: card.slug, name: card.name, place: card.location, distance: card.distance, sessions: card.sessionTypes, summary: card.summary, tags: card.tags };
+  return {
+    id: card.slug,
+    ...scrubbed({
+      name: card.name,
+      place: card.location,
+      distance: card.distance,
+      sessions: card.sessionTypes,
+      summary: card.summary,
+      tags: card.tags,
+    }),
+  };
 }

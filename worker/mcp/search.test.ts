@@ -8,6 +8,7 @@ import { UpstreamError } from "../ukcp/client";
 import { HELP_NOW } from "./instructions";
 import { bytes, results, setup, SITE } from "./mcp.testing";
 import type { ToolResult } from "./protocol";
+import { ON_PROFILE } from "./scrub";
 import { LAST_PAGE, LISTS, searchDefinition } from "./search";
 
 type Property = { type: string; items?: { enum: string[] }; description?: string; maximum?: number; maxLength?: number };
@@ -91,6 +92,21 @@ describe("search_therapists near a place", () => {
     const { call, asked } = setup();
     await call("search_therapists", { location: "Leeds", wheelchair_accessible: true });
     expect(asked()).toEqual(["/api/search/early?Location=Leeds&OnlyWheelchairAccessible=true"]);
+  });
+
+  it("leaves out a phone number or email a therapist wrote into their summary", async () => {
+    const page = results(1).replace("Summary 1.", "Call 07700 900123 or write to jane@example.com.");
+    const { call } = setup({ client: { search: vi.fn(async () => bytes(page)) } });
+    const result = await call("search_therapists", { location: "Bristol" });
+    expect(found(result).therapists[0]?.summary).toBe(`Call ${ON_PROFILE} or write to ${ON_PROFILE}.`);
+  });
+
+  it("leaves out contact details written into a therapist's place or a tag", async () => {
+    const page = results(1).replace("Bristol BS1", "Bristol 07700 900456").replace("Depression", "jane@example.com");
+    const { call } = setup({ client: { search: vi.fn(async () => bytes(page)) } });
+    const result = await call("search_therapists", { location: "Bristol" });
+    expect(found(result).therapists[0]).toMatchObject({ place: `Bristol ${ON_PROFILE}`, tags: ["Anxiety", ON_PROFILE] });
+    expect(text(result)).not.toMatch(/07700|jane@/);
   });
 
   it("says when UKCP didn't recognise the place, rather than give results from anywhere", async () => {
