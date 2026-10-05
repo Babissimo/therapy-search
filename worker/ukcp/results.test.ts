@@ -11,7 +11,7 @@ function browserResults(html: string) {
   vi.stubGlobal("DOMParser", new JSDOM().window.DOMParser);
   try {
     const { total, from, to, locationSearched, therapists } = parseResults(html);
-    const cards = therapists.map(({ slug, name, location, distance, sessionTypes, summary }) => ({ slug, name, location, distance, sessionTypes, summary }));
+    const cards = therapists.map(({ slug, name, location, distance, sessionTypes, summary, tags }) => ({ slug, name, location, distance, sessionTypes, summary, tags }));
     return { total, from, to, locationSearched, cards };
   } finally {
     vi.unstubAllGlobals();
@@ -82,7 +82,9 @@ describe("readResults", () => {
           (1.2 miles from Brighton)</span>
         <span class="profile-listing-contact-session-type"><strong>01234 567890</strong>
 |&nbsp;In-person&nbsp;&amp;&nbsp;Remote</span>
-        <p class="pt-2">Grief &amp; <em>loss</em>.&#x2026;</p>`,
+        <p class="pt-2">Grief &amp; <em>loss</em>.&#x2026;</p>
+        <ul class="tag-list"><li><span>Anger &amp;
+          rage</span></li><li><span> </span></li><li><span>Loss</span></li></ul>`,
       ),
     );
     expect(readResults(html, 0, 12, 7).cards).toEqual(browserResults(html).cards);
@@ -93,6 +95,7 @@ describe("readResults", () => {
       distance: "1.2 miles from Brighton",
       sessionTypes: "In-person & Remote",
       summary: "Grief & loss.…",
+      tags: ["Anger & rage", "Loss"],
     });
   });
 

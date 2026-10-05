@@ -158,7 +158,7 @@ function leniently(form: URLSearchParams): SearchParams {
 }
 
 /** What the cached entrypoint said went wrong, in the words the app shows. */
-async function errorOf(res: Response): Promise<string> {
+export async function errorOf(res: Response): Promise<string> {
   const body: unknown = await res.json().catch(() => ({}));
   return (body as { error?: string }).error ?? "Something went wrong.";
 }

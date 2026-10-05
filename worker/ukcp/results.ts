@@ -8,9 +8,9 @@ const RANGE = /(\d+)\s*-\s*(\d+)\s+of\s+(\d+)\s+results?/i;
 // A card's listing and the link that opens with it, which holds the whole card.
 const LISTING = /<div\b[^>]*\sclass=(["'])(?:[^"']*\s)?profile-listing(?:\s[^"']*)?\1[^>]*>\s*(<a\b[^>]*>)/gi;
 
-/** What a plain page shows of a card. */
-export type Card = Pick<TherapistCard, "slug" | "name" | "location" | "distance" | "sessionTypes" | "summary">;
-/** A results page with the cards a plain page shows from it. */
+/** What the Worker reads of a card, which leaves out the phone number UKCP puts on it. */
+export type Card = Pick<TherapistCard, "slug" | "name" | "location" | "distance" | "sessionTypes" | "summary" | "tags">;
+/** A results page with the cards read from it. */
 export type Results = Omit<SearchResult, "therapists" | "notices"> & { cards: Card[] };
 /**
  * A card as first found: where its link's content starts, and what orders it. A plain page shows no photo and reads a
@@ -68,7 +68,7 @@ function cardAt(html: string, { slug, start }: Found): Card {
   const name = lineOf(firstNamed(card, "h2")?.inner ?? "");
   if (!name) throw new ParseError("results: a card has no name");
   const locations = locationsIn(card);
-  // The strong holds the phone, which a plain page leaves to the profile's contact details.
+  // The strong holds the phone, which is left to the profile's contact details.
   const sessions = (withClass(card, "profile-listing-contact-session-type")[0]?.inner ?? "").replace(/<strong\b[^>]*>[\s\S]*?<\/strong>/gi, "");
   return {
     slug,
@@ -77,6 +77,7 @@ function cardAt(html: string, { slug, start }: Found): Card {
     distance: distanceIn(locations),
     sessionTypes: optional(lineOf(sessions).replace(/^\|\s*/, "")),
     summary: optional(lineOf(firstNamed(card, "p")?.inner ?? "")),
+    tags: (withClass(card, "tag-list")[0]?.inner.match(/<li\b[^>]*>[\s\S]*?<\/li>/gi) ?? []).map(lineOf).filter(Boolean),
   };
 }
 
