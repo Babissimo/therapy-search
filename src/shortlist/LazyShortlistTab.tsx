@@ -2,10 +2,20 @@ import { lazy, Suspense, useEffect, type ComponentProps } from "react";
 import { LoadFailed } from "@/components/LoadFailed";
 import type { ShortlistTab } from "./ShortlistTab";
 
-/** The shortlist's tab and dnd-kit, which reorders it, in a chunk of their own that the page's first render never waits for. */
-const loadShortlistTab = () => import("./ShortlistTab");
+type Loaded = { default: typeof ShortlistTab };
 
-const Tab = lazy(() => loadShortlistTab().then((module) => ({ default: module.ShortlistTab })));
+/** The tab, once its chunk is here. */
+let loaded: Loaded | undefined;
+
+/** The shortlist's tab and dnd-kit, which reorders it, in a chunk of their own that the page's first render never waits for. */
+export const loadShortlistTab = () => import("./ShortlistTab").then((module) => (loaded = { default: module.ShortlistTab }));
+
+const Tab = lazy(() => {
+  const tab = loaded;
+  // lazy suspends for a render on any promise, even a settled one, but reads a thenable that calls back at once in the
+  // render itself, so a tab whose chunk is here is drawn as it opens.
+  return tab ? ({ then: (take: (value: Loaded) => void) => take(tab) } as unknown as Promise<Loaded>) : loadShortlistTab();
+});
 
 /** The shortlist's tab, drawn once its chunk is here; it fades in as it comes. */
 export function LazyShortlistTab(props: ComponentProps<typeof ShortlistTab>) {
