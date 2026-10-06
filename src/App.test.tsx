@@ -142,6 +142,37 @@ describe("AppRoutes", () => {
     await waitFor(() => expect(document.title).toBe("1 therapist near Leeds - Find a UKCP therapist (unofficial)"));
   });
 
+  it("keeps the keyboard on the drawer's first button as the profile comes in, rather than on the drawer itself", async () => {
+    let answer = (_: Profile) => {};
+    vi.mocked(api.profile).mockImplementation(() => new Promise((resolve) => (answer = resolve)));
+    renderAt("/?Location=Leeds");
+    fireEvent.click(await screen.findByRole("link", { name: "Jo Bloggs" }));
+    const drawer = await screen.findByRole("dialog", { name: "Therapist profile" });
+    // The first of the header's buttons, which the drawer focuses as it opens.
+    const first = within(drawer).getAllByRole("button")[0];
+    await waitFor(() => expect(document.activeElement).toBe(first));
+    act(() => answer(PROFILE));
+    await within(drawer).findByRole("heading", { name: "Jo Bloggs" });
+    expect(document.activeElement).toBe(first);
+  });
+
+  it("keeps the keyboard on the drawer's first button as the profile fails to come in, and as it comes in at last", async () => {
+    let fail = (_: Error) => {};
+    vi.mocked(api.profile).mockImplementationOnce(() => new Promise((_, reject) => (fail = reject)));
+    renderAt("/?Location=Leeds");
+    fireEvent.click(await screen.findByRole("link", { name: "Jo Bloggs" }));
+    const drawer = await screen.findByRole("dialog", { name: "Therapist profile" });
+    // The first of the header's buttons, which the drawer focuses as it opens.
+    const first = within(drawer).getAllByRole("button")[0];
+    await waitFor(() => expect(document.activeElement).toBe(first));
+    act(() => fail(new Error("The profile didn't load.")));
+    const retry = await within(drawer).findByRole("button", { name: "Try again" });
+    expect(document.activeElement).toBe(first);
+    fireEvent.click(retry);
+    await within(drawer).findByRole("heading", { name: "Jo Bloggs" });
+    expect(document.activeElement).toBe(first);
+  });
+
   it("names the page after a drawer that Forward opens again, though the search beneath was drawn afresh while it was shut", async () => {
     const title = (name: string) => `${name} - Find a UKCP therapist (unofficial)`;
     renderAt(["/online?Languages=Greek", "/?Location=Leeds"]);
