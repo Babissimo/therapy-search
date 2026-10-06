@@ -4,24 +4,30 @@ import { render, renderHook, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { LazyShortlistTab, usePreloadShortlistTab } from "./LazyShortlistTab";
-import { createShortlistStore } from "./store";
-import { ShortlistContext } from "./useShortlist";
+import { usePreloadShortlistTab } from "./LazyShortlistTab";
 
-function renderTab(Tab: typeof LazyShortlistTab) {
+/** The tab's module as a page load first meets it, its chunk not yet asked for, with a way to draw the tab over a store of its own. */
+async function freshTab() {
+  vi.resetModules();
+  const { LazyShortlistTab, loadShortlistTab } = await import("./LazyShortlistTab");
+  // The store and its context as the freshly loaded tab reads them.
+  const { createShortlistStore } = await import("./store");
+  const { ShortlistContext } = await import("./useShortlist");
   const store = createShortlistStore(null, () => 1000);
   store.add({ slug: "Jo-ABCDEFGH", name: "Jo Bloggs", initials: "JB", tags: [] });
-  return render(
-    <QueryClientProvider client={new QueryClient()}>
-      <ShortlistContext.Provider value={store}>
-        <TooltipProvider>
-          <MemoryRouter>
-            <Tab sought={new Set()} />
-          </MemoryRouter>
-        </TooltipProvider>
-      </ShortlistContext.Provider>
-    </QueryClientProvider>,
-  );
+  const draw = () =>
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <ShortlistContext.Provider value={store}>
+          <TooltipProvider>
+            <MemoryRouter>
+              <LazyShortlistTab sought={new Set()} />
+            </MemoryRouter>
+          </TooltipProvider>
+        </ShortlistContext.Provider>
+      </QueryClientProvider>,
+    );
+  return { draw, loadShortlistTab };
 }
 
 afterEach(() => {
@@ -34,19 +40,26 @@ afterEach(() => {
 
 describe("LazyShortlistTab", () => {
   it("draws nothing in the tab until its chunk is here, then the shortlist", async () => {
+    const { draw } = await freshTab();
     // The chunk's first import outlasts a findBy's one-second wait under load; a lazy tab still draws empty before it.
     await import("./ShortlistTab");
-    const { container } = renderTab(LazyShortlistTab);
+    const { container } = draw();
     expect(container.textContent).toBe("");
     expect(await screen.findByRole("heading", { name: "Jo Bloggs" })).toBeTruthy();
+  });
+
+  it("draws the shortlist as the tab opens once its chunk has been fetched", async () => {
+    const { draw, loadShortlistTab } = await freshTab();
+    await loadShortlistTab();
+    draw();
+    expect(screen.getByRole("heading", { name: "Jo Bloggs" })).toBeTruthy();
   });
 
   it("says so in the tab, and leaves the page standing, when its chunk can't be fetched", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     vi.doMock("./ShortlistTab", () => Promise.reject(new TypeError("Failed to fetch dynamically imported module")));
-    vi.resetModules();
-    const { LazyShortlistTab: Failing } = await import("./LazyShortlistTab");
-    renderTab(Failing);
+    const { draw } = await freshTab();
+    draw();
     expect(await screen.findByText(/^Your shortlist couldn't be shown just now/)).toBeTruthy();
   });
 });
