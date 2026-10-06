@@ -409,7 +409,6 @@ describe("SearchPage", () => {
     renderAt("/");
     await mapLoads();
     expect(within(results()).getByText(/^Tick anything that matters to you/)).toBeTruthy();
-    expect(screen.getByRole("tab", { name: "Results" }).getAttribute("aria-selected")).toBe("true");
     expect(screen.getByRole("heading", { level: 1, name: "Find a UKCP therapist" })).toBeTruthy();
     expect(screen.queryByTestId("map")).toBeNull();
     expect(api.search).not.toHaveBeenCalled();
@@ -419,6 +418,36 @@ describe("SearchPage", () => {
     await loaded();
     expect(await screen.findByTestId("map")).toBeTruthy();
     expect(screen.queryByText(/^Tick anything that matters to you/)).toBeNull();
+  });
+
+  it.each([
+    { screen: "wide", wide: true },
+    { screen: "narrow", wide: false },
+  ])("offers the list's tabs before a search only once someone is shortlisted, on $screen screens", ({ wide }) => {
+    screenIs(wide);
+    renderAt("/");
+    expect(screen.queryByRole("tablist")).toBeNull();
+    // With no tab to name it, the prompt's panel is neither a tab panel nor a Tab stop.
+    expect(screen.queryByRole("tabpanel")).toBeNull();
+    expect(screen.getByText(/^Tick anything that matters to you/).closest("[tabindex='0']")).toBeNull();
+    act(() => shortlist.add(therapist("a")));
+    expect(screen.getByRole("tab", { name: "Results", selected: true })).toBeTruthy();
+    expect(screen.getByRole("tab", { name: "Shortlist, 1 therapist" })).toBeTruthy();
+    act(() => shortlist.remove("a"));
+    expect(screen.queryByRole("tablist")).toBeNull();
+  });
+
+  it("keeps the tabs before a search while the shortlist is open, emptied or not, handing the keyboard to the prompt as they fold away", () => {
+    screenIs(true);
+    shortlist.add(therapist("a"));
+    renderAt("/");
+    pick(/^Shortlist/);
+    act(() => shortlist.remove("a"));
+    expect(screen.getByRole("tab", { name: "Shortlist", selected: true })).toBeTruthy();
+    // As the arrow keys bring it the keyboard, the tab opens.
+    act(() => screen.getByRole("tab", { name: "Results" }).focus());
+    expect(screen.queryByRole("tablist")).toBeNull();
+    expect(document.activeElement).toBe(screen.getByText("Start with what matters to you.").parentElement);
   });
 
   it("says where to turn for help today beneath the prompt, near a place or online", () => {
@@ -810,6 +839,7 @@ describe("SearchPage", () => {
 
   it("skips past the prompt to the filters right of it on wide screens, bringing them back from beside the shortlist", async () => {
     screenIs(true);
+    shortlist.add(therapist("a"));
     renderAt("/");
     const filters = () => screen.getByRole("region", { name: "Refine your search" });
     const first = () => within(filters()).getByRole("button", { name: /^Type of session/i });
@@ -1278,6 +1308,14 @@ describe("SearchPage", () => {
     act(() => screen.getByRole("button", { name: "Map" }).focus());
     resize(true);
     expect(document.activeElement).toBe(screen.getByRole("tab", { name: "Results" }));
+  });
+
+  it("hands the keyboard to the prompt as the window crosses a tabless start screen and its control has no twin", () => {
+    const resize = screenIs(true);
+    renderAt("/");
+    act(() => within(screen.getByRole("region", { name: "Refine your search" })).getByRole("button", { name: /^Type of session/ }).focus());
+    resize(false);
+    expect(document.activeElement).toBe(screen.getByText("Start with what matters to you.").parentElement);
   });
 
   it("keeps the shortlist's tab in the keyboard's hold as the window crosses between narrow and wide", async () => {
@@ -1987,7 +2025,7 @@ describe("SearchPage online", () => {
     fireEvent.click(chip);
     expect(prompt()).toBeTruthy();
     // Right of the list, or on a phone beneath the prompt, where the filters go back to as the search ends.
-    const holder = wide ? filters() : screen.getByRole("tabpanel", { name: "Results" });
+    const holder = wide ? filters() : results();
     expect(document.activeElement).toBe(holder.querySelector('[data-slot="accordion-trigger"]'));
   });
 
@@ -2001,8 +2039,7 @@ describe("SearchPage online", () => {
     fireEvent.click(within(sheet).getByRole("checkbox", { name: "Greek" }));
     fireEvent.click(within(sheet).getByRole("button", { name: "Show results" }));
     expect(prompt()).toBeTruthy();
-    const panel = screen.getByRole("tabpanel", { name: "Results" });
-    expect(document.activeElement).toBe(panel.querySelector('[data-slot="accordion-trigger"]'));
+    expect(document.activeElement).toBe(results().querySelector('[data-slot="accordion-trigger"]'));
   });
 
   it("goes back to its prompt, asking UKCP nothing, when the last filter that narrows its search is unticked and the results updated", async () => {
@@ -2021,11 +2058,37 @@ describe("SearchPage online", () => {
     renderAt(ONLINE);
     const status = screen.getAllByRole("status").find((el) => el.tagName === "P");
     expect(status?.textContent).toBe("");
-    const panel = screen.getByRole("tabpanel", { name: "Results" });
+    const panel = results();
     fireEvent.click(within(panel).getByRole("button", { name: /^Languages/ }));
     fireEvent.click(within(panel).getByRole("checkbox", { name: "Greek" }));
     fireEvent.click(within(panel).getByRole("button", { name: "Show results" }));
     await waitFor(() => expect(status?.textContent).toBe("30 therapists working online or by phone."));
+  });
+
+  it("hands the keyboard to the prompt on a phone as an emptied shortlist's tabs fold away", () => {
+    screenIs(false);
+    shortlist.add(therapist("a"));
+    renderAt(ONLINE);
+    pick(/^Shortlist/);
+    act(() => shortlist.remove("a"));
+    act(() => screen.getByRole("tab", { name: "Results" }).focus());
+    expect(screen.queryByRole("tablist")).toBeNull();
+    expect(document.activeElement).toBe(prompt()?.parentElement);
+  });
+
+  it("offers the list's tabs before a search only with someone shortlisted, and as a filter shows results", async () => {
+    screenIs(true);
+    renderAt(ONLINE);
+    expect(screen.queryByRole("tablist")).toBeNull();
+    fireEvent.click(within(filters()).getByRole("button", { name: /^Languages/ }));
+    fireEvent.click(within(filters()).getByRole("checkbox", { name: "Greek" }));
+    fireEvent.click(within(filters()).getByRole("button", { name: "Show results" }));
+    expect(screen.getByRole("tab", { name: "Results", selected: true })).toBeTruthy();
+    await loaded();
+    cleanup();
+    shortlist.add(therapist("a"));
+    renderAt(ONLINE);
+    expect(screen.getByRole("tab", { name: "Shortlist, 1 therapist" })).toBeTruthy();
   });
 
   it("tells a screen reader what a search found though the shortlist's tab opened while it ran", async () => {
@@ -2157,7 +2220,7 @@ describe("SearchPage online", () => {
     screenIs(false);
     renderAt(ONLINE);
     expect(screen.queryByRole("button", { name: "Filters" })).toBeNull();
-    const panel = screen.getByRole("tabpanel", { name: "Results" });
+    const panel = results();
     const show = within(panel).getByRole("button", { name: "Show results" });
     expect(show.getAttribute("aria-disabled")).toBe("true");
     fireEvent.click(within(panel).getByRole("button", { name: /^Type of session/ }));

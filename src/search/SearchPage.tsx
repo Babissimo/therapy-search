@@ -1,6 +1,6 @@
 import { List, MapIcon } from "lucide-react";
 import { Tabs } from "radix-ui";
-import { lazy, useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { lazy, useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode, type RefObject } from "react";
 import { Link, useLocation, useMatch } from "react-router";
 import { canonicalLocation } from "@shared/location";
 import { onlineParams } from "@shared/online";
@@ -23,7 +23,7 @@ import { FilterChips } from "./FilterChips";
 import { FilterPanel } from "./FilterPanel";
 import { FiltersButton, FiltersSection, FiltersSheet, FiltersSheetButton, UpdateResults } from "./Filters";
 import { ListColumn } from "./ListColumn";
-import { ListPanels, ListTabs, type ListTab } from "./ListTabs";
+import { ListPanels, ListTabs, useTabbed, type ListTab } from "./ListTabs";
 import { createHighlight } from "./map/highlight";
 import type { MapPaneProps } from "./map/MapPane";
 import type { Pin } from "./map/pins";
@@ -94,7 +94,8 @@ export function SearchPage() {
 
 /**
  * Crossing the breakpoint draws the toolbar and the list afresh elsewhere in the page, taking away the control the keyboard
- * was on. The keyboard goes to the same control in its new place, known by its id or link, or else to the open tab.
+ * was on. The keyboard goes to the same control in its new place, known by its id or link, or else to the open tab, or
+ * the prompt where there are no tabs.
  */
 function useKeyboardAcross(wide: boolean) {
   // Read as the page is drawn for the other side, while the control is still there.
@@ -106,7 +107,8 @@ function useKeyboardAcross(wide: boolean) {
     if (!from || from.isConnected || (now && now !== document.body)) return;
     const href = from.getAttribute("href");
     const twins = from.id ? [document.getElementById(from.id)] : [...document.querySelectorAll("a[href]")].filter((a) => href && a.getAttribute("href") === href);
-    for (const control of [...twins, document.querySelector('[role="tab"][aria-selected="true"]')]) {
+    const fallbacks = [document.querySelector('[role="tab"][aria-selected="true"]'), document.querySelector("[data-prompt-ask]")];
+    for (const control of [...twins, ...fallbacks]) {
       if (!(control instanceof HTMLElement) || control.closest("[hidden], [inert]")) continue;
       control.focus();
       if (document.activeElement === control) return;
@@ -140,6 +142,8 @@ function SearchView({ params, onChange, wide }: ViewProps) {
   // A new search replaces the history entry, so it begins on the results.
   const [tab, setTab] = useRememberedTab(entry);
   const shortlistOpen = tab === "shortlist";
+  const askRef = useRef<HTMLDivElement>(null);
+  const tabbed = useTabbed(searching, tab, () => askRef.current);
   const [phoneMap, setPhoneMap] = useState<PhoneMap>("unasked");
   // Beside the list on wide screens; where the list leads, once asked for.
   const mapDrawn = searching && (wide || phoneMap !== "unasked");
@@ -336,7 +340,7 @@ function SearchView({ params, onChange, wide }: ViewProps) {
   // Before a search, the filters come first and the place last: beside the prompt on wide screens, beneath it on a phone.
   const start = (
     <div className="space-y-8">
-      {heldAt === undefined ? <NearPrompt wide={wide} /> : <FiltersFirst place={heldAt} wide={wide} />}
+      {heldAt === undefined ? <NearPrompt wide={wide} askRef={askRef} /> : <FiltersFirst place={heldAt} wide={wide} askRef={askRef} />}
       {!wide && (
         <div className="space-y-6">
           <FilterPanel params={params} drafts={drafts} />
@@ -348,6 +352,7 @@ function SearchView({ params, onChange, wide }: ViewProps) {
   const lists = (
     <ListPanels
       tab={tab}
+      tabbed={tabbed}
       results={searching ? list : start}
       shortlist={
         <LazyShortlistTab
@@ -364,7 +369,7 @@ function SearchView({ params, onChange, wide }: ViewProps) {
     tab === "results" ? (
       <LoadMore results={results} listRef={listRef} placing={placing || moving} folded={!panelOpen} toggleRef={panelToggleRef} />
     ) : undefined;
-  const tabs = <ListTabs ref={tabsRef} />;
+  const tabs = tabbed && <ListTabs ref={tabsRef} />;
   const mapToggle = searching && !wide && <MapToggle shown={phoneMap === "shown"} onToggle={() => setPhoneMap(phoneMap === "shown" ? "hidden" : "shown")} />;
   const map = (
     <MapSlot>
@@ -651,9 +656,9 @@ function Toolbar({
 }
 
 /** In place of the results until there is a place to search, asking for what matters before where. */
-function NearPrompt({ wide }: { wide: boolean }) {
+function NearPrompt({ wide, askRef }: { wide: boolean; askRef: RefObject<HTMLDivElement | null> }) {
   return (
-    <Prompt ask="Start with what matters to you." className={wide ? "py-10 sm:py-16" : "pt-6"}>
+    <Prompt askRef={askRef} ask="Start with what matters to you." className={wide ? "py-10 sm:py-16" : "pt-6"}>
       Tick anything that matters to you {wide ? "in the filters to the right" : "below"}, then type a town, city or postcode
       {wide && " beneath them"} to see the UKCP therapists nearest to it.
     </Prompt>
@@ -661,13 +666,12 @@ function NearPrompt({ wide }: { wide: boolean }) {
 }
 
 /** In place of the prompt while a place searched with nothing ticked waits for a filter. It takes the keyboard, so it is read out. */
-function FiltersFirst({ place, wide }: { place: string; wide: boolean }) {
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => ref.current?.focus(), [place]);
+function FiltersFirst({ place, wide, askRef }: { place: string; wide: boolean; askRef: RefObject<HTMLDivElement | null> }) {
+  useEffect(() => askRef.current?.focus(), [askRef, place]);
   return (
     // The help beneath is left out of what takes focus, so it isn't read out again for each place held.
     <Prompt
-      askRef={ref}
+      askRef={askRef}
       ask={
         <>
           Before we search near <span translate="no">{place}</span>

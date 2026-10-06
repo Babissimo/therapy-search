@@ -61,6 +61,12 @@ export function useShortlistStatuses(wanted: boolean): ReadonlyMap<string, Statu
   return useMemo(() => (marked === "[]" ? NO_STATUSES : new Map(JSON.parse(marked) as [string, Status][])), [marked]);
 }
 
+/** Whether anyone is shortlisted, set aside or not; any other change to the list leaves it, and its readers, alone. */
+export function useAnyShortlisted(): boolean {
+  const store = useShortlistStore();
+  return useSyncExternalStore(store.subscribe, () => store.get().length > 0);
+}
+
 export function useShortlistEntry(slug: string): ShortlistEntry | undefined {
   const store = useShortlistStore();
   return useSyncExternalStore(store.subscribe, () => store.get().find((entry) => entry.card.slug === slug));

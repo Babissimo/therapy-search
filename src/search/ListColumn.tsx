@@ -6,8 +6,8 @@ import type { useRememberedScroll } from "./viewMemory";
 
 type Props = {
   wide: boolean;
-  /** The tabs between the results and the shortlist. */
-  tabs: ReactNode;
+  /** The tabs between the results and the shortlist, while there are any. */
+  tabs?: ReactNode;
   /** The toolbar and filter chips, above the tabs on a phone; wide screens set them to the list's right instead. */
   top: ReactNode;
   /** Hides `top`, keeping what is typed or open in it. */
@@ -24,6 +24,8 @@ type Props = {
 /** The results and shortlist taking the page, with a map, if any, a button away. */
 export function ListColumn({ wide, tabs, top, topHidden, scroll, toggle, map, mapShown = false, children }: Props) {
   const onScroll = (e: { currentTarget: HTMLElement }) => scroll.save(e.currentTarget.scrollTop);
+  // On a phone, the bar the tabs and the map's button stay stuck in atop the list.
+  const tabBar = Boolean(tabs || toggle);
   // As the map shows, the column scrolls to its end, where the map fills the window below the tabs.
   useLayoutEffect(() => {
     const column = scroll.ref.current;
@@ -39,9 +41,11 @@ export function ListColumn({ wide, tabs, top, topHidden, scroll, toggle, map, ma
             browser carries over a page break. */}
         {wide ? (
           <>
-            <div className="border-b px-4 py-2 print:hidden">
-              <div className="mx-auto max-w-2xl">{tabs}</div>
-            </div>
+            {tabs && (
+              <div className="border-b px-4 py-2 print:hidden">
+                <div className="mx-auto max-w-2xl">{tabs}</div>
+              </div>
+            )}
             <Morph name="list">
               <div ref={scroll.ref} onScroll={onScroll} className="relative min-h-0 flex-1 overflow-y-auto p-4 print:overflow-visible print:pb-0">
                 <div className="mx-auto max-w-2xl">{children}</div>
@@ -60,15 +64,17 @@ export function ListColumn({ wide, tabs, top, topHidden, scroll, toggle, map, ma
               </div>
               <div className={cn(mapShown && "flex h-full flex-col print:block print:h-auto")}>
                 {/* Marked, so a pin's place in the list can be brought into view below it. */}
-                <div data-list-tabs className="sticky top-0 z-10 shrink-0 border-b bg-background px-4 py-2 print:hidden">
-                  <div className="mx-auto flex max-w-2xl items-center justify-between gap-2">
-                    {tabs}
-                    {toggle}
+                {tabBar && (
+                  <div data-list-tabs className="sticky top-0 z-10 shrink-0 border-b bg-background px-4 py-2 print:hidden">
+                    <div className="mx-auto flex max-w-2xl items-center justify-between gap-2">
+                      {tabs}
+                      {toggle}
+                    </div>
                   </div>
-                </div>
+                )}
                 {/* Printed though the map is in its place on screen. Whatever in it takes the keyboard scrolls into view clear of the
-                    tabs stuck above it. */}
-                <div className={cn("p-4 print:pb-0 [&_*]:scroll-mt-14 pointer-coarse:[&_*]:scroll-mt-17", mapShown && "not-print:hidden")}>
+                    tabs stuck above it, if any. */}
+                <div className={cn("p-4 print:pb-0", tabBar && "[&_*]:scroll-mt-14 pointer-coarse:[&_*]:scroll-mt-17", mapShown && "not-print:hidden")}>
                   <div className="mx-auto max-w-2xl">{children}</div>
                 </div>
                 {map && (
