@@ -46,6 +46,9 @@ export function Unfold({ open, across = false, className, children }: Props) {
       className={cn(
         "grid motion-safe:transition-[grid-template-rows,grid-template-columns,opacity,visibility] motion-safe:duration-200",
         across ? (open ? "grid-cols-[1fr]" : "grid-cols-[0fr]") : open ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
+        // What it holds adds nothing to a line's min-content, so a crowded line would squeeze it out of sight; the track's
+        // width, which follows the fold, is the floor.
+        across && "min-w-max",
         // Visibility holds until the fold ends, then takes what it held out of sight and out of a screen reader's hearing.
         !open && "invisible opacity-0",
         className,
