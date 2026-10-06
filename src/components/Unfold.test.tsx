@@ -85,4 +85,9 @@ describe("Unfold", () => {
     expect(outer.firstElementChild?.tagName).toBe("SPAN");
     expect(outer.className).toMatch(/\bgrid-cols-\[1fr\]/);
   });
+
+  it("across, is never squeezed narrower than its track, so a crowded line can't clip what it holds", () => {
+    const { container } = render(box(true, true));
+    expect((container.firstElementChild as HTMLElement).className).toMatch(/\bmin-w-max\b/);
+  });
 });
