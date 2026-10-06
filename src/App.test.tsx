@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, useLocation, useNavigate } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Profile } from "@shared/types";
@@ -178,6 +178,45 @@ describe("AppRoutes", () => {
     expect(await screen.findByRole("heading", { name: "Jo Bloggs" })).toBeTruthy();
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(screen.getByRole("link", { name: "Search for a therapist" })).toBeTruthy();
+  });
+
+  it("opens a profile over the search again where its address is entered afresh, which leaves its entry without the search", async () => {
+    renderAt("/?Location=Leeds");
+    fireEvent.click(await screen.findByRole("link", { name: "Jo Bloggs" }));
+    await screen.findByRole("dialog", { name: "Jo Bloggs" });
+    cleanup();
+    // The address entered again, as a new page in the same tab, with the search still the entry before it.
+    renderAt(["/?Location=Leeds", "/therapist/Jo-ABCDEFGH"]);
+    const drawer = await screen.findByRole("dialog", { name: "Jo Bloggs" });
+    expect(screen.getByRole("region", { name: "Results and shortlist", hidden: true })).toBeTruthy();
+    fireEvent.click(within(drawer).getByRole("button", { name: "Close" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(screen.getByTestId("url").textContent).toBe("/?Location=Leeds");
+  });
+
+  it("closes a profile reopened over the search to the search, where the tab has nothing of the site's to go back to", async () => {
+    renderAt("/?Location=Leeds");
+    fireEvent.click(await screen.findByRole("link", { name: "Jo Bloggs" }));
+    await screen.findByRole("dialog", { name: "Jo Bloggs" });
+    cleanup();
+    // The tab went elsewhere with the drawer open, then came back by the profile's address.
+    vi.stubGlobal("navigation", { canGoBack: false });
+    renderAt("/therapist/Jo-ABCDEFGH");
+    fireEvent.click(within(await screen.findByRole("dialog", { name: "Jo Bloggs" })).getByRole("button", { name: "Close" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(screen.getByTestId("url").textContent).toBe("/?Location=Leeds");
+    expect(screen.getByRole("region", { name: "Results and shortlist" })).toBeTruthy();
+  });
+
+  it("shows another profile reached directly as a page of its own, though the tab opened one over a search", async () => {
+    renderAt("/?Location=Leeds");
+    fireEvent.click(await screen.findByRole("link", { name: "Jo Bloggs" }));
+    await screen.findByRole("dialog", { name: "Jo Bloggs" });
+    cleanup();
+    vi.mocked(api.profile).mockResolvedValue({ ...PROFILE, slug: "Al-ABCDEFGH", name: "Al Smith" });
+    renderAt("/therapist/Al-ABCDEFGH");
+    expect(await screen.findByRole("heading", { name: "Al Smith" })).toBeTruthy();
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 
   it("shows the accessibility statement as a page of its own, beneath the site's name", () => {

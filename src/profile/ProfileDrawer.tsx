@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { XIcon } from "lucide-react";
-import { useNavigate } from "react-router";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetClose, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { useTitle } from "@/lib/useTitle";
 import { ProfileBody, profileQuery } from "./ProfilePage";
+import { useCloseDrawer } from "./profileLink";
 
 /** On <html> while a drawer is in the page. */
 const PRINTS_ALONE = "data-print-alone-shown";
@@ -30,7 +30,7 @@ function markPage(drawer: HTMLElement | null) {
  * any other way closes it too, as `open` follows the history.
  */
 export function ProfileDrawer({ slug, open }: { slug: string; open: boolean }) {
-  const navigate = useNavigate();
+  const closeDrawer = useCloseDrawer();
   // The card or pin that opened it. The drawer has no trigger of its own, which is where the dialog would send focus back.
   const [opener] = useState(() => document.activeElement);
   // The drawer, and the page while it is open, take the therapist's name once their profile is in.
@@ -47,7 +47,7 @@ export function ProfileDrawer({ slug, open }: { slug: string; open: boolean }) {
   );
   return (
     // Once closed, it can still be dismissed as it slides away, which must not go back a second time.
-    <Sheet open={open} onOpenChange={(next) => !next && open && navigate(-1)}>
+    <Sheet open={open} onOpenChange={(next) => !next && open && closeDrawer()}>
       <SheetContent
         side="right"
         showCloseButton={false}
