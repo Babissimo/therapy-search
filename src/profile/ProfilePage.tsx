@@ -1,6 +1,6 @@
 import { Component, createRef, Fragment, lazy, useEffect, type ReactNode, type Ref } from "react";
 import { queryOptions, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, Diamond, ExternalLink, MapPin } from "lucide-react";
+import { Check, ExternalLink, Heart, MapPin } from "lucide-react";
 import type { Office, Profile, ProfileSection } from "@shared/types";
 import { BackButton } from "@/components/BackButton";
 import { FailedAlert, FailureStatus, useFailure } from "@/components/FailedAlert";
@@ -498,10 +498,13 @@ function Group({ heading, children }: { heading: ReactNode; children: ReactNode 
   );
 }
 
-/** Marks a special interest, beside its group's heading and among the matches. A diamond, since a star echoes UKCP's branding. */
+/**
+ * Marks a special interest, beside its group's heading and among the matches. A heart rather than a star, which reads as
+ * a rating and echoes UKCP's branding.
+ */
 function InterestMark(props: { "data-icon"?: string }) {
   // A badge sizes its icons to size-3, so the heading's matches it.
-  return <Diamond aria-hidden fill="currentColor" className="size-3 shrink-0" {...props} />;
+  return <Heart aria-hidden fill="currentColor" className="size-3 shrink-0" {...props} />;
 }
 
 /** Each tag above what the therapist wrote of it, then the tags they wrote nothing of on one line. */
