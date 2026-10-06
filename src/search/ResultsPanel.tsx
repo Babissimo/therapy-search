@@ -40,7 +40,8 @@ export function ResultsPanel({ open, onOpenChange, toggleRef, tabs, masthead, sc
         aria-expanded={open}
         aria-controls={id}
         onClick={() => onOpenChange(!open)}
-        className={cn("absolute top-3 left-4 z-10 pointer-coarse:px-2", !open && "shadow-md dark:bg-background dark:hover:bg-muted")}
+        // Under IconButton's own variant, so cn swaps its padding for this one rather than keeping both.
+        className={cn("absolute top-3 left-4 z-10 stacked:px-2", !open && "shadow-md dark:bg-background dark:hover:bg-muted")}
       >
         {open ? <PanelLeftClose aria-hidden /> : <PanelLeftOpen aria-hidden />}
       </IconButton>

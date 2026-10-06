@@ -215,19 +215,22 @@ describe("TherapistCard", () => {
     expect(screen.getByRole("button", { name: "Shortlist" }).parentElement?.className).toMatch(/\bz-10\b/);
   });
 
-  it("puts the action under the rest beside the photo on a touch screen, where it is named on screen, leaving the name the room", () => {
+  it("puts the action under the rest beside the photo on a touch screen or in a narrow card, leaving the name the room", () => {
     renderCard(therapist(), [], { action: <button type="button">Shortlist</button> });
     const action = screen.getByRole("button", { name: "Shortlist" }).parentElement!;
     const details = screen.getByRole("heading", { name: "Test Therapist 1" }).parentElement!.parentElement!;
-    expect(action.className).toContain("pointer-coarse:col-start-2 pointer-coarse:row-start-3");
-    expect(details.className).toContain("pointer-coarse:col-start-2 pointer-coarse:row-start-2");
+    expect(action.className).toContain("stacked:col-start-2 stacked:row-start-3");
+    expect(details.className).toContain("stacked:col-start-2 stacked:row-start-2");
     // Centred on the photo together, by the rows either side of them.
-    expect(action.parentElement?.className).toContain("pointer-coarse:grid-rows-[1fr_auto_auto_1fr]");
+    expect(action.parentElement?.className).toContain("stacked:grid-rows-[1fr_auto_auto_1fr]");
+    // Narrow by the card's own width, whatever the window's.
+    expect(action.parentElement?.parentElement?.className).toMatch(/(^|\s)@container\/therapist(\s|$)/);
+    expect(action.closest("[data-slot=card]")!.innerHTML).not.toContain("pointer-coarse:");
   });
 
   it("keeps a column beside the name only for an action, as an empty one would still take its gap from the name", () => {
     const grid = () => screen.getByRole("heading", { name: "Test Therapist 1" }).parentElement!.parentElement!.parentElement!;
-    // A mouse's columns, leaving out a touch screen's, which never have a third.
+    // The columns beside the name, leaving out the stacked ones, which never have a third.
     const columns = () => grid().className.match(/(?<!:)grid-cols-\S+/g);
     renderCard(therapist(), [], { action: <button type="button">Shortlist</button> });
     expect(columns()).toEqual(["grid-cols-[auto_minmax(0,1fr)_auto]"]);

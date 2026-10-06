@@ -23,6 +23,17 @@ describe("index.css", () => {
     );
   });
 
+  it("lays out as on a touch screen there, and in a card or a profile's header too narrow for an action beside the name", async () => {
+    const source = readFileSync(new URL("./index.css", import.meta.url), "utf8");
+    const block = source.match(/@custom-variant stacked \{\n[\s\S]*?\n\}\n/)?.[0];
+    if (!block) throw new Error("index.css has no stacked variant");
+    const compiler = await compile(`@tailwind utilities;\n${block}`);
+    const css = compiler.build(["stacked:hidden"]).replace(/\s+/g, " ");
+    expect(css).toContain("@media (pointer: coarse) { .stacked\\:hidden { display: none; } }");
+    expect(css).toContain("@container therapist (width < 16.5rem) { .stacked\\:hidden { display: none; } }");
+    expect(css).toContain("@container profile-header (width < 19rem) { .stacked\\:hidden { display: none; } }");
+  });
+
   it("keeps :has out of print's rules, which Firefox before 121 would drop whole, printing the page beneath a drawer", () => {
     // Comments aside, which may name it.
     const source = readFileSync(new URL("./index.css", import.meta.url), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");

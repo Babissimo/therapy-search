@@ -48,7 +48,7 @@ describe("StatusMenu", () => {
   it("shows the first word of its name on a touch screen, which has no tooltip to name it by", () => {
     renderMenu(shortlisted);
     const button = screen.getByRole("button", { name: "Status of Jo Bloggs: to contact" });
-    expect([...button.querySelectorAll(".pointer-coarse\\:not-sr-only")].map((span) => span.textContent)).toEqual(["Status"]);
+    expect([...button.querySelectorAll(".stacked\\:not-sr-only")].map((span) => span.textContent)).toEqual(["Status"]);
   });
 
   it("offers every status in order, then taking the therapist off the shortlist", () => {
@@ -95,7 +95,7 @@ describe("StatusMenu", () => {
   it("keeps its chevron after the word a touch screen shows, which is ordered last", () => {
     renderMenu(shortlisted);
     const trigger = screen.getByRole("button", { name: "Status of Jo Bloggs: to contact" });
-    const [word, chevron] = [trigger.querySelector(".pointer-coarse\\:order-last")!, trigger.querySelector("svg.lucide-chevron-down")!];
+    const [word, chevron] = [trigger.querySelector(".stacked\\:order-last")!, trigger.querySelector("svg.lucide-chevron-down")!];
     expect(word.textContent).toBe("Status");
     // Equal orders fall back to the order in the page, where the word comes first.
     expect(chevron.classList.contains("order-last")).toBe(true);

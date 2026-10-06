@@ -1373,7 +1373,7 @@ describe("SearchPage", () => {
     renderAt(`${SEARCH}&Languages=French`);
     const filters = await screen.findByRole("button", { name: "Filters, 1 ticked" });
     expect(filters.firstElementChild?.textContent).toBe("Filters");
-    expect(filters.firstElementChild?.className).toContain("pointer-coarse:not-sr-only");
+    expect(filters.firstElementChild?.className).toContain("stacked:not-sr-only");
   });
 
   it("counts the therapists the map can't place, whether their location is too vague or matches nothing", async () => {
