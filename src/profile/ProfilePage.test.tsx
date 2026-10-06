@@ -152,15 +152,28 @@ describe("ProfilePage's header", () => {
     expect(email.closest("header")).not.toBeNull();
   });
 
-  it("puts its bookmark on a line of its own under the header on a touch screen, where it is named on screen, leaving a drawer's close button beside the name", async () => {
+  it("puts its bookmark on a line of its own under the header on a touch screen or in a narrow header, leaving a drawer's close button beside the name", async () => {
     renderAt(["/therapist/Test-ABCDEFGH"], PROFILE, { close: <button type="button">Close</button> });
     const bookmark = (await screen.findByRole("button", { name: "Add Test Therapist to your shortlist" })).parentElement!;
     const close = screen.getByRole("button", { name: "Close" }).parentElement!;
-    // Side by side with a mouse; on a touch screen each joins the header's row, which wraps, the bookmark last.
+    // Side by side with a mouse in a wide header; otherwise each joins the header's row, which wraps, the bookmark last.
     expect(close.parentElement).toBe(bookmark.parentElement);
-    expect(close.parentElement?.classList.contains("pointer-coarse:contents")).toBe(true);
-    expect(close.parentElement?.parentElement?.classList.contains("pointer-coarse:flex-wrap")).toBe(true);
-    expect(["pointer-coarse:order-last", "pointer-coarse:basis-full"].map((c) => bookmark.classList.contains(c))).toEqual([true, true]);
+    expect(close.parentElement?.classList.contains("stacked:contents")).toBe(true);
+    expect(close.parentElement?.parentElement?.classList.contains("stacked:flex-wrap")).toBe(true);
+    expect(["stacked:order-last", "stacked:basis-full"].map((c) => bookmark.classList.contains(c))).toEqual([true, true]);
+    // Narrow by the header's own width, whatever the window's.
+    expect(close.parentElement?.parentElement?.parentElement?.classList.contains("@container/profile-header")).toBe(true);
+  });
+
+  it("sizes its photo, name and contacts by the profile's width, though its header is a container of its own, which draws a narrow header's photo smaller", async () => {
+    renderAt(["/therapist/Test-ABCDEFGH"], { ...PROFILE, email: "test@example.com" });
+    const heading = await screen.findByRole("heading", { name: "Test Therapist", level: 1 });
+    expect(heading.closest("article")?.classList.contains("@container/profile")).toBe(true);
+    expect(heading.className).toContain("@lg/profile:text-3xl");
+    // A header too narrow to keep the name wide beside the close button draws a smaller photo.
+    expect(heading.closest("header")!.querySelector(".\\@container")!.classList.contains("@max-[19rem]/profile-header:size-18")).toBe(true);
+    // An unnamed query answers to the nearest container, which in the header is the header's own.
+    expect(heading.closest("header")!.innerHTML).not.toMatch(/(^|[\s":])@(?!container)[^\s":/]*:/);
   });
 
   it("marks itself stuck once its scroller clips it at the top, for its photo to shrink", async () => {
