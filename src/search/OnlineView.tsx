@@ -1,5 +1,5 @@
 import { Tabs } from "radix-ui";
-import { useId, useLayoutEffect, useRef } from "react";
+import { useId, useLayoutEffect, useRef, type RefObject } from "react";
 import { useLocation } from "react-router";
 import { ONLINE_FILTER_GROUPS } from "@shared/filterGroups";
 import { narrowsOnline, onlineSearch } from "@shared/online";
@@ -14,7 +14,7 @@ import { FilterChips } from "./FilterChips";
 import { FilterPanel } from "./FilterPanel";
 import { FiltersSection, MobileFilters, UpdateResults } from "./Filters";
 import { ListColumn } from "./ListColumn";
-import { ListPanels, ListTabs, type ListTab } from "./ListTabs";
+import { ListPanels, ListTabs, useTabbed, type ListTab } from "./ListTabs";
 import { LoadMore } from "./LoadMore";
 import { ModeSwitch } from "./ModeSwitch";
 import { Prompt } from "./Prompt";
@@ -44,6 +44,8 @@ export function OnlineView({ params, onChange, wide }: Props) {
   // A new search replaces the history entry, so it begins on the results.
   const [tab, setTab] = useRememberedTab(entry);
   const shortlistOpen = tab === "shortlist";
+  const askRef = useRef<HTMLDivElement>(null);
+  const tabbed = useTabbed(searching, tab, () => askRef.current);
   // The shortlist keeps its place apart from the results', under a key of its own.
   const scroll = useRememberedScroll(shortlistOpen ? `${entry} shortlist` : entry, shortlistOpen || !searching || !results.loading);
   const listRef = useRef<HTMLUListElement>(null);
@@ -90,6 +92,7 @@ export function OnlineView({ params, onChange, wide }: Props) {
   const lists = (
     <ListPanels
       tab={tab}
+      tabbed={tabbed}
       shortlist={<LazyShortlistTab sought={soughtTerms(search)} online />}
       results={
         searching ? (
@@ -100,7 +103,7 @@ export function OnlineView({ params, onChange, wide }: Props) {
           </>
         ) : (
           <div className="space-y-8">
-            <OnlinePrompt wide={wide} />
+            <OnlinePrompt wide={wide} askRef={askRef} />
             {!wide && (
               <div id={filtersId} className="space-y-6">
                 <FilterPanel params={params} drafts={drafts} groups={ONLINE_FILTER_GROUPS} />
@@ -130,7 +133,7 @@ export function OnlineView({ params, onChange, wide }: Props) {
         <ResultsStatus params={search} results={results} online searching={searching} />
         <ListColumn
           wide={wide}
-          tabs={<ListTabs ref={tabsRef} />}
+          tabs={tabbed && <ListTabs ref={tabsRef} />}
           top={
             <>
               {toolbar}
@@ -163,9 +166,9 @@ export function OnlineView({ params, onChange, wide }: Props) {
 }
 
 /** In place of the results until a filter narrows the search. The filters sit to its right on wide screens, beneath it on a phone. */
-function OnlinePrompt({ wide }: { wide: boolean }) {
+function OnlinePrompt({ wide, askRef }: { wide: boolean; askRef: RefObject<HTMLDivElement | null> }) {
   return (
-    <Prompt ask="Start with what matters to you." className={wide ? "py-10 sm:py-16" : "pt-6"}>
+    <Prompt askRef={askRef} ask="Start with what matters to you." className={wide ? "py-10 sm:py-16" : "pt-6"}>
       Thousands of UKCP therapists work online or by phone. Choose a filter {wide ? "to the right" : "below"}, such as what they
       help with, how they work or the languages they speak, then show who fits. Type of session alone won't narrow them enough.
     </Prompt>

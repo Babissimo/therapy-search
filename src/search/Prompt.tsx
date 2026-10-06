@@ -18,7 +18,7 @@ type Props = {
 export function Prompt({ ask, children, askRef, className }: Props) {
   return (
     <div className={cn("space-y-4 text-center text-balance sm:space-y-6", className)}>
-      <div ref={askRef} tabIndex={askRef ? -1 : undefined} className="space-y-4 outline-none sm:space-y-6">
+      <div ref={askRef} tabIndex={askRef ? -1 : undefined} data-prompt-ask={askRef ? "" : undefined} className="space-y-4 outline-none sm:space-y-6">
         <p className="font-heading text-3xl font-medium sm:text-4xl">{ask}</p>
         <p className="text-lg text-muted-foreground sm:text-xl">{children}</p>
       </div>
