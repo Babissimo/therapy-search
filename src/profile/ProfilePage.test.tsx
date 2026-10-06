@@ -10,6 +10,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { api, ApiError } from "@/lib/api";
 import { listed } from "@/lib/listed.testing";
 import { useResults } from "@/search/useResults";
+import { usePreloadStatusTrack } from "@/shortlist/LazyStatusTrack";
 import { createShortlistStore, type ShortlistCard, type ShortlistStore } from "@/shortlist/store";
 import { ShortlistContext } from "@/shortlist/useShortlist";
 import { ProfileBody, ProfilePage } from "./ProfilePage";
@@ -28,6 +29,12 @@ vi.mock("./ProfileMap", async (importOriginal) => {
       return createElement(ProfileMap, props);
     },
   };
+});
+
+// The track as it is, its preload watched.
+vi.mock("@/shortlist/LazyStatusTrack", async (importOriginal) => {
+  const original = await importOriginal<typeof import("@/shortlist/LazyStatusTrack")>();
+  return { ...original, usePreloadStatusTrack: vi.fn(original.usePreloadStatusTrack) };
 });
 
 const PROFILE: Profile = { slug: "Test-ABCDEFGH", name: "Test Therapist", initials: "TT", languages: [], emailInContact: false, social: [], about: [], practical: [], offices: [] };
@@ -234,6 +241,13 @@ describe("ProfilePage's status track", () => {
   const THERAPIST: ShortlistCard = { slug: "Test-ABCDEFGH", name: "Test Therapist", initials: "TT", tags: [] };
   const track = () => screen.findByRole("list", { name: "Steps with Test Therapist" });
   const step = (steps: HTMLElement) => steps.querySelector("[aria-current=step]")?.textContent;
+
+  it("asks for the track's code as the profile opens, before the profile comes", () => {
+    vi.mocked(usePreloadStatusTrack).mockClear();
+    renderAt(["/therapist/Test-ABCDEFGH"]);
+    expect(screen.queryByRole("heading", { name: "Test Therapist" })).toBeNull();
+    expect(usePreloadStatusTrack).toHaveBeenCalled();
+  });
 
   it("follows the header, outside it, while the therapist is shortlisted", async () => {
     const store = createShortlistStore(null);
