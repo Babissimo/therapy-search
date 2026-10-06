@@ -19,7 +19,6 @@ export const KNOWN_PROBLEMS: ReactNode[] = [
     JavaScript turned off, can't run the full search. They're offered the <a className="underline" href="/plain">plain search</a>{" "}
     instead, which has no map, shortlist or notes.
   </>,
-  <>On a screen 320 pixels wide, or zoomed in to 400%, some words, such as therapists' names, break part-way through to fit narrow columns.</>,
 ];
 
 /**
@@ -122,7 +121,7 @@ export function AccessibilityStatement({ followed = false }: { followed?: boolea
           so it doesn't have to. We publish one anyway, so you know what works, what doesn't yet, and that we want to hear
           about problems.
         </p>
-        <p>This statement was prepared on 1 October 2026. It was last reviewed on 5 October 2026.</p>
+        <p>This statement was prepared on 1 October 2026. It was last reviewed on 6 October 2026.</p>
       </Section>
     </article>
   );
