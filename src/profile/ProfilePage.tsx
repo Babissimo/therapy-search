@@ -84,14 +84,13 @@ export function ProfileBody({ slug, back, close }: { slug: string } & Exits) {
         {said}
         <article aria-busy className={BODY}>
           <StickyHeader back={back} close={close}>
-            <div aria-hidden>
-              <Identity
-                photo={<Skeleton className="size-full rounded-md" />}
-                name={<SkeletonText className="w-56" />}
-                location={<SkeletonText className="w-16" />}
-                contacts={<ContactListSkeleton />}
-              />
-            </div>
+            <Identity
+              placeholder
+              photo={<Skeleton className="size-full rounded-md" />}
+              name={<SkeletonText className="w-56 max-w-full" />}
+              location={<SkeletonText className="w-16" />}
+              contacts={<ContactListSkeleton />}
+            />
           </StickyHeader>
           <SectionsSkeleton />
         </article>
@@ -244,44 +243,61 @@ function SectionSkeleton({ lines = 0, tags = 0 }: { lines?: number; tags?: numbe
   );
 }
 
-type IdentityProps = { photo: ReactNode; name: ReactNode; location?: ReactNode; contacts: ReactNode; headingRef?: Ref<HTMLHeadingElement> };
+type IdentityProps = {
+  photo: ReactNode;
+  name: ReactNode;
+  location?: ReactNode;
+  contacts: ReactNode;
+  headingRef?: Ref<HTMLHeadingElement>;
+  /** Stands in for a profile still loading, hidden from screen readers. */
+  placeholder?: boolean;
+};
 
-/** Who the therapist is and how to reach them, laid out for the header of the profile and of its skeleton. */
-function Identity({ photo, name, location, contacts, headingRef }: IdentityProps) {
+/**
+ * Who the therapist is and how to reach them, as items of StickyHeader's grid, for the header of the profile and of its
+ * skeleton. The contact details go under the name where the profile is wide, and on a line of their own under the photo
+ * where it is narrow, taking the header's whole width rather than the little the photo leaves beside it.
+ */
+function Identity({ photo, name, location, contacts, headingRef, placeholder }: IdentityProps) {
   return (
-    <div className="flex items-start gap-4">
+    <>
       {/* Large for a first look, as far as UKCP's 200 px photos allow, smaller in a header too narrow to leave the name room (below
           19rem, the width at which `stacked` lays the header out as on a touch screen), then no taller than the text beside it once
           the header sticks, shrinking by no more than BODY's foot. A container, which the initials size to. */}
       <div
+        aria-hidden={placeholder}
         className={cn(
-          "@container size-24 shrink-0 @max-[19rem]/profile-header:size-18 @lg/profile:size-32 not-print:group-data-stuck/header:size-14",
-          "@lg/profile:not-print:group-data-stuck/header:size-20",
+          "@container col-1 row-1 size-24 @max-[19rem]/profile-header:size-18 @lg/profile:row-[1/span_2] @lg/profile:size-32",
+          "not-print:group-data-stuck/header:size-12 @lg/profile:not-print:group-data-stuck/header:size-20",
           "motion-safe:transition-[width,height] motion-safe:duration-200",
         )}
       >
         {photo}
       </div>
-      <div className="min-w-0 space-y-1.5">
-        <div>
-          {/* Focused only by the page, when what held the keyboard goes. */}
-          <h1
-            ref={headingRef}
-            tabIndex={-1}
-            translate="no"
-            className="rounded-sm font-heading text-2xl leading-tight font-medium outline-none focus-visible:ring-3 focus-visible:ring-ring/50 @lg/profile:text-3xl"
-          >
-            {name}
-          </h1>
-          {location && (
-            <p translate="no" className="text-sm text-muted-foreground">
-              {location}
-            </p>
-          )}
-        </div>
+      <div aria-hidden={placeholder} className="col-2 row-1 min-w-0">
+        {/* Focused only by the page, when what held the keyboard goes. */}
+        <h1
+          ref={headingRef}
+          tabIndex={-1}
+          translate="no"
+          className="rounded-sm font-heading text-2xl leading-tight font-medium outline-none focus-visible:ring-3 focus-visible:ring-ring/50 @lg/profile:text-3xl"
+        >
+          {name}
+        </h1>
+        {location && (
+          <p translate="no" className="text-sm text-muted-foreground">
+            {location}
+          </p>
+        )}
+      </div>
+      {/* On a touch screen, far enough above the bookmark, which follows all but a placeholder, that the links' targets miss its own. */}
+      <div
+        aria-hidden={placeholder}
+        className={cn("col-[1/-1] row-2 mt-3 min-w-0 space-y-1.5 @lg/profile:col-2 @lg/profile:mt-1.5", !placeholder && "pointer-coarse:mb-3")}
+      >
         {contacts}
       </div>
-    </div>
+    </>
   );
 }
 
@@ -377,6 +393,12 @@ function scrollerOf(element: Element): Element | null {
 /** Who the profile is and how to reach them, kept in view as the visitor reads on where the screen has room. */
 function StickyHeader({ back, close, bookmark, children }: Exits & { bookmark?: ReactNode; children?: ReactNode }) {
   const [ref, stuck] = useStuck();
+  // Columns for the photo, the name and any buttons (see Identity). Stacked, the bookmark leaves its column for a line of its own.
+  const columns = close
+    ? "grid-cols-[auto_minmax(0,1fr)_auto]"
+    : bookmark
+      ? "grid-cols-[auto_minmax(0,1fr)_auto] stacked:grid-cols-[auto_minmax(0,1fr)]"
+      : "grid-cols-[auto_minmax(0,1fr)]";
   return (
     // A drawer is drawn in the popover colour, which the header matches so text scrolling beneath it stays hidden. The
     // background reaches a little past the content either side, over the rings that cards and focused controls draw
@@ -390,15 +412,15 @@ function StickyHeader({ back, close, bookmark, children }: Exits & { bookmark?: 
     >
       <div className="@container/profile-header space-y-2 border-b py-3">
         {back}
-        <div className="flex items-start justify-between gap-4 stacked:flex-wrap stacked:gap-y-2">
-          <div className="min-w-0 flex-1">{children}</div>
+        <div className={cn("grid items-start gap-x-4 @lg/profile:grid-rows-[auto_1fr]", columns)}>
+          {children}
           {/* Pulls the last icon out to the content's right edge, past the ghost button's padding. On a touch screen, where the
               bookmark is named on screen, and in a header too narrow to keep it beside the name, it takes a line of its own
               under the rest, its icon in line with the photo's edge, leaving the drawer's buttons beside the name. */}
           {(bookmark || close) && (
-            <div className="-mr-2 flex shrink-0 stacked:contents">
-              {bookmark && <div className="flex stacked:order-last stacked:-ml-2.5 stacked:basis-full">{bookmark}</div>}
-              {close && <div className="flex stacked:-mr-2">{close}</div>}
+            <div className="col-3 row-1 -mr-2 flex stacked:contents">
+              {bookmark && <div className="flex stacked:col-[1/-1] stacked:row-3 stacked:mt-2 stacked:-ml-2.5">{bookmark}</div>}
+              {close && <div className="flex stacked:col-3 stacked:row-1 stacked:-mr-2">{close}</div>}
             </div>
           )}
         </div>
