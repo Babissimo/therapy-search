@@ -62,7 +62,8 @@ export function StatusTrack({ therapist, status, listed = true, onChosen, onRemo
   }
 
   return (
-    <div ref={root} className="space-y-1.5">
+    // A container for the status menu, which names itself on a touch screen only where the row has the room.
+    <div ref={root} className="@container/status-track space-y-1.5">
       {/* The role is explicit because Safari drops a list's role, and with it its name, once Tailwind's preflight removes its markers.
           Its dots keep their fill on paper, which a printer would otherwise leave out. */}
       <ol role="list" aria-label={`Steps with ${therapist.name}`} className="flex items-center px-1 print:[print-color-adjust:exact]">

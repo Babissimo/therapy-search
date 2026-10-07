@@ -43,8 +43,10 @@ export function StatusMenu({ therapist, onChosen, onRemoved }: Props) {
             its chevron saying it opens a menu. */}
         <IconButton
           label={`Status of ${therapist.name}: ${STATUS_LABEL[status].toLowerCase()}`}
-          // Beside the status it changes, which the track spells out.
+          // Beside the status it changes, which the track spells out. Only the icon where the track is too narrow for the word and
+          // the next step's button side by side (15rem with "Consultation booked", the longest), which would otherwise stack.
           touchLabel="Status"
+          className="@max-[15.5rem]/status-track:*:data-touch-label:sr-only"
           variant="outline"
           size="sm"
           data-status-menu={therapist.slug}
