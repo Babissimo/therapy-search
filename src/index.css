@@ -104,6 +104,8 @@
     /* The edge of a box to type in or tick, at 3:1 against the page and cards, so an empty one can be found. */
     --control: oklch(0.64 0.02 187.4);
     --ring: oklch(0.606 0.05 187.2);
+    /* The shade just inside a recess's edges. */
+    --recess: oklch(0.277 0.018 196.2 / 0.2);
     --chart-1: oklch(0.87 0 0);
     --chart-2: oklch(0.556 0 0);
     --chart-3: oklch(0.439 0 0);
@@ -144,6 +146,8 @@
         --input: oklch(1 0 0 / 15%);
         --control: oklch(0.56 0.02 187.4);
         --ring: oklch(0.653 0.048 187.3);
+        /* Near black, as anything fainter vanishes against the dark page. */
+        --recess: oklch(0.1 0.01 196 / 0.95);
         --chart-1: oklch(0.87 0 0);
         --chart-2: oklch(0.556 0 0);
         --chart-3: oklch(0.439 0 0);
@@ -163,6 +167,16 @@
 /* A label naming a group of things, in small spaced capitals. */
 @utility eyebrow {
   @apply text-xs font-semibold tracking-[0.12em] uppercase;
+}
+
+/* Sunk below what is around it, shaded just inside its top and bottom edges, so an open section stands apart from the
+   headings above and below it. */
+@utility recessed {
+  box-shadow: inset 0 7px 6px -6px var(--recess), inset 0 -7px 6px -6px var(--recess);
+  /* Forced colours drop the shade, so a rule marks the top, where nothing else does. */
+  @media (forced-colors: active) {
+    border-top: 1px solid CanvasText;
+  }
 }
 
 /* On a touch screen, a target at least 44px square, as GOV.UK, NHS.UK and Apple ask, centred on a smaller control, which
