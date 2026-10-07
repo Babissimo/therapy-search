@@ -172,13 +172,33 @@ describe("ProfilePage's header", () => {
     renderAt(["/therapist/Test-ABCDEFGH"], PROFILE, { close: <button type="button">Close</button> });
     const bookmark = (await screen.findByRole("button", { name: "Add Test Therapist to your shortlist" })).parentElement!;
     const close = screen.getByRole("button", { name: "Close" }).parentElement!;
-    // Side by side with a mouse in a wide header; otherwise each joins the header's row, which wraps, the bookmark last.
+    // Side by side with a mouse in a wide header; otherwise each takes a place of its own in the header's grid, the bookmark
+    // across the whole of a row below the rest.
     expect(close.parentElement).toBe(bookmark.parentElement);
     expect(close.parentElement?.classList.contains("stacked:contents")).toBe(true);
-    expect(close.parentElement?.parentElement?.classList.contains("stacked:flex-wrap")).toBe(true);
-    expect(["stacked:order-last", "stacked:basis-full"].map((c) => bookmark.classList.contains(c))).toEqual([true, true]);
+    expect(close.parentElement?.parentElement?.classList.contains("grid")).toBe(true);
+    expect(["stacked:col-[1/-1]", "stacked:row-3"].map((c) => bookmark.classList.contains(c))).toEqual([true, true]);
+    expect(["stacked:col-3", "stacked:row-1"].map((c) => close.classList.contains(c))).toEqual([true, true]);
     // Narrow by the header's own width, whatever the window's.
     expect(close.parentElement?.parentElement?.parentElement?.classList.contains("@container/profile-header")).toBe(true);
+  });
+
+  it("keeps no column for a page's bookmark once it takes a line of its own, leaving the name the room", async () => {
+    renderAt(["/therapist/Test-ABCDEFGH"]);
+    const bookmark = (await screen.findByRole("button", { name: "Add Test Therapist to your shortlist" })).parentElement!;
+    const grid = bookmark.parentElement!.parentElement!;
+    expect(grid.className).toContain("grid-cols-[auto_minmax(0,1fr)_auto] stacked:grid-cols-[auto_minmax(0,1fr)]");
+  });
+
+  it("gives a narrow profile's contact details a line of their own under the photo, and a wide one's a place under the name", async () => {
+    renderAt(["/therapist/Test-ABCDEFGH"], { ...PROFILE, email: "test@example.com" }, { close: <button type="button">Close</button> });
+    const email = await screen.findByRole("link", { name: "Email: test@example.com" });
+    const contacts = email.closest(".row-2")!;
+    const photo = contacts.parentElement!.querySelector(":scope > .\\@container")!;
+    // Across every column, under the drawer's buttons too, until the profile is wide enough to keep them beside the photo.
+    expect(["col-[1/-1]", "@lg/profile:col-2"].map((c) => contacts.classList.contains(c))).toEqual([true, true]);
+    expect(["row-1", "@lg/profile:row-[1/span_2]"].map((c) => photo.classList.contains(c))).toEqual([true, true]);
+    expect(contacts.parentElement?.classList.contains("@lg/profile:grid-rows-[auto_1fr]")).toBe(true);
   });
 
   it("sizes its photo, name and contacts by the profile's width, though its header is a container of its own, which draws a narrow header's photo smaller", async () => {
