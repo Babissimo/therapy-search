@@ -19,7 +19,7 @@ import { useStuck } from "@/lib/useStuck";
 import { useTitle } from "@/lib/useTitle";
 import { cn } from "@/lib/utils";
 import { cachedCard } from "@/search/useResults";
-import { LazyStatusTrack } from "@/shortlist/LazyStatusTrack";
+import { LazyStatusTrack, usePreloadStatusTrack } from "@/shortlist/LazyStatusTrack";
 import { ShortlistButton } from "@/shortlist/ShortlistButton";
 import type { ShortlistCard } from "@/shortlist/store";
 import { ContactList, ContactListSkeleton } from "./ContactList";
@@ -59,6 +59,7 @@ export function ProfileBody({ slug, back, close }: { slug: string } & Exits) {
   const isMatch = useSearchMatch();
   const card = useOpeningCard(slug);
   const standing = useStanding(slug);
+  usePreloadStatusTrack();
   // Says each failure, and how its retry goes, once, for the alert, which keeps quiet. First in every return, so it stays in
   // place from one to the next and is heard.
   const said = <FailureStatus failure={failure} />;

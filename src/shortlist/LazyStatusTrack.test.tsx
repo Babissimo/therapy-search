@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen } from "@testing-library/react";
+import { render, renderHook, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { LazyStatusTrack } from "./LazyStatusTrack";
@@ -28,6 +28,8 @@ afterEach(() => {
 
 describe("LazyStatusTrack", () => {
   it("draws nothing until its chunk is here, then the track", async () => {
+    // The chunk's first import outlasts a findBy's one-second wait under load; a lazy track still draws empty before it.
+    await import("./StatusTrack");
     const { container } = renderTrack(LazyStatusTrack);
     expect(container.textContent).toBe("");
     expect(await screen.findByRole("list", { name: "Steps with Jo Bloggs" })).toBeTruthy();
@@ -40,5 +42,19 @@ describe("LazyStatusTrack", () => {
     const { LazyStatusTrack: Failing } = await import("./LazyStatusTrack");
     renderTrack(Failing);
     expect(await screen.findByText(/^Where you stand with Jo Bloggs couldn't be shown just now/)).toBeTruthy();
+  });
+});
+
+describe("usePreloadStatusTrack", () => {
+  it("asks for the track's chunk as the profile opens", async () => {
+    const asked = vi.fn();
+    vi.doMock("./StatusTrack", async (importOriginal) => {
+      asked();
+      return importOriginal();
+    });
+    vi.resetModules();
+    const { usePreloadStatusTrack } = await import("./LazyStatusTrack");
+    renderHook(usePreloadStatusTrack);
+    await vi.waitFor(() => expect(asked).toHaveBeenCalledOnce());
   });
 });

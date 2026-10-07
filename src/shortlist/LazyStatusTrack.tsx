@@ -1,9 +1,10 @@
-import { lazy, Suspense, type ComponentProps } from "react";
+import { Suspense, useEffect, type ComponentProps } from "react";
 import { LoadFailed } from "@/components/LoadFailed";
+import { lazyChunk } from "@/lib/lazyChunk";
 import type { StatusTrack } from "./StatusTrack";
 
 /** The track, its menu and Radix's dropdown, in a chunk the shortlist's tab imports too, so the tab's preload fetches it. */
-const Track = lazy(() => import("./StatusTrack").then((module) => ({ default: module.StatusTrack })));
+const { Component: Track, load: loadStatusTrack } = lazyChunk(() => import("./StatusTrack").then((module) => module.StatusTrack));
 
 /** The status track, drawn once its chunk is here, for a page in the main chunk. */
 export function LazyStatusTrack(props: ComponentProps<typeof StatusTrack>) {
@@ -19,4 +20,11 @@ export function LazyStatusTrack(props: ComponentProps<typeof StatusTrack>) {
       </Suspense>
     </LoadFailed>
   );
+}
+
+/** Fetches the track's chunk as a profile opens, alongside the profile itself, so the track is drawn with it. */
+export function usePreloadStatusTrack(): void {
+  useEffect(() => {
+    void loadStatusTrack().catch(() => {});
+  }, []);
 }
