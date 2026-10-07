@@ -157,17 +157,18 @@ function CardLayout({ heading: Heading = "h2", photo, name, printed, place, meet
   return (
     // Isolated, so the parts raised over the card's link rise no further than the card, and a list's sticky bar stays above them.
     <Card className={cn("relative isolate", className)} {...card}>
-      <CardContent className="space-y-3">
-        {/* On a touch screen the action, named on screen there, goes under the rest beside the photo, the two centred on it
-            together by the rows either side. A card without one has no third column, which would take its gap all the same. */}
+      <CardContent className="@container/therapist space-y-3">
+        {/* On a touch screen, where the action is named on screen, and in a card too narrow to keep it beside the name, the
+            action goes under the rest beside the photo, the two centred on it together by the rows either side. A card
+            without one has no third column, which would take its gap all the same. */}
         <div
           className={cn(
-            "grid items-center gap-x-4 pointer-coarse:grid-rows-[1fr_auto_auto_1fr]",
-            action ? "grid-cols-[auto_minmax(0,1fr)_auto] pointer-coarse:grid-cols-[auto_minmax(0,1fr)]" : "grid-cols-[auto_minmax(0,1fr)]",
+            "grid items-center gap-x-4 stacked:grid-rows-[1fr_auto_auto_1fr]",
+            action ? "grid-cols-[auto_minmax(0,1fr)_auto] stacked:grid-cols-[auto_minmax(0,1fr)]" : "grid-cols-[auto_minmax(0,1fr)]",
           )}
         >
-          <div className={cn("size-24 transition-[opacity,filter] pointer-coarse:row-span-4", faded && "opacity-60 grayscale")}>{photo}</div>
-          <div className="min-w-0 space-y-1.5 pointer-coarse:col-start-2 pointer-coarse:row-start-2">
+          <div className={cn("size-24 transition-[opacity,filter] stacked:row-span-4", faded && "opacity-60 grayscale")}>{photo}</div>
+          <div className="min-w-0 space-y-1.5 stacked:col-start-2 stacked:row-start-2">
             {/* Boxed with the name, as hidden on screen it would still count among space-y's children. */}
             <div>
               <Heading className="font-heading text-lg leading-snug font-medium">{name}</Heading>
@@ -185,7 +186,7 @@ function CardLayout({ heading: Heading = "h2", photo, name, printed, place, meet
           {/* Raised above the stretched link, which would otherwise take its clicks. Under the rest, it reaches as far left as
               the ghost button's padding, so its icon lines up with the name. */}
           {action && (
-            <div className="relative z-10 -mt-1 -mr-1 self-start pointer-coarse:col-start-2 pointer-coarse:row-start-3 pointer-coarse:mt-2 pointer-coarse:mr-0 pointer-coarse:-ml-2.5">
+            <div className="relative z-10 -mt-1 -mr-1 self-start stacked:col-start-2 stacked:row-start-3 stacked:mt-2 stacked:mr-0 stacked:-ml-2.5">
               {action}
             </div>
           )}

@@ -38,7 +38,7 @@ describe("ShortlistButton", () => {
     renderButton();
     // The words a touch screen shows, which a tooltip names elsewhere.
     const shown = (name: string) =>
-      [...screen.getByRole("button", { name }).querySelectorAll(".pointer-coarse\\:not-sr-only")].map((span) => span.textContent);
+      [...screen.getByRole("button", { name }).querySelectorAll(".stacked\\:not-sr-only")].map((span) => span.textContent);
     expect(shown("Add Jo Bloggs to your shortlist")).toEqual(["Add"]);
     fireEvent.click(screen.getByRole("button", { name: "Add Jo Bloggs to your shortlist" }));
     expect(shown("Remove Jo Bloggs from your shortlist")).toEqual(["Remove"]);

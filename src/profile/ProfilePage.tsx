@@ -177,7 +177,7 @@ export function ProfileBody({ slug, back, close }: { slug: string } & Exits) {
 
 // Lest a sticking header's shrink take back the scroll that stuck it: no scroll anchors, and a foot as tall as its largest
 // shrink. Paper, with nothing to scroll, has no foot, which could end it on a blank page.
-const BODY = "@container space-y-8 [overflow-anchor:none] not-print:has-data-stuck:pb-12";
+const BODY = "@container/profile space-y-8 [overflow-anchor:none] not-print:has-data-stuck:pb-12";
 
 /** A profile still loading, laid out as most are: long sections beside short ones. */
 function ProfileSkeleton({ back, close }: Exits) {
@@ -244,11 +244,13 @@ type IdentityProps = { photo: ReactNode; name: ReactNode; location?: ReactNode; 
 function Identity({ photo, name, location, contacts, headingRef }: IdentityProps) {
   return (
     <div className="flex items-start gap-4">
-      {/* Large for a first look, as far as UKCP's 200 px photos allow, then no taller than the text beside it once the header
-          sticks, shrinking by no more than BODY's foot. A container, which the initials size to. */}
+      {/* Large for a first look, as far as UKCP's 200 px photos allow, smaller in a header too narrow to leave the name room (below
+          19rem, the width at which `stacked` lays the header out as on a touch screen), then no taller than the text beside it once
+          the header sticks, shrinking by no more than BODY's foot. A container, which the initials size to. */}
       <div
         className={cn(
-          "@container size-24 shrink-0 @lg:size-32 not-print:group-data-stuck/header:size-14 @lg:not-print:group-data-stuck/header:size-20",
+          "@container size-24 shrink-0 @max-[19rem]/profile-header:size-18 @lg/profile:size-32 not-print:group-data-stuck/header:size-14",
+          "@lg/profile:not-print:group-data-stuck/header:size-20",
           "motion-safe:transition-[width,height] motion-safe:duration-200",
         )}
       >
@@ -261,7 +263,7 @@ function Identity({ photo, name, location, contacts, headingRef }: IdentityProps
             ref={headingRef}
             tabIndex={-1}
             translate="no"
-            className="rounded-sm font-heading text-2xl leading-tight font-medium outline-none focus-visible:ring-3 focus-visible:ring-ring/50 @lg:text-3xl"
+            className="rounded-sm font-heading text-2xl leading-tight font-medium outline-none focus-visible:ring-3 focus-visible:ring-ring/50 @lg/profile:text-3xl"
           >
             {name}
           </h1>
@@ -379,17 +381,17 @@ function StickyHeader({ back, close, bookmark, children }: Exits & { bookmark?: 
       data-stuck={stuck || undefined}
       className="group/header sticky -top-px z-10 -mx-1 bg-background px-1 in-data-[slot=sheet-content]:bg-popover print:static"
     >
-      <div className="space-y-2 border-b py-3">
+      <div className="@container/profile-header space-y-2 border-b py-3">
         {back}
-        <div className="flex items-start justify-between gap-4 pointer-coarse:flex-wrap pointer-coarse:gap-y-2">
+        <div className="flex items-start justify-between gap-4 stacked:flex-wrap stacked:gap-y-2">
           <div className="min-w-0 flex-1">{children}</div>
           {/* Pulls the last icon out to the content's right edge, past the ghost button's padding. On a touch screen, where the
-              bookmark is named on screen, it takes a line of its own under the rest, its icon in line with the photo's edge,
-              leaving the drawer's buttons beside the name. */}
+              bookmark is named on screen, and in a header too narrow to keep it beside the name, it takes a line of its own
+              under the rest, its icon in line with the photo's edge, leaving the drawer's buttons beside the name. */}
           {(bookmark || close) && (
-            <div className="-mr-2 flex shrink-0 pointer-coarse:contents">
-              {bookmark && <div className="flex pointer-coarse:order-last pointer-coarse:-ml-2.5 pointer-coarse:basis-full">{bookmark}</div>}
-              {close && <div className="flex pointer-coarse:-mr-2">{close}</div>}
+            <div className="-mr-2 flex shrink-0 stacked:contents">
+              {bookmark && <div className="flex stacked:order-last stacked:-ml-2.5 stacked:basis-full">{bookmark}</div>}
+              {close && <div className="flex stacked:-mr-2">{close}</div>}
             </div>
           )}
         </div>

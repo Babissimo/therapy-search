@@ -40,7 +40,7 @@ describe("ResultsPanel", () => {
 
   it("names its toggle on a touch screen, by its first word beside the masthead, which makes room for it, and whole over the map", () => {
     render(<Harness />);
-    const shown = () => [...screen.getByRole("button", { name: /list$/ }).querySelectorAll(".pointer-coarse\\:not-sr-only")].map((span) => span.textContent);
+    const shown = () => [...screen.getByRole("button", { name: /list$/ }).querySelectorAll(".stacked\\:not-sr-only")].map((span) => span.textContent);
     expect(shown()).toEqual(["Hide"]);
     expect(screen.getByText("The masthead").parentElement?.className).toContain("pointer-coarse:pl-24");
     fireEvent.click(screen.getByRole("button", { name: "Hide list" }));

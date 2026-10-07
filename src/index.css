@@ -13,6 +13,20 @@
   }
 }
 
+/* Laid out as on a touch screen: there, and in a card or a profile's header too narrow to keep its action beside the name
+   (the containers named in TherapistCard and ProfilePage). */
+@custom-variant stacked {
+  @media (pointer: coarse) {
+    @slot;
+  }
+  @container therapist (width < 16.5rem) {
+    @slot;
+  }
+  @container profile-header (width < 19rem) {
+    @slot;
+  }
+}
+
 @theme inline {
     /* Names and headlines in a serif; everything else in a sans drawn for legibility. */
     --font-heading: 'Newsreader Variable', serif;

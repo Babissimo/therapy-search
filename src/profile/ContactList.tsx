@@ -65,7 +65,7 @@ export function ContactList({ profile, onReach }: Props) {
       <FailureStatus failure={failure} />
       <ContactRow>
         {items.map((item, i) => (
-          <li key={item.href} className="shrink-0 @lg:max-w-full @lg:min-w-0 @lg:shrink print:max-w-full print:min-w-0 print:shrink">
+          <li key={item.href} className="shrink-0 @lg/profile:max-w-full @lg/profile:min-w-0 @lg/profile:shrink print:max-w-full print:min-w-0 print:shrink">
             <a
               ref={i === 0 ? failure.landing : undefined}
               href={item.href}
@@ -148,7 +148,7 @@ function ContactRow({ children }: { children: ReactNode }) {
     <ul
       className={cn(
         "flex gap-x-4 gap-y-1 overflow-x-auto text-sm whitespace-nowrap [scrollbar-width:none] pointer-coarse:-my-3 pointer-coarse:gap-y-6 pointer-coarse:py-3",
-        "@lg:flex-wrap @lg:overflow-visible print:flex-wrap print:overflow-visible print:whitespace-normal",
+        "@lg/profile:flex-wrap @lg/profile:overflow-visible print:flex-wrap print:overflow-visible print:whitespace-normal",
       )}
     >
       {children}

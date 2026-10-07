@@ -140,7 +140,7 @@ describe("SearchBox", () => {
     const button = screen.getByRole("button", { name: "Use my location" });
     // In the flow beneath the box, and still positioned, so nothing placed against it lands on the box.
     expect(button.className).toContain("pointer-coarse:relative pointer-coarse:inset-auto");
-    expect(button.firstElementChild?.className).toContain("pointer-coarse:not-sr-only");
+    expect(button.firstElementChild?.className).toContain("stacked:not-sr-only");
     expect(location().className).toContain("pointer-coarse:pr-2.5");
   });
 

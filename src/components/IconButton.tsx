@@ -7,8 +7,9 @@ type Props = ComponentProps<typeof Button> & {
   label: string;
   side?: ComponentProps<typeof TooltipContent>["side"];
   /**
-   * Shows the label after the icon on touch screens, which have no tooltip to name it by, for those who say what they tap;
-   * or, given words, only those, which must start the label, so what is said still names the button.
+   * Shows the label after the icon on a touch screen, which has no tooltip to name it by, for those who say what they tap,
+   * and wherever the button is laid out as there (`stacked`); or, given words, only those, which must start the label, so
+   * what is said still names the button.
    */
   touchLabel?: boolean | string;
 };
@@ -26,13 +27,13 @@ export function IconButton({ label, side = "bottom", size = "icon", touchLabel =
         <Button
           type="button"
           size={size}
-          className={cn(shown && "pointer-coarse:w-auto pointer-coarse:gap-1.5 pointer-coarse:px-2.5", className)}
+          className={cn(shown && "stacked:w-auto stacked:gap-1.5 stacked:px-2.5", className)}
           {...props}
         >
           {/* First in the name and last on screen, after the icon. */}
           {shown ? (
             <>
-              <span className="sr-only pointer-coarse:not-sr-only pointer-coarse:order-last pointer-coarse:whitespace-nowrap">{shown}</span>
+              <span className="sr-only stacked:not-sr-only stacked:order-last stacked:whitespace-nowrap">{shown}</span>
               {/* Parted from them by a space of the button's own, as each part of a name is read trimmed; a flex box draws it as
                   nothing. */}
               {rest && (
@@ -48,6 +49,7 @@ export function IconButton({ label, side = "bottom", size = "icon", touchLabel =
           {children}
         </Button>
       </TooltipTrigger>
+      {/* Drawn outside any card or header, so only the pointer can hide it; with a mouse it stays, naming the button in full. */}
       <TooltipContent side={side} className={cn(shown && "pointer-coarse:hidden")}>
         {label}
       </TooltipContent>
