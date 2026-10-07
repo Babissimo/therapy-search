@@ -26,7 +26,7 @@ Out of scope for v1:
   - Send upstream only what a visitor's action on UKCP would send, with three exceptions: a search asks for 480 results at once where UKCP's page asks for 12, with its nearest 48 beside them when it has a location, or for every result when it has none (map spec §4.4); an opened profile asks for its contact details where UKCP's page waits for a click (§3.4); and a result card asks for its therapist's profile to read the postcode and fee of the office it names, pinning the map there and showing the fee on the card (map spec §3.4). That makes one search POST per uncached batch of results, and one more for an uncached location search's nearest 48, one profile GET and one contact POST per opened profile, and at most one profile GET a month for each therapist and office a card shows, or a week where the profile gives neither postcode nor fee there. Never prefetch or crawl.
   - Identify ourselves in the `User-Agent` with a link to the site, so UKCP can see and contact us.
   - Cap uncached upstream requests per visitor IP (§4.3).
-- **Clearly unofficial.** The site's name opens the about text, which says the site is not affiliated with UKCP, and every profile has a "View on UKCP" link.
+- **Clearly unofficial.** A link beside the site's name opens the about text, which says the site is not affiliated with UKCP, and every profile has a "View on UKCP" link.
 - **No health data at rest.** Search terms such as "Trauma" are special-category data under UK GDPR. The Worker logs no query strings or bodies, and cache keys never include the visitor's IP. Cloudflare's request analytics keep every request's URL beside the visitor's IP, so the API takes what a visitor asks in request bodies (§4.2), and the page keeps its route and search after the `#` of its address, which browsers never send. A link with them before the `#` still opens, and has them moved after it as the page loads.
 
 ## 3. The UKCP interface
@@ -156,7 +156,7 @@ Printed, a profile comes out alone and whole, from its page or from the drawer, 
 | Loading | `Skeleton` cards |
 | Profile sections | Headed sections with a `Separator` between each; offices as `Card`s |
 | Contact details | A header that stays in view, listing each way to reach the therapist by an icon |
-| Unofficial notice | The about text, shown from the site's name |
+| Unofficial notice | The about text, in a drawer opened from beside the site's name |
 
 ### 4.2 Worker API
 

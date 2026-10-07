@@ -47,7 +47,9 @@ export function RouteDrawer({ open, label, className, children, ...props }: Prop
         aria-describedby={undefined}
         onCloseAutoFocus={(event) => {
           event.preventDefault();
-          if (opener instanceof HTMLElement) opener.focus();
+          // Unless the page beneath took the keyboard as the drawer slid away, as a page a link in it led to does.
+          const now = document.activeElement;
+          if ((now === null || now === document.body) && opener instanceof HTMLElement) opener.focus();
         }}
         // Printed, what it holds is the whole of what comes out, at its full length (see index.css).
         data-print-alone

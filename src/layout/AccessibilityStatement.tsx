@@ -3,6 +3,7 @@ import { UKCP_ORIGIN } from "@shared/query";
 import { BackButton } from "@/components/BackButton";
 import { useTitle } from "@/lib/useTitle";
 import { REPORT_URL } from "@/site";
+import { LIST, Section } from "./Document";
 
 /** When the site was last tested. */
 const TESTED_ON = "1 October 2026";
@@ -28,7 +29,7 @@ export const KNOWN_PROBLEMS: ReactNode[] = [
 export function AccessibilityStatement({ followed = false }: { followed?: boolean }) {
   useTitle("Accessibility statement");
   const heading = useRef<HTMLHeadingElement>(null);
-  // The About card's link leaves with the card, and the keyboard with it, so it starts again at the heading, at the top.
+  // About's link leaves with its drawer, and the keyboard with it, so it starts again at the heading, at the top.
   useEffect(() => {
     if (!followed) return;
     window.scrollTo({ top: 0 });
@@ -124,16 +125,5 @@ export function AccessibilityStatement({ followed = false }: { followed?: boolea
         <p>This statement was prepared on 1 October 2026. It was last reviewed on 6 October 2026.</p>
       </Section>
     </article>
-  );
-}
-
-const LIST = "list-disc space-y-1.5 pl-5";
-
-function Section({ heading, children }: { heading: string; children: ReactNode }) {
-  return (
-    <section className="space-y-4">
-      <h2 className="font-heading text-xl font-medium">{heading}</h2>
-      {children}
-    </section>
   );
 }

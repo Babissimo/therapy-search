@@ -273,23 +273,85 @@ describe("AppRoutes", () => {
   it("shows the accessibility statement as a page of its own, beneath the site's name", () => {
     renderAt("/accessibility");
     const header = screen.getByRole("banner");
-    expect(within(header).getByRole("button", { name: "Find a UKCP therapist" })).toBeTruthy();
+    expect(within(header).getByText("Find a UKCP therapist")).toBeTruthy();
     expect(screen.getByRole("heading", { level: 1, name: "Accessibility statement" })).toBeTruthy();
     // Reached other than by a link, as by a reload, it leaves the keyboard at the top.
     expect(document.activeElement).toBe(document.body);
     expect(api.search).not.toHaveBeenCalled();
   });
 
-  it("takes the keyboard to the statement's heading as the About card's link leads there from the search", async () => {
+  it("takes the keyboard to the statement's heading as About's link leads there from the search", async () => {
     renderAt("/");
-    fireEvent.click(screen.getByRole("button", { name: "Find a UKCP therapist" }));
-    fireEvent.click(within(screen.getByRole("dialog", { name: "About this site" })).getByRole("link", { name: "Accessibility statement" }));
+    const about = screen.getByRole("link", { name: "About this site" });
+    about.focus();
+    fireEvent.click(about);
+    fireEvent.click(within(await screen.findByRole("dialog", { name: "About this site" })).getByRole("link", { name: "Accessibility statement" }));
     const heading = await screen.findByRole("heading", { level: 1, name: "Accessibility statement" });
     expect(screen.getByTestId("url").textContent).toBe("/accessibility");
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     await waitFor(() => expect(document.activeElement).toBe(heading));
-    // Past the card's close, which hands focus back to the title only when nothing else has taken it.
+    // Past the drawer's close, which hands focus back to a link the statement has taken away.
     await act(() => new Promise((done) => setTimeout(done, 50)));
     expect(document.activeElement).toBe(heading);
+  });
+
+  it("opens About from beside the site's name in a drawer over the search, and closing it goes back to the search as it was", async () => {
+    renderAt("/?Location=Leeds");
+    await screen.findByRole("link", { name: "Jo Bloggs" });
+    // Typed but not yet searched, which only a search kept beneath the drawer still holds as it closes.
+    fireEvent.change(screen.getByRole("textbox", { name: "Location" }), { target: { value: "York" } });
+    const about = screen.getByRole("link", { name: "About this site" });
+    about.focus();
+    fireEvent.click(about);
+    const drawer = await screen.findByRole("dialog", { name: "About this site" });
+    expect(within(drawer).getByRole("heading", { level: 1, name: "About this site" })).toBeTruthy();
+    expect(within(drawer).getByText(/^Need help now\?/).querySelector("a[href='tel:116123']")).toBeTruthy();
+    expect(screen.getByTestId("url").textContent).toBe("/about");
+    expect(document.title).toBe("About this site - Find a UKCP therapist (unofficial)");
+    expect(screen.getByRole("region", { name: "Results and shortlist", hidden: true })).toBeTruthy();
+    fireEvent.click(within(drawer).getByRole("button", { name: "Close" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(screen.getByTestId("url").textContent).toBe("/?Location=Leeds");
+    expect(screen.getByRole("textbox", { name: "Location" })).toHaveProperty("value", "York");
+    expect(api.search).toHaveBeenCalledOnce();
+    await waitFor(() => expect(document.activeElement).toBe(about));
+  });
+
+  it("opens About over a page headed by the site's name, keeping the page beneath as it was", async () => {
+    renderAt("/accessibility");
+    fireEvent.click(within(screen.getByRole("banner")).getByRole("link", { name: "About this site" }));
+    const drawer = await screen.findByRole("dialog", { name: "About this site" });
+    expect(screen.getByTestId("url").textContent).toBe("/about");
+    expect(screen.getByRole("heading", { level: 1, name: "Accessibility statement", hidden: true })).toBeTruthy();
+    // The drawer's arrival is not the statement's, which stays scrolled where it was.
+    expect(window.scrollTo).not.toHaveBeenCalled();
+    await waitFor(() => expect(drawer.contains(document.activeElement)).toBe(true));
+  });
+
+  it("takes the keyboard to the statement's heading as About's link leads there from About opened over the statement", async () => {
+    renderAt("/accessibility");
+    const about = within(screen.getByRole("banner")).getByRole("link", { name: "About this site" });
+    about.focus();
+    fireEvent.click(about);
+    fireEvent.click(within(await screen.findByRole("dialog", { name: "About this site" })).getByRole("link", { name: "Accessibility statement" }));
+    const heading = screen.getByRole("heading", { level: 1, name: "Accessibility statement" });
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    await waitFor(() => expect(document.activeElement).toBe(heading));
+    // Past the drawer's close, which leaves the keyboard where the statement took it rather than on the link that opened About.
+    await act(() => new Promise((done) => setTimeout(done, 50)));
+    expect(document.activeElement).toBe(heading);
+  });
+
+  it("shows About reached directly as a page of its own, which the link beside the site's name marks rather than opens", () => {
+    renderAt("/about");
+    expect(screen.getByRole("heading", { level: 1, name: "About this site" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Search for a therapist" })).toBeTruthy();
+    const link = within(screen.getByRole("banner")).getByRole("link", { name: "About this site" });
+    expect(link.getAttribute("aria-current")).toBe("page");
+    expect(fireEvent.click(link)).toBe(false);
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(document.title).toBe("About this site - Find a UKCP therapist (unofficial)");
+    expect(api.search).not.toHaveBeenCalled();
   });
 
   it("shortlists a therapist from the search, and opens them from the shortlist's tab over it", async () => {
