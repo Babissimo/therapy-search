@@ -416,7 +416,7 @@ function SearchView({ params, onChange, wide }: ViewProps) {
   // Before a search the list takes the page, as online's does, with the toolbar right of it on wide screens and atop it on
   // a phone; on wide screens a search gives the page to the map, the list beside it, and the toolbar keeps its place in the
   // tree as it moves over the map, so what is typed, open or in focus in it stays. On a phone the list leads throughout,
-  // the toolbar atop it, and the map waits behind the button beside its tabs.
+  // its tabs atop it, then the toolbar, and the map waits behind the button beside the tabs.
   return (
     <FiltersSheet phone={!wide} params={params} drafts={drafts}>
       {/* The tabs' root spans the page, around wherever their list and panels sit. */}
