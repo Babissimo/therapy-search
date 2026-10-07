@@ -168,7 +168,7 @@ export function OnlineView({ params, onChange, wide }: Props) {
 /** In place of the results until a filter narrows the search. The filters sit to its right on wide screens, beneath it on a phone. */
 function OnlinePrompt({ wide, askRef }: { wide: boolean; askRef: RefObject<HTMLDivElement | null> }) {
   return (
-    <Prompt askRef={askRef} ask="Start with what matters to you." className={wide ? "py-10 sm:py-16" : "pt-6"}>
+    <Prompt askRef={askRef} ask="Start with what matters to you." toFilters={!wide} className={wide ? "py-10 sm:py-16" : "pt-6"}>
       Thousands of UKCP therapists work online or by phone. Choose a filter {wide ? "to the right" : "below"}, such as what they
       help with, how they work or the languages they speak, then show who fits. Type of session alone won't narrow them enough.
     </Prompt>

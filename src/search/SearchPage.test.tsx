@@ -925,6 +925,44 @@ describe("SearchPage", () => {
     expect(document.activeElement).toBe(screen.getByRole("searchbox", { name: "Search languages" }));
   });
 
+  it("glides a phone down to the filters beneath the prompt, taking the keyboard to their first group, where wide screens set them beside it", () => {
+    const resize = screenIs(false);
+    renderAt("/");
+    const down = () => within(results()).queryByRole("button", { name: "Start your search" });
+    const filters = results().querySelector<HTMLElement>("[data-filter-panel]")!;
+    filters.scrollIntoView = vi.fn();
+    fireEvent.click(down()!);
+    expect(filters.scrollIntoView).toHaveBeenCalledWith({ behavior: "smooth", block: "start" });
+    expect(document.activeElement).toBe(within(filters).getByRole("button", { name: /^Type of session/ }));
+    resize(true);
+    expect(down()).toBeNull();
+    expect(screen.getByRole("region", { name: "Refine your search" })).toBeTruthy();
+  });
+
+  it("takes a phone down to the filters beneath the online prompt, and beneath the ask for a filter first, at once where motion is reduced", () => {
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: query === "(prefers-reduced-motion: reduce)",
+      media: query,
+      addEventListener() {},
+      removeEventListener() {},
+    }));
+    const goesDown = () => {
+      const filters = results().querySelector<HTMLElement>("[data-filter-panel]")!;
+      filters.scrollIntoView = vi.fn();
+      fireEvent.click(within(results()).getByRole("button", { name: "Start your search" }));
+      expect(filters.scrollIntoView).toHaveBeenCalledWith({ behavior: "auto", block: "start" });
+      expect(document.activeElement).toBe(within(filters).getByRole("button", { name: /^Type of session/ }));
+    };
+    renderAt("/online");
+    goesDown();
+    cleanup();
+    renderAt("/");
+    fireEvent.change(screen.getByRole("textbox", { name: "Location" }), { target: { value: "York" } });
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+    within(results()).getByText(/^Before we search near/);
+    goesDown();
+  });
+
   it("asks for a filter first when a place is searched from the start with nothing ticked, and searches once one is", async () => {
     screenIs(true);
     renderAt("/");

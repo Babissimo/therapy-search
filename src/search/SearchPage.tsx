@@ -658,7 +658,7 @@ function Toolbar({
 /** In place of the results until there is a place to search, asking for what matters before where. */
 function NearPrompt({ wide, askRef }: { wide: boolean; askRef: RefObject<HTMLDivElement | null> }) {
   return (
-    <Prompt askRef={askRef} ask="Start with what matters to you." className={wide ? "py-10 sm:py-16" : "pt-6"}>
+    <Prompt askRef={askRef} ask="Start with what matters to you." toFilters={!wide} className={wide ? "py-10 sm:py-16" : "pt-6"}>
       Tick anything that matters to you {wide ? "in the filters to the right" : "below"}, then type a town, city or postcode
       {wide && " beneath them"} to see the UKCP therapists nearest to it.
     </Prompt>
@@ -677,6 +677,7 @@ function FiltersFirst({ place, wide, askRef }: { place: string; wide: boolean; a
           Before we search near <span translate="no">{place}</span>
         </>
       }
+      toFilters={!wide}
       className={wide ? "py-10 sm:py-16" : "pt-6"}
     >
       A tick or two {wide ? "to the right" : "below"} keeps the list to people who suit you.

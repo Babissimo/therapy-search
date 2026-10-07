@@ -24,7 +24,8 @@ export function FilterPanel({ params, drafts, groups = FILTER_GROUPS, onSearch }
   const openGroups = groups.filter((g) => tickedIn(draft, g) > 0).map((g) => g.label);
 
   return (
-    <div className="space-y-6">
+    // Marked, for the button beneath a phone's prompt to bring it into view, a little below the window's top.
+    <div data-filter-panel className="scroll-mt-4 space-y-6">
       <div className="space-y-2 pointer-coarse:space-y-4">
         <Button type="button" variant="link" size="sm" className="h-auto px-0" onClick={drafts.clear}>
           Clear all filters
