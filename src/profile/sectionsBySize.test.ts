@@ -7,14 +7,14 @@ const PROFILE: Profile = { slug: "Test-ABCDEFGH", name: "Test Therapist", initia
 const headings = (sections: { heading: string }[]) => sections.map((s) => s.heading);
 
 describe("sectionsBySize", () => {
-  it("puts the sections read at length in one list and the rest, languages among them, in the other, each in UKCP's order", () => {
+  it("puts the sections read at length in one list, About Me first, and the rest, languages among them, in the other in UKCP's order", () => {
     const { long, short } = sectionsBySize({
       ...PROFILE,
       languages: ["French"],
       about: ["My Approach", "About Me", "I work with", "Special Interests", "Types of Therapies Offered", "What I can help with"].map(section),
       practical: ["Types of sessions", "Working with Children", "UKCP College"].map(section),
     });
-    expect(headings(long)).toEqual(["My Approach", "About Me", "What I can help with"]);
+    expect(headings(long)).toEqual(["About Me", "My Approach", "What I can help with"]);
     expect(headings(short)).toEqual(["I work with", "Types of Therapies Offered", "Languages", "Types of sessions", "Working with Children", "UKCP College"]);
   });
 
