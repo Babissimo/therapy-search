@@ -467,6 +467,18 @@
   animation-delay: 60ms;
   animation-duration: 140ms;
 }
+/* The tabs take their new look at once and only glide, with nothing left to blend: while their two looks cross-fade,
+   Firefox leaves the page around them unpainted, showing whatever is behind the window. */
+::view-transition-old(list-tabs) {
+  animation: none;
+  opacity: 0;
+}
+::view-transition-new(list-tabs) {
+  animation: none;
+}
+::view-transition-image-pair(list-tabs) {
+  isolation: auto;
+}
 @media (prefers-reduced-motion: reduce) {
   ::view-transition-group(*),
   ::view-transition-old(*),
