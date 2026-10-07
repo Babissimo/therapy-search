@@ -59,18 +59,20 @@ export function ProfileBody({ slug, back, close }: { slug: string } & Exits) {
   const isMatch = useSearchMatch();
   const card = useOpeningCard(slug);
   const standing = useStanding(slug);
-  // Says each failure, and how its retry goes, once, for the alert, which keeps quiet. First in the failure's return and the
-  // skeleton's, so it stays in place from the one to the other and is heard.
+  // Says each failure, and how its retry goes, once, for the alert, which keeps quiet. First in every return, so it stays in
+  // place from one to the next and is heard.
   const said = <FailureStatus failure={failure} />;
+  // After it, every return draws the same article and header, so the header's buttons stay from one to the next: a drawer
+  // whose focused button went would take the keyboard back to itself.
 
   if (failure.error) {
     return (
       <>
         {said}
-        <div className="space-y-4">
+        <article className="space-y-4">
           <StickyHeader back={back} close={close} />
           <FailedAlert error={failure.error} retrying={failure.retrying} onRetry={failure.retry} />
-        </div>
+        </article>
       </>
     );
   }
@@ -79,7 +81,19 @@ export function ProfileBody({ slug, back, close }: { slug: string } & Exits) {
     return (
       <>
         {said}
-        <ProfileSkeleton back={back} close={close} />
+        <article aria-busy className={BODY}>
+          <StickyHeader back={back} close={close}>
+            <div aria-hidden>
+              <Identity
+                photo={<Skeleton className="size-full rounded-md" />}
+                name={<SkeletonText className="w-56" />}
+                location={<SkeletonText className="w-16" />}
+                contacts={<ContactListSkeleton />}
+              />
+            </div>
+          </StickyHeader>
+          <SectionsSkeleton />
+        </article>
       </>
     );
   }
@@ -93,85 +107,88 @@ export function ProfileBody({ slug, back, close }: { slug: string } & Exits) {
   // The card the visitor's search showed, where there was one, says more than the header.
   const therapist = cachedCard(client, slug) ?? headerCard(profile);
   return (
-    <article ref={standing.root} className={BODY}>
-      <StickyHeader back={back} close={close} bookmark={<ShortlistButton therapist={therapist} />}>
-        <Identity
-          photo={
-            <Portrait
-              photoUrl={profile.photoUrl}
-              initials={profile.initials}
-              className="size-full"
-              initialsClassName="text-[length:max(1.25rem,32cqi)]"
-            />
-          }
-          name={profile.name}
-          headingRef={failure.landing}
-          location={
-            profile.location && (
-              <span className="flex gap-1.5">
-                <MapPin aria-hidden className="mt-0.5 size-4 shrink-0" />
-                <span className="min-w-0">{profile.location}</span>
-              </span>
-            )
-          }
-          contacts={
-            <>
-              <ContactList profile={profile} onReach={standing.reached} />
-              {standing.offering && <ContactOffer onAnswer={(yes) => standing.answered(therapist, yes)} />}
-            </>
-          }
-        />
-      </StickyHeader>
-
-      {/* Not last, where space-y-8 would give the columns a margin at the foot. */}
-      <p aria-live="polite" className="sr-only">
-        {standing.announcement}
-      </p>
-
-      <StandingSection key={slug} slug={slug} therapist={therapist} standing={standing} />
-
-      <HeldPlace above={standing.status !== undefined}>
-        <Columns
-          besideLong={besideLong}
-          main={
-            (hasMatches || besideLong) && (
+    <>
+      {said}
+      <article ref={standing.root} className={BODY}>
+        <StickyHeader back={back} close={close} bookmark={<ShortlistButton therapist={therapist} />}>
+          <Identity
+            photo={
+              <Portrait
+                photoUrl={profile.photoUrl}
+                initials={profile.initials}
+                className="size-full"
+                initialsClassName="text-[length:max(1.25rem,32cqi)]"
+              />
+            }
+            name={profile.name}
+            headingRef={failure.landing}
+            location={
+              profile.location && (
+                <span className="flex gap-1.5">
+                  <MapPin aria-hidden className="mt-0.5 size-4 shrink-0" />
+                  <span className="min-w-0">{profile.location}</span>
+                </span>
+              )
+            }
+            contacts={
               <>
-                {hasMatches && (
-                  <>
-                    <SectionView
-                      section={{ heading: "Matches your search", paragraphs: [], items: matches, details: [] }}
-                      isMatch={isMatch}
-                      isInterest={isInterestOf(profile)}
-                      announce={false}
-                    />
-                    <Separator />
-                  </>
-                )}
-                <Sections sections={long} isMatch={isMatch} />
+                <ContactList profile={profile} onReach={standing.reached} />
+                {standing.offering && <ContactOffer onAnswer={(yes) => standing.answered(therapist, yes)} />}
               </>
-            )
-          }
-          aside={
-            (short.length > 0 || profile.offices.length > 0) && (
-              <>
-                <ShortSections besideLong={besideLong}>
-                  {short.map((section, i) => (
-                    <SectionView key={i} section={section} isMatch={isMatch} />
-                  ))}
-                </ShortSections>
-                {offices.length > 0 && (
-                  <div className={cn("grid gap-8 @xl:grid-cols-2", besideLong && "@4xl:grid-cols-1")}>
-                    {offices.map((office, i) => (
-                      <OfficeCard key={i} office={office} profile={profile} distance={nearest !== undefined && i === 0 ? card?.distance : undefined} />
+            }
+          />
+        </StickyHeader>
+
+        {/* Not last, where space-y-8 would give the columns a margin at the foot. */}
+        <p aria-live="polite" className="sr-only">
+          {standing.announcement}
+        </p>
+
+        <StandingSection key={slug} slug={slug} therapist={therapist} standing={standing} />
+
+        <HeldPlace above={standing.status !== undefined}>
+          <Columns
+            besideLong={besideLong}
+            main={
+              (hasMatches || besideLong) && (
+                <>
+                  {hasMatches && (
+                    <>
+                      <SectionView
+                        section={{ heading: "Matches your search", paragraphs: [], items: matches, details: [] }}
+                        isMatch={isMatch}
+                        isInterest={isInterestOf(profile)}
+                        announce={false}
+                      />
+                      <Separator />
+                    </>
+                  )}
+                  <Sections sections={long} isMatch={isMatch} />
+                </>
+              )
+            }
+            aside={
+              (short.length > 0 || profile.offices.length > 0) && (
+                <>
+                  <ShortSections besideLong={besideLong}>
+                    {short.map((section, i) => (
+                      <SectionView key={i} section={section} isMatch={isMatch} />
                     ))}
-                  </div>
-                )}
-              </>
-            )
-          }
-        />
-      </HeldPlace>
-    </article>
+                  </ShortSections>
+                  {offices.length > 0 && (
+                    <div className={cn("grid gap-8 @xl:grid-cols-2", besideLong && "@4xl:grid-cols-1")}>
+                      {offices.map((office, i) => (
+                        <OfficeCard key={i} office={office} profile={profile} distance={nearest !== undefined && i === 0 ? card?.distance : undefined} />
+                      ))}
+                    </div>
+                  )}
+                </>
+              )
+            }
+          />
+        </HeldPlace>
+      </article>
+    </>
   );
 }
 
@@ -179,39 +196,27 @@ export function ProfileBody({ slug, back, close }: { slug: string } & Exits) {
 // shrink. Paper, with nothing to scroll, has no foot, which could end it on a blank page.
 const BODY = "@container/profile space-y-8 [overflow-anchor:none] not-print:has-data-stuck:pb-12";
 
-/** A profile still loading, laid out as most are: long sections beside short ones. */
-function ProfileSkeleton({ back, close }: Exits) {
+/** The sections of a profile still loading, laid out as most are: long ones beside short ones. */
+function SectionsSkeleton() {
   return (
-    <div aria-busy className={BODY}>
-      <StickyHeader back={back} close={close}>
-        <div aria-hidden>
-          <Identity
-            photo={<Skeleton className="size-full rounded-md" />}
-            name={<SkeletonText className="w-56" />}
-            location={<SkeletonText className="w-16" />}
-            contacts={<ContactListSkeleton />}
-          />
-        </div>
-      </StickyHeader>
-      <div aria-hidden>
-        <Columns
-          besideLong
-          main={
-            <>
-              <SectionSkeleton lines={6} />
-              <Separator />
-              <SectionSkeleton lines={4} />
-            </>
-          }
-          aside={
-            <ShortSections besideLong>
-              {[4, 1, 3].map((tags, i) => (
-                <SectionSkeleton key={i} tags={tags} />
-              ))}
-            </ShortSections>
-          }
-        />
-      </div>
+    <div aria-hidden>
+      <Columns
+        besideLong
+        main={
+          <>
+            <SectionSkeleton lines={6} />
+            <Separator />
+            <SectionSkeleton lines={4} />
+          </>
+        }
+        aside={
+          <ShortSections besideLong>
+            {[4, 1, 3].map((tags, i) => (
+              <SectionSkeleton key={i} tags={tags} />
+            ))}
+          </ShortSections>
+        }
+      />
     </div>
   );
 }
