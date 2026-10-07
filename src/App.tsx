@@ -4,10 +4,10 @@ import { HashRouter, Link, Route, Routes, useLocation, useNavigationType, usePar
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AccessibilityStatement } from "@/layout/AccessibilityStatement";
 import { SiteLayout } from "@/layout/SiteLayout";
+import { backgroundOf, useKeepOpened } from "@/lib/drawerRoute";
 import { queryClient } from "@/lib/queryClient";
 import { ProfileDrawer } from "@/profile/ProfileDrawer";
 import { ProfilePage } from "@/profile/ProfilePage";
-import { backgroundOf, useKeepOpened } from "@/profile/profileLink";
 import { ONLINE_PATH } from "@/search/online";
 import { SearchPage } from "@/search/SearchPage";
 import { STATEMENT_PATH } from "@/site";

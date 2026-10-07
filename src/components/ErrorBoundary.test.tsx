@@ -5,6 +5,7 @@ import { narrowsOnline } from "@shared/online";
 import { emptyParams, readParams, UKCP_ORIGIN } from "@shared/query";
 import { HelpNow } from "@/layout/HelpNow";
 import { UNREADABLE } from "@/lib/api";
+import { OPENED_KEY } from "@/lib/drawerRoute";
 import { NEW_TAB } from "@/lib/newTab";
 import { SITE_NAME } from "@/lib/useTitle";
 import { NO_PLACE } from "@/search/SearchBox";
@@ -137,10 +138,10 @@ describe("index.html's page", () => {
 
   type Remembered = { state?: unknown; opened?: unknown; className?: string };
 
-  /** The layout the shape script gives the page at an address, with what history and the tab keep of a profile's page beneath. */
+  /** The layout the shape script gives the page at an address, with what history and the tab keep of a drawer's page beneath. */
   function shape(address: string, { state = null, opened = null, className = "" }: Remembered = {}): string {
     const documentElement = { className };
-    const tab = { getItem: (key: string) => (key === "profile-opened-over" ? JSON.stringify(opened) : null) };
+    const tab = { getItem: (key: string) => (key === OPENED_KEY ? JSON.stringify(opened) : null) };
     new Function("location", "history", "sessionStorage", "document", shaper)(new URL(address, "https://site.test"), { state }, tab, { documentElement });
     return documentElement.className.slice(className.length).trim() || "start";
   }
