@@ -1,12 +1,15 @@
 // @vitest-environment jsdom
 import { render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { emptyParams, UKCP_ORIGIN } from "@shared/query";
+import { narrowsOnline } from "@shared/online";
+import { emptyParams, readParams, UKCP_ORIGIN } from "@shared/query";
 import { HelpNow } from "@/layout/HelpNow";
 import { UNREADABLE } from "@/lib/api";
 import { NEW_TAB } from "@/lib/newTab";
 import { SITE_NAME } from "@/lib/useTitle";
 import { NO_PLACE } from "@/search/SearchBox";
+import { placed } from "@/search/state";
+import { WIDE } from "@/search/wide";
 import { REPORT_URL } from "@/site";
 import * as plain from "../../worker/plain/pages";
 import indexHtml from "../../index.html?raw";
@@ -60,7 +63,7 @@ describe("ErrorBoundary", () => {
 
   it("names the site, UKCP's directory and where to report a problem as index.html's own page does, before the script draws one", () => {
     expect(indexHtml).toContain(`<title>${SITE_NAME}</title>`);
-    expect(indexHtml).toContain(`<h1>${SITE_NAME}</h1>`);
+    expect(new DOMParser().parseFromString(indexHtml, "text/html").querySelector("h1")?.textContent).toBe(SITE_NAME);
     expect(indexHtml).toContain(`href="${UKCP_ORIGIN}/find-a-therapist/"`);
     expect(indexHtml).toContain(`href="${REPORT_URL}"`);
   });
@@ -128,6 +131,81 @@ describe("index.html's page", () => {
   it("writes the gate for browsers older than any the build reaches, and starts the app only where it doesn't mark one", () => {
     expect(gate).not.toMatch(/\b(let|const|class)\b|=>|`|\?\.|\?\?/);
     expect(mainSource).toContain('if (!document.documentElement.classList.contains("old-browser"))');
+  });
+
+  const shaper = [...page().querySelectorAll("head script")].map((script) => script.textContent ?? "").find((text) => text.includes("shape-map"))!;
+
+  type Remembered = { state?: unknown; opened?: unknown; className?: string };
+
+  /** The layout the shape script gives the page at an address, with what history and the tab keep of a profile's page beneath. */
+  function shape(address: string, { state = null, opened = null, className = "" }: Remembered = {}): string {
+    const documentElement = { className };
+    const tab = { getItem: (key: string) => (key === "profile-opened-over" ? JSON.stringify(opened) : null) };
+    new Function("location", "history", "sessionStorage", "document", shaper)(new URL(address, "https://site.test"), { state }, tab, { documentElement });
+    return documentElement.className.slice(className.length).trim() || "start";
+  }
+
+  it("takes the layout the app draws at the address: the start, a search beside its map, online's start, or a page apart", () => {
+    expect(["/", "/#/", "/#/?KeywordFilter=grief", "/#/online?Languages=Polish"].map((at) => shape(at))).toEqual(Array(4).fill("start"));
+    expect(["/#/?Location=Leeds", "/?Location=Bath", "/#/?Languages=Polish&Location=York"].map((at) => shape(at))).toEqual(Array(3).fill("shape-map"));
+    expect(["/#/online", "/#/online/", "/#/online?Location=Leeds", "/online"].map((at) => shape(at))).toEqual(Array(4).fill("shape-online"));
+    expect(["/#/accessibility", "/#/therapist/jo-cole", "/#/nowhere", "/therapist/jo-cole"].map((at) => shape(at))).toEqual(Array(4).fill("shape-page"));
+  });
+
+  /** What the app makes of a query, or null where it finds the link invalid. */
+  function read(query: string) {
+    try {
+      return readParams(new URLSearchParams(query));
+    } catch {
+      return null;
+    }
+  }
+
+  it("counts a place as the app does", () => {
+    for (const query of ["Location=Leeds", "Location=%20Bath%20", "Location=+", "Location=", "Location=%E0%A4%A", "HelpWith=Location", "Location=&Location=York"]) {
+      const params = read(query);
+      expect([query, shape(`/#/?${query}`)]).toEqual([query, params && placed(params) ? "shape-map" : "start"]);
+    }
+  });
+
+  it("counts online as narrowed where the app does", () => {
+    const queries = [
+      "",
+      "TypesOfSession=Online+Therapy",
+      "Location=Leeds&OnlyWheelchairAccessible=true&LocationSearchOutsideUK=true",
+      "Languages=Polish",
+      "Colleges=",
+      "HelpWith=+,+",
+      "HelpWith=Anxiety",
+      "KeywordFilter=%20",
+      "KeywordFilter=grief",
+      "OnlyProfilesWithPhotos=false",
+      "OnlyProfilesWithPhotos=true",
+      "page=1",
+      "page=2",
+      "constructor=x&hasOwnProperty=y",
+    ];
+    for (const query of queries) {
+      const params = read(query)!;
+      expect([query, shape(`/#/online?${query}`)]).toEqual([query, narrowsOnline(params) ? "start" : "shape-online"]);
+    }
+  });
+
+  it("takes the layout of the page a profile was opened over, as history or the tab keeps it", () => {
+    const search = { pathname: "/", search: "?Location=Leeds" };
+    expect(shape("/#/therapist/jo-cole", { state: { usr: { background: search } } })).toBe("shape-map");
+    expect(shape("/#/therapist/jo-cole", { opened: { pathname: "/therapist/jo-cole", background: search } })).toBe("shape-map");
+    expect(shape("/#/therapist/jo-cole", { opened: { pathname: "/therapist/jo-cole", background: { pathname: "/online", search: "" } } })).toBe("shape-online");
+    expect(shape("/#/therapist/jo-cole", { opened: { pathname: "/therapist/ann-bell", background: search } })).toBe("shape-page");
+  });
+
+  it("leaves a browser too old for the app with the start's layout, written as the gate is for any browser", () => {
+    expect(shape("/#/?Location=Leeds", { className: "dark old-browser" })).toBe("start");
+    expect(shaper).not.toMatch(/\b(let|const|class)\b|=>|`|\?\.|\?\?/);
+  });
+
+  it("lays out the wide page where the app's search does", () => {
+    expect(indexHtml).toContain(`@media ${WIDE} {`);
   });
 });
 
