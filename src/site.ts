@@ -6,3 +6,6 @@ export const REPORT_URL = "https://github.com/Babissimo/therapy-search/issues/ne
 
 /** Where the accessibility statement lives, after the # as every page does. */
 export const STATEMENT_PATH = "/accessibility";
+
+/** Where the About text lives: in a drawer over the page it was opened from, or as a page of its own reached directly. */
+export const ABOUT_PATH = "/about";

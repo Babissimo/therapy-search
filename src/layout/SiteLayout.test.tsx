@@ -17,10 +17,11 @@ const at = (path: string | { pathname: string; state: unknown }) =>
   );
 
 describe("SiteLayout", () => {
-  it("opens a document page with the site's name and theme switch", () => {
+  it("opens a document page with the site's name, the way to About and the theme switch", () => {
     at("/therapist/Jo-ABCDEFGH");
     const header = screen.getByRole("banner");
-    expect(within(header).getByRole("button", { name: "Find a UKCP therapist" })).toBeTruthy();
+    expect(within(header).getByText("Find a UKCP therapist")).toBeTruthy();
+    expect(within(header).getByRole("link", { name: "About this site" })).toBeTruthy();
     expect(within(header).getByRole("group", { name: "Theme" })).toBeTruthy();
     expect(header.compareDocumentPosition(screen.getByText("Page")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     // The page's own heading is its h1.

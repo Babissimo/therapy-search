@@ -200,6 +200,13 @@ describe("index.html's page", () => {
     expect(shape("/#/therapist/jo-cole", { opened: { pathname: "/therapist/ann-bell", background: search } })).toBe("shape-page");
   });
 
+  it("takes the layout of the page About was opened over, and a page's own where it was reached directly", () => {
+    const search = { pathname: "/", search: "?Location=Leeds" };
+    expect(shape("/#/about", { state: { usr: { background: search } } })).toBe("shape-map");
+    expect(shape("/#/about", { opened: { pathname: "/about", background: { pathname: "/", search: "" } } })).toBe("start");
+    expect(shape("/#/about")).toBe("shape-page");
+  });
+
   it("leaves a browser too old for the app with the start's layout, written as the gate is for any browser", () => {
     expect(shape("/#/?Location=Leeds", { className: "dark old-browser" })).toBe("start");
     expect(shaper).not.toMatch(/\b(let|const|class)\b|=>|`|\?\.|\?\?/);
