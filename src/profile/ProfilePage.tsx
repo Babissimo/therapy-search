@@ -373,18 +373,19 @@ function scrollerOf(element: Element): Element | null {
   return document.scrollingElement;
 }
 
-/** Who the profile is and how to reach them, kept in view as the visitor reads on. */
+/** Who the profile is and how to reach them, kept in view as the visitor reads on where the screen has room. */
 function StickyHeader({ back, close, bookmark, children }: Exits & { bookmark?: ReactNode; children?: ReactNode }) {
   const [ref, stuck] = useStuck();
   return (
     // A drawer is drawn in the popover colour, which the header matches so text scrolling beneath it stays hidden. The
     // background reaches a little past the content either side, over the rings that cards and focused controls draw
-    // outside their boxes; the rule keeps to the content's width. It sticks a pixel high, for `useStuck` to see it clipped.
-    // Printed, it heads the first page rather than sticking.
+    // outside their boxes; the rule keeps to the content's width. It sticks a pixel high, for `useStuck` to see it clipped,
+    // and only on a screen at least 30rem tall, leaving most of it to read; on a shorter one, as a phone on its side or a
+    // window zoomed far in, it scrolls away with the profile. Printed, it heads the first page rather than sticking.
     <header
       ref={ref}
       data-stuck={stuck || undefined}
-      className="group/header sticky -top-px z-10 -mx-1 bg-background px-1 in-data-[slot=sheet-content]:bg-popover print:static"
+      className="group/header -top-px z-10 -mx-1 bg-background px-1 in-data-[slot=sheet-content]:bg-popover not-print:[@media(min-height:30rem)]:sticky"
     >
       <div className="@container/profile-header space-y-2 border-b py-3">
         {back}

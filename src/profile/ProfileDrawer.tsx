@@ -59,7 +59,7 @@ export function ProfileDrawer({ slug, open }: { slug: string; open: boolean }) {
   // The drawer, and the page while it is open, take the therapist's name once their profile is in.
   const name = useQuery(profileQuery(slug)).data?.name;
   useTitle(name, open);
-  // The drawer's buttons live in the profile's header, which stays in view as the drawer scrolls.
+  // The drawer's buttons live in the profile's header, which stays in view as the drawer scrolls on all but a short screen.
   const corner = (
     <>
       {/* Shown, like the expansion it makes, only where the drawer leaves room beside it: narrower windows it all but fills. */}
