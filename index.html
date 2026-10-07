@@ -46,15 +46,13 @@
         var root = document.documentElement;
         if (/(^| )old-browser( |$)/.test(root.className)) return;
         var at = location.hash.indexOf("#/") === 0 ? location.hash.slice(1) : location.pathname + location.search;
-        // A profile opened over a page shows over it, as history or the tab remembers (profileLink's backgroundOf).
-        if (at.indexOf("/therapist/") === 0) {
-          try {
-            var over = history.state && history.state.usr && history.state.usr.background;
-            var opened = over ? null : JSON.parse(sessionStorage.getItem("profile-opened-over"));
-            if (opened && opened.pathname === at.split("?")[0]) over = opened.background;
-            if (over && typeof over.pathname == "string") at = over.pathname + (over.search || "");
-          } catch (e) {}
-        }
+        // A page opened in a drawer over another shows over it, as history or the tab remembers (drawerRoute's backgroundOf).
+        try {
+          var over = history.state && history.state.usr && history.state.usr.background;
+          var opened = over ? null : JSON.parse(sessionStorage.getItem("drawer-opened-over"));
+          if (opened && opened.pathname === at.split("?")[0]) over = opened.background;
+          if (over && typeof over.pathname == "string") at = over.pathname + (over.search || "");
+        } catch (e) {}
         var path = at.split("?")[0].replace(/(.)\/$/, "$1");
         // Each name's first value, as readParams reads it with URLSearchParams, which keeps a broken escape as it is.
         var values = {};

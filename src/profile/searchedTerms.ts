@@ -3,10 +3,10 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "react-router";
 import { InvalidParam, type SearchParams } from "@shared/query";
 import type { Profile, TherapistCard } from "@shared/types";
+import { backgroundOf } from "@/lib/drawerRoute";
 import { soughtTerms } from "@/search/activeFilters";
 import { shownCard } from "@/search/useResults";
 import { viewSearch } from "@/search/useSearchState";
-import { backgroundOf } from "./profileLink";
 
 /** The search a profile was opened from, as the view beneath it shows it, if it was opened from one. */
 function useOpeningSearch(): SearchParams | undefined {

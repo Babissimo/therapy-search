@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { matchPath, useLocation } from "react-router";
-import { backgroundOf } from "@/profile/profileLink";
+import { backgroundOf } from "@/lib/drawerRoute";
 import { ONLINE_PATH } from "@/search/online";
 import { Masthead } from "./Masthead";
 
