@@ -1,8 +1,11 @@
 import { ArrowDown } from "lucide-react";
 import type { ReactNode, Ref } from "react";
+import { Link } from "react-router";
 import { Button } from "@/components/ui/button";
 import { HelpNow } from "@/layout/HelpNow";
+import { useDrawerLink } from "@/lib/drawerRoute";
 import { cn } from "@/lib/utils";
+import { ABOUT_PATH } from "@/site";
 import { LanguagesShortcut } from "./LanguagesShortcut";
 
 type Props = {
@@ -18,9 +21,10 @@ type Props = {
 /**
  * What a view asks for before it has anything to search, in large type in place of its results, with a line on how, a
  * way down to the filters where they come beneath it, a way straight to the languages among them, and, smaller, where to
- * turn for help today.
+ * turn for help today and that UKCP doesn't run the site, for anyone who arrives thinking it does.
  */
 export function Prompt({ ask, children, askRef, toFilters = false, className }: Props) {
+  const link = useDrawerLink();
   return (
     <div className={cn("space-y-4 text-center text-balance sm:space-y-6", className)}>
       <div ref={askRef} tabIndex={askRef ? -1 : undefined} data-prompt-ask={askRef ? "" : undefined} className="space-y-4 outline-none sm:space-y-6">
@@ -35,6 +39,12 @@ export function Prompt({ ask, children, askRef, toFilters = false, className }: 
       )}
       <LanguagesShortcut />
       <HelpNow className="pt-4 text-muted-foreground sm:pt-6" />
+      <p className="text-sm text-muted-foreground">
+        This site is unofficial: UKCP does not run it.{" "}
+        <Link className="underline" {...link(ABOUT_PATH)}>
+          More about this site
+        </Link>
+      </p>
     </div>
   );
 }
