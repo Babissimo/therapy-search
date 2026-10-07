@@ -651,6 +651,29 @@ describe("ProfilePage's content", () => {
     }
   });
 
+  it("puts who the therapist works with, how and in what language above the offices, and their training below them", async () => {
+    renderAt(["/therapist/Test-ABCDEFGH"], {
+      ...PROFILE,
+      languages: ["French"],
+      about: [section("I work with", ["Adults"]), section("Types of Therapies Offered", ["Integrative Psychotherapist"])],
+      practical: [section("Types of sessions", ["Online Therapy"]), section("UKCP College", ["Test College"])],
+      offices: [office("Brighton Office", "£70 per session")],
+    });
+    await screen.findByText("Brighton Office");
+    const shown = [...document.querySelectorAll("aside h2, aside [data-slot=card-title]")].map((element) => element.textContent);
+    expect(shown).toEqual(["I work with", "Types of sessions", "Languages", "Brighton Office", "Types of Therapies Offered", "UKCP College"]);
+    // Below the offices, the first keeps its rule.
+    const training = screen.getByRole("heading", { name: "Types of Therapies Offered" }).closest("section")?.parentElement;
+    expect(training?.className).toContain("border-t");
+    expect(training?.className).not.toContain("border-t-0");
+  });
+
+  it("leaves no rule above the training where nothing comes before it", async () => {
+    renderAt(["/therapist/Test-ABCDEFGH"], { ...PROFILE, practical: [section("UKCP College", ["Test College"])] });
+    const college = (await screen.findByRole("heading", { name: "UKCP College" })).closest("section")?.parentElement;
+    expect(college?.className).toContain("first:border-t-0");
+  });
+
   it("lets a tag too long for its column wrap onto another line", async () => {
     const college = "College of Family Couple and Systemic Psychotherapy (CFCSP)";
     renderAt(["/therapist/Test-ABCDEFGH"], { ...PROFILE, practical: [section("UKCP College", [college])] });

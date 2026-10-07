@@ -100,7 +100,8 @@ export function ProfileBody({ slug, back, close }: { slug: string } & Exits) {
   }
 
   const matches = matchingTags(profile, isMatch);
-  const { long, short } = sectionsBySize(profile);
+  const { long, beforeOffices, afterOffices } = sectionsBySize(profile);
+  const shortViews = (sections: ShownSection[]) => sections.map((section, i) => <SectionView key={i} section={section} isMatch={isMatch} />);
   const hasMatches = matches.length > 0;
   const besideLong = long.length > 0;
   const nearest = nearestOffice(profile.offices, card);
@@ -169,13 +170,9 @@ export function ProfileBody({ slug, back, close }: { slug: string } & Exits) {
               )
             }
             aside={
-              (short.length > 0 || profile.offices.length > 0) && (
+              (beforeOffices.length > 0 || offices.length > 0 || afterOffices.length > 0) && (
                 <>
-                  <ShortSections besideLong={besideLong}>
-                    {short.map((section, i) => (
-                      <SectionView key={i} section={section} isMatch={isMatch} />
-                    ))}
-                  </ShortSections>
+                  <ShortSections besideLong={besideLong}>{shortViews(beforeOffices)}</ShortSections>
                   {offices.length > 0 && (
                     <div className={cn("grid gap-8 @xl:grid-cols-2", besideLong && "@4xl:grid-cols-1")}>
                       {offices.map((office, i) => (
@@ -183,6 +180,9 @@ export function ProfileBody({ slug, back, close }: { slug: string } & Exits) {
                       ))}
                     </div>
                   )}
+                  <ShortSections besideLong={besideLong} opens={beforeOffices.length === 0 && offices.length === 0}>
+                    {shortViews(afterOffices)}
+                  </ShortSections>
                 </>
               )
             }
@@ -433,16 +433,17 @@ function Sections({ sections, isMatch }: { sections: ShownSection[]; isMatch: Se
 }
 
 /**
- * Short sections, two to a line once there is room, each under a rule of its own. The first line has none where only a
- * rule or the header is above it: with no long sections, or at the top of a wide page's short column.
+ * Short sections, two to a line once there is room, each under a rule of its own. Where they open the aside, the first
+ * line has none where only a rule or the header is above it: with no long sections, or at the top of a wide page's short
+ * column.
  */
-function ShortSections({ besideLong, children }: { besideLong: boolean; children: ReactNode[] }) {
+function ShortSections({ besideLong, opens = true, children }: { besideLong: boolean; opens?: boolean; children: ReactNode[] }) {
   if (children.length === 0) return null;
   const first = besideLong ? "@4xl:first:border-t-0 @4xl:first:pt-0" : "first:border-t-0 first:pt-0 @xl:nth-2:border-t-0 @xl:nth-2:pt-0";
   return (
     <div className={cn("grid grid-cols-1 gap-8 @xl:grid-cols-2", besideLong && "@4xl:grid-cols-1")}>
       {children.map((section, i) => (
-        <div key={i} className={cn("border-t pt-8 print:break-inside-avoid", first)}>
+        <div key={i} className={cn("border-t pt-8 print:break-inside-avoid", opens && first)}>
           {section}
         </div>
       ))}

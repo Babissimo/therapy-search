@@ -7,24 +7,30 @@ const PROFILE: Profile = { slug: "Test-ABCDEFGH", name: "Test Therapist", initia
 const headings = (sections: { heading: string }[]) => sections.map((s) => s.heading);
 
 describe("sectionsBySize", () => {
-  it("puts the sections read at length in one list, About Me first, and the rest, languages among them, in the other in UKCP's order", () => {
-    const { long, short } = sectionsBySize({
+  it("puts About Me first of the sections read at length, and who, how and in what language before the offices, the rest after", () => {
+    const { long, beforeOffices, afterOffices } = sectionsBySize({
       ...PROFILE,
       languages: ["French"],
       about: ["My Approach", "About Me", "I work with", "Special Interests", "Types of Therapies Offered", "What I can help with"].map(section),
-      practical: ["Types of sessions", "Working with Children", "UKCP College"].map(section),
+      practical: ["Types of sessions", "UKCP College", "Working with Children"].map(section),
     });
     expect(headings(long)).toEqual(["About Me", "My Approach", "What I can help with"]);
-    expect(headings(short)).toEqual(["I work with", "Types of Therapies Offered", "Languages", "Types of sessions", "Working with Children", "UKCP College"]);
+    expect(headings(beforeOffices)).toEqual(["I work with", "Types of sessions", "Languages"]);
+    expect(headings(afterOffices)).toEqual(["Types of Therapies Offered", "UKCP College", "Working with Children"]);
   });
 
-  it("knows a heading whatever its case, and takes one it doesn't know as short", () => {
-    const { long, short } = sectionsBySize({ ...PROFILE, about: [section("ABOUT ME"), section("Qualifications")] });
+  it("knows a heading whatever its case, and puts one it doesn't know after the offices in UKCP's order", () => {
+    const { long, beforeOffices, afterOffices } = sectionsBySize({
+      ...PROFILE,
+      about: [section("Qualifications"), section("ABOUT ME"), section("types of sessions")],
+      practical: [section("UKCP College"), section("Insurance")],
+    });
     expect(headings(long)).toEqual(["ABOUT ME"]);
-    expect(headings(short)).toEqual(["Qualifications"]);
+    expect(headings(beforeOffices)).toEqual(["types of sessions"]);
+    expect(headings(afterOffices)).toEqual(["Qualifications", "UKCP College", "Insurance"]);
   });
 
   it("has no languages section for a profile without languages", () => {
-    expect(sectionsBySize(PROFILE)).toEqual({ long: [], short: [] });
+    expect(sectionsBySize(PROFILE)).toEqual({ long: [], beforeOffices: [], afterOffices: [] });
   });
 });
