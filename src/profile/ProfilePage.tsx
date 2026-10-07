@@ -6,6 +6,7 @@ import { BackButton } from "@/components/BackButton";
 import { FailedAlert, FailureStatus, useFailure } from "@/components/FailedAlert";
 import { MapSlot } from "@/components/MapSlot";
 import { Portrait } from "@/components/Portrait";
+import { Sessions } from "@/components/Sessions";
 import { SkeletonText } from "@/components/SkeletonText";
 import { Badge, TAG } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,6 +31,7 @@ import { NoteField } from "./NoteField";
 import { useOfficePlace } from "./place";
 import { sectionsBySize } from "./sectionsBySize";
 import { matchingTags, useOpeningCard, useSearchMatch } from "./searchedTerms";
+import { sessionTypesOf } from "./sessions";
 import { useStanding } from "./standing";
 
 const ProfileMap = lazy(() => import("./ProfileMap"));
@@ -89,6 +91,7 @@ export function ProfileBody({ slug, back, close }: { slug: string } & Exits) {
               photo={<Skeleton className="size-full rounded-md" />}
               name={<SkeletonText className="w-56 max-w-full" />}
               location={<SkeletonText className="w-16" />}
+              sessions={<SkeletonText className="w-40 max-w-full" />}
               contacts={<ContactListSkeleton />}
             />
           </StickyHeader>
@@ -106,6 +109,7 @@ export function ProfileBody({ slug, back, close }: { slug: string } & Exits) {
   const offices = nearest === undefined ? profile.offices : [profile.offices[nearest]!, ...profile.offices.toSpliced(nearest, 1)];
   // The card the visitor's search showed, where there was one, says more than the header.
   const therapist = cachedCard(client, slug) ?? headerCard(profile);
+  const sessions = sessionTypesOf(profile);
   return (
     <>
       {said}
@@ -130,6 +134,7 @@ export function ProfileBody({ slug, back, close }: { slug: string } & Exits) {
                 </span>
               )
             }
+            sessions={sessions && <Sessions text={sessions} />}
             contacts={
               <>
                 <ContactList profile={profile} onReach={standing.reached} />
@@ -247,6 +252,8 @@ type IdentityProps = {
   photo: ReactNode;
   name: ReactNode;
   location?: ReactNode;
+  /** How they meet, as a search's card says it. */
+  sessions?: ReactNode;
   contacts: ReactNode;
   headingRef?: Ref<HTMLHeadingElement>;
   /** Stands in for a profile still loading, hidden from screen readers. */
@@ -258,7 +265,7 @@ type IdentityProps = {
  * skeleton. The contact details go under the name where the profile is wide, and on a line of their own under the photo
  * where it is narrow, taking the header's whole width rather than the little the photo leaves beside it.
  */
-function Identity({ photo, name, location, contacts, headingRef, placeholder }: IdentityProps) {
+function Identity({ photo, name, location, sessions, contacts, headingRef, placeholder }: IdentityProps) {
   return (
     <>
       {/* Large for a first look, as far as UKCP's 200 px photos allow, smaller in a header too narrow to leave the name room (below
@@ -289,6 +296,7 @@ function Identity({ photo, name, location, contacts, headingRef, placeholder }: 
             {location}
           </p>
         )}
+        {sessions && <p className="text-sm text-muted-foreground">{sessions}</p>}
       </div>
       {/* On a touch screen, far enough above the bookmark, which follows all but a placeholder, that the links' targets miss its own. */}
       <div
@@ -430,8 +438,9 @@ function StickyHeader({ back, close, bookmark, children }: Exits & { bookmark?: 
 }
 
 /** The therapist as the header shows them, for a shortlist card until a search that finds them fills it in. */
-function headerCard({ slug, name, initials, photoUrl, location }: Profile): ShortlistCard {
-  return { slug, name, initials, photoUrl, location, tags: [] };
+function headerCard(profile: Profile): ShortlistCard {
+  const { slug, name, initials, photoUrl, location } = profile;
+  return { slug, name, initials, photoUrl, location, sessionTypes: sessionTypesOf(profile), tags: [] };
 }
 
 type TagProps = {
