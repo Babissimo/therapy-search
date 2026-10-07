@@ -20,7 +20,7 @@ vi.mock("@/components/ui/map", async () => {
       createElement("div", { "data-testid": "map", "data-view": `${center.join(",")}@${zoom}` }, children as never),
     MapTileLayer: ({ bounds }: { bounds?: unknown }) => createElement("div", { "data-testid": "tiles", "data-bounds": JSON.stringify(bounds ?? null) }),
     MapBounds: ({ bounds }: { bounds?: unknown }) => createElement("div", { "data-testid": "bounds", "data-bounds": JSON.stringify(bounds ?? null) }),
-    MapZoomControl: () => null,
+    MapZoomControl: () => createElement("div", { role: "group", "aria-label": "Zoom" }),
     useReducedMotion: () => motion.reduced,
     MapMarkerClusterGroup: ({ children }: { children?: unknown }) => createElement(Fragment, null, children as never),
     MapMarker: ({
@@ -212,6 +212,21 @@ describe("MapPane", () => {
     cleanup();
     renderPane({ fitKey: "Location=Brighton", centre: BRIGHTON });
     expect(screen.getByTestId("fit").dataset.underToolbar).toBe("false");
+  });
+
+  it("puts its zoom buttons in the map, or where it is told outside it once that place is drawn", () => {
+    const zoom = () => screen.queryByRole("group", { name: "Zoom" });
+    renderPane();
+    expect(screen.getByTestId("map").contains(zoom())).toBe(true);
+    cleanup();
+    renderPane({ zoomTo: null });
+    expect(zoom()).toBeNull();
+    cleanup();
+    const slot = document.body.appendChild(document.createElement("div"));
+    onTestFinished(() => slot.remove());
+    renderPane({ zoomTo: slot });
+    expect(slot.contains(zoom())).toBe(true);
+    expect(screen.getByTestId("map").contains(zoom())).toBe(false);
   });
 
   it("remembers its view and how many it placed for the history entry, and opens there again for the same search", () => {
