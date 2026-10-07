@@ -642,9 +642,12 @@ describe("SearchPage", () => {
     expect(await screen.findByRole("region", { name: "Map of results" })).toBe(map());
     expect(toggle.textContent).toBe("List");
     expect(document.activeElement).toBe(toggle);
-    // In the list's place, scrolled to, with the site's name and the toolbar above it.
+    // In the list's place, scrolled to, with the toolbar above it to scroll back to, and as tall as the window less the tabs,
+    // whose height both read from the one variable.
     expect(column.scrollTop).toBe(1200);
     expect(screen.getByRole("textbox", { name: "Location" })).toBeTruthy();
+    expect(map().closest('[class~="h-[calc(100%-var(--list-tabs))]"]')).not.toBeNull();
+    expect(column.querySelector("[data-list-tabs]")?.classList.contains("h-(--list-tabs)")).toBe(true);
     expect(screen.getByRole("tabpanel", { name: "Results" }).closest(".not-print\\:hidden")).not.toBeNull();
     fireEvent.click(toggle);
     expect(toggle.textContent).toBe("Map");
@@ -748,15 +751,16 @@ describe("SearchPage", () => {
     expect(screen.getAllByRole("link", { name: /^Skip/ }).map((link) => link.textContent)).toEqual(["Skip to the results"]);
   });
 
-  it("puts the toolbar first in the page on narrow screens, then the tabs and the map's button, then the list, then the map", async () => {
+  it("puts the tabs and the map's button first in the page on narrow screens, then the toolbar, then the list, then the map", async () => {
     screenIs(false);
     renderAt(SEARCH);
     await loaded();
     const before = (a: Node, b: Node) => Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
     const toggle = screen.getByRole("button", { name: "Map" });
-    expect(before(screen.getByRole("textbox", { name: "Location" }), screen.getByRole("tablist"))).toBe(true);
+    const box = screen.getByRole("textbox", { name: "Location" });
     expect(before(screen.getByRole("tablist"), toggle)).toBe(true);
-    expect(before(toggle, screen.getByRole("tabpanel", { name: "Results" }))).toBe(true);
+    expect(before(toggle, box)).toBe(true);
+    expect(before(box, screen.getByRole("tabpanel", { name: "Results" }))).toBe(true);
     fireEvent.click(toggle);
     expect(before(screen.getByRole("tabpanel", { name: "Results" }), await screen.findByTestId("map"))).toBe(true);
     expect(screen.getAllByRole("link", { name: /^Skip/ }).map((link) => link.textContent)).toEqual(["Skip to the results"]);
@@ -1097,7 +1101,7 @@ describe("SearchPage", () => {
     expect(body?.contains(screen.getByRole("button", { name: close }))).toBe(false);
   });
 
-  it("sets the switch above the list's tabs on a phone before a search, and the filters then the place box beneath the prompt, handing the keyboard to the search's list as it begins", async () => {
+  it("sets the switch beneath the list's tabs on a phone before a search, and the filters then the place box beneath the prompt, handing the keyboard to the search's list as it begins", async () => {
     screenIs(false);
     shortlist.add(therapist("a"));
     renderAt("/");
@@ -1106,14 +1110,14 @@ describe("SearchPage", () => {
     expect(screen.queryByTestId("map")).toBeNull();
     expect(screen.queryByRole("button", { name: "Filters" })).toBeNull();
     const tablist = screen.getByRole("tablist");
-    expect(screen.getByRole("link", { name: "Near me" }).compareDocumentPosition(tablist) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(tablist.compareDocumentPosition(screen.getByRole("link", { name: "Near me" })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     const panel = screen.getByRole("tabpanel", { name: "Results" });
     const box = within(panel).getByRole("textbox", { name: "Location" });
     expect(within(panel).getByRole("button", { name: /^Languages/ }).compareDocumentPosition(box) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.getAllByRole("heading", { level: 1, name: "Find a UKCP therapist" })).toHaveLength(1);
     pick(/^Shortlist/);
     expect(within(screen.getByRole("tabpanel", { name: /^Shortlist/ })).getByRole("link", { name: "Therapist a" })).toBeTruthy();
-    // The switch above the tabs belongs to the search, which the shortlist has no use for.
+    // The switch beneath the tabs belongs to the search, which the shortlist has no use for.
     expect(screen.queryByRole("link", { name: "Near me" })).toBeNull();
     pick("Results");
     fireEvent.click(within(panel).getByRole("button", { name: /^Languages/ }));
@@ -1328,14 +1332,14 @@ describe("SearchPage", () => {
     expect(document.activeElement).toBe(screen.getByRole("tab", { name: /^Shortlist/ }));
   });
 
-  it("keeps the keyboard clear of the tabs stuck over the list where it leads", async () => {
+  it("keeps the keyboard clear of the tabs stuck over the toolbar and the list where the list leads", async () => {
     screenIs(false);
     renderAt(SEARCH);
     await loaded();
     // A browser scrolls what takes focus into view this far below the column's top, which the tabs fill.
-    const margins = screen.getByRole("tabpanel", { name: "Results" }).closest(".p-4")!.className;
-    expect(margins).toContain("[&_*]:scroll-mt-14");
-    expect(margins).toContain("pointer-coarse:[&_*]:scroll-mt-17");
+    const margin = '[class~="[&_*]:scroll-mt-[calc(var(--list-tabs)+0.5rem)]"]';
+    expect(screen.getByRole("textbox", { name: "Location" }).closest(margin)).not.toBeNull();
+    expect(screen.getByRole("tabpanel", { name: "Results" }).closest(margin)).not.toBeNull();
   });
 
   it("heads an invalid search link with the site's name, marked as an error", () => {
