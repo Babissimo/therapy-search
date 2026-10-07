@@ -2,7 +2,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, useLocation, useNavigate } from "react-router";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import type { Profile } from "@shared/types";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { api } from "@/lib/api";
@@ -93,6 +93,26 @@ describe("AppRoutes", () => {
     expect(api.search).toHaveBeenCalledOnce();
     // The keyboard carries on from the card that opened it.
     await waitFor(() => expect(document.activeElement).toBe(card));
+  });
+
+  it("expands a profile's drawer to the whole window and shrinks it back, opening the next as the last was left", async () => {
+    onTestFinished(() => localStorage.clear());
+    renderAt("/?Location=Leeds");
+    fireEvent.click(await screen.findByRole("link", { name: "Jo Bloggs" }));
+    let drawer = await screen.findByRole("dialog", { name: "Jo Bloggs" });
+    expect(drawer.hasAttribute("data-expanded")).toBe(false);
+    const expand = within(drawer).getByRole("button", { name: "Expand to full width" });
+    fireEvent.click(expand);
+    expect(drawer.hasAttribute("data-expanded")).toBe(true);
+    // The same button, renamed, so the keyboard stays on it.
+    expect(expand.textContent).toContain("Shrink to the side");
+    fireEvent.click(within(drawer).getByRole("button", { name: "Close" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    fireEvent.click(screen.getByRole("link", { name: "Jo Bloggs" }));
+    drawer = await screen.findByRole("dialog", { name: "Jo Bloggs" });
+    expect(drawer.hasAttribute("data-expanded")).toBe(true);
+    fireEvent.click(within(drawer).getByRole("button", { name: "Shrink to the side" }));
+    expect(drawer.hasAttribute("data-expanded")).toBe(false);
   });
 
   it("marks the drawer to print alone, in place of the search beneath it, and the page while the drawer is there", async () => {

@@ -30,7 +30,7 @@ export function AboutText() {
       <h3 className="font-medium">Who sees what</h3>
       <ul className="list-disc space-y-1.5 pl-4">
         <li>
-          Your browser keeps your shortlist (with where you stand with each therapist and your notes on them), your theme, a random number
+          Your browser keeps your shortlist (with where you stand with each therapist and your notes on them), your theme, whether profiles open full width, a random number
           that holds results in the same order and, until you close the tab, the search you last opened a profile from, and shares none of
           them. Anyone you remove from your shortlist is kept in case you add them
           back, until you clear it or open this site {REMOVED_DAYS} days or more after removing them.
