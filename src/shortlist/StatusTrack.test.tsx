@@ -169,6 +169,14 @@ describe("StatusTrack", () => {
     expect(["ml-auto", "justify-end"].map((c) => buttons.classList.contains(c))).toEqual([true, true]);
   });
 
+  it("leaves the menu its icon on a touch screen where the track lacks the room for its word beside the next step", () => {
+    renderTrack("contacted");
+    const menu = screen.getByRole("button", { name: "Status of Jo Bloggs: contacted" });
+    expect(menu.closest("[class~='@container/status-track']")).not.toBeNull();
+    expect(menu.classList.contains("@max-[15.5rem]/status-track:*:data-touch-label:sr-only")).toBe(true);
+    expect(within(menu).getByText("Status").hasAttribute("data-touch-label")).toBe(true);
+  });
+
   it("shows where a therapist taken off the shortlist stood, saying they were removed, with nothing to change it", () => {
     renderTrack("contacted", { listed: false });
     expect(currentStep()).toBe("Contacted");

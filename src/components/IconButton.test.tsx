@@ -26,6 +26,8 @@ describe("IconButton", () => {
     expect(filters.firstElementChild).toBe(shown);
     expect(shown.className).toContain("stacked:not-sr-only");
     expect(shown.className).toContain("stacked:order-last");
+    // Marked for a caller to hide where they lack the room.
+    expect(shown.hasAttribute("data-touch-label")).toBe(true);
     expect(within(screen.getByRole("button", { name: "Search" })).getByText("Search").className).toBe("sr-only");
   });
 

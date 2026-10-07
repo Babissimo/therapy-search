@@ -9,7 +9,7 @@ type Props = ComponentProps<typeof Button> & {
   /**
    * Shows the label after the icon on a touch screen, which has no tooltip to name it by, for those who say what they tap,
    * and wherever the button is laid out as there (`stacked`); or, given words, only those, which must start the label, so
-   * what is said still names the button.
+   * what is said still names the button. The words are marked `data-touch-label`, for a caller to hide where they lack the room.
    */
   touchLabel?: boolean | string;
 };
@@ -33,7 +33,9 @@ export function IconButton({ label, side = "bottom", size = "icon", touchLabel =
           {/* First in the name and last on screen, after the icon. */}
           {shown ? (
             <>
-              <span className="sr-only stacked:not-sr-only stacked:order-last stacked:whitespace-nowrap">{shown}</span>
+              <span data-touch-label className="sr-only stacked:not-sr-only stacked:order-last stacked:whitespace-nowrap">
+                {shown}
+              </span>
               {/* Parted from them by a space of the button's own, as each part of a name is read trimmed; a flex box draws it as
                   nothing. */}
               {rest && (
