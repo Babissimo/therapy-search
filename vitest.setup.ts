@@ -28,6 +28,11 @@ afterEach(() => cleanup());
 // Each test's first history entry is keyed "default", as a page load's is, so none may find what the last left there.
 afterEach(() => forgetViews());
 
+// Each test is a tab of its own, so none finds the profile the last opened over a page.
+afterEach(() => {
+  if (typeof sessionStorage !== "undefined") sessionStorage.clear();
+});
+
 if (typeof window !== "undefined") {
   // jsdom has no matchMedia: pages see a narrow screen without hover unless a test stubs its own.
   window.matchMedia ??= (query) => ({

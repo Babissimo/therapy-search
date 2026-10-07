@@ -7,7 +7,7 @@ import { SiteLayout } from "@/layout/SiteLayout";
 import { queryClient } from "@/lib/queryClient";
 import { ProfileDrawer } from "@/profile/ProfileDrawer";
 import { ProfilePage } from "@/profile/ProfilePage";
-import { backgroundOf } from "@/profile/profileLink";
+import { backgroundOf, useKeepOpened } from "@/profile/profileLink";
 import { ONLINE_PATH } from "@/search/online";
 import { SearchPage } from "@/search/SearchPage";
 import { STATEMENT_PATH } from "@/site";
@@ -31,6 +31,7 @@ export function AppRoutes() {
   // Read here, as the Routes below, given a location, report every arrival as a POP.
   const arrival = useNavigationType();
   const background = backgroundOf(location);
+  useKeepOpened(location);
   // The drawer's profile outlasts leaving it, so the drawer slides away still showing it.
   const [drawn, setDrawn] = useState(background && location);
   if (background && location !== drawn) setDrawn(location);

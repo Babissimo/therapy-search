@@ -151,6 +151,7 @@ When the visitor typed a location but UKCP searched "United Kingdom" (parity §3
 
 - A profile opened from a card or a pin shows in a drawer from the right, over the search, which stays rendered beneath it. The URL becomes `/#/therapist/:slug`, carrying the search's location as React Router's background location, so closing the drawer or Back returns to the search exactly as it was, and `SiteLayout` keeps the search's layout beneath.
 - A profile reached any other way, such as a shared link, is a page of its own, as before; a reload keeps whichever it was, since the browser keeps the history entry's state. The profile lays itself out by the width it is given, so it reads the same in the drawer as on a narrow page.
+- Entering a drawer's address again makes its entry afresh without that state, so the tab also keeps, in `sessionStorage`, the profile it last opened over a page and that page, and the profile at a stateless entry shows over it again. Closing it goes Back, or, where the Navigation API says the tab has nothing of the site's behind it, puts the page in the entry's place. The search stays out of the profile's address, so a copied link never carries what was searched for.
 
 ## 5. Worker: place and office lookups
 

@@ -6,3 +6,12 @@ export function browserStorage(): Storage | null {
     return null;
   }
 }
+
+/** `sessionStorage`, kept for the tab, or null where the browser refuses access to it. */
+export function tabStorage(): Storage | null {
+  try {
+    return window.sessionStorage;
+  } catch {
+    return null;
+  }
+}
