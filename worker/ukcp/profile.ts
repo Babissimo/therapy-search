@@ -1,6 +1,6 @@
 import type { ContactDetails, Profile, ProfileSection } from "../../shared/types";
 import { CONTACT_DETAIL, PROFILE_HEADER } from "../../shared/ukcp/markers";
-import { ParseError, mailtoAddress, optional, safeUrl } from "../../shared/ukcp/text";
+import { ParseError, mailtoAddress, optional, safeUrl, saysSomething } from "../../shared/ukcp/text";
 import { attribute, children, firstNamed, hasClass, lineOf, textOf, withClass, type Element } from "./markup";
 import { officesIn } from "./offices";
 
@@ -64,7 +64,7 @@ function sectionOf(section: Element): ProfileSection {
     paragraphs: parts
       .filter((el) => !/^(h2|h3|ul)$/.test(el.name) && !hasClass(el, "accordion-item") && withClass(el.inner, "accordion-item").length === 0)
       .flatMap((el) => textOf(el.inner).split(/\n{2,}/))
-      .filter(Boolean),
+      .filter(saysSomething),
     items: parts
       .filter((el) => el.name === "ul")
       .flatMap((ul) => children(ul.inner).filter((li) => li.name === "li"))

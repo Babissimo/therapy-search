@@ -1,6 +1,6 @@
 import type { Office, Profile, ProfileSection } from "../types";
 import { PROFILE_HEADER } from "./markers";
-import { ParseError, initialsOf, mailtoAddress, multiLine, oneLine, optional, readHtml, safeUrl } from "./text";
+import { ParseError, initialsOf, mailtoAddress, multiLine, oneLine, optional, readHtml, safeUrl, saysSomething } from "./text";
 
 export function parseProfile(html: string, slug: string): Profile {
   const doc = readHtml(html);
@@ -52,7 +52,7 @@ function parseSection(section: Element): ProfileSection {
     paragraphs: [...section.children]
       .filter((el) => !/^(H2|H3|UL)$/.test(el.tagName) && !el.classList.contains("accordion-item") && !el.querySelector(".accordion-item"))
       .flatMap((el) => multiLine(el).split(/\n{2,}/))
-      .filter(Boolean),
+      .filter(saysSomething),
     items: [...section.querySelectorAll(":scope > ul > li")].map((li) => oneLine(li.textContent)).filter(Boolean),
     details: [...section.querySelectorAll(".accordion-item")].map((item) => ({
       title: oneLine(item.querySelector(".accordion-header")?.textContent),

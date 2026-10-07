@@ -35,6 +35,15 @@ export function tidyLines(text: string): string {
     .trim();
 }
 
+// UKCP's own line under "Working with Children", on every therapist with a child or family title. It links to UKCP's page on
+// training to work with children, so says nothing to someone looking for a therapist.
+const CHILDREN_STOCK = /^for more information about therapy for children and young people, visit our info page\.?$/i;
+
+/** Whether a paragraph of a profile's section says something of the therapist: not empty, nor a stock line of UKCP's. */
+export function saysSomething(paragraph: string): boolean {
+  return paragraph !== "" && !CHILDREN_STOCK.test(oneLine(paragraph));
+}
+
 export function optional(text: string): string | undefined {
   return text === "" ? undefined : text;
 }
