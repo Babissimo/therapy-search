@@ -168,6 +168,25 @@ describe("ProfilePage's header", () => {
     expect(email.closest("header")).not.toBeNull();
   });
 
+  it("says how the therapist meets under their place, each way by its icon, as their card in a search does", async () => {
+    const practical = [{ heading: "Types of sessions", paragraphs: [], items: ["Face to Face - Long Term", "Online Therapy"], details: [] }];
+    renderAt(["/therapist/Test-ABCDEFGH"], { ...PROFILE, location: "Testtown", practical });
+    const line = (await screen.findByText("Remote")).closest("p")!;
+    expect(line.closest("header")).not.toBeNull();
+    expect(line.previousElementSibling?.textContent).toBe("Testtown");
+    expect(line.textContent).toBe("In-person, Remote");
+    expect([...line.querySelectorAll("svg")].map((svg) => ["armchair", "video"].find((name) => svg.classList.contains(`lucide-${name}`)))).toEqual([
+      "armchair",
+      "video",
+    ]);
+  });
+
+  it("says nothing of how they meet where the profile lists no types of session", async () => {
+    renderAt(["/therapist/Test-ABCDEFGH"], { ...PROFILE, location: "Testtown" });
+    const place = (await screen.findByText("Testtown")).closest("p")!;
+    expect(place.nextElementSibling).toBeNull();
+  });
+
   it("puts its bookmark on a line of its own under the header on a touch screen or in a narrow header, leaving a drawer's close button beside the name", async () => {
     renderAt(["/therapist/Test-ABCDEFGH"], PROFILE, { close: <button type="button">Close</button> });
     const bookmark = (await screen.findByRole("button", { name: "Add Test Therapist to your shortlist" })).parentElement!;
@@ -239,11 +258,14 @@ describe("ProfilePage's bookmark", () => {
 
   it("shortlists the therapist from the header with what it shows of them, where no search showed their card", async () => {
     const store = createShortlistStore(null);
-    renderAt(["/therapist/Test-ABCDEFGH"], { ...PROFILE, location: "Testtown", photoUrl: "https://example.invalid/photo.jpg" }, { store });
+    const practical = [{ heading: "Types of sessions", paragraphs: [], items: ["Online Therapy"], details: [] }];
+    renderAt(["/therapist/Test-ABCDEFGH"], { ...PROFILE, location: "Testtown", photoUrl: "https://example.invalid/photo.jpg", practical }, { store });
     await screen.findByRole("heading", { name: "Test Therapist" });
     expect(screen.getByRole("button", { name: "Add Test Therapist to your shortlist" }).closest("header")).not.toBeNull();
     add();
-    expect(store.get().map((entry) => entry.card)).toEqual([{ slug: "Test-ABCDEFGH", name: "Test Therapist", initials: "TT", photoUrl: "https://example.invalid/photo.jpg", location: "Testtown", tags: [] }]);
+    expect(store.get().map((entry) => entry.card)).toEqual([
+      { slug: "Test-ABCDEFGH", name: "Test Therapist", initials: "TT", photoUrl: "https://example.invalid/photo.jpg", location: "Testtown", sessionTypes: "Remote", tags: [] },
+    ]);
     remove();
     expect(store.get()).toEqual([]);
   });
