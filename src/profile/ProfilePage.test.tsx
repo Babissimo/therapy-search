@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, renderHook, screen, waitFor, within } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { MemoryRouter, Route, Routes, type Location } from "react-router";
+import { compile } from "tailwindcss";
 import { afterEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import { emptyParams, readParams } from "@shared/query";
 import type { Profile, TherapistCard } from "@shared/types";
@@ -69,7 +70,10 @@ afterEach(() => {
   mapChunk.fails = false;
 });
 
-/** Stands in for the IntersectionObserver jsdom lacks, and returns what reports the header clipped at the top, as its scroller does once it sticks. */
+/**
+ * Stands in for the IntersectionObserver jsdom lacks, and returns what reports the header clipped at the top, as its scroller
+ * does once it sticks. Sticky, as the stylesheet jsdom doesn't load makes it on a screen tall enough.
+ */
 function stickable() {
   const reports: IntersectionObserverCallback[] = [];
   vi.stubGlobal(
@@ -79,11 +83,16 @@ function stickable() {
         reports.push(callback);
       }
       observe() {}
+      unobserve() {}
       disconnect() {}
     },
   );
   const clipped = { boundingClientRect: { top: -1 }, intersectionRect: { top: 0 } } as IntersectionObserverEntry;
-  return () => act(() => reports.at(-1)!([clipped], {} as IntersectionObserver));
+  return () =>
+    act(() => {
+      document.querySelector<HTMLElement>("article > header")!.style.position = "sticky";
+      reports.at(-1)!([clipped], {} as IntersectionObserver);
+    });
 }
 
 describe("ProfilePage's way back", () => {
@@ -183,6 +192,16 @@ describe("ProfilePage's header", () => {
     expect(header?.dataset.stuck).toBeUndefined();
     stick();
     expect(header?.dataset.stuck).toBe("true");
+  });
+
+  it("sticks only where the screen is tall enough to leave most of it to read, and never on paper", async () => {
+    renderAt(["/therapist/Test-ABCDEFGH"]);
+    const header = (await screen.findByRole("heading", { name: "Test Therapist" })).closest("header")!;
+    const sticky = [...header.classList].filter((c) => c.endsWith("sticky"));
+    expect(sticky).toEqual(["not-print:[@media(min-height:30rem)]:sticky"]);
+    // Tailwind drops a variant it can't read without a word, which would leave the header never sticking.
+    const css = (await compile("@tailwind utilities;")).build(sticky);
+    expect(css).toMatch(/@media not print\s*\{\s*@media \(min-height:\s*30rem\)\s*\{[^{}]*\{\s*position: sticky;\s*\}/);
   });
 });
 
