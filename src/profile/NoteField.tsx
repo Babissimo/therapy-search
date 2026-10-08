@@ -1,10 +1,8 @@
 import { useEffect, useEffectEvent, useId, useState } from "react";
 import { Textarea } from "@/components/ui/textarea";
+import { SAVE_AFTER } from "@/lib/useSavedValue";
 import { NOTE_LIMIT } from "@/shortlist/store";
 import { useShortlisted, useShortlistNote, useShortlistStore } from "@/shortlist/useShortlist";
-
-/** How long typing rests before the note is saved. */
-const SAVE_AFTER = 500;
 
 /** How few characters may be left before the box says how many. */
 const COUNT_WITHIN = 100;
