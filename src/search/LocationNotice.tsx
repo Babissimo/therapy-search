@@ -5,7 +5,7 @@ export function LocationNotice({ typed, searched }: { typed: string; searched?: 
   if (!locationFellBack(typed, searched)) return null;
   return (
     <Alert>
-      <AlertDescription>UKCP didn't recognise "{typed.trim()}", so these results are from across the UK. Try a town or a postcode.</AlertDescription>
+      <AlertDescription>UKCP didn't recognise "{typed.trim()}", so these results are from across the UK. Try a postcode or a town.</AlertDescription>
     </Alert>
   );
 }

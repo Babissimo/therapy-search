@@ -216,7 +216,7 @@ describe("POST /plain near a place", () => {
   it("says when UKCP didn't recognise the place, rather than listing results from anywhere", async () => {
     const { post } = setup({ client: { search: vi.fn(async () => bytes(results(12, { place: "United Kingdom" }))) } });
     const { doc } = await read(await post("/plain", "Location=Brightn"));
-    expect(doc.querySelector("#place-error")?.textContent).toBe(`Error: UKCP didn't recognise "Brightn". Try a town or a postcode.`);
+    expect(doc.querySelector("#place-error")?.textContent).toBe(`Error: UKCP didn't recognise "Brightn". Try a postcode or a town.`);
     expect(doc.querySelector(".results")).toBeNull();
   });
 

@@ -662,7 +662,7 @@ function Toolbar({
 function NearPrompt({ wide, askRef }: { wide: boolean; askRef: RefObject<HTMLDivElement | null> }) {
   return (
     <Prompt askRef={askRef} ask="Start with what matters to you." toFilters={!wide} className={wide ? "py-10 sm:py-16" : "pt-6"}>
-      Tick anything that matters to you {wide ? "in the filters to the right" : "below"}, then type a town, city or postcode
+      Tick anything that matters to you {wide ? "in the filters to the right" : "below"}, then type a postcode, town or city
       {wide && " beneath them"} to see the UKCP therapists nearest to it.
     </Prompt>
   );

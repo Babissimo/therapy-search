@@ -13,7 +13,7 @@ export type Html = ReturnType<typeof html>;
 export const SITE_NAME = "Find a UKCP therapist (unofficial)";
 export const REPORT_URL = "https://github.com/Babissimo/therapy-search/issues/new?template=accessibility.yml";
 export const NEW_TAB = "(opens in a new tab)";
-export const NO_PLACE = "Type a town or postcode to search.";
+export const NO_PLACE = "Type a postcode or town to search.";
 export const UNREADABLE = "UKCP's pages have changed, so this site can't read them yet. Search on UKCP directly.";
 
 export const NEEDS_FILTER = "To search online, choose a filter or type a keyword. Type of session alone leaves thousands of therapists.";
@@ -28,7 +28,7 @@ export type Asked = { online: boolean; params: SearchParams; shown: number; seed
 export type Problems = { place?: string; filters?: string; search?: string };
 
 export function unrecognised(place: string): string {
-  return `UKCP didn't recognise "${place}". Try a town or a postcode.`;
+  return `UKCP didn't recognise "${place}". Try a postcode or a town.`;
 }
 
 export function searchPage(asked: Asked, problems: Problems = {}): Html {
@@ -152,7 +152,7 @@ ${seedField(seed)}
 <p class="hint" id="online-hint">Wherever they are. Face-to-face sessions, home visits and wheelchair access don't count.</p></div>
 </fieldset>
 <div class="field">
-<label for="place">Town or postcode</label>
+<label for="place">Postcode or town</label>
 <p class="hint" id="place-hint">For Near me.</p>
 ${errorLine("place-error", place)}
 <input type="text" id="place" name="Location" value="${params.text.Location}" maxlength="${TEXT_MAX_LENGTH}" aria-describedby="place-hint${place ? " place-error" : ""}"${place ? raw(' aria-invalid="true"') : ""}>
