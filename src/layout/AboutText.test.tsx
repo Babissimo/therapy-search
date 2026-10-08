@@ -34,4 +34,9 @@ describe("AboutText", () => {
       /with where you stand with each therapist, the search you found them by, your notes and email drafts, and the name and free times you give for drafts\)/,
     );
   });
+
+  it("says the browser keeps the answers to the questions until the tab closes", () => {
+    render(<AboutText />, { wrapper: MemoryRouter });
+    screen.getByText(/until you close the tab, your answers to the questions and the search you last opened a profile or this text from, and shares none of them\./);
+  });
 });
