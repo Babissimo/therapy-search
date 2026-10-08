@@ -71,22 +71,24 @@ Written from three sources: the search the therapist was found by (§4.7), their
 >
 > I found your profile on the UKCP register and I'm looking for {who for}. I'd like some help with {issues}. I'm particularly interested in working with {type of therapy}.
 >
-> I'd like to meet {how}{, for longer- or short-term work}{, and to have sessions in {language}}. I live {near place}. I'm usually free {when}.
+> I'd like to have sessions {how}{, for longer- or short-term work}{, and in {language}}. I live {near place}. I'm usually free {when}.
 >
-> Could you let me know whether you have space for new clients{, what your fees are}{, whether your room is wheelchair accessible}{, whether you accept clients through private health insurance}, and whether you offer a first consultation?
+> Could you let me know whether you have space for new clients{, what your fees are}{, whether your room is wheelchair accessible}{, whether you accept clients through private health insurance} and whether you offer a first consultation?
 >
 > Many thanks,
 > {name}
+
+The help sentence reads "I'd like some help for my child with …" when the child is the only person ticked, and a name that starts with a title is greeted by title and surname ("Hello Dr Bloggs,"), as in the dialog's title and wherever else the first name stands.
 
 Each filter becomes one chip per value:
 
 | From the search | Chip | Words |
 |---|---|---|
-| Works With: Individuals, Couples, Families, Children and young people, Groups | the option's label | "a therapist for myself", "couples therapy for my partner and me", "family therapy", "a therapist for my child", "group therapy"; with none, "a therapist" |
+| Works With: Individuals, Couples, Families, Children and young people, Groups | the option's label | "a therapist for myself", "couples therapy with my partner", "family therapy", "a therapist for my child", "group therapy"; with none, "a therapist" |
 | I Want Help With, and HelpWith terms in that list | the term | after "help with", lower-cased except words in capitals (ADHD, AIDS/HIV) |
 | Type of Therapy, and HelpWith terms in that list | the title | as UKCP writes it, with "a" or "an" by its sound ("a UTC Psychotherapist"); several joined by "or" |
 | Type of Session | "In person", "At home", "Online", "By phone" | "in person", "at home", "online", "by phone", joined by "or"; "Face to Face - Long Term" or "- Short Term" alone adds the term of the work |
-| Languages | the language | "to have sessions in Polish" |
+| Languages | the language | "in Polish", after the way of meeting or, with none, as "have sessions in Polish"; several joined by "or" |
 | Location, on Near me | "Near Leeds" or "In the LS6 area" | a place as typed; a postcode, typed or found by Use my location, by its outward code only |
 | Only show wheelchair accessible | "Wheelchair access" | the question about the room |
 | Works With: Private healthcare referrals | "Private health insurance" | the question about insurance |
@@ -101,6 +103,11 @@ Some help-with terms don't read after "help with", and are written differently:
 | Sex Offenders, Those at Risk of Sexual(ly) Offending | "a risk of sexual offending" |
 | Workplace Counselling | "problems at work" |
 | Parents | "parenting" |
+| Gender, Transgender | "gender identity" |
+| Family | "family issues" |
+| Supervision | "clinical supervision" |
+| Training | "my training as a therapist" |
+| Private Practice Issues | "running a private practice" |
 | Online Counselling, Telephone Counselling | a Type of Session: "online", "by phone" |
 | EMDR | a type of therapy: "I'm particularly interested in EMDR." |
 
