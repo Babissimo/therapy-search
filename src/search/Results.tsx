@@ -89,9 +89,11 @@ export function Results({ params, results, listRef, pins = [], unplaced = [], se
       {slowNote}
       {/* Dims while the next search's results are on their way. */}
       <section aria-busy={stale} className={cn("space-y-4 motion-safe:transition-opacity", stale && "opacity-60")}>
-        {/* The heading and each entry fade in as they replace their skeleton or arrive, and again as their tab is shown,
-            which starts their animations afresh. Side by side rather than one within another, so no fade dims another. */}
-        <div className="space-y-4 fade-in-0 motion-safe:animate-in">
+        {/* In a wide window (WIDE), the heading and each entry fade in as they replace their skeleton or arrive, and again as
+            their tab is shown, which starts their animations afresh; in a narrower one, where Near me's list takes turns with
+            its map and so shows again far more often, they don't. Side by side rather than one within another, so no fade
+            dims another. */}
+        <div className="space-y-4 fade-in-0 wide:motion-safe:animate-in">
           {/* With no one found, the heading has said so, and the place still says where. Online, the heading stands alone. Paper,
               without the chips or Load more, names the filters and says how many there are, in lines boxed with the heading, as
               hidden on screen they would still count among space-y's children. */}
@@ -126,7 +128,7 @@ export function Results({ params, results, listRef, pins = [], unplaced = [], se
                 key={key}
                 data-pin={pin?.key}
                 aria-current={marked || undefined}
-                className={cn("rounded-xl fade-in-0 motion-safe:animate-in", marked && t && "ring-2 ring-highlight forced-marked")}
+                className={cn("rounded-xl fade-in-0 wide:motion-safe:animate-in", marked && t && "ring-2 ring-highlight forced-marked")}
               >
                 {t ? (
                   <ResultCard therapist={t} sought={sought} online={online} fee={feeOf(t)} onHighlight={highlight(t.slug)} />

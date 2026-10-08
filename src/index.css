@@ -13,6 +13,13 @@
   }
 }
 
+/* Wide enough for the list to sit beside the map (wide.ts's WIDE). */
+@custom-variant wide {
+  @media (min-width: 64rem) and (min-height: 31rem) {
+    @slot;
+  }
+}
+
 /* Laid out as on a touch screen: there, and in a card or a profile's header too narrow to keep its action beside the name
    (the containers named in TherapistCard and ProfilePage). */
 @custom-variant stacked {
