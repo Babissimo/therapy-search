@@ -1,6 +1,7 @@
-import { Pause } from "lucide-react";
+import { Mail, Pause } from "lucide-react";
 import { useLayoutEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { LazyEmailDrafter, usePreloadDrafter } from "@/drafter/LazyEmailDrafter";
 import { cn } from "@/lib/utils";
 import { STATUS_LABEL } from "./status";
 import { StatusMenu } from "./StatusMenu";
@@ -25,6 +26,9 @@ const NEXT_STEP: Record<Status, { label: string; status: Status } | undefined> =
   setAside: { label: "Consider again", status: "toContact" },
 };
 
+/** The controls the track gives focus to as it redraws, by their attributes. */
+type Refocus = "[data-status-menu]" | "[data-next-step]" | "[data-draft-email]";
+
 type Props = {
   therapist: ShortlistCard;
   status: Status;
@@ -40,13 +44,19 @@ type Props = {
 export function StatusTrack({ therapist, status, listed = true, onChosen, onRemoved }: Props) {
   const store = useShortlistStore();
   const root = useRef<HTMLDivElement>(null);
-  // Set when the button takes them to the path's end, where it goes, so focus moves to the menu beside it.
-  const toMenu = useRef(false);
+  // What takes focus once the track redraws, where what had it has gone or a click never gave it.
+  const refocus = useRef<Refocus | undefined>(undefined);
   useLayoutEffect(() => {
-    if (!toMenu.current) return;
-    toMenu.current = false;
-    root.current?.querySelector<HTMLElement>("[data-status-menu]")?.focus();
+    const target = refocus.current;
+    refocus.current = undefined;
+    if (target) root.current?.querySelector<HTMLElement>(target)?.focus();
   });
+  const drafts = listed && status === "toContact";
+  usePreloadDrafter(drafts);
+  // Open while the visitor writes; mounted only then, as it reads the therapist's profile.
+  const [drafting, setDrafting] = useState(false);
+  // Shut once the track stops offering it, as when another tab marks them contacted, so it stays shut if they come back.
+  if (drafting && !drafts) setDrafting(false);
   // Once the status changes here, the words saying it fade in as they change; as the track first draws they are simply there.
   const [shown, setShown] = useState({ status, changed: false });
   if (status !== shown.status) setShown({ status, changed: true });
@@ -56,7 +66,8 @@ export function StatusTrack({ therapist, status, listed = true, onChosen, onRemo
   const next = NEXT_STEP[status];
 
   function step(to: Status) {
-    toMenu.current = NEXT_STEP[to] === undefined;
+    // The button goes at the path's end, so focus moves to the menu beside it.
+    if (NEXT_STEP[to] === undefined) refocus.current = "[data-status-menu]";
     store.setStatus(therapist.slug, to);
     onChosen?.(to);
   }
@@ -104,8 +115,18 @@ export function StatusTrack({ therapist, status, listed = true, onChosen, onRemo
         </p>
         {listed ? (
           <div className="ml-auto flex flex-wrap items-center justify-end gap-1 pointer-coarse:gap-y-4">
+            {drafts && (
+              <Button variant="outline" size="sm" data-draft-email onClick={() => setDrafting(true)}>
+                <Mail aria-hidden />
+                {/* The space outside, as a name computed from the content may trim it from the start of the hidden words. */}
+                Draft an email{" "}
+                <span className="sr-only">
+                  to <span translate="no">{therapist.name}</span>
+                </span>
+              </Button>
+            )}
             {next && (
-              <Button variant="outline" size="sm" onClick={() => step(next.status)}>
+              <Button variant="outline" size="sm" data-next-step onClick={() => step(next.status)}>
                 {/* Its words drawn anew, the button kept, so focus stays on it. */}
                 <span key={next.label} className={cn(fadeIn)}>
                   {next.label}
@@ -122,6 +143,22 @@ export function StatusTrack({ therapist, status, listed = true, onChosen, onRemo
           <p className="ml-auto text-sm text-muted-foreground">Removed from your shortlist</p>
         )}
       </div>
+      {drafting && (
+        <LazyEmailDrafter
+          therapist={therapist}
+          onClose={() => {
+            setDrafting(false);
+            // Back to its button, which a click doesn't focus in Safari or Firefox.
+            refocus.current = "[data-draft-email]";
+          }}
+          onMarked={() => {
+            setDrafting(false);
+            // Its button goes with the status, so focus moves to the next step instead.
+            refocus.current = "[data-next-step]";
+            step("contacted");
+          }}
+        />
+      )}
     </div>
   );
 }
