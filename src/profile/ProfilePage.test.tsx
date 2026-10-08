@@ -168,12 +168,14 @@ describe("ProfilePage's header", () => {
     expect(email.closest("header")).not.toBeNull();
   });
 
-  it("says how the therapist meets under their place, each way by its icon, as their card in a search does", async () => {
+  it("says how the therapist meets beside their place, each way by its icon, as their card in a search does", async () => {
     const practical = [{ heading: "Types of sessions", paragraphs: [], items: ["Face to Face - Long Term", "Online Therapy"], details: [] }];
     renderAt(["/therapist/Test-ABCDEFGH"], { ...PROFILE, location: "Testtown", practical });
     const line = (await screen.findByText("Remote")).closest("p")!;
     expect(line.closest("header")).not.toBeNull();
     expect(line.previousElementSibling?.textContent).toBe("Testtown");
+    // A row of their own, not two lines of the name's column.
+    expect(line.parentElement).not.toBe(screen.getByRole("heading", { name: "Test Therapist" }).parentElement);
     expect(line.textContent).toBe("In-person, Remote");
     expect([...line.querySelectorAll("svg")].map((svg) => ["armchair", "video"].find((name) => svg.classList.contains(`lucide-${name}`)))).toEqual([
       "armchair",

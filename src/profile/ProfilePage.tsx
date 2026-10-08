@@ -291,12 +291,13 @@ function Identity({ photo, name, location, sessions, contacts, headingRef, place
         >
           {name}
         </h1>
-        {location && (
-          <p translate="no" className="text-sm text-muted-foreground">
-            {location}
-          </p>
+        {/* On one line, spaced as the ways of meeting are among themselves, which fall under the place where both don't fit. */}
+        {(location || sessions) && (
+          <div className="flex flex-wrap gap-x-3 text-sm text-muted-foreground">
+            {location && <p translate="no">{location}</p>}
+            {sessions && <p>{sessions}</p>}
+          </div>
         )}
-        {sessions && <p className="text-sm text-muted-foreground">{sessions}</p>}
       </div>
       {/* On a touch screen, far enough above the bookmark, which follows all but a placeholder, that the links' targets miss its own. */}
       <div
