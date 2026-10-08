@@ -284,6 +284,14 @@ describe("ProfilePage's bookmark", () => {
     expect(store.get().map((entry) => entry.card)).toEqual([CARD]);
   });
 
+  it("keeps the search a profile was opened from with a therapist bookmarked there", async () => {
+    const store = createShortlistStore(null);
+    const background = { pathname: "/", search: "?HelpWithAdvanced=Anxiety", hash: "", state: null, key: "beneath" };
+    renderAt([{ pathname: "/therapist/Test-ABCDEFGH", state: { background } }], PROFILE, { store, close: <button>Close</button> });
+    fireEvent.click(await screen.findByRole("button", { name: "Add Test Therapist to your shortlist" }));
+    expect(store.get()[0]?.search).toBe("HelpWithAdvanced=Anxiety");
+  });
+
   it("puts back where and as they were a therapist removed before the profile opened, with their note", async () => {
     const store = createShortlistStore(null);
     store.add(CARD, { status: "consultation" });
@@ -534,6 +542,16 @@ describe("ProfilePage's contact offer", () => {
     screen.getByText("Test Therapist: Contacted, and added to your shortlist.");
     screen.getByRole("button", { name: "Remove Test Therapist from your shortlist" });
     expect(await step()).toBe("Contacted");
+  });
+
+  it("keeps the search a profile was opened from with a therapist shortlisted as contacted on Yes", async () => {
+    const store = createShortlistStore(null);
+    const background = { pathname: "/", search: "?HelpWithAdvanced=Anxiety", hash: "", state: null, key: "beneath" };
+    renderAt([{ pathname: "/therapist/Test-ABCDEFGH", state: { background } }], REACHABLE, { store, close: <button>Close</button> });
+    await screen.findByRole("heading", { name: "Test Therapist" });
+    follow("Email: test@example.com");
+    fireEvent.click(screen.getByRole("button", { name: "Yes" }));
+    expect(store.get()[0]).toMatchObject({ status: "contacted", search: "HelpWithAdvanced=Anxiety" });
   });
 
   it("marks a shortlisted therapist still to contact as contacted on Yes, keeping their place and card", async () => {

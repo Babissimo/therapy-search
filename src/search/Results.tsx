@@ -1,6 +1,6 @@
 import { MapPin } from "lucide-react";
 import { useId, type ComponentProps, type ReactNode, type Ref } from "react";
-import type { SearchParams } from "@shared/query";
+import { toQuery, type SearchParams } from "@shared/query";
 import type { TherapistCard as Therapist } from "@shared/types";
 import { SkeletonText } from "@/components/SkeletonText";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -77,6 +77,8 @@ export function Results({ params, results, listRef, pins = [], unplaced = [], se
   const located = searchedPlace !== undefined;
   const highlight = (slug: string) => (on: boolean) => onHighlight?.(on ? slug : undefined);
   const sought = soughtTerms(params);
+  // Kept with anyone shortlisted from these results.
+  const search = toQuery({ ...params, page: 1 }) || undefined;
   const filters = activeFilters(asked);
   const wanted = feeKinds(params.multi.WorksWith);
   const feeOf = (t: Therapist) => {
@@ -131,9 +133,9 @@ export function Results({ params, results, listRef, pins = [], unplaced = [], se
                 className={cn("rounded-xl fade-in-0 wide:motion-safe:animate-in", marked && t && "ring-2 ring-highlight forced-marked")}
               >
                 {t ? (
-                  <ResultCard therapist={t} sought={sought} online={online} fee={feeOf(t)} onHighlight={highlight(t.slug)} />
+                  <ResultCard therapist={t} sought={sought} online={online} fee={feeOf(t)} onHighlight={highlight(t.slug)} search={search} />
                 ) : (
-                  <PinGroup pin={entry.pin} marked={marked} sought={sought} feeOf={feeOf} highlight={highlight} />
+                  <PinGroup pin={entry.pin} marked={marked} sought={sought} feeOf={feeOf} highlight={highlight} search={search} />
                 )}
               </li>
             );
@@ -145,9 +147,9 @@ export function Results({ params, results, listRef, pins = [], unplaced = [], se
 }
 
 /** A result's card with its bookmark, saying where the visitor stands with them once shortlisted. */
-function ResultCard(props: Omit<ComponentProps<typeof TherapistCard>, "action" | "status">) {
+function ResultCard({ search, ...props }: Omit<ComponentProps<typeof TherapistCard>, "action" | "status"> & { search?: string }) {
   const status = useShortlistStatus(props.therapist.slug);
-  return <TherapistCard {...props} action={<ShortlistButton therapist={props.therapist} />} status={status} />;
+  return <TherapistCard {...props} action={<ShortlistButton therapist={props.therapist} search={search} />} status={status} />;
 }
 
 /** The list's heading and the lines under it, shared by the list and its skeleton. */
@@ -180,10 +182,11 @@ type PinGroupProps = {
   sought: ReadonlySet<string>;
   feeOf: (t: Therapist) => Fee | undefined;
   highlight: (slug: string) => (on: boolean) => void;
+  search?: string;
 };
 
 /** Everyone at a stacked pin, under the place they list. */
-function PinGroup({ pin, marked, sought, feeOf, highlight }: PinGroupProps) {
+function PinGroup({ pin, marked, sought, feeOf, highlight, search }: PinGroupProps) {
   const headingId = useId();
   return (
     // A group rather than a section, which would make every place a landmark.
@@ -204,7 +207,7 @@ function PinGroup({ pin, marked, sought, feeOf, highlight }: PinGroupProps) {
       <ul className="space-y-3">
         {pin.therapists.map((t) => (
           <li key={t.slug}>
-            <ResultCard therapist={t} sought={sought} grouped fee={feeOf(t)} onHighlight={highlight(t.slug)} />
+            <ResultCard therapist={t} sought={sought} grouped fee={feeOf(t)} onHighlight={highlight(t.slug)} search={search} />
           </li>
         ))}
       </ul>

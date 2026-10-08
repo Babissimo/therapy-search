@@ -5,9 +5,10 @@ import { useShortlistAnnouncement, useShortlistStatus, useShortlistStore } from 
 
 /**
  * Where the visitor stands with a profile's therapist, with the offer to mark them contacted once a phone or email link is
- * followed, what a screen reader hears as that changes, and where focus goes as the track and the offer do.
+ * followed, what a screen reader hears as that changes, and where focus goes as the track and the offer do. `search` is kept
+ * with a therapist the offer shortlists.
  */
-export function useStanding(slug: string) {
+export function useStanding(slug: string, search?: string) {
   const store = useShortlistStore();
   const status = useShortlistStatus(slug);
   const unmarked = status === undefined || status === "toContact";
@@ -56,7 +57,7 @@ export function useStanding(slug: string) {
           store.setStatus(slug, "contacted");
           chosen(therapist, "contacted");
         } else {
-          store.add(therapist, { status: "contacted" });
+          store.add(therapist, { status: "contacted", search });
           announce(`${therapist.name}: ${STATUS_LABEL.contacted}, and added to your shortlist.`);
         }
       }
