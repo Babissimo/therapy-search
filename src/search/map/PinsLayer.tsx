@@ -88,6 +88,9 @@ function restingZ(therapists: Pin["therapists"] | undefined, shortlisted: Readon
 
 const MARKS = ["pin-highlight", "pin-selected"] as const;
 
+/** On the selected pin once its halo has pulsed in view, so a pin redrawn to show the same selection doesn't pulse again (index.css). */
+const PULSED = "pin-pulsed";
+
 /**
  * Keeps `className` on whichever pin or cluster shows the marker for `slug`, as zooming and panning redraw them, and as a
  * change to `shortlisted` or `statuses` redraws their icons.
@@ -102,14 +105,26 @@ function useMarkedPin(
   statuses: ReadonlyMap<string, Status>,
 ) {
   const map = useMap();
+  // Only the selected pin's halo pulses, once for each selection; `pulsed` names the one whose has.
+  const pulses = className === "pin-selected";
+  const pulsed = useRef<string | undefined>(undefined);
   useEffect(() => {
     const group = cluster.current;
+    if (slug === undefined) pulsed.current = undefined;
     if (slug === undefined || !group) return;
     let marked: { layer: L.Marker; element: HTMLElement } | undefined;
+    // Only a pulse played through counts: one cut short, as its pin is redrawn or hidden, plays afresh on the pin showing it next.
+    const ended = (event: Event) => {
+      if ((event as AnimationEvent).animationName !== "pin-pulse") return;
+      pulsed.current = slug;
+      marked?.element.classList.add(PULSED);
+    };
     const unmark = () => {
       if (!marked) return;
       const { layer, element } = marked;
       element.classList.remove(className);
+      if (pulses) element.classList.remove(PULSED);
+      element.removeEventListener("animationend", ended);
       // Kept raised while the other mark is on it.
       if (!MARKS.some((mark) => element.classList.contains(mark))) layer.setZIndexOffset(restingZ(markerData<Pin>(layer)?.therapists, shortlisted));
       marked = undefined;
@@ -121,6 +136,10 @@ function useMarkedPin(
       const element = shown?.getElement();
       if (!shown || !element) return;
       element.classList.add(className);
+      if (pulses) {
+        if (pulsed.current === slug) element.classList.add(PULSED);
+        else element.addEventListener("animationend", ended);
+      }
       shown.setZIndexOffset(1000);
       marked = { layer: shown, element };
     };

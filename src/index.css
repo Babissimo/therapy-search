@@ -13,6 +13,13 @@
   }
 }
 
+/* Wide enough for the list to sit beside the map (wide.ts's WIDE). */
+@custom-variant wide {
+  @media (min-width: 64rem) and (min-height: 31rem) {
+    @slot;
+  }
+}
+
 /* Laid out as on a touch screen: there, and in a card or a profile's header too narrow to keep its action beside the name
    (the containers named in TherapistCard and ProfilePage). */
 @custom-variant stacked {
@@ -387,9 +394,13 @@
   .pin-highlight > * {
     @apply scale-125 motion-safe:transition-[scale];
   }
-  /* The selected pin, whose entry the list marks, or the cluster holding it. */
+  /* The selected pin, whose entry the list marks, or the cluster holding it. Its halo pulses until it has once in view, not
+     again as zooming redraws it or the map shows again (PinsLayer's PULSED). */
   .pin-selected .pin-avatar::before {
-    @apply ring-1 ring-highlight/40 motion-safe:animate-[pin-pulse_1.2s_ease-out_3];
+    @apply ring-1 ring-highlight/40;
+  }
+  .pin-selected:not(.pin-pulsed) .pin-avatar::before {
+    @apply motion-safe:animate-[pin-pulse_1.2s_ease-out_3];
   }
   /* The pin or cluster under the pointer shows as a highlighted one does, above the rest. Only where the pointer can
      hover: a tap would leave it so. */

@@ -109,6 +109,49 @@ describe("PinsLayer", () => {
     expect(shown.setZIndexOffset).toHaveBeenLastCalledWith(0);
   });
 
+  it("pulses the selected pin's halo until it has once, not again as a redraw shows the same selection", async () => {
+    const shown = { element: document.createElement("div"), setZIndexOffset: vi.fn() };
+    const onAdd = vi.spyOn(L.MarkerClusterGroup.prototype, "onAdd");
+    vi.spyOn(L.MarkerClusterGroup.prototype, "getVisibleParent").mockImplementation(
+      () => ({ options: {}, getElement: () => shown.element, setZIndexOffset: shown.setZIndexOffset }) as unknown as L.Marker,
+    );
+    const pins = [pin(BRIGHTON, "a"), pin(HOVE, "b", "c")];
+    const store = createHighlight();
+    const selecting = (selected?: Pin) => onMap(<PinsLayer pins={pins} highlight={store} selected={selected} onSelect={() => {}} />);
+    const { rerender } = render(selecting(pins[1]));
+    await waitFor(() => expect(shown.element.classList.contains("pin-selected")).toBe(true));
+    const map = onAdd.mock.calls[0]?.[0] as L.Map;
+    const classes = () => [...shown.element.classList];
+    // jsdom has no AnimationEvent. The halo is an avatar's ::before, whose animations reach the pin by bubbling.
+    const ended = (animationName: string) => {
+      const avatar = shown.element.appendChild(document.createElement("span"));
+      act(() => void avatar.dispatchEvent(Object.assign(new Event("animationend", { bubbles: true }), { animationName })));
+    };
+    // As zooming draws the selection on another element.
+    const redraw = () => {
+      shown.element = document.createElement("div");
+      act(() => void map.fire("moveend"));
+    };
+    redraw();
+    expect(classes()).toEqual(["pin-selected"]);
+    ended("enter");
+    expect(classes()).toEqual(["pin-selected"]);
+    ended("pin-pulse");
+    expect(classes()).toEqual(["pin-selected", "pin-pulsed"]);
+    // Highlighted and let go, as its card is hovered and left, it stays pulsed.
+    act(() => store.set("b"));
+    await waitFor(() => expect(classes()).toContain("pin-highlight"));
+    act(() => store.set(undefined));
+    expect(classes()).toEqual(["pin-selected", "pin-pulsed"]);
+    redraw();
+    expect(classes()).toEqual(["pin-selected", "pin-pulsed"]);
+    // Let go and selected again, it pulses afresh.
+    rerender(selecting());
+    expect(classes()).toEqual([]);
+    rerender(selecting(pins[1]));
+    await waitFor(() => expect(classes()).toEqual(["pin-selected"]));
+  });
+
   it("lets the selected pin go as the pointer leaves it, or as zooming out gathers it into a cluster, where the pointer can hover", async () => {
     pointerCanHover(true);
     const added = watchAdded();
