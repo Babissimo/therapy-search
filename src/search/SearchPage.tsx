@@ -1,6 +1,6 @@
 import { List, MapIcon } from "lucide-react";
 import { Tabs } from "radix-ui";
-import { lazy, useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode, type RefObject } from "react";
+import { lazy, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { Link, useLocation, useMatch } from "react-router";
 import { canonicalLocation } from "@shared/location";
 import { onlineParams } from "@shared/online";
@@ -14,6 +14,7 @@ import { Masthead } from "@/layout/Masthead";
 import { focusOnceShown, SkipLinks, type Skip } from "@/layout/SkipLinks";
 import { useMediaQuery } from "@/lib/useMediaQuery";
 import { cn } from "@/lib/utils";
+import { placeSent } from "@/questions/handoff";
 import { LazyShortlistTab } from "@/shortlist/LazyShortlistTab";
 import { useSetAsideOpen } from "@/shortlist/setAside";
 import { statusOf } from "@/shortlist/store";
@@ -41,7 +42,7 @@ import { ResultsStatus } from "./ResultsStatus";
 import { SEARCH_BOX_ID, SearchBox } from "./SearchBox";
 import { placed, tickedFilters } from "./state";
 import { useResults } from "./useResults";
-import { useDraftFilters, useSearchDrafts, type SearchDrafts } from "./useSearchDrafts";
+import { useDraftFiltered, useDraftFilters, useSearchDrafts, type SearchDrafts } from "./useSearchDrafts";
 import { useSearchState } from "./useSearchState";
 import { useRememberedScroll, useRememberedTab } from "./viewMemory";
 import { WIDE } from "./wide";
@@ -121,7 +122,7 @@ type ViewProps = { params: SearchParams; onChange: (next: SearchParams) => void;
 
 /** Therapists near a place, on a map of where they are. */
 function SearchView({ params, onChange, wide }: ViewProps) {
-  const { key: entry } = useLocation();
+  const { key: entry, state: arrival } = useLocation();
   // Only a place makes a search here: without one UKCP would list everyone matching in a random order, which answers no
   // one looking nearby. Ticks and the keyword wait for one.
   const searching = placed(params);
@@ -132,6 +133,12 @@ function SearchView({ params, onChange, wide }: ViewProps) {
     if (placed(next) === searching) onChange(next);
     else startMorph(() => onChange(next));
   });
+  // A place the questions send with "Choose filters yourself" waits in the box, after the drafts take the URL's. It is set once per
+  // history entry: a pop hands the same entry a new state object, which must not undo what was typed since.
+  useLayoutEffect(() => {
+    const place = placeSent(arrival);
+    if (place !== undefined) drafts.set("location", place);
+  }, [entry]);
   // The search, which the map's framings, and the selections on them, belong to.
   const fitKey = searching ? toQuery(params) : "";
   useShortlistRefresh(results.therapists);
@@ -343,7 +350,7 @@ function SearchView({ params, onChange, wide }: ViewProps) {
   // Before a search, the filters come first and the place last: beside the prompt on wide screens, beneath it on a phone.
   const start = (
     <div className="space-y-8">
-      {heldAt === undefined ? <NearPrompt wide={wide} askRef={askRef} /> : <FiltersFirst place={heldAt} wide={wide} askRef={askRef} />}
+      {heldAt === undefined ? <NearPrompt wide={wide} askRef={askRef} drafts={drafts} /> : <FiltersFirst place={heldAt} wide={wide} askRef={askRef} />}
       {!wide && (
         <div className="space-y-6">
           <FilterPanel params={params} drafts={drafts} />
@@ -661,9 +668,16 @@ function Toolbar({
 }
 
 /** In place of the results until there is a place to search, asking for what matters before where. */
-function NearPrompt({ wide, askRef }: { wide: boolean; askRef: RefObject<HTMLDivElement | null> }) {
+function NearPrompt({ wide, askRef, drafts }: { wide: boolean; askRef: RefObject<HTMLDivElement | null>; drafts: SearchDrafts }) {
+  const filtered = useDraftFiltered(drafts);
   return (
-    <Prompt askRef={askRef} ask="Start with what matters to you." toFilters={!wide} className={wide ? "py-10 sm:py-16" : "pt-6"}>
+    <Prompt
+      askRef={askRef}
+      ask="Start with what matters to you."
+      toFilters={!wide}
+      questions={filtered ? "paused" : "offered"}
+      className={wide ? "py-10 sm:py-16" : "pt-6"}
+    >
       Tick anything that matters to you {wide ? "in the filters to the right" : "below"}, then type a postcode, town or city
       {wide && " beneath them"} to see the UKCP therapists nearest to it.
     </Prompt>
@@ -704,7 +718,7 @@ type PlaceStepProps = {
  * paired, the switch to online would glide it into that view's toolbar.
  */
 function PlaceStep({ params, drafts, hold, onPlaceSearch, onUnfiltered }: PlaceStepProps) {
-  const filtered = useSyncExternalStore(drafts.subscribe, () => activeFilters(drafts.search()).length > 0);
+  const filtered = useDraftFiltered(drafts);
   return (
     <div className="space-y-2 pointer-coarse:space-y-4">
       <p className="text-sm font-medium">Where are you?</p>
