@@ -2,12 +2,13 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
-import { afterEach, describe, expect, it, onTestFinished, vi } from "vitest";
-import type { Profile } from "@shared/types";
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi, type MockInstance } from "vitest";
+import type { ContactDetails, Profile } from "@shared/types";
 import { api, ApiError } from "@/lib/api";
 import { createShortlistStore, type ShortlistCard, type ShortlistStore } from "@/shortlist/store";
 import { ShortlistContext } from "@/shortlist/useShortlist";
 import { EmailDrafter } from "./EmailDrafter";
+import { MAILTO_SAFE } from "./mailto";
 
 const JO: ShortlistCard = { slug: "Jo-ABCDEFGH", name: "Jo Anne Bloggs", initials: "JB", tags: [] };
 const PROFILE: Profile = {
@@ -24,14 +25,26 @@ const PROFILE: Profile = {
 };
 const ANXIOUS = "HelpWithAdvanced=Anxiety&HelpWithAdvanced=Depression&WorksWith=Individuals";
 
-type Setup = { search?: string; profile?: Profile | ApiError; store?: ShortlistStore; at?: string };
+/** What a request answers with: its data, its failure, or a promise to answer later. */
+type Answer<T> = T | ApiError | Promise<T>;
+type Setup = { search?: string; profile?: Answer<Profile>; contact?: Answer<ContactDetails>; store?: ShortlistStore; at?: string };
 
-function renderDrafter({ search = ANXIOUS, profile = PROFILE, store = createShortlistStore(null), at = "/therapist/Jo-ABCDEFGH" }: Setup = {}) {
+function answer<T>(asked: MockInstance<(...args: never[]) => Promise<T>>, given: Answer<T>) {
+  if (given instanceof ApiError) asked.mockRejectedValue(given);
+  else if (given instanceof Promise) asked.mockReturnValue(given);
+  else asked.mockResolvedValue(given);
+}
+
+function renderDrafter({
+  search = ANXIOUS,
+  profile = PROFILE,
+  contact = {},
+  store = createShortlistStore(null),
+  at = "/therapist/Jo-ABCDEFGH",
+}: Setup = {}) {
   if (!store.has(JO.slug)) store.add(JO, { search });
-  const asked = vi.spyOn(api, "profile");
-  if (profile instanceof ApiError) asked.mockRejectedValue(profile);
-  else asked.mockResolvedValue(profile);
-  vi.spyOn(api, "contact").mockResolvedValue({});
+  answer(vi.spyOn(api, "profile"), profile);
+  answer(vi.spyOn(api, "contact"), contact);
   const onClose = vi.fn();
   const onMarked = vi.fn();
   const { unmount } = render(
@@ -283,5 +296,221 @@ describe("EmailDrafter", () => {
     unmount();
     await afterClosing();
     expect(document.activeElement).toBe(opener);
+  });
+});
+
+describe("EmailDrafter sending", () => {
+  // jsdom can't follow a mailto: or tel: link.
+  const noNavigation = (event: Event) => event.preventDefault();
+  const writeText = vi.fn<(text: string) => Promise<void>>();
+  const NO_EMAIL: Profile = { ...PROFILE, email: undefined, contactId: "7" };
+  const copyButton = () => screen.getByRole("button", { name: "Copy message" });
+  const offer = () => screen.queryByRole("group", { name: "Mark as contacted?" });
+  /** Presses a control the way a visitor does: focused first, then clicked, with the clipboard's answer let in. */
+  const press = (control: HTMLElement) =>
+    act(async () => {
+      control.focus();
+      fireEvent.click(control);
+    });
+  beforeEach(() => {
+    document.addEventListener("click", noNavigation);
+    writeText.mockReset().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+  });
+  afterEach(() => {
+    document.removeEventListener("click", noNavigation);
+    Reflect.deleteProperty(navigator, "clipboard");
+  });
+
+  it("opens the draft in the visitor's email app, addressed to the therapist", async () => {
+    renderDrafter();
+    const link = await screen.findByRole("link", { name: "Open in email app" });
+    expect(link.getAttribute("href")).toMatch(/^mailto:jo@example\.com\?subject=Enquiry%20about%20therapy&body=Hello%20Jo%2C%0D%0A%0D%0AI%20found/);
+  });
+
+  it("asks UKCP for contact details only where the profile has no email", async () => {
+    renderDrafter({ profile: { ...PROFILE, contactId: "7" } });
+    await screen.findByRole("link", { name: "Open in email app" });
+    expect(api.contact).not.toHaveBeenCalled();
+  });
+
+  it("offers only to copy it where the profile can't be read", async () => {
+    renderDrafter({ profile: new ApiError(502, "UKCP's pages have changed.") });
+    await shownLine(/Jo's profile couldn't be read/);
+    expect(copyButton()).toBeTruthy();
+    expect(screen.queryByRole("link", { name: "Open in email app" })).toBeNull();
+    expect(screen.queryByText(/UKCP shows no way/)).toBeNull();
+  });
+
+  it("sends the visitor's edit, not the site's draft", async () => {
+    renderDrafter();
+    fireEvent.change(await message(), { target: { value: "My own words." } });
+    expect(screen.getByRole("link", { name: "Open in email app" }).getAttribute("href")).toMatch(/&body=My%20own%20words\.$/);
+  });
+
+  it("addresses the email to the one UKCP's contact details give where the profile has none", async () => {
+    renderDrafter({ profile: { ...NO_EMAIL, emailInContact: true }, contact: { email: "jo@practice.example" } });
+    const link = await screen.findByRole("link", { name: "Open in email app" });
+    expect(link.getAttribute("href")).toMatch(/^mailto:jo@practice\.example\?/);
+  });
+
+  it("offers nothing to send until the profile has been read or has failed", async () => {
+    renderDrafter({ profile: new Promise<Profile>(() => {}) });
+    await screen.findByText("Writing your draft");
+    expect(screen.queryByRole("button", { name: "Copy message" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Open in email app" })).toBeNull();
+  });
+
+  it("copies the subject and message, saying so from a live region that was there before, and leaves the keyboard on the button", async () => {
+    renderDrafter();
+    await message();
+    const regions = new Set(document.querySelectorAll("[aria-live=polite]"));
+    await press(copyButton());
+    expect(writeText.mock.calls[0]?.[0]).toMatch(/^Subject: Enquiry about therapy\n\nHello Jo,/);
+    expect(regions.has(screen.getByText("Copied."))).toBe(true);
+    expect(document.activeElement).toBe(copyButton());
+  });
+
+  it("is heard again when copied again, its region emptied while the clipboard answers and then saying Copied. once more", async () => {
+    renderDrafter();
+    await message();
+    await press(copyButton());
+    const region = screen.getByText("Copied.");
+    let answer: () => void = () => {};
+    writeText.mockReturnValue(new Promise<void>((resolve) => (answer = resolve)));
+    await press(copyButton());
+    expect(region.textContent).toBe("");
+    await act(async () => answer());
+    expect(region.textContent).toBe("Copied.");
+  });
+
+  it("lets go of what it said about the draft once the draft changes, so Copied. never stands beside words not copied", async () => {
+    renderDrafter();
+    await message();
+    await press(copyButton());
+    const region = screen.getByText("Copied.");
+    fireEvent.change(await message(), { target: { value: "My own words." } });
+    expect(region.textContent).toBe("");
+  });
+
+  it("selects the message, keyboard in it, and says how to copy it where the clipboard is refused", async () => {
+    writeText.mockRejectedValue(new DOMException("Denied", "NotAllowedError"));
+    renderDrafter();
+    const box = await message();
+    await press(copyButton());
+    expect([box.selectionStart, box.selectionEnd]).toEqual([0, box.value.length]);
+    // Ctrl+C copies from the focused control.
+    expect(document.activeElement).toBe(box);
+    screen.getByText("Couldn't copy it for you. It's selected: press Ctrl+C (⌘C on a Mac) to copy it.");
+    expect(screen.queryByText("Copied.")).toBeNull();
+  });
+
+  it("also copies a message too long for every email app to take whole", async () => {
+    renderDrafter();
+    fireEvent.change(await message(), { target: { value: "x".repeat(2500) } });
+    await press(screen.getByRole("link", { name: "Open in email app" }));
+    expect(writeText).toHaveBeenCalledWith("x".repeat(2500));
+    screen.getByText("Also copied, in case your email app cuts it short.");
+  });
+
+  it("measures the link rather than the message, copying one short enough whose link, encoded, is too long", async () => {
+    renderDrafter();
+    const words = "a b ".repeat(400);
+    fireEvent.change(await message(), { target: { value: words } });
+    const link = screen.getByRole("link", { name: "Open in email app" });
+    expect([words.length < MAILTO_SAFE, link.getAttribute("href")!.length > MAILTO_SAFE]).toEqual([true, true]);
+    await press(link);
+    expect(writeText).toHaveBeenCalledWith(words);
+  });
+
+  it("copies nothing more of a message short enough to go whole", async () => {
+    renderDrafter();
+    await message();
+    await press(screen.getByRole("link", { name: "Open in email app" }));
+    expect(writeText).not.toHaveBeenCalled();
+  });
+
+  it("offers to mark them contacted once the email app opens, leaving the drafter open and the keyboard on the link for Not now", async () => {
+    const { onMarked } = renderDrafter();
+    const link = await screen.findByRole("link", { name: "Open in email app" });
+    expect(offer()).toBeNull();
+    await press(link);
+    await press(within(offer()!).getByRole("button", { name: "Not now" }));
+    expect(offer()).toBeNull();
+    screen.getByRole("dialog");
+    expect(onMarked).not.toHaveBeenCalled();
+    expect(document.activeElement).toBe(link);
+  });
+
+  it("offers it after copying too, and tells the page that they did on Yes", async () => {
+    const { onMarked } = renderDrafter();
+    await message();
+    await press(copyButton());
+    fireEvent.click(within(offer()!).getByRole("button", { name: "Yes" }));
+    expect(onMarked).toHaveBeenCalledOnce();
+    expect(offer()).toBeNull();
+  });
+
+  it("gives a phone number where there is no email, as a link that also brings the offer", async () => {
+    renderDrafter({ profile: NO_EMAIL, contact: { phone: "0113 496 0000" } });
+    await screen.findByText(/Jo gives a phone number rather than an email address/);
+    expect(screen.queryByRole("link", { name: "Open in email app" })).toBeNull();
+    expect(copyButton()).toBeTruthy();
+    screen.getByText(/The message works as notes for the call\./);
+    const phone = screen.getByRole("link", { name: "0113 496 0000" });
+    expect(phone.getAttribute("href")).toBe("tel:01134960000");
+    await press(phone);
+    await press(within(offer()!).getByRole("button", { name: "Not now" }));
+    expect(document.activeElement).toBe(phone);
+  });
+
+  it("gives a website where there is neither email nor phone", async () => {
+    renderDrafter({ profile: NO_EMAIL, contact: { website: "https://www.jo.example/contact/" } });
+    await screen.findByText(/Jo gives a website rather than an email address/);
+    screen.getByRole("link", { name: "jo.example/contact (opens in a new tab)" });
+    screen.getByRole("link", { name: "View on UKCP (opens in a new tab)" });
+  });
+
+  it("says when UKCP shows no way to reach the therapist, linking to their UKCP page", async () => {
+    renderDrafter({ profile: NO_EMAIL, contact: {} });
+    await screen.findByText(/UKCP shows no way to reach Jo\./);
+    expect(screen.getByRole("link", { name: "View on UKCP (opens in a new tab)" }).getAttribute("href")).toContain(JO.slug);
+    expect(copyButton()).toBeTruthy();
+  });
+
+  it("says nothing of what UKCP has while the contact details are on their way", async () => {
+    renderDrafter({ profile: NO_EMAIL, contact: new Promise<ContactDetails>(() => {}) });
+    await message();
+    expect(copyButton()).toBeTruthy();
+    expect(screen.queryByText(/UKCP shows no way/)).toBeNull();
+    expect(screen.queryByRole("link", { name: /View on UKCP/ })).toBeNull();
+  });
+
+  it("does not say UKCP has no way to reach them where the contact details couldn't be read, but offers to try again", async () => {
+    renderDrafter({ profile: NO_EMAIL, contact: new ApiError(502, "UKCP's pages have changed.") });
+    await shownLine(/Jo's contact details couldn't be read/);
+    expect(screen.queryByText(/UKCP shows no way/)).toBeNull();
+    const retry = screen.getByRole("button", { name: "Try again" });
+    vi.mocked(api.contact).mockResolvedValue({ phone: "0113 496 0000" });
+    retry.focus();
+    fireEvent.click(retry);
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Try again" })).toBeNull());
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("link", { name: "0113 496 0000" })));
+  });
+
+  it("says that the contact details couldn't be read, in the words of the line it shows", async () => {
+    renderDrafter({ profile: NO_EMAIL, contact: new ApiError(502, "UKCP's pages have changed.") });
+    const line = await shownLine(/Jo's contact details couldn't be read/);
+    expect(said()).toEqual(["Jo's contact details couldn't be read."]);
+    expect(line.textContent).toContain(said()[0]);
+  });
+
+  it("gives the keyboard to the email link once retried contact details bring the address", async () => {
+    renderDrafter({ profile: { ...NO_EMAIL, emailInContact: true }, contact: new ApiError(502, "UKCP's pages have changed.") });
+    const retry = await screen.findByRole("button", { name: "Try again" });
+    vi.mocked(api.contact).mockResolvedValue({ email: "jo@practice.example" });
+    retry.focus();
+    fireEvent.click(retry);
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("link", { name: "Open in email app" })));
   });
 });
