@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import { useLocate } from "./useLocate";
 import { useDraft, type SearchDrafts } from "./useSearchDrafts";
 
-export const NO_PLACE = "Type a town or postcode to search.";
+export const NO_PLACE = "Type a postcode or town to search.";
 
 /** The box for a place, which a skip link sends the keyboard to. The page shows one at a time. */
 export const SEARCH_BOX_ID = "search-place";
@@ -71,7 +71,7 @@ export function SearchBox({ params, drafts, onPlaceSearch, onFocus, hold, classN
             aria-label="Location"
             aria-invalid={wanting || undefined}
             aria-describedby={problem ? problemId : undefined}
-            placeholder="Town or postcode"
+            placeholder="Postcode or town"
             maxLength={TEXT_MAX_LENGTH}
             value={location}
             onChange={(e) => {

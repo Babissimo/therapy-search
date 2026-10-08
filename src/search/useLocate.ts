@@ -2,9 +2,9 @@ import type { Point } from "./map/geo";
 import { usePostcodeNear } from "./usePostcodeNear";
 
 // Each fits one line beneath the box on a phone, so the toolbar above the list stays short.
-export const REFUSED = "Location access is off. Type a town or postcode.";
-export const UNKNOWN = "Couldn't find you. Type a town or postcode.";
-export const NO_POSTCODE = "No UK postcode near you. Type a town or postcode.";
+export const REFUSED = "Location access is off. Type a postcode or town.";
+export const UNKNOWN = "Couldn't find you. Type a postcode or town.";
+export const NO_POSTCODE = "No UK postcode near you. Type a postcode or town.";
 
 // GeolocationPositionError's PERMISSION_DENIED.
 const DENIED = 1;

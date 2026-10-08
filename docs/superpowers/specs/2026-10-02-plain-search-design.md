@@ -44,7 +44,7 @@ Each answers `text/html; charset=utf-8` with `Cache-Control: private, no-cache`,
 ### 3.2 The form
 
 1. "Where to meet": Near me (chosen at first) or Online or by phone, as radio buttons.
-2. "Town or postcode", which only Near me uses.
+2. "Postcode or town", which only Near me uses.
 3. "Keyword search", which UKCP looks for in names and profile text.
 4. Search.
 5. "Filters": every group the app's filter panel shows, with its name and plain-words help, from `shared/filterGroups.ts`. Each group is a `details` holding a `fieldset` of checkboxes, open when something in it is ticked, as the app's accordion is. Groups with headings of our own (`shared/sections.ts`) set them out as nested fieldsets. Groups whose ticks UKCP ANDs carry the app's line saying so.
@@ -56,13 +56,13 @@ To share the app's names and help, the filter groups, the online rules (`onlineS
 
 ### 3.3 Searching
 
-- **Near me** needs a place, or says "Type a town or postcode to search." beside the box.
+- **Near me** needs a place, or says "Type a postcode or town to search." beside the box.
 - **Online** asks what the app's online view asks (`onlineSearch`), and needs a filter besides type of session by the app's rule (`narrowsOnline`), or says so beside the Filters heading.
 - The Worker asks the cached entrypoint for the batch holding the page: batches of 480 near a place and the whole set online, under the URLs the app asks for them by. A page shows 12 results, as the app's Load more does, and More results is a button whose form carries the search, its seed and how many have been shown.
 - Near a place, results come in the app's order (`shared/order.ts`): nearest first, by UKCP's miles, and among those at the same distance by the rank a seed gives each slug. A plain page shows no photo and reads a card whole only once it is shown, so the app's preference for cards with a photo and summary, which would mean reading every card of a batch, is left out. A search's first page draws its seed at random, and More results and the results page's own search form carry it back in their bodies, so a search keeps one order across its pages and as it is refined, while a search begun afresh draws another. UKCP reshuffles those at the same distance about once a minute, and the cache keeps a batch at most 15 minutes, so the Worker orders each batch before taking a page from it, and a batch fetched again pages as it did before.
 - Online, results come in UKCP's shuffled order, since ordering a whole set would take more CPU than a request has (§2). The cache keeps the set at most 6 hours, so its pages repeat or skip someone only when that entry expires, or the cache drops it, while someone is paging through. Its forms carry the seed all the same, so a search changed to Near me keeps it.
 - UKCP chooses each batch near a place by distance, so a batch fetched again holds the same therapists, except where several share the distance at which it ends. Those can move between it and the next batch when the two come from different shuffles, to be shown twice or not at all. Only a search of more than 480 results has such an end, and only a visitor paging past it meets it.
-- When UKCP didn't recognise the place and searched the whole UK instead, the page says so beside the box ("UKCP didn't recognise "Brightn". Try a town or a postcode.") and shows no results, which would come from anywhere.
+- When UKCP didn't recognise the place and searched the whole UK instead, the page says so beside the box ("UKCP didn't recognise "Brightn". Try a postcode or a town.") and shows no results, which would come from anywhere.
 - Too many searches and UKCP not responding give the Worker's own messages at the top of the form. A results page the Worker can't read says so and points to UKCP.
 
 An error's page title begins "Error:", a box at the top of the main content links to the field concerned, and the message sits beside the field, tied to it by `aria-describedby`.
