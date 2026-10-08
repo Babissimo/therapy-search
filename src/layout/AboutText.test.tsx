@@ -28,8 +28,10 @@ describe("AboutText", () => {
     screen.getByText(/or open this site 30 days or more after removing them\.$/);
   });
 
-  it("says the browser keeps the search each therapist was found by, with where the visitor stands with them and their notes", () => {
+  it("says the browser keeps the search each therapist was found by, with where the visitor stands, their notes and their drafts", () => {
     render(<AboutText />, { wrapper: MemoryRouter });
-    screen.getByText(/with where you stand with each therapist, the search you found them by and your notes on them\)/);
+    screen.getByText(
+      /with where you stand with each therapist, the search you found them by, your notes and email drafts, and the name and free times you give for drafts\)/,
+    );
   });
 });
