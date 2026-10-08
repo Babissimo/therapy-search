@@ -79,6 +79,14 @@ export function nearestQuery(lat: number, lng: number): string {
   return new URLSearchParams({ lat: rounded(lat), lng: rounded(lng) }).toString();
 }
 
+/**
+ * Whether UKCP measured a search's distances: it names the place it measured from, where it searched near one rather
+ * than the whole country.
+ */
+export function measuredNear(searched: string | undefined): boolean {
+  return searched !== undefined && searched !== "United Kingdom";
+}
+
 /** UKCP answers a place it doesn't know with results from anywhere, saying only that it searched "United Kingdom". */
 export function locationFellBack(typed: string, searched: string | undefined): boolean {
   const place = typed.trim();

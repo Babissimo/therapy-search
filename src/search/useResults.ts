@@ -9,20 +9,27 @@ import {
   type QueryClient,
   type UseInfiniteQueryResult,
 } from "@tanstack/react-query";
-import { locationFellBack } from "@shared/location";
+import { locationFellBack, measuredNear } from "@shared/location";
+import { batchFrom, moreIn, ready, streamsFrom, takeMerged, type Stream } from "@shared/merge";
 import { asksWhole, PAGE_SIZE, toQuery, type SearchParams } from "@shared/query";
+import { asksUnsaid, saysNothing, withoutSessions } from "@shared/sessions";
 import type { SearchResult, TherapistCard } from "@shared/types";
-import type { Listings } from "@shared/ukcp/parseResults";
+import type { Listing, Listings } from "@shared/ukcp/parseResults";
 import { useFailure, type Failure } from "@/components/FailedAlert";
 import { api } from "@/lib/api";
 import { FRESH_FOR } from "@/lib/queryClient";
 import { inOrder, orderSeed, settled } from "./order";
 import { withFlag, withPage } from "./state";
 
-/** A page of results with the batch it was cut from, which the next page is cut from too while it lasts. */
-type Page = SearchResult & { batch: Listings; stride: number };
-/** How many results the pages so far hold, and the batch they came from. */
-type After = { shown: number; batch?: Listings; stride?: number };
+/**
+ * A page of results with the batch it was cut from, which the next page is cut from too while it lasts, or, for two
+ * searches listed as one, what remains of them.
+ */
+type Page = SearchResult & { batch?: Listings; stride?: number; merged?: Merged };
+/** How many results the pages so far hold, and the batch they came from or the searches they are merged from. */
+type After = { shown: number; batch?: Listings; stride?: number; merged?: Merged };
+/** A search and the same without its session types, listed as one: what remains of each, and the ticked search's place and notices. */
+type Merged = { streams: Stream<Listing>[]; about: Omit<SearchResult, "therapists"> };
 
 export type SearchResults = {
   /**
@@ -97,11 +104,22 @@ function earlyQuery(params: SearchParams) {
   return queryOptions({
     queryKey: earlyKey(params),
     queryFn: async (): Promise<SearchResult> => {
-      const nearest = await api.searchEarly(query);
-      const therapists = settled(nearest.listings, nearest.to >= nearest.total, orderSeed())
-        .slice(0, PAGE_SIZE)
-        .map((listing) => listing.read());
-      return { ...aboutBatch(nearest), from: 1, to: therapists.length, therapists };
+      const [nearest, unticked] = await Promise.all([
+        api.searchEarly(query),
+        asksUnsaid(params) ? api.searchEarly(toQuery(withPage(withoutSessions(params), 1))) : undefined,
+      ]);
+      if (unticked === undefined || !measuredNear(nearest.locationSearched)) {
+        const therapists = settled(nearest.listings, nearest.to >= nearest.total, orderSeed())
+          .slice(0, PAGE_SIZE)
+          .map((listing) => listing.read());
+        return { ...aboutBatch(nearest), from: 1, to: therapists.length, therapists };
+      }
+      const streams = streamsFrom([batchFrom(nearest), batchFrom(unticked, saysNothing)]);
+      const listed = ready(streams, orderSeed());
+      const therapists = listed.slice(0, PAGE_SIZE).map((listing) => listing.read());
+      // Until both are loaded whole, more are to come than the first page shows.
+      const total = streams.some((stream) => stream.reach < Infinity) ? nearest.total + unticked.total : listed.length;
+      return { ...aboutBatch(nearest), notices: noticesOf(nearest, unticked, therapists), from: 1, to: therapists.length, total, therapists };
     },
     gcTime: FRESH_FOR,
   });
@@ -112,10 +130,16 @@ function resultsQuery(params: SearchParams) {
   // Spelt out because TypeScript otherwise fills in the page data's type before inferring the page parameter's.
   return infiniteQueryOptions<Page, Error, InfiniteData<Page, After>, readonly unknown[], After>({
     queryKey: resultsKey(params),
-    queryFn: ({ pageParam, client }) =>
-      pageAfter(pageParam, async (n) => (n === 1 ? photosFromLoaded(client, params) : undefined) ?? batchInOrder(batchQuery(n))),
+    queryFn: ({ pageParam, client }) => {
+      if (pageParam.merged) return mergedPage(params, pageParam.shown, pageParam.merged);
+      if (pageParam.shown === 0 && asksUnsaid(params)) return firstMergedPage(params);
+      return pageAfter(pageParam, async (n) => (n === 1 ? photosFromLoaded(client, params) : undefined) ?? batchInOrder(batchQuery(n)));
+    },
     initialPageParam: { shown: 0 },
-    getNextPageParam: (last) => (last.therapists.length > 0 && last.to < last.total ? { shown: last.to, batch: last.batch, stride: last.stride } : undefined),
+    getNextPageParam: (last) => {
+      if (last.merged) return moreIn(last.merged.streams) ? { shown: last.to, merged: last.merged } : undefined;
+      return last.therapists.length > 0 && last.to < last.total ? { shown: last.to, batch: last.batch, stride: last.stride } : undefined;
+    },
     // As long as results stay fresh, so Back from a profile finds every page still loaded.
     gcTime: FRESH_FOR,
   });
@@ -168,9 +192,50 @@ async function pageAfter({ shown, batch, stride }: After, fetchBatch: (n: number
   return { ...aboutBatch(batch), from: shown + 1, to: shown + therapists.length, therapists, batch, stride };
 }
 
+/**
+ * A face-to-face search's first page, listing among its results those the same search without its session types finds
+ * who list none, unless UKCP measured no distances to list them by. Both are asked at once, as the place is nearly always
+ * one UKCP measures from.
+ */
+async function firstMergedPage(params: SearchParams): Promise<Page> {
+  const [ticked, unticked] = await Promise.all([api.search(toQuery(withPage(params, 1))), api.search(toQuery(withPage(withoutSessions(params), 1)))]);
+  if (!measuredNear(ticked.locationSearched)) {
+    return pageAfter({ shown: 0 }, async (n) => (n === 1 ? inBrowserOrder(ticked) : batchInOrder(toQuery(withPage(params, n)))));
+  }
+  const streams = streamsFrom([batchFrom(ticked), batchFrom(unticked, saysNothing)]);
+  const page = await mergedPage(params, 0, { streams, about: aboutBatch(ticked) });
+  return { ...page, notices: noticesOf(ticked, unticked, page.therapists) };
+}
+
+/** The page after the first `shown` of a search and the same without its session types, listed as one. */
+async function mergedPage(params: SearchParams, shown: number, { streams, about }: Merged): Promise<Page> {
+  const searches = [params, withoutSessions(params)];
+  const { taken, streams: rest } = await takeMerged(streams, PAGE_SIZE, orderSeed(), async (i, n) => {
+    const batch = await api.search(toQuery(withPage(searches[i]!, n)));
+    return i === 0 ? batchFrom(batch) : batchFrom(batch, saysNothing);
+  });
+  const therapists = taken.map((listing) => listing.read());
+  const to = shown + therapists.length;
+  // Each search's count is its own, and the list's is known only once both are loaded, so this counts those loaded: a
+  // floor under it, which says whether there are any.
+  const total = to + rest.reduce((waiting, stream) => waiting + stream.waiting.length, 0);
+  return { ...about, from: shown + 1, to, total, therapists, merged: { streams: rest, about } };
+}
+
+/**
+ * UKCP's notices for a merged list: the ticked search's, unless it found no one and the list holds those who list no
+ * session types, when its advice on finding no one would be wrong.
+ */
+function noticesOf(ticked: Listings, unticked: Listings, listed: TherapistCard[]): string[] {
+  return ticked.total === 0 && listed.length > 0 ? unticked.notices : ticked.notices;
+}
+
 /** A batch in this browser's order, in place of the shuffle UKCP gave it. */
 async function batchInOrder(query: string): Promise<Listings> {
-  const batch = await api.search(query);
+  return inBrowserOrder(await api.search(query));
+}
+
+function inBrowserOrder(batch: Listings): Listings {
   return { ...batch, listings: inOrder(batch.listings, orderSeed()) };
 }
 

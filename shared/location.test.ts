@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canonicalLocation, classifyLocation, locationFellBack, nearestQuery, placeQuery, settlementRank } from "./location";
+import { canonicalLocation, classifyLocation, locationFellBack, measuredNear, nearestQuery, placeQuery, settlementRank } from "./location";
 
 describe("canonicalLocation", () => {
   it("trims, collapses spaces and upper-cases", () => {
@@ -67,5 +67,15 @@ describe("locationFellBack", () => {
     [" united kingdom ", "United Kingdom", false],
   ])("typed %j, searched %j: %s", (typed, searched, expected) => {
     expect(locationFellBack(typed, searched)).toBe(expected);
+  });
+});
+
+describe("measuredNear", () => {
+  it.each([
+    ["Brighton, Brighton and Hove, UK", true],
+    ["United Kingdom", false],
+    [undefined, false],
+  ])("searched %j: %s", (searched, expected) => {
+    expect(measuredNear(searched)).toBe(expected);
   });
 });

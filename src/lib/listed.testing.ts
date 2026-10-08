@@ -10,6 +10,7 @@ export function listed({ therapists, ...found }: SearchResult): Listings {
       distance: card.distance,
       hasPhoto: card.photoUrl !== undefined,
       hasSummary: card.summary !== undefined,
+      hasSessions: card.sessionTypes !== undefined,
       read: () => card,
     })),
   };
