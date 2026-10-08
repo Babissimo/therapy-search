@@ -9,3 +9,6 @@ export const STATEMENT_PATH = "/accessibility";
 
 /** Where the About text lives: in a drawer over the page it was opened from, or as a page of its own reached directly. */
 export const ABOUT_PATH = "/about";
+
+/** Where the questions live, a screen at a time beneath it, as `/questions/who`. */
+export const QUESTIONS_PATH = "/questions";
