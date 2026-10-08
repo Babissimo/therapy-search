@@ -683,6 +683,12 @@ describe("ProfilePage's content", () => {
     expect(card?.textContent).not.toContain("£70 per session");
   });
 
+  it("says where an office gives no fees", async () => {
+    renderAt(["/therapist/Test-ABCDEFGH"], { ...PROFILE, offices: [{ name: "Leeds Office", isMain: false, address: [] }] });
+    const card = (await screen.findByText("Leeds Office")).closest("[data-slot=card]");
+    expect(card?.textContent).toContain("FeesNone given");
+  });
+
   it("puts the long sections first and the short ones beside or after them", async () => {
     const prose = (heading: string) => ({ heading, paragraphs: ["Text"], items: [], details: [] });
     renderAt(["/therapist/Test-ABCDEFGH"], { ...PROFILE, about: [prose("My Approach"), section("I work with", ["Adults"])], practical: [section("UKCP College", ["Test College"])] });

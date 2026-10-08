@@ -245,7 +245,7 @@ function officeOf({ name, isMain, address, cost }: PlainProfile["offices"][numbe
   return html`<h3 translate="no">${name || "Office"}</h3>
 ${isMain ? html`<p>Main address</p>` : ""}
 ${address.length > 0 ? html`<p translate="no">${lines(address.join("\n"))}</p>` : ""}
-${cost ? html`<p>Fees:</p>${blocks(cost)}` : ""}`;
+${cost ? html`<p>Fees:</p>${blocks(cost)}` : html`<p>Fees: none given</p>`}`;
 }
 
 function newTab(href: string, text: string, verbatim = false): Html {
