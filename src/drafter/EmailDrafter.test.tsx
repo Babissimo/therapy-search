@@ -333,7 +333,9 @@ describe("EmailDrafter sending", () => {
   const writeText = vi.fn<(text: string) => Promise<void>>();
   const NO_EMAIL: Profile = { ...PROFILE, email: undefined, contactId: "7" };
   const copyButton = () => screen.getByRole("button", { name: "Copy message" });
-  const offer = () => screen.queryByRole("group", { name: "Mark as contacted?" });
+  const popup = () => screen.queryByRole("alertdialog");
+  /** The popup's words after its title. */
+  const told = () => document.getElementById(popup()!.getAttribute("aria-describedby")!)!.textContent;
   /** Presses a control the way a visitor does: focused first, then clicked, with the clipboard's answer let in. */
   const press = (control: HTMLElement) =>
     act(async () => {
@@ -389,56 +391,74 @@ describe("EmailDrafter sending", () => {
     expect(screen.queryByRole("link", { name: "Open in email app" })).toBeNull();
   });
 
-  it("copies the subject and message, saying so from a live region that was there before, and leaves the keyboard on the button", async () => {
+  it("copies the subject and message, saying so in a popup that asks whether to mark them contacted, keyboard on Not now", async () => {
     renderDrafter();
     await message();
-    const regions = new Set(document.querySelectorAll("[aria-live=polite]"));
     await press(copyButton());
     expect(writeText.mock.calls[0]?.[0]).toMatch(/^Subject: Enquiry about therapy\n\nHello Jo,/);
-    expect(regions.has(screen.getByText("Copied."))).toBe(true);
+    screen.getByRole("alertdialog", { name: "Copied" });
+    expect(told()).toBe("Your subject and message are ready to paste. Mark Jo as contacted?");
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Not now" }));
+  });
+
+  it("gives the keyboard back to the button on Not now, and says Copied again on copying again", async () => {
+    const { onMarked } = renderDrafter();
+    await message();
+    await press(copyButton());
+    fireEvent.click(screen.getByRole("button", { name: "Not now" }));
+    await afterClosing();
+    expect(popup()).toBeNull();
     expect(document.activeElement).toBe(copyButton());
+    await press(copyButton());
+    screen.getByRole("alertdialog", { name: "Copied" });
+    expect(onMarked).not.toHaveBeenCalled();
   });
 
-  it("is heard again when copied again, its region emptied while the clipboard answers and then saying Copied. once more", async () => {
-    renderDrafter();
-    await message();
-    await press(copyButton());
-    const region = screen.getByText("Copied.");
-    let answer: () => void = () => {};
-    writeText.mockReturnValue(new Promise<void>((resolve) => (answer = resolve)));
-    await press(copyButton());
-    expect(region.textContent).toBe("");
-    await act(async () => answer());
-    expect(region.textContent).toBe("Copied.");
-  });
-
-  it("lets go of what it said about the draft once the draft changes, so Copied. never stands beside words not copied", async () => {
-    renderDrafter();
-    await message();
-    await press(copyButton());
-    const region = screen.getByText("Copied.");
-    fireEvent.change(await message(), { target: { value: "My own words." } });
-    expect(region.textContent).toBe("");
-  });
-
-  it("selects the message, keyboard in it, and says how to copy it where the clipboard is refused", async () => {
+  it("says where the clipboard is refused, asking nothing, and selects the message with the keyboard in it as the popup goes", async () => {
     writeText.mockRejectedValue(new DOMException("Denied", "NotAllowedError"));
     renderDrafter();
     const box = await message();
     await press(copyButton());
+    screen.getByRole("alertdialog", { name: "Couldn't copy it" });
+    expect(told()).toBe("This browser didn't allow it. Select the message, then press Ctrl+C (⌘C on a Mac) to copy it.");
+    expect(screen.queryByRole("button", { name: "Mark as contacted" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Select the message" }));
+    await afterClosing();
     expect([box.selectionStart, box.selectionEnd]).toEqual([0, box.value.length]);
     // Ctrl+C copies from the focused control.
     expect(document.activeElement).toBe(box);
-    screen.getByText("Couldn't copy it for you. It's selected: press Ctrl+C (⌘C on a Mac) to copy it.");
-    expect(screen.queryByText("Copied.")).toBeNull();
   });
 
-  it("also copies a message too long for every email app to take whole", async () => {
+  it("selects the message as well where the refusal's popup is closed by Escape", async () => {
+    writeText.mockRejectedValue(new DOMException("Denied", "NotAllowedError"));
+    renderDrafter();
+    const box = await message();
+    await press(copyButton());
+    fireEvent.keyDown(document.activeElement!, { key: "Escape" });
+    await afterClosing();
+    expect(popup()).toBeNull();
+    expect([box.selectionStart, box.selectionEnd]).toEqual([0, box.value.length]);
+    expect(document.activeElement).toBe(box);
+  });
+
+  it("asks without saying the message is copied too where the clipboard refuses a long link's message", async () => {
+    writeText.mockRejectedValue(new DOMException("Denied", "NotAllowedError"));
+    renderDrafter();
+    fireEvent.change(await message(), { target: { value: "x".repeat(2500) } });
+    await press(screen.getByRole("link", { name: "Open in email app" }));
+    screen.getByRole("alertdialog", { name: "Mark Jo as contacted?" });
+    expect(told()).toBe("Your email to Jo should open in your email app, ready to send.");
+  });
+
+  it("also copies a message too long for every email app to take whole, and says so as it asks", async () => {
     renderDrafter();
     fireEvent.change(await message(), { target: { value: "x".repeat(2500) } });
     await press(screen.getByRole("link", { name: "Open in email app" }));
     expect(writeText).toHaveBeenCalledWith("x".repeat(2500));
-    screen.getByText("Also copied, in case your email app cuts it short.");
+    screen.getByRole("alertdialog", { name: "Mark Jo as contacted?" });
+    expect(told()).toBe(
+      "Your email to Jo should open in your email app, ready to send. The message is copied too, in case your email app cuts it short.",
+    );
   });
 
   it("measures the link rather than the message, copying one short enough whose link, encoded, is too long", async () => {
@@ -456,42 +476,45 @@ describe("EmailDrafter sending", () => {
     await message();
     await press(screen.getByRole("link", { name: "Open in email app" }));
     expect(writeText).not.toHaveBeenCalled();
+    expect(told()).toBe("Your email to Jo should open in your email app, ready to send.");
   });
 
-  it("offers to mark them contacted once the email app opens, leaving the drafter open and the keyboard on the link for Not now", async () => {
+  it("asks whether to mark them contacted once the email app opens, leaving the drafter open and the keyboard on the link for Not now", async () => {
     const { onMarked } = renderDrafter();
     const link = await screen.findByRole("link", { name: "Open in email app" });
-    expect(offer()).toBeNull();
+    expect(popup()).toBeNull();
     await press(link);
-    await press(within(offer()!).getByRole("button", { name: "Not now" }));
-    expect(offer()).toBeNull();
+    screen.getByRole("alertdialog", { name: "Mark Jo as contacted?" });
+    fireEvent.keyDown(document.activeElement!, { key: "Escape" });
+    await afterClosing();
+    expect(popup()).toBeNull();
     screen.getByRole("dialog");
     expect(onMarked).not.toHaveBeenCalled();
     expect(document.activeElement).toBe(link);
   });
 
-  it("offers it after copying too, and tells the page that they did on Yes", async () => {
+  it("tells the page that they got in touch on Mark as contacted", async () => {
     const { onMarked } = renderDrafter();
     await message();
     await press(copyButton());
-    fireEvent.click(within(offer()!).getByRole("button", { name: "Yes" }));
+    fireEvent.click(screen.getByRole("button", { name: "Mark as contacted" }));
     expect(onMarked).toHaveBeenCalledOnce();
-    expect(offer()).toBeNull();
+    expect(popup()).toBeNull();
   });
 
-  it("leaves the keyboard on the track's next step once Yes from its drafter marks them contacted and the drafter has gone", async () => {
+  it("leaves the keyboard on the track's next step once its drafter marks them contacted and the drafter has gone", async () => {
     const { store } = renderTrack();
     await press(screen.getByRole("button", { name: "Draft an email to Jo Anne Bloggs" }));
     await message();
     await press(copyButton());
-    fireEvent.click(within(offer()!).getByRole("button", { name: "Yes" }));
+    fireEvent.click(screen.getByRole("button", { name: "Mark as contacted" }));
     await afterClosing();
     expect(statusOf(store.get()[0]!)).toBe("contacted");
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(document.activeElement).toBe(screen.getByRole("button", { name: "Consultation booked, Jo Anne Bloggs" }));
   });
 
-  it("gives a phone number where there is no email, as a link that also brings the offer", async () => {
+  it("gives a phone number where there is no email, as a link that also brings the question", async () => {
     renderDrafter({ profile: NO_EMAIL, contact: { phone: "0113 496 0000" } });
     await screen.findByText(/Jo gives a phone number rather than an email address/);
     expect(screen.queryByRole("link", { name: "Open in email app" })).toBeNull();
@@ -500,7 +523,10 @@ describe("EmailDrafter sending", () => {
     const phone = screen.getByRole("link", { name: "0113 496 0000" });
     expect(phone.getAttribute("href")).toBe("tel:01134960000");
     await press(phone);
-    await press(within(offer()!).getByRole("button", { name: "Not now" }));
+    screen.getByRole("alertdialog", { name: "Mark Jo as contacted?" });
+    expect(told()).toBe("Your phone app should open, ready to call Jo.");
+    fireEvent.click(screen.getByRole("button", { name: "Not now" }));
+    await afterClosing();
     expect(document.activeElement).toBe(phone);
   });
 

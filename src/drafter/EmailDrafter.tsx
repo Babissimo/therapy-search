@@ -24,13 +24,13 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { HelpNow } from "@/layout/HelpNow";
 import { useSavedValue } from "@/lib/useSavedValue";
-import { ContactOffer } from "@/profile/ContactOffer";
 import { profileQuery } from "@/profile/ProfilePage";
 import { readSearch, useShownParams } from "@/search/useSearchState";
 import { MESSAGE_LIMIT, SENDER_LIMIT, SUBJECT_LIMIT, type EmailDraft, type Sender, type ShortlistCard } from "@/shortlist/store";
 import { useShortlistDraft, useShortlistSearch, useShortlistSender, useShortlistStore } from "@/shortlist/useShortlist";
 import { mentionsOf } from "./mentions";
 import { asksFee, firstName, writeEmail } from "./message";
+import { Reached, type Reach } from "./Reached";
 import { SendDraft } from "./SendDraft";
 
 type Props = {
@@ -70,7 +70,9 @@ export function EmailDrafter({ therapist, onClose, onMarked }: Props) {
 
   // What opened it, where the keyboard goes back to: Radix would send it to the dialog's trigger, and it has none.
   const [opener] = useState(() => document.activeElement);
-  // Whether to ask if they got in touch, and the control that raised it, which takes the keyboard back on Not now.
+  // How the draft last went on, kept as its popup fades, whether the popup is open, and the control it went by, which takes the
+  // keyboard back as the popup goes.
+  const [reached, setReached] = useState<Reach>();
   const [asking, setAsking] = useState(false);
   const raisedBy = useRef<HTMLElement | null>(null);
   const fold = useRef<HTMLDivElement>(null);
@@ -195,23 +197,26 @@ export function EmailDrafter({ therapist, onClose, onMarked }: Props) {
               draft={shown}
               first={first}
               profile={profile}
-              onReached={(control) => {
+              onReached={(reach, control) => {
                 raisedBy.current = control;
+                setReached(reach);
                 setAsking(true);
-              }}
-              // Selecting a text control focuses it, which Ctrl+C needs; not every browser does so unasked.
-              onRefused={() => {
-                messageBox.current?.focus();
-                messageBox.current?.select();
               }}
             />
           )}
-          {asking && (
-            <ContactOffer
-              onAnswer={(yes) => {
-                setAsking(false);
-                if (yes) onMarked();
-                else raisedBy.current?.focus();
+          {reached && (
+            <Reached
+              first={first}
+              reach={reached}
+              open={asking}
+              onClose={() => setAsking(false)}
+              onMarked={onMarked}
+              onGone={() => {
+                if (reached === "refused") {
+                  // Selecting a text control focuses it, which Ctrl+C needs; not every browser does so unasked.
+                  messageBox.current?.focus();
+                  messageBox.current?.select();
+                } else raisedBy.current?.focus();
               }}
             />
           )}
