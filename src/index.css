@@ -493,6 +493,13 @@
 ::view-transition-image-pair(list-tabs) {
   isolation: auto;
 }
+/* A collapsible closing as the page morphs goes at once, its old look fading where it stood, such as the filters a first
+   search puts away: rolling up within a gliding look, it leaves holes in the page in Firefox. */
+:root:active-view-transition [data-slot="collapsible-content"] {
+  @variant data-closed {
+    display: none;
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   ::view-transition-group(*),
   ::view-transition-old(*),
