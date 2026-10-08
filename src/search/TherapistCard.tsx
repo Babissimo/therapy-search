@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 import { useProfileLink } from "@/profile/profileLink";
 import { STATUS_ICON, STATUS_LABEL } from "@/shortlist/status";
 import type { Status } from "@/shortlist/store";
+import type { Fee } from "./fee";
 
 type Props = {
   therapist: Therapist;
@@ -31,8 +32,8 @@ type Props = {
   track?: ReactNode;
   /** The visitor's note on a shortlisted therapist, whose first line shows under the track. */
   note?: string;
-  /** The fee at the office the card names, once the therapist's profile has been read. */
-  fee?: string;
+  /** The fees at the office the card names, or that it gives none, once the therapist's profile has been read. */
+  fee?: Fee;
   /** Where the visitor stands with a shortlisted therapist; "To contact" goes unsaid, the filled bookmark saying as much. */
   status?: Status;
   /** Fades the portrait as "Set aside" does, for a therapist taken off the shortlist whose card stays to add them back. */
@@ -90,10 +91,13 @@ export function TherapistCard({ therapist: t, sought, grouped = false, online = 
       meets={meets && <Sessions text={meets} />}
       fee={
         fee && (
-          <span className="flex items-center gap-1.5">
-            <Banknote aria-hidden className="size-4 shrink-0" />
-            <span className="sr-only">Fees: </span>
-            {fee}
+          // Boxed apart from the icon, so fees for several kinds of session wrap as one line beside it, as the place does.
+          <span className="flex gap-1.5">
+            <Banknote aria-hidden className="mt-0.5 size-4 shrink-0" />
+            <span className="min-w-0">
+              {fee.given && <span className="sr-only">Fees: </span>}
+              {fee.text}
+            </span>
           </span>
         )
       }

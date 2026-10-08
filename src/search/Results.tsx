@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import { ShortlistButton } from "@/shortlist/ShortlistButton";
 import { useShortlistStatus } from "@/shortlist/useShortlist";
 import { activeFilters, soughtTerms } from "./activeFilters";
-import { feeText } from "./fee";
+import { feeKinds, feeLine, type Fee } from "./fee";
 import { LocationNotice } from "./LocationNotice";
 import { listEntries, pinLabel, type Pin } from "./map/pins";
 import { resultsHeading } from "./reach";
@@ -78,7 +78,11 @@ export function Results({ params, results, listRef, pins = [], unplaced = [], se
   const highlight = (slug: string) => (on: boolean) => onHighlight?.(on ? slug : undefined);
   const sought = soughtTerms(params);
   const filters = activeFilters(asked);
-  const feeOf = (t: Therapist) => feeText(officeOf(t)?.cost);
+  const wanted = feeKinds(params.multi.WorksWith);
+  const feeOf = (t: Therapist) => {
+    const office = officeOf(t);
+    return office && feeLine(office.cost, wanted);
+  };
 
   return (
     <>
@@ -172,7 +176,7 @@ type PinGroupProps = {
   pin: Pin;
   marked: boolean;
   sought: ReadonlySet<string>;
-  feeOf: (t: Therapist) => string | undefined;
+  feeOf: (t: Therapist) => Fee | undefined;
   highlight: (slug: string) => (on: boolean) => void;
 };
 

@@ -5,6 +5,7 @@ import { MemoryRouter } from "react-router";
 import { describe, expect, it } from "vitest";
 import type { TherapistCard as Therapist } from "@shared/types";
 import type { Status } from "@/shortlist/store";
+import type { Fee } from "./fee";
 import { TherapistCard } from "./TherapistCard";
 
 const therapist = (extra: Partial<Therapist> = {}): Therapist => ({
@@ -23,7 +24,7 @@ type Options = {
   grouped?: boolean;
   action?: ReactNode;
   online?: boolean;
-  fee?: string;
+  fee?: Fee;
   status?: Status;
   track?: ReactNode;
   note?: string;
@@ -79,22 +80,27 @@ describe("TherapistCard", () => {
     expect(printed.previousElementSibling?.textContent).toBe("Test Therapist 1");
   });
 
-  it("gives the fee of the office it names on a line of its own, and none it hasn't", () => {
-    renderCard(therapist(), [], { fee: "From £60" });
-    expect(screen.getByText("From £60").closest("p")?.textContent).toBe("Fees: From £60");
+  it("gives the fees of the office it names on a line of its own, and none it hasn't", () => {
+    renderCard(therapist(), [], { fee: { text: "Individual £60, couples £80", given: true } });
+    expect(screen.getByText("Individual £60, couples £80").closest("p")?.textContent).toBe("Fees: Individual £60, couples £80");
     expect(screen.getByText("Remote").closest("p")?.textContent).toBe("In-person, Remote");
     cleanup();
     renderCard(therapist());
     expect(screen.queryByText(/Fees/)).toBeNull();
   });
 
+  it("says so where the office gives no fees, in words that need no heading", () => {
+    renderCard(therapist(), [], { fee: { text: "No fees given", given: false } });
+    expect(screen.getByText("No fees given").closest("p")?.textContent).toBe("No fees given");
+  });
+
   it("gives the fee on its own among therapists met online", () => {
-    renderCard(therapist({ sessionTypes: "Remote" }), [], { online: true, fee: "£70" });
+    renderCard(therapist({ sessionTypes: "Remote" }), [], { online: true, fee: { text: "£70", given: true } });
     expect(screen.getByText("£70").closest("p")?.textContent).toBe("Fees: £70");
   });
 
   it("says where the visitor stands with a shortlisted therapist on a line after the fee, and nothing for To contact", () => {
-    renderCard(therapist(), [], { fee: "From £60", status: "consultation" });
+    renderCard(therapist(), [], { fee: { text: "From £60", given: true }, status: "consultation" });
     const line = screen.getByText("Consultation").closest("p");
     expect(line?.textContent).toBe("Status: Consultation");
     expect(line?.querySelector("svg")).not.toBeNull();

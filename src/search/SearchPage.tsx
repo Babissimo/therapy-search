@@ -19,6 +19,7 @@ import { useSetAsideOpen } from "@/shortlist/setAside";
 import { statusOf } from "@/shortlist/store";
 import { useShortlistIf, useShortlistRefresh } from "@/shortlist/useShortlist";
 import { activeFilters, soughtTerms } from "./activeFilters";
+import { feeKinds } from "./fee";
 import { FilterChips } from "./FilterChips";
 import { FilterPanel } from "./FilterPanel";
 import { FiltersButton, FiltersSection, FiltersSheet, FiltersSheetButton, UpdateResults } from "./Filters";
@@ -359,6 +360,7 @@ function SearchView({ params, onChange, wide }: ViewProps) {
       shortlist={
         <LazyShortlistTab
           sought={soughtTerms(params)}
+          feeKinds={feeKinds(params.multi.WorksWith)}
           pins={shortlistPins.pins}
           unplaced={shortlistPins.unplaced.length}
           selected={selected}

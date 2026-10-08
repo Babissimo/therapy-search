@@ -15,7 +15,7 @@ import { LoadMore } from "./LoadMore";
 import type { Pin } from "./map/pins";
 import { Results } from "./Results";
 import { ResultsStatus } from "./ResultsStatus";
-import { withFlag, withHelpWithTerms, withText } from "./state";
+import { withFlag, withHelpWithTerms, withMulti, withText } from "./state";
 import { useResults } from "./useResults";
 
 // Results keep the order they are answered in here; order.test.ts and useResults.test.tsx cover the order itself.
@@ -477,12 +477,23 @@ describe("Results", () => {
     await screen.findByText("£60");
     view.rerender(leeds, { pins: [{ key: "LS2", point: { lat: 53.8, lng: -1.55 }, therapists: therapists.slice(1), kind: "outcode" }] });
     within(screen.getByRole("group")).getByText("£70");
+    within(screen.getByRole("group")).getByText("No fees given");
     expect(screen.getAllByText("Fees:")).toHaveLength(2);
     expect(office.mock.calls.map(([slug, location]) => [slug, location])).toEqual([
       ["a", "LEEDS LS1"],
       ["b", "LEEDS LS2"],
       ["c", "LEEDS LS2"],
     ]);
+  });
+
+  it("gives individual and couples fees, or only the fees for whom the search's Works With ticks ask", async () => {
+    const therapists = [{ slug: "a", name: "Therapist a", initials: "T", tags: [], location: "Leeds LS1" }];
+    vi.spyOn(api, "search").mockResolvedValue(listed({ total: 1, from: 1, to: 1, notices: [], therapists }));
+    vi.spyOn(api, "office").mockResolvedValue({ cost: "£60 Individual\n£80 Couples\n£90 Family" });
+    const view = renderResults(leeds);
+    await screen.findByText("Individual £60, couples £80");
+    view.rerender(withMulti(leeds, "WorksWith", "Families", true));
+    await screen.findByText("Family £90");
   });
 
   it("says where the visitor stands with each shortlisted therapist, in a pin's box too, and fades those set aside in place", async () => {
