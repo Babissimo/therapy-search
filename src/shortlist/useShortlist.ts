@@ -1,7 +1,16 @@
 import { createContext, useContext, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import type { TherapistCard } from "@shared/types";
 import { browserStorage } from "@/lib/storage";
-import { createShortlistStore, statusOf, type Shortlist, type ShortlistEntry, type ShortlistStore, type Status } from "./store";
+import {
+  createShortlistStore,
+  statusOf,
+  type EmailDraft,
+  type Sender,
+  type Shortlist,
+  type ShortlistEntry,
+  type ShortlistStore,
+  type Status,
+} from "./store";
 
 /** The store the page's components share; left unset, it is the one kept in this browser. */
 export const ShortlistContext = createContext<ShortlistStore | null>(null);
@@ -91,6 +100,28 @@ export function useShortlistStatus(slug: string): Status | undefined {
 export function useShortlistNote(slug: string): string {
   const store = useShortlistStore();
   return useSyncExternalStore(store.subscribe, () => store.get().find((e) => e.card.slug === slug)?.note ?? "");
+}
+
+/** The search a therapist was shortlisted from, as a query, or nothing where none was kept. */
+export function useShortlistSearch(slug: string): string | undefined {
+  const store = useShortlistStore();
+  return useSyncExternalStore(store.subscribe, () => store.get().find((e) => e.card.slug === slug)?.search);
+}
+
+/** The visitor's email to a therapist, once edited by hand, or nothing. */
+export function useShortlistDraft(slug: string): EmailDraft | undefined {
+  const store = useShortlistStore();
+  return useSyncExternalStore(store.subscribe, () => store.get().find((e) => e.card.slug === slug)?.draft);
+}
+
+const NO_SENDER: Sender = {};
+
+/** The visitor's name and when they're usually free, as one value that changes only as either does. */
+export function useShortlistSender(): Sender {
+  const store = useShortlistStore();
+  const name = useSyncExternalStore(store.subscribe, () => store.sender()?.name);
+  const free = useSyncExternalStore(store.subscribe, () => store.sender()?.free);
+  return useMemo(() => (name === undefined && free === undefined ? NO_SENDER : { name, free }), [name, free]);
 }
 
 /**

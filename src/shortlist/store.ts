@@ -10,6 +10,14 @@ export const NOTE_LIMIT = 1000;
 export const REMOVED_DAYS = 30;
 const DAY = 24 * 60 * 60 * 1000;
 
+/** The most a draft's subject and message hold. */
+export const SUBJECT_LIMIT = 200;
+export const MESSAGE_LIMIT = 5000;
+/** The most each of the visitor's own fields holds. */
+export const SENDER_LIMIT = 200;
+/** The longest found-by search kept, above what a search with every filter ticked makes. */
+export const SEARCH_LIMIT = 12_000;
+
 /** Where the visitor stands with a shortlisted therapist, in the order a search usually runs through them. */
 export const STATUSES = ["toContact", "contacted", "waiting", "consultation", "seeing", "setAside"] as const;
 export type Status = (typeof STATUSES)[number];
@@ -20,9 +28,23 @@ type StoredStatus = Exclude<Status, "toContact">;
 export type ShortlistCard = Omit<TherapistCard, "distance">;
 /**
  * `rank` is set once the visitor moves them; until then they are ranked by when they were added. `note` is the visitor's
- * own, written on the profile.
+ * own, written on the profile. `search` is the query of the search they were shortlisted from, and `draft` the visitor's
+ * email to them once edited by hand.
  */
-export type ShortlistEntry = { addedAt: number; rank?: number; status?: StoredStatus; note?: string; card: ShortlistCard };
+export type ShortlistEntry = {
+  addedAt: number;
+  rank?: number;
+  status?: StoredStatus;
+  note?: string;
+  search?: string;
+  draft?: EmailDraft;
+  card: ShortlistCard;
+};
+
+export type EmailDraft = { subject: string; message: string };
+
+/** The visitor's name and when they're usually free, which every draft signs and offers. */
+export type Sender = { name?: string; free?: string };
 
 /** Highest rank first: newest first, as UKCP lists its own, until the visitor rearranges it. */
 export type Shortlist = readonly ShortlistEntry[];
@@ -35,8 +57,8 @@ type RemovedEntry = ShortlistEntry & { removedAt: number };
 
 type Entries = ReadonlyMap<string, ShortlistEntry>;
 type Removed = ReadonlyMap<string, RemovedEntry>;
-type State = { entries: Entries; removed: Removed };
-type Stored = { v: 1; entries: Record<string, ShortlistEntry>; removed: Record<string, RemovedEntry> };
+type State = { entries: Entries; removed: Removed; sender?: Sender };
+type Stored = { v: 1; entries: Record<string, ShortlistEntry>; removed: Record<string, RemovedEntry>; sender?: Sender };
 type KeyValue = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 type Events = Pick<EventTarget, "addEventListener" | "removeEventListener">;
 
@@ -64,6 +86,11 @@ export type ShortlistStore = {
   setStatus: (slug: string, status: Status) => void;
   /** Keeps the first `NOTE_LIMIT` characters, and an empty note as none, for a removed therapist too. */
   setNote: (slug: string, note: string) => void;
+  /** Keeps the visitor's edited draft to a therapist, removed or not; none forgets it. */
+  setDraft: (slug: string, draft: EmailDraft | undefined) => void;
+  /** The visitor's own fields, or nothing while neither is given. */
+  sender: () => Sender | undefined;
+  setSender: (sender: Sender) => void;
   /** Brings shortlisted therapists' cards up to date from results the site has fetched anyway. */
   refresh: (cards: readonly TherapistCard[]) => void;
   subscribe: (onChange: () => void) => () => void;
@@ -74,7 +101,7 @@ export type ShortlistStore = {
  * where storage is refused it still lasts for the page load. `events` is where another tab's changes are heard.
  */
 export function createShortlistStore(storage: KeyValue | null, now: () => number = Date.now, events?: Events): ShortlistStore {
-  let { entries, removed } = stored(storage) ?? NOBODY;
+  let { entries, removed, sender } = stored(storage) ?? NOBODY;
   // Whether storage holds the list in memory; once a write is refused, only memory does.
   let persisted = true;
   // Those removed too long ago are forgotten as the page loads, in storage as well as here.
@@ -83,7 +110,7 @@ export function createShortlistStore(storage: KeyValue | null, now: () => number
     const recent = new Map([...removed].filter(([, entry]) => entry.removedAt > since));
     if (recent.size < removed.size) {
       removed = recent;
-      persisted = write(storage, entries, removed);
+      persisted = write(storage, { entries, removed, sender });
     }
   }
   let list = ordered(entries);
@@ -94,15 +121,17 @@ export function createShortlistStore(storage: KeyValue | null, now: () => number
     list = ordered(entries);
     for (const listener of listeners) listener();
   };
-  // Starts from the list as stored rather than as last heard, so another tab's change not yet heard of survives.
-  const update = (change: (next: Map<string, ShortlistEntry>, gone: Map<string, RemovedEntry>) => void) => {
-    const from = (persisted && stored(storage)) || { entries, removed };
+  // Starts from the list as stored rather than as last heard, so another tab's change not yet heard of survives. A change
+  // that returns a sender replaces the visitor's fields; any other keeps them as stored.
+  const update = (change: (next: Map<string, ShortlistEntry>, gone: Map<string, RemovedEntry>) => { sender: Sender | undefined } | void) => {
+    const from = (persisted && stored(storage)) || { entries, removed, sender };
     const next = new Map(from.entries);
     const gone = new Map(from.removed);
-    change(next, gone);
+    const made = change(next, gone);
     entries = next;
     removed = gone;
-    persisted = write(storage, entries, removed);
+    sender = made ? made.sender : from.sender;
+    persisted = write(storage, { entries, removed, sender });
     notify();
   };
   const onStorage = (event: Event) => {
@@ -112,16 +141,17 @@ export function createShortlistStore(storage: KeyValue | null, now: () => number
     if (key !== SHORTLIST_KEY && key !== null) return;
     // Only a clear takes the list out of storage. Storage is still read, as this tab may have written to it since.
     if (newValue === null) clears += 1;
-    ({ entries, removed } = stored(storage) ?? (newValue === null ? NOBODY : { entries, removed }));
+    ({ entries, removed, sender } = stored(storage) ?? (newValue === null ? NOBODY : { entries, removed, sender }));
     notify();
   };
   // What another tab did while no one here was subscribed went unheard, a clear among them, so the first to subscribe
   // again catches up. Anyone gone from the list meanwhile may have gone in a clear, so counts as one.
   const catchUp = () => {
     const inStorage = persisted ? stored(storage) : undefined;
-    if (!inStorage || JSON.stringify([...inStorage.entries, ...inStorage.removed]) === JSON.stringify([...entries, ...removed])) return;
+    const snapshot = (state: State) => JSON.stringify([...state.entries, ...state.removed, state.sender ?? null]);
+    if (!inStorage || snapshot(inStorage) === snapshot({ entries, removed, sender })) return;
     if ([...entries.keys()].some((slug) => !inStorage.entries.has(slug))) clears += 1;
-    ({ entries, removed } = inStorage);
+    ({ entries, removed, sender } = inStorage);
     list = ordered(entries);
   };
 
@@ -133,8 +163,10 @@ export function createShortlistStore(storage: KeyValue | null, now: () => number
         // Listed already, as by another tab this one has yet to hear from, they are not started afresh.
         const kept = next.get(card.slug) ?? gone.get(card.slug);
         gone.delete(card.slug);
-        const { addedAt = now(), rank, status, note } = { ...kept, ...place };
-        next.set(card.slug, { addedAt, rank, status, note: noteFrom(note), card: cardOf(kept?.card ?? card) });
+        const { addedAt = now(), rank, status, note, draft } = { ...kept, ...place };
+        // The newer search where one is given, as the one the visitor last found them by.
+        const search = searchFrom(place?.search) ?? kept?.search;
+        next.set(card.slug, { addedAt, rank, status, note: noteFrom(note), search, draft: draftFrom(draft), card: cardOf(kept?.card ?? card) });
       });
       return statusOf(entries.get(card.slug)!);
     },
@@ -148,7 +180,7 @@ export function createShortlistStore(storage: KeyValue | null, now: () => number
     // Takes the list out of storage, which leaves nothing behind and is how other tabs know it was cleared.
     clear: () => {
       clears += 1;
-      ({ entries, removed } = NOBODY);
+      ({ entries, removed, sender } = NOBODY);
       persisted = erase(storage);
       notify();
     },
@@ -179,6 +211,15 @@ export function createShortlistStore(storage: KeyValue | null, now: () => number
         const kept = gone.get(slug);
         if (kept) gone.set(slug, { ...kept, note: noteFrom(note) });
       }),
+    setDraft: (slug, draft) =>
+      update((next, gone) => {
+        const entry = next.get(slug);
+        if (entry) next.set(slug, { ...entry, draft: draftFrom(draft) });
+        const kept = gone.get(slug);
+        if (kept) gone.set(slug, { ...kept, draft: draftFrom(draft) });
+      }),
+    sender: () => sender,
+    setSender: (value) => update(() => ({ sender: senderFrom(value) })),
     refresh: (cards) => {
       // Runs whenever results render, so only shortlisted therapists' cards are copied and compared.
       const changed = cards.filter((fresh) => {
@@ -293,12 +334,12 @@ function stored(storage: KeyValue | null): State | undefined {
     const entry = removedFrom(item);
     if (entry?.card.slug === slug && !entries.has(slug)) removed.set(slug, entry);
   }
-  return { entries, removed };
+  return { entries, removed, sender: senderFrom(value.sender) };
 }
 
 /** Whether storage took the list; private browsing can refuse it. */
-function write(storage: KeyValue | null, entries: Entries, removed: Removed): boolean {
-  const value: Stored = { v: 1, entries: Object.fromEntries(entries), removed: Object.fromEntries(removed) };
+function write(storage: KeyValue | null, { entries, removed, sender }: State): boolean {
+  const value: Stored = { v: 1, entries: Object.fromEntries(entries), removed: Object.fromEntries(removed), sender };
   try {
     storage?.setItem(SHORTLIST_KEY, JSON.stringify(value));
     return storage !== null;
@@ -328,6 +369,8 @@ function entryFrom(value: unknown): ShortlistEntry | undefined {
     rank: typeof value.rank === "number" ? value.rank : undefined,
     status: storedStatus(value.status),
     note: noteFrom(value.note),
+    search: searchFrom(value.search),
+    draft: draftFrom(value.draft),
     card: cardOf({
       slug: c.slug,
       name: c.name,
@@ -355,6 +398,26 @@ function storedStatus(value: unknown): StoredStatus | undefined {
 /** A note as kept: no more than `NOTE_LIMIT` characters, and none where nothing is written or it isn't text. */
 function noteFrom(value: unknown): string | undefined {
   return typeof value === "string" && value !== "" ? value.slice(0, NOTE_LIMIT) : undefined;
+}
+
+/** A found-by search as kept, or none where it isn't one. */
+function searchFrom(value: unknown): string | undefined {
+  return typeof value === "string" && value !== "" && value.length <= SEARCH_LIMIT ? value : undefined;
+}
+
+/** A draft as kept, each part held to its limit, or none where it isn't one. */
+function draftFrom(value: unknown): EmailDraft | undefined {
+  if (!isRecord(value) || typeof value.subject !== "string" || typeof value.message !== "string") return undefined;
+  return { subject: value.subject.slice(0, SUBJECT_LIMIT), message: value.message.slice(0, MESSAGE_LIMIT) };
+}
+
+/** The visitor's fields as kept, each held to its limit, an empty one as none, and none at all where neither is given. */
+function senderFrom(value: unknown): Sender | undefined {
+  if (!isRecord(value)) return undefined;
+  const field = (text: unknown) => (typeof text === "string" && text !== "" ? text.slice(0, SENDER_LIMIT) : undefined);
+  const name = field(value.name);
+  const free = field(value.free);
+  return name === undefined && free === undefined ? undefined : { name, free };
 }
 
 function text(value: unknown): string | undefined {

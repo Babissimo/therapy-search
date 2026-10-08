@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from "vitest";
 import type { TherapistCard } from "@shared/types";
-import { createShortlistStore, NOTE_LIMIT, REMOVED_DAYS, SHORTLIST_KEY, statusOf } from "./store";
+import { createShortlistStore, MESSAGE_LIMIT, NOTE_LIMIT, REMOVED_DAYS, SEARCH_LIMIT, SENDER_LIMIT, SHORTLIST_KEY, statusOf, SUBJECT_LIMIT } from "./store";
 
 function memory(initial?: unknown) {
   const store = new Map<string, string>(initial === undefined ? [] : [[SHORTLIST_KEY, typeof initial === "string" ? initial : JSON.stringify(initial)]]);
@@ -646,5 +646,101 @@ describe("createShortlistStore", () => {
     createShortlistStore(storage, () => 1001 + REMOVED_DAYS * 24 * 60 * 60 * 1000);
     store.subscribe(() => {});
     expect(store.removedCount()).toBe(0);
+  });
+
+  it("keeps the search a therapist was found by, their draft and the visitor's own fields, for the next visit", () => {
+    const storage = memory();
+    const store = createShortlistStore(storage, clock());
+    store.add(card("a"), { search: "HelpWithAdvanced=Anxiety&Location=Leeds" });
+    store.setDraft("a", { subject: "Hello", message: "Dear A" });
+    store.setSender({ name: "Sam", free: "weekday evenings" });
+    const again = createShortlistStore(storage, clock());
+    expect(again.get()[0]).toMatchObject({ search: "HelpWithAdvanced=Anxiety&Location=Leeds", draft: { subject: "Hello", message: "Dear A" } });
+    expect(again.sender()).toEqual({ name: "Sam", free: "weekday evenings" });
+  });
+
+  it("takes the newer search on adding a therapist back, keeping the one they had where none is given, and keeps their draft", () => {
+    const store = createShortlistStore(memory(), clock());
+    store.add(card("a"), { search: "Location=Leeds" });
+    store.setDraft("a", { subject: "S", message: "M" });
+    store.remove("a");
+    store.add(card("a"), { search: undefined });
+    expect(store.get()[0]).toMatchObject({ search: "Location=Leeds", draft: { subject: "S", message: "M" } });
+    store.remove("a");
+    store.add(card("a"), { search: "Location=York" });
+    expect(store.get()[0]?.search).toBe("Location=York");
+  });
+
+  it("keeps a found-by search up to its limit, and none longer or empty", () => {
+    const store = createShortlistStore(memory(), clock());
+    store.add(card("a"), { search: "x".repeat(SEARCH_LIMIT) });
+    store.add(card("b"), { search: "x".repeat(SEARCH_LIMIT + 1) });
+    store.add(card("c"), { search: "" });
+    const searchOf = (slug: string) => store.get().find((entry) => entry.card.slug === slug)?.search;
+    expect(searchOf("a")).toBe("x".repeat(SEARCH_LIMIT));
+    expect(searchOf("b")).toBeUndefined();
+    expect(searchOf("c")).toBeUndefined();
+  });
+
+  it("keeps a draft saved after its therapist was removed, for when they are added back", () => {
+    const store = createShortlistStore(memory(), clock());
+    store.add(card("a"));
+    store.remove("a");
+    store.setDraft("a", { subject: "S", message: "M" });
+    store.add(card("a"));
+    expect(store.get()[0]?.draft).toEqual({ subject: "S", message: "M" });
+  });
+
+  it("holds a draft and the visitor's fields to their limits, and forgets a draft or fields set to none", () => {
+    const store = createShortlistStore(memory(), clock());
+    store.add(card("a"));
+    store.setDraft("a", { subject: "x".repeat(SUBJECT_LIMIT + 1), message: "y".repeat(MESSAGE_LIMIT + 1) });
+    expect(store.get()[0]?.draft).toEqual({ subject: "x".repeat(SUBJECT_LIMIT), message: "y".repeat(MESSAGE_LIMIT) });
+    store.setDraft("a", undefined);
+    expect(store.get()[0]?.draft).toBeUndefined();
+    store.setSender({ name: "n".repeat(SENDER_LIMIT + 1), free: "" });
+    expect(store.sender()).toEqual({ name: "n".repeat(SENDER_LIMIT) });
+    store.setSender({ name: "", free: "" });
+    expect(store.sender()).toBeUndefined();
+  });
+
+  it("drops a stored search, draft or sender it can't read", () => {
+    const stored = { v: 1, entries: { a: { addedAt: 1, search: 7, draft: { subject: 1 }, card: card("a") } }, removed: {}, sender: "Sam" };
+    const store = createShortlistStore(memory(stored));
+    expect(store.get()[0]).toEqual({ addedAt: 1, card: { ...card("a"), distance: undefined } });
+    expect(store.sender()).toBeUndefined();
+  });
+
+  it("clears drafts and the visitor's own fields with the list", () => {
+    const storage = memory();
+    const store = createShortlistStore(storage, clock());
+    store.add(card("a"));
+    store.setDraft("a", { subject: "S", message: "M" });
+    store.setSender({ name: "Sam" });
+    store.clear();
+    expect(store.sender()).toBeUndefined();
+    expect(createShortlistStore(storage).sender()).toBeUndefined();
+  });
+
+  it("keeps the visitor's own fields as other changes are made, and follows them changed in another tab", () => {
+    const storage = memory();
+    const events = new EventTarget();
+    const store = createShortlistStore(storage, clock(), events);
+    store.setSender({ name: "Sam" });
+    store.add(card("a"));
+    expect(store.sender()).toEqual({ name: "Sam" });
+    store.subscribe(() => {});
+    createShortlistStore(storage).setSender({ name: "Sam", free: "mornings" });
+    events.dispatchEvent(new StorageEvent("storage", { key: SHORTLIST_KEY, newValue: storage.store.get(SHORTLIST_KEY) }));
+    expect(store.sender()).toEqual({ name: "Sam", free: "mornings" });
+  });
+
+  it("keeps the visitor's fields as another tab set them when this tab changes the list before hearing of it", () => {
+    const storage = memory();
+    const store = createShortlistStore(storage, clock());
+    createShortlistStore(storage).setSender({ name: "Sam", free: "mornings" });
+    store.add(card("a"));
+    expect(createShortlistStore(storage).sender()).toEqual({ name: "Sam", free: "mornings" });
+    expect(store.sender()).toEqual({ name: "Sam", free: "mornings" });
   });
 });
