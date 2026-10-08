@@ -7,8 +7,8 @@ import { LoadFailed } from "./LoadFailed";
 
 /**
  * In place of the page when drawing it throws, which would otherwise leave it blank: what went wrong in plain words, a
- * reload, the plain search, UKCP's own directory, where to report it, and where to turn for help today. Laid out as
- * index.html's fallback is, with its `fallback` class.
+ * reload, the plain search, UKCP's own directory, where to report it, and where to turn for help today. Laid out by the
+ * `fallback` rules in index.html's head, which need nothing of the build's styles.
  */
 export function ErrorBoundary({ children }: { children: ReactNode }) {
   return <LoadFailed fallback={<PageFailed />}>{children}</LoadFailed>;

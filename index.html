@@ -37,6 +37,52 @@
           document.documentElement.classList.add("dark");
       }
     </script>
+    <script>
+      // Picks which of the app's layouts the page below takes while the script loads, by the address the app reads (App's
+      // routes, fragmentAddress): a search near a place beside its map, online's start, a page apart from the search, or
+      // else the search's start, which is also the page's shape without script. Written for any browser that runs script,
+      // as the gate is.
+      (function () {
+        var root = document.documentElement;
+        if (/(^| )old-browser( |$)/.test(root.className)) return;
+        var at = location.hash.indexOf("#/") === 0 ? location.hash.slice(1) : location.pathname + location.search;
+        // A profile opened over a page shows over it, as history or the tab remembers (profileLink's backgroundOf).
+        if (at.indexOf("/therapist/") === 0) {
+          try {
+            var over = history.state && history.state.usr && history.state.usr.background;
+            var opened = over ? null : JSON.parse(sessionStorage.getItem("profile-opened-over"));
+            if (opened && opened.pathname === at.split("?")[0]) over = opened.background;
+            if (over && typeof over.pathname == "string") at = over.pathname + (over.search || "");
+          } catch (e) {}
+        }
+        var path = at.split("?")[0].replace(/(.)\/$/, "$1");
+        // Each name's first value, as readParams reads it with URLSearchParams, which keeps a broken escape as it is.
+        var values = {};
+        var has = function (name) {
+          return Object.prototype.hasOwnProperty.call(values, name);
+        };
+        var pairs = (at.split("?")[1] || "").split("&");
+        for (var i = 0; i < pairs.length; i++) {
+          var name = pairs[i].split("=")[0];
+          var value = pairs[i].slice(name.length + 1).replace(/\+/g, " ");
+          try {
+            value = decodeURIComponent(value);
+          } catch (e) {}
+          if (name && !has(name)) values[name] = value;
+        }
+        // Online asks for a filter besides the session types before it lists anyone (narrowsOnline).
+        var text = function (name, pattern) {
+          return has(name) && pattern.test(values[name]);
+        };
+        var narrows = text("HelpWith", /[^\s,]/) || text("KeywordFilter", /\S/) || text("OnlyProfilesWithPhotos", /^true$/);
+        narrows = narrows || (has("page") && Number(values.page) > 1);
+        var lists = ["HelpWithAdvanced", "WorksWith", "TypesOfTherapy", "Languages", "Colleges"];
+        for (i = 0; i < lists.length; i++) narrows = narrows || has(lists[i]);
+        if (path === "/" && text("Location", /\S/)) root.className += " shape-map";
+        else if (path === "/online" && !narrows) root.className += " shape-online";
+        else if (path !== "/" && path !== "/online") root.className += " shape-page";
+      })();
+    </script>
     <style>
       /* The page before its script draws it, or in its place when the script never runs. Plain CSS, which any browser reads. */
       .fallback {
@@ -84,6 +130,224 @@
       .old-browser .fallback .report {
         animation: none;
       }
+      .old-browser .loading-page .ask {
+        min-height: 0;
+      }
+      /* Laid out as the page the app draws in its place, measured from it, so the app fills it in rather than replacing it:
+         the site's name where the masthead has it, and on the search, a large line where the prompt asks, beside the side
+         bar's edge or the map's ground. The shape script above picks the layout. */
+      .loading-page {
+        min-height: 100svh;
+        font-family: "Atkinson Hyperlegible Next Variable", system-ui, sans-serif;
+      }
+      .loading-masthead {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        box-sizing: border-box;
+        /* The theme switch's height, which sets the masthead's, with the padding and rule around it. */
+        min-height: calc(3.625rem + 1px);
+        padding: 0.75rem 1rem;
+        border-bottom: 1px solid var(--border);
+      }
+      /* The name wraps where the app's does, beside the theme switch and with room for the ⓘ that follows it. */
+      .loading-masthead h1 {
+        min-width: 0;
+        margin: 0;
+        padding-right: 1.375rem;
+        font: 500 1.125rem/1.75rem "Newsreader Variable", serif;
+      }
+      .loading-masthead::after {
+        content: "";
+        flex: none;
+        width: 5.625rem;
+        margin-left: 0.5rem;
+      }
+      /* The app's ⓘ says the site is unofficial, so while it loads that is for screen readers alone, until the late note. */
+      .loading-masthead .unofficial {
+        animation: fallback-named 0s 10s both;
+      }
+      @keyframes fallback-named {
+        from {
+          position: absolute;
+          width: 1px;
+          height: 1px;
+          overflow: hidden;
+          clip: rect(0 0 0 0);
+          white-space: nowrap;
+        }
+      }
+      .old-browser .loading-masthead .unofficial {
+        animation: none;
+      }
+      .old-browser .loading-masthead h1 {
+        padding-right: 0;
+      }
+      .old-browser .loading-masthead::after {
+        display: none;
+      }
+      .loading-page .fallback {
+        max-width: 44rem;
+        margin: 0 auto;
+        /* Down past the switch between near me and online. */
+        padding: 6.375rem 1rem 2rem;
+        text-align: center;
+        color: var(--muted-foreground);
+      }
+      /* As tall as the prompt's line, its words on how, the button down to the filters and the way to the languages, so the
+         help line beneath stays put. */
+      .loading-page .ask {
+        min-height: 17.125rem;
+        color: var(--foreground);
+      }
+      .loading-page .fallback .loading {
+        margin: 0;
+        font: 500 1.875rem/2.25rem "Newsreader Variable", serif;
+      }
+      .loading-page .fallback .help {
+        padding-top: 2rem;
+      }
+      .loading-side {
+        display: none;
+      }
+      .shape-map .loading-page .fallback,
+      .shape-page .loading-page .fallback {
+        max-width: none;
+        padding: 1rem;
+        text-align: left;
+      }
+      .shape-map .loading-page .ask,
+      .shape-page .loading-page .ask {
+        min-height: 0;
+      }
+      .shape-map .loading-page .fallback .loading {
+        margin-bottom: 1rem;
+        font-size: 1.5rem;
+        line-height: 2rem;
+      }
+      .shape-map .loading-page .fallback .help,
+      .shape-page .loading-page .fallback .help {
+        padding-top: 0;
+      }
+      /* A page apart from the search reads as a document, its masthead in the header's middle. */
+      .shape-page .loading-masthead {
+        padding-right: max(1rem, 50% - 35rem);
+        padding-left: max(1rem, 50% - 35rem);
+      }
+      .shape-page .loading-page .fallback {
+        max-width: 72rem;
+        padding: 2rem 1rem;
+      }
+      .shape-page .loading-page .fallback > * {
+        max-width: 36rem;
+      }
+      .shape-page .loading-page .fallback .loading {
+        margin-bottom: 1rem;
+        font-size: 1.875rem;
+        line-height: 2.25rem;
+      }
+      /* Online's switch says where its therapists work, a line more, and its words on how run longer. */
+      .shape-online .loading-page .fallback {
+        padding-top: 8.875rem;
+      }
+      .shape-online .loading-page .ask {
+        min-height: 22.375rem;
+      }
+      /* The theme switch and the switch between near me and online stand taller for a finger. */
+      @media (pointer: coarse) {
+        .loading-masthead {
+          min-height: calc(4.125rem + 1px);
+        }
+        .loading-masthead::after {
+          width: 8.625rem;
+        }
+        .loading-page .fallback {
+          padding-top: 7.125rem;
+        }
+        .shape-online .loading-page .fallback {
+          padding-top: 9.625rem;
+        }
+      }
+      /* The build rewrites widths in range syntax, which a browser too old for the app skips, leaving it the narrow layout.
+         On the narrowest phones the prompt's words take two more lines. */
+      @media (max-width: 22.25rem) {
+        .loading-page .ask {
+          min-height: 20.375rem;
+        }
+        .shape-online .loading-page .ask {
+          min-height: 25.625rem;
+        }
+      }
+      @media (min-width: 40rem) {
+        /* The button and the way to the languages share a line here. */
+        .loading-page .ask {
+          min-height: 11.75rem;
+        }
+        .shape-online .loading-page .ask {
+          min-height: 13.5rem;
+        }
+        .loading-page .fallback .loading {
+          font-size: 2.25rem;
+          line-height: 2.5rem;
+        }
+        .loading-page .fallback .help {
+          padding-top: 3rem;
+        }
+      }
+      /* SearchPage's WIDE, where the list sits beside the map, and the prompt beside the filters. */
+      @media (min-width: 64rem) and (min-height: 31rem) {
+        .loading-page {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) 24rem;
+          grid-template-rows: auto 1fr;
+        }
+        .loading-masthead,
+        .loading-page .fallback {
+          grid-column: 1;
+        }
+        .loading-page .fallback {
+          padding-top: 5rem;
+        }
+        /* With the filters beside it, the prompt has no button down to them, and online's switch sits with them. */
+        .loading-page .ask {
+          min-height: 10.875rem;
+        }
+        .shape-online .loading-page .fallback {
+          padding-top: 5rem;
+        }
+        .shape-online .loading-page .ask {
+          min-height: 12.625rem;
+        }
+        .loading-side {
+          display: block;
+          grid-column: 2;
+          grid-row: 1 / 3;
+          border-left: 1px solid var(--border);
+        }
+        .shape-map .loading-page {
+          grid-template-columns: calc(24rem - 1px) minmax(0, 1fr);
+        }
+        /* Clear of the button that puts the list away, with the tabs beneath rather than a rule. */
+        .shape-map .loading-masthead {
+          min-height: 3.5rem;
+          padding-left: 3.5rem;
+          border-bottom: 0;
+        }
+        .shape-map .loading-side {
+          background: var(--muted);
+        }
+        .shape-page .loading-page {
+          display: block;
+        }
+        .shape-page .loading-side {
+          display: none;
+        }
+      }
+      @media (min-width: 64rem) and (min-height: 31rem) and (pointer: coarse) {
+        .shape-map .loading-masthead {
+          padding-left: 6rem;
+        }
+      }
     </style>
     <noscript>
       <style>
@@ -91,9 +355,19 @@
         .fallback .late {
           display: none;
         }
-        /* Without the script there is nothing to wait for. */
-        .fallback .report {
+        /* Without the script there is nothing to wait for, nor a prompt or a theme switch to keep room for. */
+        .fallback .report,
+        .loading-masthead .unofficial {
           animation: none;
+        }
+        .loading-page .ask {
+          min-height: 0;
+        }
+        .loading-masthead h1 {
+          padding-right: 0;
+        }
+        .loading-masthead::after {
+          display: none;
         }
       </style>
     </noscript>
@@ -101,43 +375,51 @@
   <body>
     <!-- React replaces what is in #root as it first draws the page. -->
     <div id="root">
-      <main class="fallback">
-        <h1>Find a UKCP therapist (unofficial)</h1>
-        <!-- The plain search is the Worker's, at /plain, and needs neither JavaScript nor a recent browser. -->
-        <noscript>
-          <p>
-            This search needs JavaScript, which is turned off in this browser. The <a href="/plain">plain search</a> works
-            without it, and UKCP's own directory lists the same therapists:
-            <a href="https://www.psychotherapy.org.uk/find-a-therapist/">find a therapist on the UKCP website</a>.
+      <div class="loading-page">
+        <header class="loading-masthead">
+          <h1>Find a UKCP therapist<span class="unofficial"> (unofficial)</span></h1>
+        </header>
+        <main class="fallback">
+          <div class="ask">
+            <!-- The plain search is the Worker's, at /plain, and needs neither JavaScript nor a recent browser. -->
+            <noscript>
+              <p>
+                This search needs JavaScript, which is turned off in this browser. The <a href="/plain">plain search</a> works
+                without it, and UKCP's own directory lists the same therapists:
+                <a href="https://www.psychotherapy.org.uk/find-a-therapist/">find a therapist on the UKCP website</a>.
+              </p>
+            </noscript>
+            <p class="old">
+              This browser is too old for this search. The <a href="/plain">plain search</a> works in any browser, and UKCP's
+              own directory lists the same therapists:
+              <a href="https://www.psychotherapy.org.uk/find-a-therapist/">find a therapist on the UKCP website</a>.
+            </p>
+            <p class="loading">Loading the search…</p>
+          </div>
+          <!-- HelpNow's words and numbers, which ErrorBoundary.test.tsx holds this copy to. Above the late note, as the space
+               that note keeps while hidden would part it from the rest. -->
+          <p class="help">
+            Need help now? In the UK, call <a translate="no" href="tel:111">111</a> and choose the mental health option (in
+            Northern Ireland, <span translate="no">Lifeline</span> on <a translate="no" href="tel:08088088000">0808 808 8000</a>),
+            <span translate="no">Samaritans</span> on <a translate="no" href="tel:116123">116 123</a>, or text
+            <a translate="no" href="sms:85258?&amp;body=SHOUT">SHOUT to 85258</a>. In an emergency, call
+            <a translate="no" href="tel:999">999</a>.
           </p>
-        </noscript>
-        <p class="old">
-          This browser is too old for this search. The <a href="/plain">plain search</a> works in any browser, and UKCP's own
-          directory lists the same therapists:
-          <a href="https://www.psychotherapy.org.uk/find-a-therapist/">find a therapist on the UKCP website</a>.
-        </p>
-        <p class="loading">Loading the search…</p>
-        <!-- HelpNow's words and numbers, which ErrorBoundary.test.tsx holds this copy to. Above the late note, as the space
-             that note keeps while hidden would part it from the rest. -->
-        <p>
-          Need help now? In the UK, call <a translate="no" href="tel:111">111</a> and choose the mental health option (in Northern
-          Ireland, <span translate="no">Lifeline</span> on <a translate="no" href="tel:08088088000">0808 808 8000</a>),
-          <span translate="no">Samaritans</span> on <a translate="no" href="tel:116123">116 123</a>, or text
-          <a translate="no" href="sms:85258?&amp;body=SHOUT">SHOUT to 85258</a>. In an emergency, call
-          <a translate="no" href="tel:999">999</a>.
-        </p>
-        <p class="late">
-          If the search doesn't load, the connection may be too slow or this browser too old for it. Try the
-          <a href="/plain">plain search</a>, which works in any browser, or UKCP's own directory, which lists the same
-          therapists: <a href="https://www.psychotherapy.org.uk/find-a-therapist/">find a therapist on the UKCP website</a>.
-        </p>
-        <!-- The accessibility statement needs the script, so its way to report a problem is here too. -->
-        <p class="report">
-          If this site doesn't work for you, please
-          <a href="https://github.com/Babissimo/therapy-search/issues/new?template=accessibility.yml">report a problem</a>
-          on <span translate="no">GitHub</span>.
-        </p>
-      </main>
+          <p class="late">
+            If the search doesn't load, the connection may be too slow or this browser too old for it. Try the
+            <a href="/plain">plain search</a>, which works in any browser, or UKCP's own directory, which lists the same
+            therapists: <a href="https://www.psychotherapy.org.uk/find-a-therapist/">find a therapist on the UKCP website</a>.
+          </p>
+          <!-- The accessibility statement needs the script, so its way to report a problem is here too. -->
+          <p class="report">
+            If this site doesn't work for you, please
+            <a href="https://github.com/Babissimo/therapy-search/issues/new?template=accessibility.yml">report a problem</a>
+            on <span translate="no">GitHub</span>.
+          </p>
+        </main>
+        <!-- The side bar's edge, or the map's ground. -->
+        <div class="loading-side"></div>
+      </div>
     </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
