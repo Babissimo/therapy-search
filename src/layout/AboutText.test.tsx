@@ -27,4 +27,9 @@ describe("AboutText", () => {
     screen.getByText(/Anyone you remove from your shortlist is kept in case you add them back, until you clear it or open this site 30 days or more/);
     screen.getByText(/or open this site 30 days or more after removing them\.$/);
   });
+
+  it("says the browser keeps the search each therapist was found by, with where the visitor stands with them and their notes", () => {
+    render(<AboutText />, { wrapper: MemoryRouter });
+    screen.getByText(/with where you stand with each therapist, the search you found them by and your notes on them\)/);
+  });
 });
