@@ -373,7 +373,7 @@ function SearchView({ params, onChange, wide }: ViewProps) {
     ) : undefined;
   const tabs = tabbed && <ListTabs ref={tabsRef} />;
   const mapToggle = searching && !wide && <MapToggle shown={phoneMap === "shown"} onToggle={() => setPhoneMap(phoneMap === "shown" ? "hidden" : "shown")} />;
-  const map = (
+  const map = (zoomTo?: HTMLElement | null) => (
     <MapSlot>
       <MapPane
         {...mapView}
@@ -395,6 +395,7 @@ function SearchView({ params, onChange, wide }: ViewProps) {
         }
         outsideUK={params.flags.LocationSearchOutsideUK}
         underToolbar={wide}
+        zoomTo={zoomTo}
       />
     </MapSlot>
   );
@@ -436,7 +437,7 @@ function SearchView({ params, onChange, wide }: ViewProps) {
               topHidden={shortlistOpen}
               scroll={scroll}
               toggle={mapToggle}
-              map={!wide && mapDrawn && map}
+              map={!wide && mapDrawn ? map : undefined}
               mapShown={phoneMap === "shown"}
             >
               {lists}
@@ -469,7 +470,7 @@ function SearchView({ params, onChange, wide }: ViewProps) {
                   {lists}
                 </ResultsPanel>
               )}
-              {searching && <div className="col-start-2 row-start-1">{map}</div>}
+              {searching && <div className="col-start-2 row-start-1">{map()}</div>}
             </div>
           )}
         </div>

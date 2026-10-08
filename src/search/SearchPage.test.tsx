@@ -41,10 +41,12 @@ vi.mock("./prefetch", async (importOriginal) => {
 const mapChunk = vi.hoisted(() => ({ fails: false }));
 
 // The map pane is tested on its own; here it shows what the page passed it, with a button for each pin, one for a click on
-// the map away from them, and one that finds BN3 1FG in the middle of the map where it offers a search there. Once its code
-// can't be fetched, it throws where it would draw, as React does with a lazy component whose import failed.
+// the map away from them, one that finds BN3 1FG in the middle of the map where it offers a search there, and its zoom
+// buttons' group where it is told to put them. Once its code can't be fetched, it throws where it would draw, as React does
+// with a lazy component whose import failed.
 vi.mock("./map/MapPane", async () => {
   const { createElement, useSyncExternalStore } = await import("react");
+  const { createPortal } = await import("react-dom");
   type Props = {
     label: string;
     fitKey: string;
@@ -59,6 +61,7 @@ vi.mock("./map/MapPane", async () => {
     onSearchArea?: (postcode: string) => boolean;
     outsideUK?: boolean;
     underToolbar?: boolean;
+    zoomTo?: HTMLElement | null;
   };
   return {
     default: ({
@@ -75,9 +78,11 @@ vi.mock("./map/MapPane", async () => {
       onSearchArea,
       outsideUK,
       underToolbar,
+      zoomTo,
     }: Props) => {
       if (mapChunk.fails) throw new TypeError("Failed to fetch dynamically imported module");
       const slug = useSyncExternalStore(highlight.subscribe, highlight.get);
+      const zoom = createElement("div", { role: "group", "aria-label": "Zoom" });
       return createElement(
         "div",
         {
@@ -107,6 +112,7 @@ vi.mock("./map/MapPane", async () => {
             { type: "button", onClick: (event: { currentTarget: HTMLElement }) => (event.currentTarget.dataset.searched = String(onSearchArea("BN3 1FG"))) },
             "Search this area",
           ),
+        zoomTo === undefined ? zoom : zoomTo && createPortal(zoom, zoomTo),
       );
     },
   };
@@ -645,7 +651,11 @@ describe("SearchPage", () => {
     // In the list's place, scrolled to, with the toolbar above it to scroll back to, and as tall as the window less the tabs,
     // whose height both read from the one variable.
     expect(column.scrollTop).toBe(1200);
-    expect(screen.getByRole("textbox", { name: "Location" })).toBeTruthy();
+    // Its zoom buttons ride below the toolbar, outside the map, which stays put as the rest of the column slides over it.
+    const zoom = await screen.findByRole("group", { name: "Zoom" });
+    expect(map().contains(zoom)).toBe(false);
+    expect(screen.getByRole("textbox", { name: "Location" }).compareDocumentPosition(zoom) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(zoom.compareDocumentPosition(map()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(map().closest('[class~="h-[calc(100%-var(--list-tabs))]"]')).not.toBeNull();
     expect(column.querySelector("[data-list-tabs]")?.classList.contains("h-(--list-tabs)")).toBe(true);
     expect(screen.getByRole("tabpanel", { name: "Results" }).closest(".not-print\\:hidden")).not.toBeNull();
@@ -655,6 +665,7 @@ describe("SearchPage", () => {
     expect(screen.getByRole("tabpanel", { name: "Results" }).closest(".not-print\\:hidden")).toBeNull();
     // Kept, hidden, to come back as it was left.
     expect(map().closest("[hidden]")).not.toBeNull();
+    expect(zoom.closest("[hidden]")).not.toBeNull();
     fireEvent.click(toggle);
     expect(map().closest("[hidden]")).toBeNull();
   });

@@ -1,4 +1,4 @@
-import { useLayoutEffect, type ReactNode } from "react";
+import { useLayoutEffect, useState, type ReactNode } from "react";
 import { Morph } from "@/components/Morph";
 import { Masthead } from "@/layout/Masthead";
 import { cn } from "@/lib/utils";
@@ -15,8 +15,11 @@ type Props = {
   scroll: ReturnType<typeof useRememberedScroll>;
   /** On a phone, the button beside the tabs that shows the map in the list's place, and the list again. */
   toggle?: ReactNode;
-  /** On a phone, the list's map, once asked for: in the list's place while `mapShown`, hidden otherwise. */
-  map?: ReactNode;
+  /**
+   * On a phone, the list's map, once asked for: in the list's place while `mapShown`, hidden otherwise. It is given the
+   * place for its zoom buttons, below the toolbar, or null until that is drawn.
+   */
+  map?: (zoomTo: HTMLElement | null) => ReactNode;
   mapShown?: boolean;
   children: ReactNode;
 };
@@ -28,6 +31,7 @@ export function ListColumn({ wide, tabs, top, topHidden, scroll, toggle, map, ma
   const tabBar = Boolean(tabs || toggle);
   // Whatever takes the keyboard beneath the tabs is scrolled into view clear of them.
   const belowTabs = tabBar && "[&_*]:scroll-mt-[calc(var(--list-tabs)+0.5rem)]";
+  const [zoomSlot, setZoomSlot] = useState<HTMLDivElement | null>(null);
   // As the map shows, the column scrolls to its end, where the map fills the window below the tabs.
   useLayoutEffect(() => {
     const column = scroll.ref.current;
@@ -59,14 +63,17 @@ export function ListColumn({ wide, tabs, top, topHidden, scroll, toggle, map, ma
           // toolbar comes beneath the tabs, as it acts on the results alone. The map takes the list's place, as tall as the
           // window below the tabs, and while it shows the list's scroll is kept as it was rather than recorded. A short wide
           // window centres all but the site's name at the list's width.
+          //
+          // The map stays put as the column scrolls, stuck to its foot beneath the rest: the toolbar slides out from under the
+          // tabs over it, then the tabs and the site's name, with the map's zoom buttons riding below the toolbar.
           <Morph name="list">
             <div
               ref={scroll.ref}
               onScroll={mapShown ? undefined : onScroll}
               // The tabs' height: their controls, h-8 or h-11 on a touch screen, with the bar's padding and border.
-              className="relative min-h-0 flex-1 overflow-y-auto [--list-tabs:calc(3rem+1px)] pointer-coarse:[--list-tabs:calc(3.75rem+1px)] print:overflow-visible"
+              className="relative isolate min-h-0 flex-1 overflow-y-auto [--list-tabs:calc(3rem+1px)] pointer-coarse:[--list-tabs:calc(3.75rem+1px)] print:overflow-visible"
             >
-              <Masthead className="border-b px-4 py-3" />
+              <Masthead className="border-b bg-background px-4 py-3" />
               {/* Marked, so a pin's place in the list can be brought into view below it. */}
               {tabBar && (
                 <div data-list-tabs className="sticky top-0 z-10 h-(--list-tabs) border-b bg-background px-4 py-2 print:hidden">
@@ -76,7 +83,7 @@ export function ListColumn({ wide, tabs, top, topHidden, scroll, toggle, map, ma
                   </div>
                 </div>
               )}
-              <div hidden={topHidden} className={cn("px-3 pt-3 print:hidden", belowTabs)}>
+              <div hidden={topHidden} className={cn("bg-background px-3 pt-3 print:hidden", belowTabs)}>
                 <div className="mx-auto max-w-2xl space-y-2">{top}</div>
               </div>
               {/* Printed though the map is in its place on screen. */}
@@ -84,9 +91,13 @@ export function ListColumn({ wide, tabs, top, topHidden, scroll, toggle, map, ma
                 <div className="mx-auto max-w-2xl">{children}</div>
               </div>
               {map && (
-                <div hidden={!mapShown} className="h-[calc(100%-var(--list-tabs))] print:hidden">
-                  {map}
-                </div>
+                <>
+                  <div ref={setZoomSlot} hidden={!mapShown} className="relative h-0 print:hidden" />
+                  {/* A child of the column itself, as a sticky box keeps within its parent. */}
+                  <div hidden={!mapShown} className="sticky bottom-0 -z-1 h-[calc(100%-var(--list-tabs))] print:hidden">
+                    {map(zoomSlot)}
+                  </div>
+                </>
               )}
             </div>
           </Morph>

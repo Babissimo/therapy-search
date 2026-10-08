@@ -1,4 +1,5 @@
 import { useReducer, useState } from "react";
+import { createPortal } from "react-dom";
 import { useMapEvents } from "react-leaflet";
 import { Map, MapBounds, MapMarker, MapTileLayer, MapZoomControl, useReducedMotion } from "@/components/ui/map";
 import { savedView, saveView } from "../viewMemory";
@@ -42,6 +43,11 @@ export type MapPaneProps = {
   outsideUK?: boolean;
   /** The search's toolbar lies over the map's top left. */
   underToolbar?: boolean;
+  /**
+   * Where the zoom buttons go if not at the map's foot: the top right of an element outside the map, or nowhere while it
+   * is null, still to be drawn.
+   */
+  zoomTo?: HTMLElement | null;
 };
 
 /** The map behind the side bar: the open list's pins, with the search's centre, framed as they are placed, with the view kept for Back. */
@@ -62,6 +68,7 @@ export default function MapPane({
   onSearchArea,
   outsideUK,
   underToolbar,
+  zoomTo,
 }: MapPaneProps) {
   const saved = savedView(entry).map;
   const restored = saved?.fitKey === fitKey ? saved : undefined;
@@ -77,15 +84,16 @@ export default function MapPane({
   const points = pins.map((p) => p.point);
   const placed = pins.reduce((count, pin) => count + pin.therapists.length, 0);
   const bounds = outsideUK ? undefined : UK_BOUNDS;
+  // For those who can't pinch or scroll to zoom: at the foot beside the offer to search where the map has moved, unless
+  // given a place outside the map.
+  const zoom = <MapZoomControl className={zoomTo === undefined ? "top-auto right-2 bottom-8 left-auto" : "right-2 left-auto"} />;
   return (
     <div role="region" aria-label={label} className="isolate size-full">
       <Map center={restored?.centre ?? UK_VIEW.centre} zoom={restored?.zoom ?? UK_VIEW.zoom}>
         {/* Tiles stop at the bounds, which a view wider or taller than them reaches past. */}
         {tiles && <MapTileLayer bounds={bounds} />}
         <MapBounds bounds={bounds} />
-        {/* For those who can't pinch or scroll to zoom. At the foot beside the offer to search where the map has moved, or on a
-            narrow map, which leaves the foot to that offer, at the top. */}
-        <MapZoomControl className="top-auto right-2 bottom-8 left-auto max-lg:top-2 max-lg:bottom-auto" />
+        {zoomTo === undefined ? zoom : zoomTo && createPortal(zoom, zoomTo)}
         {/* Above the therapists' pins, which often share its point, but beneath one hovered (index.css raises it above
             every marker) or marked (PinsLayer raises it 1000); it lets clicks through to them. */}
         {centre && <MapMarker position={[centre.lat, centre.lng]} icon={centrePin} interactive={false} keyboard={false} zIndexOffset={200} />}
