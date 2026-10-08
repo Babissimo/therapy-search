@@ -1,11 +1,24 @@
 // @vitest-environment jsdom
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import type { ComponentProps } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { StatusTrack } from "./StatusTrack";
 import { createShortlistStore, statusOf, type ShortlistCard, type Status } from "./store";
 import { ShortlistContext, useShortlistEntry } from "./useShortlist";
+
+const drafter = vi.hoisted(() => ({ preload: vi.fn() }));
+
+// The drafter itself has tests of its own; here it is a stand-in that closes, or says the visitor got in touch.
+vi.mock("@/drafter/LazyEmailDrafter", () => ({
+  LazyEmailDrafter: ({ onClose, onMarked }: { onClose: () => void; onMarked: () => void }) => (
+    <div role="dialog" aria-label="Drafter">
+      <button onClick={onClose}>Close drafter</button>
+      <button onClick={onMarked}>Got in touch</button>
+    </div>
+  ),
+  usePreloadDrafter: drafter.preload,
+}));
 
 const JO: ShortlistCard = { slug: "Jo-ABCDEFGH", name: "Jo Bloggs", initials: "JB", tags: [] };
 
@@ -183,5 +196,55 @@ describe("StatusTrack", () => {
     screen.getByText("Contacted", { selector: "p" });
     screen.getByText("Removed from your shortlist", { selector: "p" });
     expect(screen.queryAllByRole("button")).toEqual([]);
+  });
+
+  it("offers to draft an email while the therapist is to contact, and nowhere further on or once removed", () => {
+    renderTrack("toContact");
+    screen.getByRole("button", { name: "Draft an email to Jo Bloggs" });
+    cleanup();
+    renderTrack("contacted");
+    expect(screen.queryByRole("button", { name: /^Draft an email/ })).toBeNull();
+    cleanup();
+    renderTrack("toContact", { listed: false });
+    expect(screen.queryByRole("button", { name: /^Draft an email/ })).toBeNull();
+  });
+
+  it("fetches the drafter's code while the track stands at To contact", () => {
+    renderTrack("toContact");
+    expect(drafter.preload).toHaveBeenLastCalledWith(true);
+    cleanup();
+    renderTrack("waiting");
+    expect(drafter.preload).toHaveBeenLastCalledWith(false);
+  });
+
+  it("opens the drafter, and closes it, giving focus back to its button though a click never focused it", () => {
+    renderTrack("toContact");
+    const button = screen.getByRole("button", { name: "Draft an email to Jo Bloggs" });
+    fireEvent.click(button);
+    fireEvent.click(within(screen.getByRole("dialog", { name: "Drafter" })).getByRole("button", { name: "Close drafter" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(document.activeElement).toBe(button);
+  });
+
+  it("marks the therapist contacted from the drafter, closing it and giving focus to the next step", () => {
+    const onChosen = vi.fn();
+    const store = renderTrack("toContact", { onChosen });
+    fireEvent.click(screen.getByRole("button", { name: "Draft an email to Jo Bloggs" }));
+    fireEvent.click(screen.getByRole("button", { name: "Got in touch" }));
+    expect(statusOf(store.get()[0]!)).toBe("contacted");
+    expect(onChosen).toHaveBeenCalledWith("contacted");
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Consultation booked, Jo Bloggs" }));
+  });
+
+  it("closes the drafter once the therapist moves on elsewhere, and leaves it closed if they come back to To contact", () => {
+    const store = renderTrack("toContact");
+    fireEvent.click(screen.getByRole("button", { name: "Draft an email to Jo Bloggs" }));
+    // As from the profile, or another tab.
+    act(() => store.setStatus(JO.slug, "contacted"));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    act(() => store.setStatus(JO.slug, "toContact"));
+    screen.getByRole("button", { name: "Draft an email to Jo Bloggs" });
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 });

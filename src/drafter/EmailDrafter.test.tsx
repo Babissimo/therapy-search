@@ -1,12 +1,15 @@
 // @vitest-environment jsdom
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi, type MockInstance } from "vitest";
 import type { ContactDetails, Profile } from "@shared/types";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { api, ApiError } from "@/lib/api";
-import { createShortlistStore, type ShortlistCard, type ShortlistStore } from "@/shortlist/store";
-import { ShortlistContext } from "@/shortlist/useShortlist";
+import { StatusTrack } from "@/shortlist/StatusTrack";
+import { createShortlistStore, statusOf, type ShortlistCard, type ShortlistStore } from "@/shortlist/store";
+import { ShortlistContext, useShortlistEntry } from "@/shortlist/useShortlist";
 import { EmailDrafter } from "./EmailDrafter";
 import { MAILTO_SAFE } from "./mailto";
 
@@ -35,28 +38,41 @@ function answer<T>(asked: MockInstance<(...args: never[]) => Promise<T>>, given:
   else asked.mockResolvedValue(given);
 }
 
-function renderDrafter({
-  search = ANXIOUS,
-  profile = PROFILE,
-  contact = {},
-  store = createShortlistStore(null),
-  at = "/therapist/Jo-ABCDEFGH",
-}: Setup = {}) {
+/** `drawn` with what the drafter reads from: Jo shortlisted, the profile and contact details as given, and the page's address. */
+function renderWith(
+  drawn: ReactNode,
+  { search = ANXIOUS, profile = PROFILE, contact = {}, store = createShortlistStore(null), at = "/therapist/Jo-ABCDEFGH" }: Setup,
+) {
   if (!store.has(JO.slug)) store.add(JO, { search });
   answer(vi.spyOn(api, "profile"), profile);
   answer(vi.spyOn(api, "contact"), contact);
-  const onClose = vi.fn();
-  const onMarked = vi.fn();
   const { unmount } = render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
       <ShortlistContext.Provider value={store}>
-        <MemoryRouter initialEntries={[at]}>
-          <EmailDrafter therapist={JO} onClose={onClose} onMarked={onMarked} />
-        </MemoryRouter>
+        <MemoryRouter initialEntries={[at]}>{drawn}</MemoryRouter>
       </ShortlistContext.Provider>
     </QueryClientProvider>,
   );
-  return { store, onClose, onMarked, unmount };
+  return { store, unmount };
+}
+
+function renderDrafter(setup: Setup = {}) {
+  const onClose = vi.fn();
+  const onMarked = vi.fn();
+  return { ...renderWith(<EmailDrafter therapist={JO} onClose={onClose} onMarked={onMarked} />, setup), onClose, onMarked };
+}
+
+/** Jo's status track, whose button opens the drafter. */
+const renderTrack = (setup: Setup = {}) => renderWith(<JosTrack />, setup);
+
+/** Jo's status track as the shortlist's tab or a profile draws it, at the status the store holds. */
+function JosTrack() {
+  const entry = useShortlistEntry(JO.slug);
+  return entry ? (
+    <TooltipProvider>
+      <StatusTrack therapist={JO} status={statusOf(entry)} />
+    </TooltipProvider>
+  ) : null;
 }
 
 const message = () => screen.findByRole<HTMLTextAreaElement>("textbox", { name: "Message" });
@@ -297,6 +313,18 @@ describe("EmailDrafter", () => {
     await afterClosing();
     expect(document.activeElement).toBe(opener);
   });
+
+  it("gives the keyboard back to the track's button as Escape closes it, though a click never focused it, as in Safari and Firefox", async () => {
+    renderTrack();
+    const opener = screen.getByRole("button", { name: "Draft an email to Jo Anne Bloggs" });
+    fireEvent.click(opener);
+    expect(document.activeElement).not.toBe(opener);
+    await message();
+    fireEvent.keyDown(document.activeElement!, { key: "Escape" });
+    await afterClosing();
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(document.activeElement).toBe(opener);
+  });
 });
 
 describe("EmailDrafter sending", () => {
@@ -449,6 +477,18 @@ describe("EmailDrafter sending", () => {
     fireEvent.click(within(offer()!).getByRole("button", { name: "Yes" }));
     expect(onMarked).toHaveBeenCalledOnce();
     expect(offer()).toBeNull();
+  });
+
+  it("leaves the keyboard on the track's next step once Yes from its drafter marks them contacted and the drafter has gone", async () => {
+    const { store } = renderTrack();
+    await press(screen.getByRole("button", { name: "Draft an email to Jo Anne Bloggs" }));
+    await message();
+    await press(copyButton());
+    fireEvent.click(within(offer()!).getByRole("button", { name: "Yes" }));
+    await afterClosing();
+    expect(statusOf(store.get()[0]!)).toBe("contacted");
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Consultation booked, Jo Anne Bloggs" }));
   });
 
   it("gives a phone number where there is no email, as a link that also brings the offer", async () => {
