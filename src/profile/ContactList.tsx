@@ -1,8 +1,8 @@
 import type { ReactNode } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { queryOptions, useQuery } from "@tanstack/react-query";
 import { AtSign, ExternalLink, Globe, Loader2, Mail, Phone, type LucideIcon } from "lucide-react";
 import { ukcpProfileAddress, ukcpProfileUrl } from "@shared/query";
-import type { Profile } from "@shared/types";
+import type { ContactDetails, Profile } from "@shared/types";
 import { ErrorLine } from "@/components/ErrorLine";
 import { FailureStatus, useFailure } from "@/components/FailedAlert";
 import { SkeletonText } from "@/components/SkeletonText";
@@ -34,10 +34,9 @@ type Props = {
   onReach?: (link: HTMLAnchorElement) => void;
 };
 
-/** Every way to reach the therapist, each marked by an icon. UKCP gives phone and website only on request, made as the profile opens. */
-export function ContactList({ profile, onReach }: Props) {
-  const { contactId } = profile;
-  const contact = useQuery({
+/** A therapist's phone, email and website, which UKCP gives only on request, made once per therapist a visit opens. */
+export function contactQuery(contactId: string | undefined) {
+  return queryOptions({
     queryKey: ["contact", contactId],
     queryFn: () => api.contact(contactId ?? ""),
     enabled: contactId !== undefined,
@@ -45,10 +44,21 @@ export function ContactList({ profile, onReach }: Props) {
     staleTime: Infinity,
     gcTime: Infinity,
   });
+}
+
+/** The therapist's email address: the profile's own, else the one their contact details give, where UKCP shows it. */
+export function emailOf(profile: Profile, contact?: ContactDetails): string | undefined {
+  return profile.email ?? (profile.emailInContact ? contact?.email : undefined);
+}
+
+/** Every way to reach the therapist, each marked by an icon. UKCP gives phone and website only on request, made as the profile opens. */
+export function ContactList({ profile, onReach }: Props) {
+  const { contactId } = profile;
+  const contact = useQuery(contactQuery(contactId));
   // Held while asked again, so Try again keeps the keyboard until the first of the details takes it.
   const failure = useFailure<HTMLAnchorElement>(contact, contactId ?? "");
   const { phone, website } = contact.data ?? {};
-  const email = profile.email ?? (profile.emailInContact ? contact.data?.email : undefined);
+  const email = emailOf(profile, contact.data);
 
   const items: Item[] = [];
   if (phone) items.push({ icon: Phone, kind: "Telephone", text: phone, href: `tel:${phone.replace(/\s/g, "")}`, verbatim: true, reaches: true });
@@ -179,7 +189,7 @@ function unescaped(text: string): string {
   }
 }
 
-function shortUrl(url: string): string {
+export function shortUrl(url: string): string {
   const parts = splitUrl(url);
   return parts ? parts.host + parts.rest : url;
 }
