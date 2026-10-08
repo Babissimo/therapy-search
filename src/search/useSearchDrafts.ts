@@ -91,6 +91,11 @@ export function useDraftSearch(drafts: SearchDrafts): SearchParams {
   return useMemo(() => searchOf({ location, keyword, filters }), [location, keyword, filters]);
 }
 
+/** Whether the draft narrows the search, by a tick, a help-with term or the keyword, redrawing the caller only as that changes. */
+export function useDraftFiltered(drafts: SearchDrafts): boolean {
+  return useSyncExternalStore(drafts.subscribe, () => activeFilters(drafts.search()).length > 0);
+}
+
 /** A search's filters alone, with no place or keyword. */
 function filtersOf(params: SearchParams): SearchParams {
   return withText(withText(params, "Location", ""), "KeywordFilter", "");

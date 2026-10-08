@@ -21,7 +21,7 @@ import { Prompt } from "./Prompt";
 import { Results } from "./Results";
 import { ResultsStatus } from "./ResultsStatus";
 import { useResults } from "./useResults";
-import { useSearchDrafts } from "./useSearchDrafts";
+import { useDraftFiltered, useSearchDrafts, type SearchDrafts } from "./useSearchDrafts";
 import { useRememberedScroll, useRememberedTab } from "./viewMemory";
 
 type Props = { params: SearchParams; onChange: (next: SearchParams) => void; wide: boolean };
@@ -105,7 +105,7 @@ export function OnlineView({ params, onChange, wide }: Props) {
           </>
         ) : (
           <div className="space-y-8">
-            <OnlinePrompt wide={wide} askRef={askRef} />
+            <OnlinePrompt wide={wide} askRef={askRef} drafts={drafts} />
             {!wide && (
               <div id={filtersId} className="space-y-6">
                 <FilterPanel params={params} drafts={drafts} groups={ONLINE_FILTER_GROUPS} />
@@ -168,9 +168,16 @@ export function OnlineView({ params, onChange, wide }: Props) {
 }
 
 /** In place of the results until a filter narrows the search. The filters sit to its right on wide screens, beneath it on a phone. */
-function OnlinePrompt({ wide, askRef }: { wide: boolean; askRef: RefObject<HTMLDivElement | null> }) {
+function OnlinePrompt({ wide, askRef, drafts }: { wide: boolean; askRef: RefObject<HTMLDivElement | null>; drafts: SearchDrafts }) {
+  const filtered = useDraftFiltered(drafts);
   return (
-    <Prompt askRef={askRef} ask="Start with what matters to you." toFilters={!wide} className={wide ? "py-10 sm:py-16" : "pt-6"}>
+    <Prompt
+      askRef={askRef}
+      ask="Start with what matters to you."
+      toFilters={!wide}
+      questions={filtered ? "paused" : "offered"}
+      className={wide ? "py-10 sm:py-16" : "pt-6"}
+    >
       Thousands of UKCP therapists work online or by phone. Choose a filter {wide ? "to the right" : "below"}, such as what they
       help with, how they work or the languages they speak, then show who fits. Type of session alone won't narrow them enough.
     </Prompt>

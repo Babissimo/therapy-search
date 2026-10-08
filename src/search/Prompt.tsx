@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { HelpNow } from "@/layout/HelpNow";
 import { useDrawerLink } from "@/lib/drawerRoute";
 import { cn } from "@/lib/utils";
-import { ABOUT_PATH } from "@/site";
+import { preloadQuestions } from "@/questions/LazyQuestionsPage";
+import { ABOUT_PATH, QUESTIONS_PATH } from "@/site";
 import { LanguagesShortcut } from "./LanguagesShortcut";
 
 type Props = {
@@ -15,15 +16,22 @@ type Props = {
   askRef?: Ref<HTMLDivElement>;
   /** Offers a button down to the filters, for a phone, where they follow the prompt out of sight below it. */
   toFilters?: boolean;
+  /**
+   * Offers the questions in place of the filters, on a view's start screen. It is paused, out of sight and reach, once
+   * anything is chosen in the filters: what is chosen there waits in a draft, which leaving for the questions would lose.
+   * Left out, no line is made for them.
+   */
+  questions?: "offered" | "paused";
   className?: string;
 };
 
 /**
  * What a view asks for before it has anything to search, in large type in place of its results, with a line on how, a
- * way down to the filters where they come beneath it, a way straight to the languages among them, and, smaller, where to
- * turn for help today and that UKCP doesn't run the site, for anyone who arrives thinking it does.
+ * way down to the filters where they come beneath it, the questions, where a view offers them, a way straight to the
+ * languages among the filters, and, smaller, where to turn for help today and that UKCP doesn't run the site, for anyone
+ * who arrives thinking it does.
  */
-export function Prompt({ ask, children, askRef, toFilters = false, className }: Props) {
+export function Prompt({ ask, children, askRef, toFilters = false, questions, className }: Props) {
   const link = useDrawerLink();
   return (
     <div className={cn("space-y-4 text-center text-balance sm:space-y-6", className)}>
@@ -36,6 +44,14 @@ export function Prompt({ ask, children, askRef, toFilters = false, className }: 
           Start your search
           <ArrowDown data-icon="inline-end" aria-hidden />
         </Button>
+      )}
+      {questions && (
+        // invisible keeps the line's height, so the filters beneath it on a phone don't jump as a tick is made.
+        <p className={cn("text-lg", questions === "paused" && "invisible")}>
+          <Link className="underline" to={QUESTIONS_PATH} onPointerEnter={preloadQuestions} onFocus={preloadQuestions}>
+            Answer a few questions instead
+          </Link>
+        </p>
       )}
       <LanguagesShortcut />
       <HelpNow className="pt-4 text-muted-foreground sm:pt-6" />
