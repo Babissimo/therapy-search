@@ -183,10 +183,10 @@ describe("ProfilePage's header", () => {
     ]);
   });
 
-  it("says nothing of how they meet where the profile lists no types of session", async () => {
+  it("says when the profile lists no types of session", async () => {
     renderAt(["/therapist/Test-ABCDEFGH"], { ...PROFILE, location: "Testtown" });
     const place = (await screen.findByText("Testtown")).closest("p")!;
-    expect(place.nextElementSibling).toBeNull();
+    expect(place.nextElementSibling?.textContent).toBe("Doesn't say how they meet");
   });
 
   it("puts its bookmark on a line of its own under the header on a touch screen or in a narrow header, leaving a drawer's close button beside the name", async () => {

@@ -10,11 +10,14 @@ import { INVALID, NEEDS_FILTER, NEW_TAB, NO_PLACE, UNREADABLE } from "./pages";
 
 const bytes = (text: string) => new TextEncoder().encode(text);
 
-/** A card of UKCP's results, `miles` from the place searched, or with no distance where null. */
-function listing(n: number, { name = `Therapist ${n}`, summary = `Summary ${n}.`, miles = n / 10 as number | null } = {}) {
+/** A card of UKCP's results, `miles` from the place searched, or with no distance where null, and no session line where `sessions` is null. */
+function listing(
+  n: number,
+  { name = `Therapist ${n}`, summary = `Summary ${n}.`, miles = n / 10 as number | null, sessions = "In-person&nbsp;&amp;&nbsp;Remote" as string | null } = {},
+) {
   return `<div class="profile-listing margin-b-md"><a href="therapist/Therapist-${n}-ABCDEFGH" class="light-anchor">
   <h2>${name}</h2><span class="profile-listing-locations"><strong>Bristol BS${n}</strong>${miles === null ? "" : ` (${miles} miles from Bristol)`}</span>
-  <span class="profile-listing-contact-session-type">In-person&nbsp;&amp;&nbsp;Remote</span><p class="pt-2">${summary}</p></a></div>`;
+  ${sessions === null ? "" : `<span class="profile-listing-contact-session-type">${sessions}</span>`}<p class="pt-2">${summary}</p></a></div>`;
 }
 
 /** A page of UKCP's results: `count` cards from `from`, of `total`. */
@@ -131,6 +134,13 @@ describe("POST /plain near a place", () => {
     const cards = [...doc.querySelectorAll(".results > li")];
     expect(cards.map((li) => li.querySelector("h2")?.textContent)).toEqual(Array.from({ length: 12 }, (_, i) => `Therapist ${i + 1}`));
     expect([...cards[0]!.querySelectorAll("p")].map((p) => p.textContent)).toEqual(["Bristol BS1 (0.1 miles away)", "In-person & Remote", "Summary 1."]);
+  });
+
+  it("says when a therapist doesn't say how they meet", async () => {
+    const cards = [listing(1, { sessions: null }), listing(2)].join("\n");
+    const { doc } = await read(await setup({ client: { search: vi.fn(async () => bytes(results(2, { cards }))) } }).post("/plain", "Location=Bristol"));
+    const lines = [...doc.querySelectorAll(".results > li")].map((li) => li.querySelectorAll(".meta")[1]?.textContent);
+    expect(lines).toEqual(["Doesn't say how they meet", "In-person & Remote"]);
   });
 
   it("opens each profile in a new tab by a form posting its slug, and says so", async () => {

@@ -2,6 +2,7 @@ import { html, raw } from "hono/html";
 import { FILTER_GROUPS, groupName } from "../../shared/filterGroups";
 import { FLAG_PARAMS, MULTI_PARAMS, TEXT_MAX_LENGTH, UKCP_ORIGIN, toQuery, ukcpProfileUrl, type FlagParam, type MultiParam, type SearchParams } from "../../shared/query";
 import { sectionsOf } from "../../shared/sections";
+import { UNSAID_SESSIONS } from "../../shared/sessions";
 import type { ContactDetails, FilterField, FilterGroup, ProfileSection } from "../../shared/types";
 import type { PlainProfile } from "../ukcp/profile";
 import type { Card, Results } from "../ukcp/results";
@@ -206,7 +207,7 @@ ${section.about ? html`<p class="hint">${section.about}</p>` : ""}${section.fiel
 function cardItem(card: Card, online: boolean): Html {
   // UKCP's "0.2 miles from E8 3DQ" repeats the searched place, which the heading already names.
   const away = online ? undefined : card.distance?.replace(/\bfrom\b.*$/, "away");
-  const meets = online && /remote/i.test(card.sessionTypes ?? "") ? undefined : card.sessionTypes;
+  const meets = online && /remote/i.test(card.sessionTypes ?? "") ? undefined : (card.sessionTypes ?? UNSAID_SESSIONS);
   const place = card.location ? html`<span translate="no">${card.location}</span>${away ? ` (${away})` : ""}` : away;
   return html`<li>
 <h2 translate="no">${card.name}</h2>
