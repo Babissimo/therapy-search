@@ -646,12 +646,10 @@ function OfficeCard({ office, profile, distance }: { office: Office; profile: Pr
             ))}
           </address>
         )}
-        {office.cost && (
-          <div>
-            <h3 className="font-medium">Fees</h3>
-            <p className="whitespace-pre-line">{office.cost}</p>
-          </div>
-        )}
+        <div>
+          <h3 className="font-medium">Fees</h3>
+          {office.cost ? <p className="whitespace-pre-line">{office.cost}</p> : <p className="text-muted-foreground">None given</p>}
+        </div>
         {/* The map takes the card's foot, so maps in a row of cards line up. */}
         <OfficeMap office={office} profile={profile} />
       </CardContent>

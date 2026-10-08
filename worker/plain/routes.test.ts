@@ -354,6 +354,15 @@ describe("POST /plain/therapist", () => {
     expect(doc.querySelector("main")?.textContent).toContain("£70 per fifty-minute session.");
   });
 
+  it("says where an office gives no fees", async () => {
+    const noCost = (html: string) => html.replace(/<h4 class="mb-0">Cost:<\/h4>\s*<span>[\s\S]*?<\/span>/g, "");
+    const { post } = profileSetup({ profile: vi.fn(async () => noCost(await fixture("profile.html"))) });
+    const res = await post("/plain/therapist", "slug=Test-Therapist-1-TESTID01");
+    const texts = [...(await read(res)).doc.querySelectorAll("main p")].map((p) => p.textContent);
+    expect(texts.filter((text) => text === "Fees: none given").length).toBeGreaterThan(0);
+    expect(texts).not.toContain("Fees:");
+  });
+
   it("refuses a request another site's page makes, without asking the cache", async () => {
     const { post, forwarded } = profileSetup();
     for (const site of ["cross-site", "same-site"]) {
