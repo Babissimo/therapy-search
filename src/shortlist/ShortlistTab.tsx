@@ -32,7 +32,7 @@ import { Button } from "@/components/ui/button";
 import { crossFade } from "@/lib/crossFade";
 import { useMediaQuery } from "@/lib/useMediaQuery";
 import { cn } from "@/lib/utils";
-import { feeText } from "@/search/fee";
+import { feeLine, type Fee, type FeeKind } from "@/search/fee";
 import { pinsBySlug, type Pin } from "@/search/map/pins";
 import { TherapistCard } from "@/search/TherapistCard";
 import { useOffices } from "@/search/useOffices";
@@ -48,6 +48,8 @@ import { therapistCount, useShortlist, useShortlistAnnouncement, useShortlistCle
 type Props = {
   /** The search's terms, which pick out tags as they do in the results. */
   sought: ReadonlySet<string>;
+  /** The kinds of fee the search asks for, which the cards give as the results do. */
+  feeKinds?: readonly FeeKind[];
   /** Beside a list of therapists met online or by phone, drawing its cards as that list does. */
   online?: boolean;
   /** The shortlist's pins, while the map shows them. */
@@ -61,7 +63,7 @@ type Props = {
 };
 
 /** The shortlist beside the search's results, in the visitor's order, with those set aside gathered at its foot. */
-export function ShortlistTab({ sought, online = false, pins = [], unplaced = 0, selected, onHighlight }: Props) {
+export function ShortlistTab({ sought, feeKinds = [], online = false, pins = [], unplaced = 0, selected, onHighlight }: Props) {
   const store = useShortlistStore();
   // Drawn before the callback returns, for the transition to see the page as the clear leaves it.
   const clear = () => crossFade(() => flushSync(store.clear));
@@ -72,6 +74,10 @@ export function ShortlistTab({ sought, online = false, pins = [], unplaced = 0, 
   const setAside = shown.filter((entry) => statusOf(entry) === "setAside");
   // A shortlist gathers therapists from any search, so their offices are asked about whatever this one is, while their cards show.
   const { officeOf } = useOffices((setAsideOpen ? [...list, ...setAside] : list).map((entry) => entry.card), true);
+  const feeOf = (card: ShortlistCard) => {
+    const office = officeOf(card);
+    return office && feeLine(office.cost, feeKinds);
+  };
   const [announcement, announce] = useShortlistAnnouncement();
   const root = useRef<HTMLDivElement>(null);
   // What takes focus once the list has redrawn, when what had it has moved or gone.
@@ -165,7 +171,7 @@ export function ShortlistTab({ sought, online = false, pins = [], unplaced = 0, 
             listed={listed.has(card.slug)}
             sought={sought}
             online={online}
-            fee={feeText(officeOf(card)?.cost)}
+            fee={feeOf(card)}
             pinKey={pinKey}
             marked={pinKey !== undefined && pinKey === selected?.key}
             onHighlight={onHighlight}
@@ -340,7 +346,7 @@ type EntryProps = {
   listed: boolean;
   sought: ReadonlySet<string>;
   online: boolean;
-  fee?: string;
+  fee?: Fee;
   pinKey?: string;
   /** At the pin selected on the map. */
   marked: boolean;

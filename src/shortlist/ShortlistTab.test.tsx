@@ -253,6 +253,12 @@ describe("ShortlistTab", () => {
     expect(office).toHaveBeenCalledWith("Ann-AAAAAAAA", "LEEDS LS1", expect.any(AbortSignal));
   });
 
+  it("gives only the fees for whom the search asks, as the results do", async () => {
+    vi.spyOn(api, "office").mockResolvedValue({ cost: "Individuals: £60\nCouples: £75" });
+    renderTab({ feeKinds: ["couple"] }, card("Ann-AAAAAAAA", "Ann"));
+    await screen.findByText("Couples £75");
+  });
+
   it("asks about the offices of those set aside only once their section is open", async () => {
     renderTab({ statuses: { "Ann-AAAAAAAA": "setAside" } }, card("Ann-AAAAAAAA", "Ann"), card("Bo-BBBBBBBB", "Bo"));
     await waitFor(() => expect(api.office).toHaveBeenCalled());
