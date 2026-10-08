@@ -73,12 +73,12 @@ describe("parseResults card details", () => {
 });
 
 describe("parseListings", () => {
-  it("finds each card's slug, distance and whether it shows a photo and a summary, reading the rest only when asked", () => {
+  it("finds each card's slug, distance and whether it shows a photo, a summary and how they meet, reading the rest only when asked", () => {
     const { listings, ...found } = parseListings(fixture("results-location.html"));
     const { therapists, ...read } = parseResults(fixture("results-location.html"));
     expect(found).toEqual(read);
-    expect(listings.map((l) => [l.slug, l.distance, l.hasPhoto, l.hasSummary])).toEqual(
-      therapists.map((t) => [t.slug, t.distance, t.photoUrl !== undefined, t.summary !== undefined]),
+    expect(listings.map((l) => [l.slug, l.distance, l.hasPhoto, l.hasSummary, l.hasSessions])).toEqual(
+      therapists.map((t) => [t.slug, t.distance, t.photoUrl !== undefined, t.summary !== undefined, t.sessionTypes !== undefined]),
     );
     expect(listings.map((l) => l.read())).toEqual(therapists);
   });
@@ -91,6 +91,15 @@ describe("parseListings", () => {
     expect(listingOf(`<img class="profile-photo" src="https://example.invalid/jo.jpg"><h2>Jo Bloggs</h2><p>Summary.</p>`)).toMatchObject(shown);
     expect(listingOf(`<img class="profile-photo" src="javascript:alert(1)"><h2>Jo Bloggs</h2><p>&nbsp;</p>`)).toMatchObject(none);
     expect(listingOf(`<div class="profile-photo profile-photo-placeholder"><span>JB</span></div><h2>Jo Bloggs</h2>`)).toMatchObject(none);
+  });
+
+  it("counts a card as saying how they meet only where it names a way, a phone number alone not counting", () => {
+    const listingOf = (inner: string) =>
+      parseListings(`<span class="results-no">1-1 of 1 results</span><div class="profile-listing"><a href="therapist/Jo-Bloggs-ABCDEFGH"><h2>Jo Bloggs</h2>${inner}</a></div>`)
+        .listings[0];
+    expect(listingOf(`<span class="profile-listing-contact-session-type"><strong>0121 504 3691</strong> |&nbsp;Remote</span>`)?.hasSessions).toBe(true);
+    expect(listingOf(`<span class="profile-listing-contact-session-type"><strong>0121 504 3691</strong> </span>`)?.hasSessions).toBe(false);
+    expect(listingOf("")?.hasSessions).toBe(false);
   });
 
   it("leaves a card it can't read to fail when it is read", () => {

@@ -4,8 +4,8 @@ import { ParseError, initialsOf, oneLine, optional, readHtml, safeUrl } from "./
 
 const RANGE = /(\d+)\s*-\s*(\d+)\s+of\s+(\d+)\s+results?/i;
 
-/** A card found on a results page: enough to order it by, with the rest read only when it is shown. */
-export type Listing = { slug: string; distance?: string; hasPhoto: boolean; hasSummary: boolean; read: () => TherapistCard };
+/** A card found on a results page: enough to order and sift it by, with the rest read only when it is shown. */
+export type Listing = { slug: string; distance?: string; hasPhoto: boolean; hasSummary: boolean; hasSessions: boolean; read: () => TherapistCard };
 /** A results page with its cards not yet read. */
 export type Listings = Omit<SearchResult, "therapists"> & { listings: Listing[] };
 
@@ -38,7 +38,14 @@ function listingOf(a: Element): Listing {
   const slug = /therapist\/([^/?#]+)/.exec(href)?.[1];
   if (!slug) throw new ParseError("results: a card has no profile link");
   const distance = distanceOf(a);
-  return { slug, distance, hasPhoto: photoOf(a) !== undefined, hasSummary: summaryOf(a) !== undefined, read: () => readCard(a, slug, distance) };
+  return {
+    slug,
+    distance,
+    hasPhoto: photoOf(a) !== undefined,
+    hasSummary: summaryOf(a) !== undefined,
+    hasSessions: sessionsOf(a) !== undefined,
+    read: () => readCard(a, slug, distance),
+  };
 }
 
 function distanceOf(a: Element): string | undefined {
@@ -53,17 +60,22 @@ function summaryOf(a: Element): string | undefined {
   return optional(oneLine(a.querySelector("p")?.textContent));
 }
 
+/** How the card says they meet, such as "In-person & Remote". */
+function sessionsOf(a: Element): string | undefined {
+  const contact = a.querySelector(".profile-listing-contact-session-type");
+  // The strong holds the phone, which the list leaves to the profile's contact reveal.
+  const text = [...(contact?.childNodes ?? [])]
+    .filter((n) => n.nodeName !== "STRONG")
+    .map((n) => n.textContent ?? "")
+    .join("");
+  return optional(oneLine(text).replace(/^\|\s*/, ""));
+}
+
 function readCard(a: Element, slug: string, distance: string | undefined): TherapistCard {
   const name = oneLine(a.querySelector("h2")?.textContent);
   if (!name) throw new ParseError("results: a card has no name");
 
   const locations = a.querySelector(".profile-listing-locations");
-  const contact = a.querySelector(".profile-listing-contact-session-type");
-  // The strong holds the phone, which the list leaves to the profile's contact reveal.
-  const sessionText = [...(contact?.childNodes ?? [])]
-    .filter((n) => n.nodeName !== "STRONG")
-    .map((n) => n.textContent ?? "")
-    .join("");
 
   return {
     slug,
@@ -72,7 +84,7 @@ function readCard(a: Element, slug: string, distance: string | undefined): Thera
     photoUrl: photoOf(a),
     location: optional(oneLine(locations?.querySelector("strong")?.textContent)),
     distance,
-    sessionTypes: optional(oneLine(sessionText).replace(/^\|\s*/, "")),
+    sessionTypes: sessionsOf(a),
     summary: summaryOf(a),
     tags: [...a.querySelectorAll(".tag-list li")].map((li) => oneLine(li.textContent)).filter(Boolean),
   };

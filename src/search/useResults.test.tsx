@@ -329,3 +329,96 @@ describe("useResults near a place", () => {
     expect(shownCard(client, near("Leeds"), first!.slug)).toBe(first);
   });
 });
+
+describe("useResults with a face-to-face type ticked", () => {
+  const faceToFace = (Location = "Leeds", TypesOfSession = ["Face to Face - Long Term"]): SearchParams => {
+    const empty = emptyParams();
+    return { ...empty, text: { ...empty.text, Location }, multi: { ...empty.multi, TypesOfSession } };
+  };
+  // A tenth of a mile apart: every fourth says nothing of how they meet, and every fourth from the fourth meets only remotely.
+  const around = Array.from({ length: 40 }, (_, i): TherapistCard => ({
+    ...cards[i % 30]!,
+    slug: `Near-${i}-ID${i}`,
+    distance: `${(i + 1) / 10} miles from Leeds`,
+    sessionTypes: i % 4 === 0 ? undefined : i % 4 === 3 ? "Remote" : "In-person",
+  }));
+  const inPerson = around.filter((card) => card.sessionTypes === "In-person");
+  const listedTogether = around.filter((card) => card.sessionTypes !== "Remote").map((card) => card.slug);
+
+  /** UKCP answering the ticked search with `ticked` and the same without its ticks with `all`, `size` at a time. */
+  function answerBoth(ticked: TherapistCard[], all: TherapistCard[], { size = 1000, place = "Leeds, West Yorkshire, UK" } = {}) {
+    const answer = (query: string) => {
+      const asked = new URLSearchParams(query);
+      const found = asked.has("TypesOfSession") ? ticked : all;
+      const from = (Number(asked.get("page") ?? 1) - 1) * size;
+      const sent = found.slice(from, from + size);
+      return listed({ total: found.length, from: from + 1, to: from + sent.length, locationSearched: place, notices: [], therapists: sent });
+    };
+    return {
+      search: vi.spyOn(api, "search").mockImplementation(async (query) => answer(query)),
+      early: vi.spyOn(api, "searchEarly").mockImplementation(async (query) => {
+        const sent = answer(query);
+        return { ...sent, to: Math.min(sent.to, 12), listings: sent.listings.slice(0, 12) };
+      }),
+    };
+  }
+
+  /** Whether each search asked carried the ticks. */
+  const ticked = (search: { mock: { calls: [string][] } }) => search.mock.calls.map(([query]) => new URLSearchParams(query).has("TypesOfSession"));
+
+  it("lists those who don't say how they meet among the rest by distance, and no one else the search without its ticks finds", async () => {
+    const { search } = answerBoth(inPerson, around);
+    const { result } = renderHook(() => useResults(faceToFace()), { wrapper: withClient() });
+    await waitFor(() => expect(shown(result.current.therapists)).toEqual(listedTogether.slice(0, 12)));
+    expect(ticked(search).sort()).toEqual([false, true]);
+  });
+
+  it("pages through both searches' batches nearest first, asking each for its next batch only once it is needed", async () => {
+    const { search } = answerBoth(inPerson, around, { size: 10 });
+    const { result } = renderHook(() => useResults(faceToFace()), { wrapper: withClient() });
+    await waitFor(() => expect(shown(result.current.therapists)).toEqual(listedTogether.slice(0, 12)));
+    // The ticked search's first ten reach 1.9 miles and the other's 1 mile, so only the other is asked for its second.
+    expect(search.mock.calls.map(([query]) => query).filter((query) => query.includes("page="))).toEqual(["Location=Leeds&page=2"]);
+    while (result.current.query.hasNextPage) {
+      act(() => void result.current.query.fetchNextPage());
+      await waitFor(() => expect(result.current.query.isFetchingNextPage).toBe(false));
+    }
+    expect(shown(result.current.therapists)).toEqual(listedTogether);
+  });
+
+  it("lists the ticked search alone when UKCP didn't recognise the place, as it then measures no distances", async () => {
+    const unmeasured = (list: TherapistCard[]) => list.map((card) => ({ ...card, distance: undefined }));
+    answerBoth(unmeasured(inPerson), unmeasured(around), { place: "United Kingdom" });
+    const { result } = renderHook(() => useResults(faceToFace("Nowhereville")), { wrapper: withClient() });
+    await waitFor(() => expect(result.current.therapists).toHaveLength(12));
+    expect(result.current.therapists.every((card) => card.sessionTypes === "In-person")).toBe(true);
+  });
+
+  it("shows both searches' nearest few, merged, before their batches", async () => {
+    const { search } = answerBoth(inPerson, around);
+    search.mockImplementation(() => new Promise(() => {}));
+    const { result } = renderHook(() => useResults(faceToFace()), { wrapper: withClient() });
+    // The other search's twelve reach 1.2 miles, nearer than the ticked search's, so the few end short of that.
+    await waitFor(() => expect(shown(result.current.therapists)).toEqual(listedTogether.slice(0, 9)));
+    expect(result.current.partial).toBe(true);
+  });
+
+  it("fails as a whole when the search without its ticks fails, to be tried again", async () => {
+    const { search } = answerBoth(inPerson, around);
+    const answered = search.getMockImplementation()!;
+    search.mockImplementation(async (query) => (new URLSearchParams(query).has("TypesOfSession") ? answered(query) : Promise.reject(new Error("UKCP is down"))));
+    const { result } = renderHook(() => useResults(faceToFace()), { wrapper: withClient() });
+    await waitFor(() => expect(result.current.failure.error?.message).toBe("UKCP is down"));
+    expect(result.current.therapists).toEqual([]);
+    search.mockImplementation(answered);
+    act(() => result.current.failure.retry());
+    await waitFor(() => expect(shown(result.current.therapists)).toEqual(listedTogether.slice(0, 12)));
+  });
+
+  it("asks only the ticked search without a face-to-face tick", async () => {
+    const { search } = answerBoth(inPerson, around);
+    const { result } = renderHook(() => useResults(faceToFace("Leeds", ["Online Therapy"])), { wrapper: withClient() });
+    await waitFor(() => expect(result.current.therapists).toHaveLength(12));
+    expect(ticked(search)).toEqual([true]);
+  });
+});
