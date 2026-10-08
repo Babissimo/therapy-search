@@ -53,14 +53,20 @@ export function useFailure<Landing extends HTMLElement = HTMLHeadingElement>(que
   return { error, retrying: query.isFetching, retry, landing };
 }
 
+type StatusProps = {
+  failure: Pick<Failure, "error" | "retrying">;
+  /** The failure in the words its line shows, where those say what failed and the error's own message doesn't. */
+  saying?: string;
+};
+
 /**
  * What a failure's alert or quiet error line leaves unsaid: its error, "Trying again" while it is asked again, and the
  * error once more if that fails. Drawn before the failure, as a screen reader hears only a live region already there.
  */
-export function FailureStatus({ failure: { error, retrying } }: { failure: Pick<Failure, "error" | "retrying"> }) {
+export function FailureStatus({ failure: { error, retrying }, saying }: StatusProps) {
   return (
     <p aria-live="polite" className="sr-only">
-      {error ? (retrying ? "Trying again" : error.message) : ""}
+      {error ? (retrying ? "Trying again" : (saying ?? error.message)) : ""}
     </p>
   );
 }
