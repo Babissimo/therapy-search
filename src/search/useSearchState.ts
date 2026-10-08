@@ -1,9 +1,10 @@
 import { useCallback, useMemo } from "react";
-import { matchPath, useSearchParams } from "react-router";
+import { matchPath, useLocation, useSearchParams } from "react-router";
 import { onlineSearch } from "@shared/online";
 import { ALLOWED } from "@shared/options";
 import { InvalidParam, readParams, toQuery, type SearchParams } from "@shared/query";
-import { ONLINE_PATH } from "./online";
+import { backgroundOf } from "@/lib/drawerRoute";
+import { isSearchPage, ONLINE_PATH } from "./online";
 
 /** The search lives in the query string after the page's `#`, in UKCP's own parameter names. */
 export function useSearchState() {
@@ -38,4 +39,28 @@ export function readSearch(query: string): SearchParams {
 export function viewSearch(pathname: string, query: string): SearchParams {
   const params = readSearch(query);
   return matchPath(ONLINE_PATH, pathname) ? onlineSearch(params) : params;
+}
+
+/**
+ * The search on screen: the search page's own, or the one beneath a drawer opened over it. Nothing on any other page, or
+ * for a search UKCP's form couldn't send.
+ */
+export function useShownParams(): SearchParams | undefined {
+  const location = useLocation();
+  const { pathname, search } = backgroundOf(location) ?? location;
+  return useMemo(() => {
+    if (!isSearchPage(pathname)) return undefined;
+    try {
+      return viewSearch(pathname, search);
+    } catch (error) {
+      if (error instanceof InvalidParam) return undefined;
+      throw error;
+    }
+  }, [pathname, search]);
+}
+
+/** The search on screen as one query, which is what a result card's bookmark keeps. Nothing where nothing is searched. */
+export function useShownSearch(): string | undefined {
+  const params = useShownParams();
+  return params && (toQuery(params) || undefined);
 }

@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
-import { matchPath, useLocation } from "react-router";
+import { useLocation } from "react-router";
 import { backgroundOf } from "@/lib/drawerRoute";
-import { ONLINE_PATH } from "@/search/online";
+import { isSearchPage } from "@/search/online";
 import { Masthead } from "./Masthead";
 
 export function SiteLayout({ children }: { children: ReactNode }) {
@@ -10,8 +10,7 @@ export function SiteLayout({ children }: { children: ReactNode }) {
   // so the open list runs on over as many pages as it needs.
   const location = useLocation();
   const { pathname } = backgroundOf(location) ?? location;
-  const fill = matchPath("/", pathname) !== null || matchPath(ONLINE_PATH, pathname) !== null;
-  if (fill) return <main className="flex h-svh flex-col print:block print:h-auto">{children}</main>;
+  if (isSearchPage(pathname)) return <main className="flex h-svh flex-col print:block print:h-auto">{children}</main>;
   return (
     <>
       <header className="border-b">

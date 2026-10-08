@@ -5,7 +5,7 @@ import { useRef } from "react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { onlineSearch } from "@shared/online";
-import { BATCH_SIZE, emptyParams, type SearchParams } from "@shared/query";
+import { BATCH_SIZE, emptyParams, toQuery, type SearchParams } from "@shared/query";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { api, ApiError, OFFLINE } from "@/lib/api";
 import { listed } from "@/lib/listed.testing";
@@ -687,5 +687,25 @@ describe("Results", () => {
     rerender(withText(emptyParams(), "Location", "York"));
     await screen.findByRole("heading", { name: /^12 results/ });
     expect(cards()).toHaveLength(12);
+  });
+
+  it("keeps the search a therapist was shortlisted from, without the page it had grown to", async () => {
+    answerBatches({ total: 2 });
+    const shortlist = createShortlistStore(null);
+    const anxious = withHelpWithTerms(leeds, ["Anxiety"]);
+    renderResults({ ...anxious, page: 2 }, shortlist);
+    fireEvent.click(await screen.findByRole("button", { name: "Add Therapist 1-0 to your shortlist" }));
+    expect(shortlist.get()[0]?.search).toBe(toQuery(anxious));
+  });
+
+  it("keeps the search for a therapist shortlisted from a pin's box too", async () => {
+    const therapists = ["a", "b"].map((slug) => ({ slug, name: `Therapist ${slug}`, initials: "T", location: "Leeds LS1", tags: [] }));
+    vi.spyOn(api, "search").mockResolvedValue(listed({ total: 2, from: 1, to: 2, notices: [], therapists }));
+    const shortlist = createShortlistStore(null);
+    const view = renderResults(leeds, shortlist);
+    await screen.findByRole("link", { name: "Therapist a" });
+    view.rerender(leeds, { pins: [{ key: "LS1", point: { lat: 53.8, lng: -1.55 }, therapists, kind: "outcode" }] });
+    fireEvent.click(within(screen.getByRole("group")).getByRole("button", { name: "Add Therapist b to your shortlist" }));
+    expect(shortlist.get()[0]?.search).toBe(toQuery(leeds));
   });
 });

@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
-import { render, screen } from "@testing-library/react";
+import { render, renderHook, screen } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it } from "vitest";
 import { onlineSearch } from "@shared/online";
-import { readSearch, useSearchState, viewSearch } from "./useSearchState";
+import { readSearch, useSearchState, useShownSearch, viewSearch } from "./useSearchState";
 
 function Page() {
   const { params } = useSearchState();
@@ -31,5 +32,37 @@ describe("viewSearch", () => {
     expect(viewSearch("/online", "?Location=Leeds&Languages=Greek")).toEqual(online);
     expect(viewSearch("/Online/", "?Location=Leeds&Languages=Greek")).toEqual(online);
     expect(online.multi.TypesOfSession).toEqual(["Online Therapy", "Telephone Therapy"]);
+  });
+});
+
+describe("useShownSearch", () => {
+  const shownAt = (entry: string | { pathname: string; state?: unknown }) =>
+    renderHook(() => useShownSearch(), {
+      wrapper: ({ children }: { children: ReactNode }) => <MemoryRouter initialEntries={[entry]}>{children}</MemoryRouter>,
+    }).result.current;
+
+  it("is the search page's own search, as one query", () => {
+    expect(shownAt("/?HelpWithAdvanced=Anxiety&Location=Leeds")).toBe("Location=Leeds&HelpWithAdvanced=Anxiety");
+  });
+
+  it("is the online view's search there, which has no place and keeps to the sessions had remotely", () => {
+    expect(shownAt("/online?HelpWithAdvanced=Anxiety&Location=Leeds")).toBe(
+      "TypesOfSession=Online+Therapy&TypesOfSession=Telephone+Therapy&HelpWithAdvanced=Anxiety",
+    );
+  });
+
+  it("names no page, since results grow with Load more", () => {
+    expect(shownAt("/?Location=Leeds&page=2")).toBe("Location=Leeds");
+  });
+
+  it("is the search beneath a drawer opened over the search page", () => {
+    const background = { pathname: "/", search: "?Location=Leeds", hash: "", state: null, key: "beneath" };
+    expect(shownAt({ pathname: "/therapist/Jo-ABCDEFGH", state: { background } })).toBe("Location=Leeds");
+  });
+
+  it("is nothing on any other page, on a search page with nothing searched, or for a search UKCP couldn't send", () => {
+    expect(shownAt("/therapist/Jo-ABCDEFGH")).toBeUndefined();
+    expect(shownAt("/")).toBeUndefined();
+    expect(shownAt("/?Languages=Klingon")).toBeUndefined();
   });
 });

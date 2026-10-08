@@ -127,4 +127,17 @@ describe("ShortlistButton", () => {
     press();
     expect(region.textContent).toBe("Added Jo Bloggs back to your shortlist: Set aside.");
   });
+
+  it("keeps the search it was pressed beside with the therapist", () => {
+    const store = clockedStore(null);
+    render(
+      <ShortlistContext.Provider value={store}>
+        <TooltipProvider>
+          <ShortlistButton therapist={JO} search="Location=Leeds" />
+        </TooltipProvider>
+      </ShortlistContext.Provider>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Add Jo Bloggs to your shortlist" }));
+    expect(store.get()[0]?.search).toBe("Location=Leeds");
+  });
 });

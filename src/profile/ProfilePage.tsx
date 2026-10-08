@@ -20,6 +20,7 @@ import { useStuck } from "@/lib/useStuck";
 import { useTitle } from "@/lib/useTitle";
 import { cn } from "@/lib/utils";
 import { cachedCard } from "@/search/useResults";
+import { useShownSearch } from "@/search/useSearchState";
 import { LazyStatusTrack, usePreloadStatusTrack } from "@/shortlist/LazyStatusTrack";
 import { ShortlistButton } from "@/shortlist/ShortlistButton";
 import type { ShortlistCard } from "@/shortlist/store";
@@ -60,7 +61,8 @@ export function ProfileBody({ slug, back, close }: { slug: string } & Exits) {
   const client = useQueryClient();
   const isMatch = useSearchMatch();
   const card = useOpeningCard(slug);
-  const standing = useStanding(slug);
+  const shownSearch = useShownSearch();
+  const standing = useStanding(slug, shownSearch);
   usePreloadStatusTrack();
   // Says each failure, and how its retry goes, once, for the alert, which keeps quiet. First in every return, so it stays in
   // place from one to the next and is heard.
@@ -114,7 +116,7 @@ export function ProfileBody({ slug, back, close }: { slug: string } & Exits) {
     <>
       {said}
       <article ref={standing.root} className={BODY}>
-        <StickyHeader back={back} close={close} bookmark={<ShortlistButton therapist={therapist} />}>
+        <StickyHeader back={back} close={close} bookmark={<ShortlistButton therapist={therapist} search={shownSearch} />}>
           <Identity
             photo={
               <Portrait

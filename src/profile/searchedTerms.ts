@@ -1,30 +1,13 @@
 import { useMemo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useLocation } from "react-router";
-import { InvalidParam, type SearchParams } from "@shared/query";
 import type { Profile, TherapistCard } from "@shared/types";
-import { backgroundOf } from "@/lib/drawerRoute";
 import { soughtTerms } from "@/search/activeFilters";
 import { shownCard } from "@/search/useResults";
-import { viewSearch } from "@/search/useSearchState";
-
-/** The search a profile was opened from, as the view beneath it shows it, if it was opened from one. */
-function useOpeningSearch(): SearchParams | undefined {
-  const { pathname, search } = backgroundOf(useLocation()) ?? {};
-  return useMemo(() => {
-    if (pathname === undefined || search === undefined) return undefined;
-    try {
-      return viewSearch(pathname, search);
-    } catch (error) {
-      if (error instanceof InvalidParam) return undefined;
-      throw error;
-    }
-  }, [pathname, search]);
-}
+import { useShownParams } from "@/search/useSearchState";
 
 /** Whether a tag is one the visitor searched for, as the result cards judge it; nothing is, on a profile not opened from a search. */
 export function useSearchMatch(): (tag: string) => boolean {
-  const params = useOpeningSearch();
+  const params = useShownParams();
   return useMemo(() => {
     const sought = params ? soughtTerms(params) : new Set<string>();
     return (tag) => sought.has(tag.toLowerCase());
@@ -33,7 +16,7 @@ export function useSearchMatch(): (tag: string) => boolean {
 
 /** The card the search a profile was opened from showed for the therapist, while that search's results are kept. */
 export function useOpeningCard(slug: string): TherapistCard | undefined {
-  const params = useOpeningSearch();
+  const params = useShownParams();
   const client = useQueryClient();
   return params && shownCard(client, params, slug);
 }
