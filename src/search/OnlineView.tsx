@@ -54,10 +54,12 @@ export function OnlineView({ params, onChange, wide }: Props) {
   const firstFilter = () => document.getElementById(filtersId)?.querySelector<HTMLElement>('[data-slot="accordion-trigger"]');
   const tabsRef = useRef<HTMLDivElement>(null);
   const wasSearching = useRef(searching);
-  // On a phone the keyboard goes with what held it as a search begins or ends: Show results beneath the prompt gives way to
-  // the results, so it goes to their tab, as Near me's place box does; the filters' sheet goes, so it goes to the filters
-  // beneath the prompt.
+  // A search begins at the list's top rather than where the filters beneath the prompt were scrolled to. On a phone the
+  // keyboard goes with what held it as a search begins or ends: Show results beneath the prompt gives way to the results,
+  // so it goes to their tab, as Near me's place box does; the filters' sheet goes, so it goes to the filters beneath the
+  // prompt.
   useLayoutEffect(() => {
+    if (searching && !wasSearching.current) scroll.toTop();
     if (!wide && wasSearching.current !== searching && document.activeElement === document.body) {
       if (searching) tabsRef.current?.querySelector<HTMLElement>('[aria-selected="true"]')?.focus();
       else firstFilter()?.focus();

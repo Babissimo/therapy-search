@@ -39,7 +39,9 @@ function openAt(entry: string): { entry: string; tab: ListTab } {
 /**
  * Scrolls a list back to where it was for this history entry once it has content, and records it as it moves. A list
  * that shares its element with another passes a key of its own in place of the entry. One that hides passes `ready`
- * false while it is out of sight, and is scrolled back as it shows again.
+ * false while it is out of sight, and is scrolled back as it shows again. One whose element held other content until
+ * now calls `toTop`, so it waits at its top rather than at the old content's scroll, which would otherwise be recorded
+ * as its own; a place kept for the entry still waits for `ready`.
  */
 export function useRememberedScroll(entry: string, ready: boolean) {
   const ref = useRef<HTMLDivElement>(null);
@@ -52,5 +54,8 @@ export function useRememberedScroll(entry: string, ready: boolean) {
     restored.current = { entry, element };
     element.scrollTop = savedView(entry).scrollTop ?? 0;
   });
-  return { ref, save: (scrollTop: number) => saveView(entry, { scrollTop }) };
+  const toTop = () => {
+    if (ref.current && savedView(entry).scrollTop === undefined) ref.current.scrollTop = 0;
+  };
+  return { ref, save: (scrollTop: number) => saveView(entry, { scrollTop }), toTop };
 }

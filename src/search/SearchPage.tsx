@@ -205,11 +205,13 @@ function SearchView({ params, onChange, wide }: ViewProps) {
   const handOver = useRef(false);
   const tabsRef = useRef<HTMLDivElement>(null);
   const wasSearching = useRef(searching);
-  // As a search begins, the place box beneath the filters gives way to the toolbar's, so the keyboard, dropped with the box
-  // it was in, goes to the new search's open tab rather than the top of the page.
+  // As a search begins, the place box beneath the filters gives way to the toolbar's. The list opens at its top rather than
+  // where the filters were scrolled to, and the keyboard, dropped with the box it was in, goes to the new search's open tab
+  // rather than the top of the page.
   useLayoutEffect(() => {
-    if (searching && !wasSearching.current && document.activeElement === document.body) {
-      tabsRef.current?.querySelector<HTMLElement>('[aria-selected="true"]')?.focus();
+    if (searching && !wasSearching.current) {
+      scroll.toTop();
+      if (document.activeElement === document.body) tabsRef.current?.querySelector<HTMLElement>('[aria-selected="true"]')?.focus();
     }
     wasSearching.current = searching;
   }, [searching]);

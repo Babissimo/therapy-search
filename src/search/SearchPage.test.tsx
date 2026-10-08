@@ -674,6 +674,41 @@ describe("SearchPage", () => {
     expect(column.scrollTop).toBe(400);
   });
 
+  it("opens a first search where the list leads at its top, wherever the filters above the place box were scrolled to", async () => {
+    screenIs(false);
+    renderAt("/");
+    const column = list();
+    column.scrollTop = 400;
+    fireEvent.scroll(column);
+    fireEvent.change(screen.getByRole("textbox", { name: "Location" }), { target: { value: "York" } });
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+    fireEvent.click(screen.getByRole("button", { name: "Search without filters" }));
+    expect(column.scrollTop).toBe(0);
+    // As a browser tells of the scroll while the results load.
+    fireEvent.scroll(column);
+    await loaded();
+    expect(column.scrollTop).toBe(0);
+  });
+
+  it("goes back to a search's place in the list as the browser jumps to it from the prompt, the view staying mounted", async () => {
+    screenIs(false);
+    renderAt("/?Location=Leeds&Languages=French");
+    await loaded();
+    list().scrollTop = 400;
+    fireEvent.scroll(list());
+    fireEvent.click(screen.getByRole("link", { name: "Online" }));
+    fireEvent.click(screen.getByRole("link", { name: "Near me" }));
+    await loaded();
+    fireEvent.change(screen.getByRole("textbox", { name: "Location" }), { target: { value: "" } });
+    fireEvent.click(screen.getByRole("button", { name: /^Filters/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "Clear all filters" }));
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(within(results()).getByText(/^Tick anything that matters to you/)).toBeTruthy();
+    // As from the browser's history menu: past Online to the first search.
+    travel(-2);
+    expect(list().scrollTop).toBe(400);
+  });
+
   it("frames the map clear of the toolbar only where the toolbar lies over it", async () => {
     const resize = screenIs(true);
     renderAt(SEARCH);
@@ -2277,6 +2312,22 @@ describe("SearchPage online", () => {
     // Show results gives way to the results, handing the keyboard to their tab.
     expect(document.activeElement).toBe(screen.getByRole("tab", { name: "Results" }));
     await loaded();
+  });
+
+  it("opens a first search on a phone at the list's top, wherever the filters beneath the prompt were scrolled to", async () => {
+    screenIs(false);
+    renderAt(ONLINE);
+    const column = list();
+    column.scrollTop = 400;
+    fireEvent.scroll(column);
+    fireEvent.click(within(results()).getByRole("button", { name: /^Languages/ }));
+    fireEvent.click(within(results()).getByRole("checkbox", { name: "Greek" }));
+    fireEvent.click(within(results()).getByRole("button", { name: "Show results" }));
+    expect(column.scrollTop).toBe(0);
+    // As a browser tells of the scroll while the results load.
+    fireEvent.scroll(column);
+    await loaded();
+    expect(column.scrollTop).toBe(0);
   });
 
   it("leaves focus be on wide screens as a search begins, Show results staying where it is", async () => {
