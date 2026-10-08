@@ -376,4 +376,9 @@ describe("AppRoutes", () => {
     await screen.findByRole("link", { name: "Jo Bloggs" });
     expect(shortlist.get()[0]?.card.name).toBe("Jo Bloggs");
   });
+
+  it("opens the questions at #/questions, in their own chunk", async () => {
+    renderAt("/questions");
+    expect(await screen.findByRole("heading", { level: 1, name: "Is it urgent?" })).toBeTruthy();
+  });
 });

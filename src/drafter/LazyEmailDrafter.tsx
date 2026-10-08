@@ -1,7 +1,7 @@
-import { Loader2 } from "lucide-react";
-import { Suspense, useEffect, useState, type ComponentProps } from "react";
+import { Suspense, useEffect, type ComponentProps } from "react";
 import { ErrorLine } from "@/components/ErrorLine";
 import { LoadFailed } from "@/components/LoadFailed";
+import { LoadingLine } from "@/components/LoadingLine";
 import { lazyChunk } from "@/lib/lazyChunk";
 import type { EmailDrafter } from "./EmailDrafter";
 
@@ -14,23 +14,10 @@ export function LazyEmailDrafter(props: ComponentProps<typeof EmailDrafter>) {
   const failed = <ErrorLine>The email drafter couldn't open just now. Reload the page to try again.</ErrorLine>;
   return (
     <LoadFailed fallback={failed}>
-      <Suspense fallback={<Opening />}>
+      <Suspense fallback={<LoadingLine>Opening the drafter</LoadingLine>}>
         <Drafter {...props} />
       </Suspense>
     </LoadFailed>
-  );
-}
-
-/** Says the drafter is on its way. Its words come just after its region, as a screen reader misses text that arrives with its region. */
-function Opening() {
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-  return (
-    // At the words' height before they come.
-    <p role="status" className="flex min-h-5 items-center gap-1.5 text-sm text-muted-foreground">
-      <Loader2 aria-hidden className="size-4 shrink-0 motion-safe:animate-spin" />
-      {mounted && "Opening the drafter"}
-    </p>
   );
 }
 

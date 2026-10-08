@@ -9,9 +9,10 @@ import { backgroundOf, useKeepOpened } from "@/lib/drawerRoute";
 import { queryClient } from "@/lib/queryClient";
 import { ProfileDrawer } from "@/profile/ProfileDrawer";
 import { ProfilePage } from "@/profile/ProfilePage";
+import { LazyQuestionsPage } from "@/questions/LazyQuestionsPage";
 import { ONLINE_PATH } from "@/search/online";
 import { SearchPage } from "@/search/SearchPage";
-import { ABOUT_PATH, STATEMENT_PATH } from "@/site";
+import { ABOUT_PATH, QUESTIONS_PATH, STATEMENT_PATH } from "@/site";
 
 export function App() {
   return (
@@ -45,6 +46,7 @@ export function AppRoutes() {
         {/* Followed by a link only where the statement itself was arrived at, not a drawer opened over it. */}
         <Route path={STATEMENT_PATH} element={<AccessibilityStatement followed={arrival === "PUSH" && !background} />} />
         <Route path={ABOUT_PATH} element={<AboutPage />} />
+        <Route path={`${QUESTIONS_PATH}/:screen?`} element={<LazyQuestionsPage />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
       {drawn && (
