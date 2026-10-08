@@ -35,7 +35,7 @@ describe("readProfile", () => {
     ]);
   });
 
-  it("reads sections as the browser's parser does: paragraphs, items and details, and none left empty", () => {
+  it("reads sections as the browser's parser does: paragraphs, items and details, without UKCP's stock line, and none left empty", () => {
     const html = page(`<div class="profile-bio"><section><h2>About &amp; more</h2>
       <p>One.<br><br>Two &#x2014; <strong>bold</strong>.</p><span>Working with children.</span>
       <ul><li>Couples</li><li><span>Families</span></li></ul>
@@ -43,6 +43,8 @@ describe("readProfile", () => {
         <div class="accordion-body collapse"><div><span>Line one.&#xA;Line two.</span></div></div></div></div>
     </section><section><h2>Empty</h2></section><div><section><h2>Nested</h2><p>Not the bio's own.</p></section></div></div>
     <div class="profile-practical-information"><section><h3>Types of sessions</h3><ul><li>Online Therapy</li></ul></section>
+      <section><h2>Working with Children</h2><span>For more information about therapy for children and young people,
+        <a href="/psychotherapy-training/working-with-children-and-young-people/">visit our info page</a>.</span></section>
       <div class="profile-locations"><section><h3>Office</h3><address>Hove BN3 2FL</address></section></div></div>`);
     expect(readProfile(html)).toEqual(browserProfile(html));
     expect(readProfile(html).about).toEqual([
@@ -53,6 +55,7 @@ describe("readProfile", () => {
         details: [{ title: "Grief", text: "Line one.\nLine two." }],
       },
     ]);
+    expect(readProfile(html).practical.map((s) => s.heading)).toEqual(["Types of sessions"]);
   });
 
   it("gives no contact id where UKCP has no details, however it quotes saying so", () => {

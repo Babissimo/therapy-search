@@ -95,6 +95,15 @@ describe("parseProfile details", () => {
     ]);
   });
 
+  it("leaves out UKCP's own line under Working with Children, and the section with it where that is all it says", () => {
+    const stock = `<span>For more information about therapy for children and young people, <a href="/psychotherapy-training/working-with-children-and-young-people/">visit our info page</a>.</span>`;
+    const side = (extra: string) => `<div class="profile-practical-information"><section><h2>Working with Children</h2>${stock}${extra}</section></div>`;
+    expect(parseProfile(header + side(""), "Jo-Bloggs-ABCDEFGH").practical).toEqual([]);
+    expect(parseProfile(header + side("<p>I see teenagers.</p>"), "Jo-Bloggs-ABCDEFGH").practical).toEqual([
+      { heading: "Working with Children", paragraphs: ["I see teenagers."], items: [], details: [] },
+    ]);
+  });
+
   it("offers no map for an office without an address", () => {
     const office = `<div class="profile-locations"><section><h3>Office</h3><address><strong><br></strong></address><a class="mini-cta" href="https://maps.google.co.uk/?q=%2c+%2c+">View Map</a></section></div>`;
     expect(parseProfile(header + office, "Jo-Bloggs-ABCDEFGH").offices).toEqual([{ name: "Office", isMain: false, address: [], mapUrl: undefined, cost: undefined }]);
