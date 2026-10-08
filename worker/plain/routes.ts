@@ -1,17 +1,32 @@
 import { Hono, type Context } from "hono";
 import type { ContentfulStatusCode, RedirectStatusCode } from "hono/utils/http-status";
-import { locationFellBack } from "../../shared/location";
+import { locationFellBack, measuredNear } from "../../shared/location";
+import { batchFrom, moreIn, ready, streamsFrom, takeMerged } from "../../shared/merge";
 import { narrowsOnline, onlineSearch } from "../../shared/online";
 import { newSeed, readSeed } from "../../shared/order";
 import { ALLOWED } from "../../shared/options";
 import { InvalidParam, PAGE_SIZE, batchSize, emptyParams, readParams, toQuery, type SearchParams } from "../../shared/query";
+import { asksUnsaid, saysNothing, withoutSessions } from "../../shared/sessions";
 import type { ContactDetails } from "../../shared/types";
 import { ParseError } from "../../shared/ukcp/text";
 import type { Env } from "../app";
 import { SLUG } from "../ukcp/client";
 import { readContact, readProfile, type PlainProfile } from "../ukcp/profile";
-import { readResults, type Results } from "../ukcp/results";
-import { INVALID, NEEDS_FILTER, NO_PLACE, UNREADABLE, messagePage, profilePage, resultsPage, searchPage, unrecognised, type Asked, type Html } from "./pages";
+import { readListings, readResults, type Results } from "../ukcp/results";
+import {
+  INVALID,
+  NEEDS_FILTER,
+  NO_PLACE,
+  UNREADABLE,
+  messagePage,
+  profilePage,
+  resultsPage,
+  searchPage,
+  unrecognised,
+  type Asked,
+  type Html,
+  type Shown,
+} from "./pages";
 
 type Ctx = Context<{ Bindings: Env }>;
 /** Asks the cached entrypoint for a canonical path, as the gateway's own routes do. */
@@ -58,6 +73,17 @@ export function plainSearch(forward: Forward) {
     if (!online && params.text.Location === "") return page(c, searchPage(asked, { place: NO_PLACE }));
     if (online && !narrowsOnline(params)) return page(c, searchPage(asked, { filters: NEEDS_FILTER }));
 
+    if (!online && asksUnsaid(params)) {
+      let merged: Shown | undefined;
+      try {
+        merged = await mergedResults(c, params, shown, seed);
+      } catch (error) {
+        if (error instanceof Unanswered) return page(c, searchPage(asked, { search: await errorOf(error.res) }), error.res.status as ContentfulStatusCode);
+        return unreadable(c, error, searchPage(asked, { search: UNREADABLE }));
+      }
+      if (merged) return page(c, resultsPage(asked, merged));
+    }
+
     // The batch holding this page, asked for by the URL the app asks for it by, so the two share the cache's answer.
     const search = online ? onlineSearch(params) : params;
     const size = batchSize(search);
@@ -78,6 +104,33 @@ export function plainSearch(forward: Forward) {
     }
     return page(c, resultsPage(asked, results));
   });
+
+  /**
+   * A face-to-face search's page, listing among its results, by distance as the app does, those the same search without
+   * its session types finds who list none; or undefined where UKCP measured no distances to list them by. A page keeps
+   * nothing between requests, so each merges afresh from the first batches, which the cache holds after the first page.
+   */
+  async function mergedResults(c: Ctx, params: SearchParams, shown: number, seed: number): Promise<Shown | undefined> {
+    const searches = [params, withoutSessions(params)];
+    const fetchBatch = async (i: number, n: number) => {
+      const res = await forward(c, `/api/search?${toQuery({ ...searches[i]!, page: n })}`);
+      if (!res.ok) throw new Unanswered(res);
+      return readListings(await res.text());
+    };
+    const [ticked, unticked] = await Promise.all([fetchBatch(0, 1), fetchBatch(1, 1)]);
+    const { locationSearched } = ticked;
+    if (!measuredNear(locationSearched)) return undefined;
+    const streams = streamsFrom([batchFrom(ticked), batchFrom(unticked, saysNothing)]);
+    const { taken, streams: rest } = await takeMerged(streams, shown + PAGE_SIZE, seed, async (i, n) => {
+      const batch = await fetchBatch(i, n);
+      return i === 0 ? batchFrom(batch) : batchFrom(batch, saysNothing);
+    });
+    const cards = taken.slice(shown).map((listing) => listing.read());
+    const more = moreIn(rest);
+    // Each search's count is its own, so the list's is known only once both are loaded whole.
+    const total = rest.every((stream) => stream.reach === Infinity) ? taken.length + ready(rest, seed).length : undefined;
+    return { total, more, from: shown + 1, to: shown + cards.length, locationSearched, cards };
+  }
 
   plain.post("/therapist", async (c) => {
     // As the API's contact route, so other sites can't make their visitors' browsers ask UKCP for contact details.
@@ -115,6 +168,14 @@ export function plainSearch(forward: Forward) {
   });
 
   return plain;
+}
+
+/** A search the cached entrypoint answered with an error, which the page says in its words. */
+class Unanswered extends Error {
+  override name = "Unanswered";
+  constructor(readonly res: Response) {
+    super(`the cache answered ${res.status}`);
+  }
 }
 
 /** The page "too large" draws, for the gateway's body limit to answer with. */

@@ -2,7 +2,7 @@ import { JSDOM } from "jsdom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { FILTER_GROUPS, groupName } from "../../shared/filterGroups";
 import { readSeed } from "../../shared/order";
-import { BATCH_SIZE, UKCP_ORIGIN, WHOLE_SET_SIZE } from "../../shared/query";
+import { BATCH_SIZE, UKCP_ORIGIN, WHOLE_SET_SIZE, type SearchParams } from "../../shared/query";
 import { fixture } from "../../shared/ukcp/__fixtures__";
 import { createCache, createGateway, TOO_MANY, UPSTREAM_DOWN, type Env, type PlaceFinder } from "../app";
 import { UpstreamError, type UkcpClient } from "../ukcp/client";
@@ -205,6 +205,66 @@ describe("POST /plain near a place", () => {
     expect(asked()).toEqual(["/api/search?Location=Bristol&page=2"]);
     expect(stub.search).toHaveBeenCalledWith(expect.objectContaining({ page: 2 }), BATCH_SIZE);
     expect(doc.querySelector(".results h2")?.textContent).toBe(`Therapist ${BATCH_SIZE + 1}`);
+  });
+
+  describe("with a face-to-face type ticked", () => {
+    const FACE_TO_FACE = "TypesOfSession=Face+to+Face+-+Long+Term";
+    const unsaid = (n: number, miles: number) => listing(n, { sessions: null, miles });
+
+    /** UKCP answering the ticked search with its 30 and the same search without ticks with `cards` of `total`. */
+    function answering(cards: string[], total = cards.length) {
+      return setup({
+        client: {
+          search: vi.fn(async (params: SearchParams) =>
+            bytes(params.multi.TypesOfSession.length > 0 ? results(30) : results(cards.length, { total, cards: cards.join("\n") })),
+          ),
+        },
+      });
+    }
+
+    it("lists among the rest, nearest first, those the same search without its ticks finds who don't say how they meet", async () => {
+      // The fifth is listed in both, as anyone ticked is, and so stays where the ticked search puts them.
+      const { post, asked } = answering([unsaid(101, 0.15), unsaid(102, 0.25), listing(5)]);
+      const { doc } = await read(await post("/plain", `Location=Bristol&${FACE_TO_FACE}`));
+      expect(asked().toSorted()).toEqual(["/api/search?Location=Bristol", `/api/search?Location=Bristol&${FACE_TO_FACE}`]);
+      expect(doc.querySelector("h1")?.textContent).toBe("32 therapists near Bristol");
+      const names = [...doc.querySelectorAll(".results h2")].map((h) => h.textContent);
+      expect(names).toEqual([1, 101, 2, 102, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => `Therapist ${n}`));
+      expect(doc.querySelectorAll(".results > li")[1]?.querySelectorAll(".meta")[1]?.textContent).toBe("Doesn't say how they meet");
+    });
+
+    it("pages through the merged list, each page following on from the last", async () => {
+      const { post } = answering([unsaid(101, 0.15), unsaid(102, 1.25), unsaid(103, 2.95)]);
+      const pages = await pageThrough(post, `Location=Bristol&${FACE_TO_FACE}`);
+      const names = (ns: number[]) => ns.map((n) => `Therapist ${n}`);
+      const order = [1, 101, ...Array.from({ length: 11 }, (_, i) => i + 2), 102, ...Array.from({ length: 17 }, (_, i) => i + 13), 103, 30];
+      expect(pages).toEqual([names(order.slice(0, 12)), names(order.slice(12, 24)), names(order.slice(24))]);
+    });
+
+    it("counts no one until both searches are loaded whole", async () => {
+      // The search without ticks has more beyond 2 miles, past where the first page ends.
+      const { post } = answering([unsaid(101, 0.15), unsaid(102, 2)], 600);
+      const { doc } = await read(await post("/plain", `Location=Bristol&${FACE_TO_FACE}`));
+      expect(doc.querySelector("h1")?.textContent).toBe("Therapists near Bristol");
+      expect(doc.querySelectorAll(".results > li")).toHaveLength(12);
+      expect([...doc.querySelectorAll("form")].some((form) => form.textContent?.includes("More results"))).toBe(true);
+    });
+
+    it("says UKCP isn't responding when the search without its ticks fails", async () => {
+      vi.spyOn(console, "error").mockImplementation(() => {});
+      const search = vi.fn(async (params: SearchParams) =>
+        params.multi.TypesOfSession.length > 0 ? bytes(results(30)) : Promise.reject(new UpstreamError(503, "UKCP answered 503")),
+      );
+      const res = await setup({ client: { search } }).post("/plain", `Location=Bristol&${FACE_TO_FACE}`);
+      expect(res.status).toBe(502);
+      expect((await read(res)).doc.querySelector(".problem li")?.textContent).toBe(UPSTREAM_DOWN);
+    });
+
+    it("says when UKCP didn't recognise the place", async () => {
+      const { post } = setup({ client: { search: vi.fn(async () => bytes(results(12, { place: "United Kingdom" }))) } });
+      const { doc } = await read(await post("/plain", `Location=Brightn&${FACE_TO_FACE}`));
+      expect(doc.querySelector("#place-error")?.textContent).toBe(`Error: UKCP didn't recognise "Brightn". Try a postcode or a town.`);
+    });
   });
 
   it("asks for a place, beside its box, without asking the cache", async () => {

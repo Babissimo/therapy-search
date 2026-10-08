@@ -43,11 +43,18 @@ ${searchForm(asked, problems, 2)}`,
   );
 }
 
-export function resultsPage(asked: Asked, { total, locationSearched, cards }: Results): Html {
+/**
+ * A page of results: UKCP's count, or none for two searches listed as one until both are loaded whole, and whether more
+ * follow, where that isn't known from the count.
+ */
+export type Shown = Omit<Results, "total"> & { total?: number; more?: boolean };
+
+export function resultsPage(asked: Asked, { total, locationSearched, cards, more }: Shown): Html {
   const { online, params, shown } = asked;
   // UKCP names the place in full, such as "Brighton, Brighton and Hove, UK".
   const place = locationSearched?.split(",")[0] || params.text.Location;
-  const title = `${total === 0 ? "No therapists" : total === 1 ? "1 therapist" : `${total} therapists`} ${online ? "working online or by phone" : `near ${place}`}`;
+  const count = total === undefined ? "Therapists" : total === 0 ? "No therapists" : total === 1 ? "1 therapist" : `${total} therapists`;
+  const title = `${count} ${online ? "working online or by phone" : `near ${place}`}`;
   const last = shown + cards.length;
   const filtered = toQuery({ ...params, text: { ...params.text, Location: "" }, flags: { ...params.flags, LocationSearchOutsideUK: false } }) !== "";
   return layout(
@@ -55,9 +62,9 @@ export function resultsPage(asked: Asked, { total, locationSearched, cards }: Re
     html`<h1>${title}</h1>
 ${cards.length > 0 ? html`<p>Showing ${shown + 1} to ${last}${online ? "" : ", nearest first"}. <a href="#search">Change your search</a></p>` : ""}
 ${total === 0 && filtered ? html`<p>Remove a filter to see more.</p>` : ""}
-${total > 0 && cards.length === 0 ? html`<p>There are no more results for this search.</p>` : ""}
+${total !== 0 && cards.length === 0 ? html`<p>There are no more results for this search.</p>` : ""}
 ${cards.length > 0 ? html`<ol class="results" role="list">${cards.map((card) => cardItem(card, online))}</ol>` : ""}
-${cards.length > 0 && last < total ? moreForm(asked, last) : ""}
+${cards.length > 0 && (more ?? (total !== undefined && last < total)) ? moreForm(asked, last) : ""}
 <h2 id="search">Change your search</h2>
 ${searchForm(asked, {}, 3)}`,
   );
