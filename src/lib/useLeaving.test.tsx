@@ -19,16 +19,16 @@ function List({ items }: { items: string[] }) {
 let styles: HTMLStyleElement | undefined;
 afterEach(() => styles?.remove());
 
-/** Gives a leaving element the exit animation the page's styles would, which jsdom reads but never plays. */
-function withExit() {
+/** Gives an arriving element the entrance and a leaving one the exit the page's styles would, which jsdom reads but never plays. */
+function withAnimations() {
   styles = document.createElement("style");
-  styles.textContent = "[data-leaving] { animation-name: exit; }";
+  styles.textContent = "[data-entering] { animation-name: enter; } [data-leaving] { animation-name: exit; }";
   document.head.append(styles);
 }
 
 // jsdom has no AnimationEvent.
-function ended(element: Element, animationName: string) {
-  act(() => void element.dispatchEvent(Object.assign(new Event("animationend"), { animationName })));
+function ended(element: Element, animationName: string, type = "animationend") {
+  act(() => void element.dispatchEvent(Object.assign(new Event(type), { animationName })));
 }
 
 const items = (container: HTMLElement) => [...container.querySelectorAll("li")];
@@ -37,7 +37,7 @@ const texts = (container: HTMLElement) => items(container).map((li) => li.textCo
 
 describe("useLeaving", () => {
   it("keeps an item that goes in its place, out of reach, until its exit animation ends", () => {
-    withExit();
+    withAnimations();
     const { container, rerender } = render(<List items={["a", "b", "c"]} />);
     rerender(<List items={["a", "c"]} />);
     const b = item(container, "b");
@@ -54,14 +54,16 @@ describe("useLeaving", () => {
     expect(texts(container)).toEqual(["d", "a", "c"]);
   });
 
-  it("lets an item with no exit animation to play go at once", () => {
+  it("lets an item with no exit animation to play go at once, and one with no entrance arrive at once", () => {
     const { container, rerender } = render(<List items={["a", "b"]} />);
     rerender(<List items={["a"]} />);
     expect(texts(container)).toEqual(["a"]);
+    rerender(<List items={["a", "c"]} />);
+    expect(item(container, "c").hasAttribute("data-entering")).toBe(false);
   });
 
   it("marks those arriving after the first draw as entering, and one back before it had gone", () => {
-    withExit();
+    withAnimations();
     const { container, rerender } = render(<List items={["a", "b"]} />);
     expect(item(container, "a").hasAttribute("data-entering")).toBe(false);
     rerender(<List items={["a", "b", "c"]} />);
@@ -73,5 +75,21 @@ describe("useLeaving", () => {
     expect(a.hasAttribute("inert")).toBe(false);
     expect(a.hasAttribute("data-leaving")).toBe(false);
     expect(a.hasAttribute("data-entering")).toBe(true);
+  });
+
+  it("marks one entering only until its entrance ends or is cut short, so hiding it and showing it again doesn't replay it", () => {
+    withAnimations();
+    const { container, rerender } = render(<List items={["a"]} />);
+    rerender(<List items={["a", "b", "c"]} />);
+    // Others coming leave it entering.
+    rerender(<List items={["a", "b", "c", "d"]} />);
+    expect(item(container, "b").hasAttribute("data-entering")).toBe(true);
+    ended(item(container, "b"), "enter");
+    // Hidden as it enters.
+    ended(item(container, "c"), "enter", "animationcancel");
+    rerender(<List items={["a", "b", "c", "d", "e"]} />);
+    expect(item(container, "b").hasAttribute("data-entering")).toBe(false);
+    expect(item(container, "c").hasAttribute("data-entering")).toBe(false);
+    expect(item(container, "d").hasAttribute("data-entering")).toBe(true);
   });
 });
