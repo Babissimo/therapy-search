@@ -110,7 +110,6 @@ export function ProfileBody({ slug, back, close }: { slug: string } & Exits) {
   const offices = nearest === undefined ? profile.offices : [profile.offices[nearest]!, ...profile.offices.toSpliced(nearest, 1)];
   // The card the visitor's search showed, where there was one, says more than the header.
   const therapist = cachedCard(client, slug) ?? headerCard(profile);
-  const sessions = sessionTypesOf(profile);
   return (
     <>
       {said}
@@ -135,7 +134,7 @@ export function ProfileBody({ slug, back, close }: { slug: string } & Exits) {
                 </span>
               )
             }
-            sessions={sessions && <Sessions text={sessions} />}
+            sessions={<Sessions text={sessionTypesOf(profile)} />}
             contacts={
               <>
                 <ContactList profile={profile} onReach={standing.reached} />

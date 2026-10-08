@@ -183,6 +183,14 @@ describe("TherapistCard", () => {
     screen.getByText("In-person");
   });
 
+  it("says when a therapist doesn't say how they meet, near a place and online alike", () => {
+    renderCard(therapist({ sessionTypes: undefined }));
+    expect(screen.getByText("Doesn't say how they meet").querySelector("svg")).toBeNull();
+    cleanup();
+    renderCard(therapist({ sessionTypes: undefined }), [], { online: true });
+    screen.getByText("Doesn't say how they meet");
+  });
+
   it("marks each way of meeting with its icon", () => {
     renderCard(therapist());
     const icons = screen.getByText("Remote").closest("p")!.querySelectorAll("svg");

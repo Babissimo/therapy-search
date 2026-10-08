@@ -57,7 +57,7 @@ export function TherapistCard({ therapist: t, sought, grouped = false, online = 
       {where && away ? ` (${away})` : away}
     </span>
   );
-  const meets = online && /remote/i.test(t.sessionTypes ?? "") ? undefined : t.sessionTypes;
+  const meets = online && /remote/i.test(t.sessionTypes ?? "") ? undefined : <Sessions text={t.sessionTypes} />;
   // The first line written; the whole note is on the profile.
   const noteLine = note?.trim().split("\n", 1)[0];
 
@@ -88,7 +88,7 @@ export function TherapistCard({ therapist: t, sought, grouped = false, online = 
           </span>
         )
       }
-      meets={meets && <Sessions text={meets} />}
+      meets={meets}
       fee={
         fee && (
           // Boxed apart from the icon, so fees for several kinds of session wrap as one line beside it, as the place does.

@@ -1,4 +1,5 @@
 import { Armchair, Video, type LucideIcon } from "lucide-react";
+import { UNSAID_SESSIONS } from "@shared/sessions";
 
 // UKCP's two ways of meeting, matched as isRemoteOnly matches them.
 const SESSION_ICONS: [RegExp, LucideIcon][] = [
@@ -6,8 +7,12 @@ const SESSION_ICONS: [RegExp, LucideIcon][] = [
   [/remote/i, Video],
 ];
 
-/** UKCP's "In-person & Remote" as its kinds side by side, each after its icon; a kind it doesn't know keeps its words alone. */
-export function Sessions({ text }: { text: string }) {
+/**
+ * UKCP's "In-person & Remote" as its kinds side by side, each after its icon; a kind it doesn't know keeps its words alone.
+ * Without any, it says so.
+ */
+export function Sessions({ text }: { text?: string }) {
+  if (!text) return <span>{UNSAID_SESSIONS}</span>;
   const kinds = text.split(/\s*&\s*/).filter(Boolean);
   return (
     <span className="flex flex-wrap gap-x-3 gap-y-1">
