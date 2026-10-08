@@ -24,12 +24,14 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { HelpNow } from "@/layout/HelpNow";
 import { useSavedValue } from "@/lib/useSavedValue";
+import { ContactOffer } from "@/profile/ContactOffer";
 import { profileQuery } from "@/profile/ProfilePage";
 import { readSearch, useShownParams } from "@/search/useSearchState";
 import { MESSAGE_LIMIT, SENDER_LIMIT, SUBJECT_LIMIT, type EmailDraft, type Sender, type ShortlistCard } from "@/shortlist/store";
 import { useShortlistDraft, useShortlistSearch, useShortlistSender, useShortlistStore } from "@/shortlist/useShortlist";
 import { mentionsOf } from "./mentions";
 import { asksFee, firstName, writeEmail } from "./message";
+import { SendDraft } from "./SendDraft";
 
 type Props = {
   therapist: ShortlistCard;
@@ -42,7 +44,7 @@ type Props = {
  * A first email to a shortlisted therapist, written from the search they were found by and their profile until the visitor
  * edits it, and theirs from then on, saved with the therapist as they type.
  */
-export function EmailDrafter({ therapist, onClose }: Props) {
+export function EmailDrafter({ therapist, onClose, onMarked }: Props) {
   const { slug } = therapist;
   const store = useShortlistStore();
   const profileAnswer = useQuery(profileQuery(slug));
@@ -68,6 +70,9 @@ export function EmailDrafter({ therapist, onClose }: Props) {
 
   // What opened it, where the keyboard goes back to: Radix would send it to the dialog's trigger, and it has none.
   const [opener] = useState(() => document.activeElement);
+  // Whether to ask if they got in touch, and the control that raised it, which takes the keyboard back on Not now.
+  const [asking, setAsking] = useState(false);
+  const raisedBy = useRef<HTMLElement | null>(null);
   const fold = useRef<HTMLDivElement>(null);
   // While the site writes the draft, the keyboard starts on the first chip, or on the first field where there are none.
   const toStart = () => focusOnceShown(fold.current?.querySelector<HTMLElement>("[role=checkbox], input"));
@@ -185,6 +190,31 @@ export function EmailDrafter({ therapist, onClose }: Props) {
             </ErrorLine>
           )}
           {written.crisis && <HelpNow className="text-sm" />}
+          {(settled || draft.value) && (
+            <SendDraft
+              draft={shown}
+              first={first}
+              profile={profile}
+              onReached={(control) => {
+                raisedBy.current = control;
+                setAsking(true);
+              }}
+              // Selecting a text control focuses it, which Ctrl+C needs; not every browser does so unasked.
+              onRefused={() => {
+                messageBox.current?.focus();
+                messageBox.current?.select();
+              }}
+            />
+          )}
+          {asking && (
+            <ContactOffer
+              onAnswer={(yes) => {
+                setAsking(false);
+                if (yes) onMarked();
+                else raisedBy.current?.focus();
+              }}
+            />
+          )}
         </div>
       </DialogContent>
     </Dialog>
