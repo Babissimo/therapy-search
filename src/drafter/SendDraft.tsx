@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Copy, Mail } from "lucide-react";
-import { useState, type Ref } from "react";
+import type { Ref } from "react";
 import { ukcpProfileUrl } from "@shared/query";
 import type { ContactDetails, Profile } from "@shared/types";
 import { ErrorLine } from "@/components/ErrorLine";
@@ -11,6 +11,7 @@ import { NEW_TAB } from "@/lib/newTab";
 import { contactQuery, emailOf, shortUrl } from "@/profile/ContactList";
 import type { EmailDraft } from "@/shortlist/store";
 import { copiedText, MAILTO_SAFE, mailtoHref } from "./mailto";
+import type { Reach } from "./Reached";
 
 type Props = {
   draft: EmailDraft;
@@ -18,10 +19,8 @@ type Props = {
   first: string;
   /** None where it couldn't be read, when only copying is offered. */
   profile?: Profile;
-  /** After the email app opens, the draft is copied or a phone link is followed, any of which may mean they got in touch. */
-  onReached: (control: HTMLElement) => void;
-  /** After the clipboard refuses the draft, for the message to be selected in its place. */
-  onRefused: () => void;
+  /** As the draft goes on, or the clipboard refuses it, with the control it went by. */
+  onReached: (reach: Reach, control: HTMLElement) => void;
 };
 
 async function copy(text: string): Promise<boolean> {
@@ -34,20 +33,12 @@ async function copy(text: string): Promise<boolean> {
 }
 
 /** Where the draft goes: the visitor's email app, addressed to the therapist, or their clipboard, with what UKCP has where it gives no email. */
-export function SendDraft({ draft, first, profile, onReached, onRefused }: Props) {
+export function SendDraft({ draft, first, profile, onReached }: Props) {
   // Asked only where the profile has no email: with one, the draft goes to it and nothing else is wanted.
   const contact = useQuery(contactQuery(profile?.email ? undefined : profile?.contactId));
   // Held while asked again, so Try again keeps the keyboard until what it brings takes it.
   const failure = useFailure<HTMLAnchorElement>(contact, profile?.contactId ?? "");
   const email = profile && emailOf(profile, contact.data);
-  // What the polite region below says. The region stays drawn, empty, as a screen reader misses text that arrives with its region.
-  const [said, setSaid] = useState("");
-  // Emptied as the draft changes, so "Copied." never stands beside words that weren't copied.
-  const [saidOf, setSaidOf] = useState(draft);
-  if (draft.subject !== saidOf.subject || draft.message !== saidOf.message) {
-    setSaidOf(draft);
-    setSaid("");
-  }
   const href = email && mailtoHref(email, draft);
   // Shown, and said in place of the error's own message, which doesn't say what failed.
   const unread = `${first}'s contact details couldn't be read.`;
@@ -62,12 +53,10 @@ export function SendDraft({ draft, first, profile, onReached, onRefused }: Props
               ref={failure.landing}
               href={href}
               onClick={(event) => {
-                setSaid("");
-                // Some email apps cut a long link short, so the message waits on the clipboard too.
-                if (href.length > MAILTO_SAFE) {
-                  void copy(draft.message).then((ok) => ok && setSaid("Also copied, in case your email app cuts it short."));
-                }
-                onReached(event.currentTarget);
+                const link = event.currentTarget;
+                // Some email apps cut a long link short, so the message goes on the clipboard too, and the question waits to say whether it did.
+                if (href.length > MAILTO_SAFE) void copy(draft.message).then((ok) => onReached(ok ? "emailed and copied" : "emailed", link));
+                else onReached("emailed", link);
               }}
             >
               <Mail aria-hidden />
@@ -79,23 +68,13 @@ export function SendDraft({ draft, first, profile, onReached, onRefused }: Props
           variant="outline"
           onClick={async (event) => {
             const button = event.currentTarget;
-            // Emptied while the clipboard answers, so a second press is heard as well as the first.
-            setSaid("");
-            if (await copy(copiedText(draft))) setSaid("Copied.");
-            else {
-              onRefused();
-              setSaid("Couldn't copy it for you. It's selected: press Ctrl+C (⌘C on a Mac) to copy it.");
-            }
-            onReached(button);
+            onReached((await copy(copiedText(draft))) ? "copied" : "refused", button);
           }}
         >
           <Copy aria-hidden />
           Copy message
         </Button>
       </div>
-      <p aria-live="polite" className="text-sm text-muted-foreground not-empty:mt-3">
-        {said}
-      </p>
       {profile && !email && (
         <div className="mt-3 text-sm">
           {failure.error ? (
@@ -132,7 +111,7 @@ type ElsewhereProps = {
   contact?: ContactDetails;
   /** Where the keyboard goes once contact details that failed to load arrive: the first link. */
   landing: Ref<HTMLAnchorElement>;
-  onReached: (control: HTMLElement) => void;
+  onReached: (reach: Reach, control: HTMLElement) => void;
 };
 
 /** What UKCP gives in place of an email: a phone number, a website, or nothing, with the therapist's UKCP page after. */
@@ -149,7 +128,7 @@ function Elsewhere({ first, profile, contact = {}, landing, onReached }: Elsewhe
             translate="no"
             className={link}
             href={`tel:${phone.replace(/\s/g, "")}`}
-            onClick={(event) => onReached(event.currentTarget)}
+            onClick={(event) => onReached("phoned", event.currentTarget)}
           >
             {phone}
           </a>

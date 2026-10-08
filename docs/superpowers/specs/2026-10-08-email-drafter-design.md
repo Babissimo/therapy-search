@@ -127,13 +127,13 @@ Their text is saved with the therapist's entry as they type, as notes are (statu
 
 ### 4.5 Sending
 
-**Open in email app** follows a `mailto:` link to the therapist's address, with the subject and message percent-encoded and line breaks as `%0D%0A`. Some email apps cut a link longer than about 2,000 characters, so a longer one also copies the message and says so ("Also copied, in case your email app cuts it short.").
+**Open in email app** follows a `mailto:` link to the therapist's address, with the subject and message percent-encoded and line breaks as `%0D%0A`. Some email apps cut a link longer than about 2,000 characters, so a longer one also copies the message.
 
-**Copy message** puts the subject and message on the clipboard and says "Copied." in a polite region. Where the clipboard is refused, the message is selected and the line says to press Ctrl+C (⌘C on a Mac).
+**Copy message** puts the subject and message on the clipboard.
 
 Without an email address (8 of 36, §3), the open button gives way to a line saying what UKCP has instead, with the details as links: a phone number ("The message works as notes for the call."), a website, or none ("UKCP shows no way to reach {first name}."), with "View on UKCP" after. Copy stays.
 
-After either button, or a followed phone link, the drafter asks "Mark as contacted?" with the profile's `ContactOffer` (statuses §4.5). "Yes" marks them contacted and closes the drafter; the track's button goes with the status, so focus moves to the track's next step. "Not now" leaves the drafter open.
+After either button, or a followed phone link, an alert dialog over the drafter says what happened and asks whether to mark them contacted, as the drafter's foot, under the buttons, may be out of sight. After copying it is titled "Copied" ("Your subject and message are ready to paste. Mark {first name} as contacted?"); after the email or phone link it is titled "Mark {first name} as contacted?", saying the email app or phone should open, and that the message is copied too where the link was long. "Mark as contacted" marks them and closes the drafter; the track's button goes with the status, so focus moves to the track's next step. "Not now" leaves the drafter open, with focus back on the control pressed. Where the clipboard is refused, the dialog is titled "Couldn't copy it", says to press Ctrl+C (⌘C on a Mac), asks nothing, and its one button, "Select the message", selects the message and focuses it for Ctrl+C.
 
 ### 4.6 What the profile adds
 
@@ -154,7 +154,7 @@ The clear dialog and the About card name drafts with notes ("with your notes, dr
 
 - The chips are checkboxes in a group named "Mention", each named by its label. Ticked shows a check as well as a fill, so it holds in forced colours.
 - The subject and message are labelled fields; the message notes "Saved as you type, in this browser only.", as notes do.
-- "Copied." and the long-link line are said in a polite region; the help-now line, when it appears, is not announced, as it isn't urgent.
+- The dialog after sending takes focus, on its first button, so its title and words are said; the help-now line, when it appears, is not announced, as it isn't urgent.
 - Focus starts on the first chip, or on the message once the text is the visitor's. Escape closes the drafter and returns focus to its button.
 - The drafter stays off paper.
 
