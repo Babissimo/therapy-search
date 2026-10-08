@@ -43,9 +43,10 @@ describe("filterGroups", () => {
     }
   });
 
-  it("says what the session types' terms mean, and that any one ticked will do", () => {
+  it("says what the session types' terms mean, that any one ticked will do, and who face to face also shows", () => {
     const help = filterGroups({ helpWith: [], groups: [sessions] })[0]?.help;
     expect(help).toContain("Therapists who offer any one you tick will show.");
+    expect(help).toContain("Ticking face to face also shows those who don't say how they meet.");
     expect(help).toContain("Short term and long term");
   });
 });

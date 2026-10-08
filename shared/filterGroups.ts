@@ -12,7 +12,8 @@ const OUTSIDE_UK_HELP = '"Search locations outside the UK" looks for the place y
 const HELP: Record<string, string> = {
   // How long therapy lasts, from UKCP's FAQs.
   "Type of Session":
-    "How you'd like to meet. Therapists who offer any one you tick will show. Short term and long term say how long they like to " +
+    "How you'd like to meet. Therapists who offer any one you tick will show. Ticking face to face also shows those who don't " +
+    "say how they meet. Short term and long term say how long they like to " +
     "work with someone: therapy rarely lasts fewer than six sessions, and some goes on for two years or more. If you're not sure, " +
     "leave this blank.",
   "I Want Help With": "Tick what you'd like help with, to find therapists who work with it. If you're not sure, leave this blank.",

@@ -12,6 +12,8 @@ const LISTING = /<div\b[^>]*\sclass=(["'])(?:[^"']*\s)?profile-listing(?:\s[^"']
 export type Card = Pick<TherapistCard, "slug" | "name" | "location" | "distance" | "sessionTypes" | "summary">;
 /** A results page with the cards a plain page shows from it. */
 export type Results = Omit<SearchResult, "therapists" | "notices"> & { cards: Card[] };
+/** A card to list beside another search's: what orders and sifts it, with the card itself read only once shown. */
+export type Listing = { slug: string; distance?: string; hasSessions: boolean; read: () => Card };
 /**
  * A card as first found: where its link's content starts, and what orders it. A plain page shows no photo and reads a
  * card whole only once it is shown, so cards here are ordered by their distance and the seed alone.
@@ -25,25 +27,41 @@ type Found = { slug: string; start: number; distance?: string };
  * little more than a scan for where cards start.
  */
 export function readResults(html: string, skip: number, count: number, seed?: number): Results {
+  const about = countOf(html);
+  // UKCP gives distances only for a search near a place, which the page names.
+  const measured = about.locationSearched !== undefined;
+  const shown =
+    seed === undefined ? listed(html, skip, count) : inOrder([...html.matchAll(LISTING)].map((m) => foundAt(html, m, measured)), seed).slice(skip, skip + count);
+  return { ...about, cards: shown.map((card) => cardAt(html, card)) };
+}
+
+/** UKCP's count and searched place, and every card, each read whole only once shown: a batch to list beside another search's. */
+export function readListings(html: string): Omit<Results, "cards"> & { listings: Listing[] } {
+  const about = countOf(html);
+  const measured = about.locationSearched !== undefined;
+  const listings = [...html.matchAll(LISTING)].map((m): Listing => {
+    const found = foundAt(html, m, measured);
+    const hasSessions = sessionsIn(cardFrom(html, found.start)) !== undefined;
+    return { slug: found.slug, distance: found.distance, hasSessions, read: () => cardAt(html, found) };
+  });
+  return { ...about, listings };
+}
+
+/** UKCP's count and searched place, read from the page's opening, before its first card. */
+function countOf(html: string): Omit<Results, "cards"> {
   const first = html.search(LISTING);
   const opening = first < 0 ? html : html.slice(0, first);
   const searched = withClass(opening, "results-location")[0];
   const locationSearched = optional(lineOf(firstNamed(searched?.inner ?? "", "strong")?.inner ?? ""));
-  // UKCP gives distances only for a search near a place, which the page names.
-  const measured = locationSearched !== undefined;
-  const shown =
-    seed === undefined ? listed(html, skip, count) : inOrder([...html.matchAll(LISTING)].map((m) => foundAt(html, m, measured)), seed).slice(skip, skip + count);
-  const cards = shown.map((card) => cardAt(html, card));
-
   const range = withClass(opening, RESULTS_COUNT)[0];
   if (!range) {
     const notices = withClass(opening, RESULTS_NOTICE).filter((notice) => lineOf(firstNamed(notice.inner, "h6")?.inner ?? "") !== "");
-    if (first < 0 && notices.length > 0) return { total: 0, from: 0, to: 0, locationSearched, cards };
+    if (first < 0 && notices.length > 0) return { total: 0, from: 0, to: 0, locationSearched };
     throw new ParseError(`results: no .${RESULTS_COUNT} and no notice`);
   }
   const m = RANGE.exec(lineOf(range.inner));
   if (!m) throw new ParseError(`results: unreadable range "${lineOf(range.inner)}"`);
-  return { total: Number(m[3]), from: Number(m[1]), to: Number(m[2]), locationSearched, cards };
+  return { total: Number(m[3]), from: Number(m[1]), to: Number(m[2]), locationSearched };
 }
 
 /** The `count` cards after the first `skip` in UKCP's order, found without reading further. */
@@ -68,16 +86,28 @@ function cardAt(html: string, { slug, start }: Found): Card {
   const name = lineOf(firstNamed(card, "h2")?.inner ?? "");
   if (!name) throw new ParseError("results: a card has no name");
   const locations = locationsIn(card);
-  // The strong holds the phone, which a plain page leaves to the profile's contact details.
-  const sessions = (withClass(card, "profile-listing-contact-session-type")[0]?.inner ?? "").replace(/<strong\b[^>]*>[\s\S]*?<\/strong>/gi, "");
   return {
     slug,
     name,
     location: optional(lineOf(firstNamed(locations, "strong")?.inner ?? "")),
     distance: distanceIn(locations),
-    sessionTypes: optional(lineOf(sessions).replace(/^\|\s*/, "")),
+    sessionTypes: sessionsIn(card),
     summary: optional(lineOf(firstNamed(card, "p")?.inner ?? "")),
   };
+}
+
+/**
+ * How a card says they meet, such as "In-person & Remote". It is read for every card listed beside another search's, so
+ * found by its class's name alone and taken to the first span to close, as UKCP's span holds no other.
+ */
+function sessionsIn(card: string): string | undefined {
+  const at = card.indexOf("profile-listing-contact-session-type");
+  if (at < 0) return undefined;
+  const from = card.indexOf(">", at) + 1;
+  const end = card.indexOf("</span>", from);
+  // The strong holds the phone, which a plain page leaves to the profile's contact details.
+  const sessions = card.slice(from, end < 0 ? undefined : end).replace(/<strong\b[^>]*>[\s\S]*?<\/strong>/gi, "");
+  return optional(lineOf(sessions).replace(/^\|\s*/, ""));
 }
 
 /** The content of the card whose link's content starts at `start`, which is the whole card. */
