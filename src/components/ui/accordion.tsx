@@ -2,6 +2,7 @@ import * as React from "react"
 import { cn } from "cn"
 import { Accordion as AccordionPrimitive } from "radix-ui"
 import { ChevronDownIcon } from "lucide-react"
+import { unrolls } from "./collapsible"
 
 function Accordion({
   className,
@@ -59,7 +60,8 @@ function AccordionContent({
   return (
     <AccordionPrimitive.Content
       data-slot="accordion-content"
-      className="recessed overflow-hidden text-sm motion-safe:data-open:animate-accordion-down motion-safe:data-closed:animate-accordion-up"
+      className="recessed overflow-hidden text-sm motion-safe:data-open:not-data-unrolled:animate-accordion-down motion-safe:data-closed:animate-accordion-up"
+      ref={unrolls}
       {...props}
     >
       <div

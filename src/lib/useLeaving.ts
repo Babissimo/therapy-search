@@ -6,7 +6,7 @@ type Entry<T> = { key: string; item: T; entering: boolean; leaving: boolean };
 export type Shown<T> = {
   key: string;
   item: T;
-  /** For the item's element: `data-entering` once it arrives after the first draw, and `data-leaving`, out of reach, as it goes. */
+  /** For the item's element: `data-entering` as it arrives after the first draw, and `data-leaving`, out of reach, as it goes. */
   props: {
     ref?: (element: HTMLElement | null) => (() => void) | undefined;
     inert: boolean;
@@ -17,7 +17,8 @@ export type Shown<T> = {
 
 /**
  * `items`, with each one gone from them kept in its place until its element's exit animation, which its `data-leaving`
- * starts, ends. One with no exit animation to play, as under reduced motion, goes at once.
+ * starts, ends. One with no exit animation to play, as under reduced motion, goes at once. Likewise one arriving is
+ * `data-entering` only until its entrance ends or is cut short, so hiding it and showing it again doesn't replay it.
  */
 export function useLeaving<T>(items: readonly T[], keyOf: (item: T) => string): Shown<T>[] {
   const keys = JSON.stringify(items.map(keyOf));
@@ -27,12 +28,20 @@ export function useLeaving<T>(items: readonly T[], keyOf: (item: T) => string): 
   }));
   if (state.keys !== keys) setState({ keys, entries: merge(state.entries, items, keyOf) });
   const gone = useCallback((key: string) => setState((s) => ({ ...s, entries: s.entries.filter((e) => !(e.leaving && e.key === key)) })), []);
+  const entered = useCallback(
+    (key: string) => setState((s) => ({ ...s, entries: s.entries.map((e) => (e.entering && e.key === key ? { ...e, entering: false } : e)) })),
+    [],
+  );
   const current = new Map(items.map((item) => [keyOf(item), item]));
   return state.entries.map(({ key, item, entering, leaving }) => ({
     key,
     // Drawn as it is now while it stays, and as it was last as it goes.
     item: current.get(key) ?? item,
-    props: leaving ? { ref: playOut(() => gone(key)), inert: true, "data-leaving": "" } : { inert: false, "data-entering": entering ? "" : undefined },
+    props: leaving
+      ? { ref: played(() => gone(key)), inert: true, "data-leaving": "" }
+      : entering
+        ? { ref: played(() => entered(key)), inert: false, "data-entering": "" }
+        : { inert: false },
   }));
 }
 
@@ -50,7 +59,7 @@ function merge<T>(before: Entry<T>[], items: readonly T[], keyOf: (item: T) => s
   const entries = items.map((item): Entry<T> => {
     const key = keyOf(item);
     const was = prior.get(key);
-    // Entering until it goes, so its entrance isn't cut short as others come and go.
+    // Still entering as others come and go, so its entrance isn't cut short.
     return { key, item, entering: !was || was.leaving || was.entering, leaving: false };
   });
   const has = (key: string) => entries.some((entry) => entry.key === key);
@@ -62,19 +71,19 @@ function merge<T>(before: Entry<T>[], items: readonly T[], keyOf: (item: T) => s
   return entries;
 }
 
-/** A leaving element's ref, calling `gone` once its exit animation ends, or at once if it has none. */
-function playOut(gone: () => void) {
+/** An entering or leaving element's ref, calling `done` once its entrance or exit ends or is cut short, or at once if it has none. */
+function played(done: () => void) {
   return (element: HTMLElement | null) => {
     if (!element) return undefined;
-    const exits = getComputedStyle(element).animationName.split(", ");
-    if (exits.every((name) => name === "" || name === "none")) {
-      gone();
+    const names = getComputedStyle(element).animationName.split(", ");
+    if (names.every((name) => name === "" || name === "none")) {
+      done();
       return undefined;
     }
     const end = (event: Event) => {
-      // Its own exit, rather than an animation within it or the entrance its exit cut short. Gone before the next frame
-      // draws it as it was before its exit.
-      if (event.target === element && exits.includes((event as AnimationEvent).animationName)) flushSync(gone);
+      // Its own, rather than an animation within it or the entrance an exit cut short. Done before the next frame, which
+      // would draw one leaving as it was before its exit.
+      if (event.target === element && names.includes((event as AnimationEvent).animationName)) flushSync(done);
     };
     element.addEventListener("animationend", end);
     element.addEventListener("animationcancel", end);

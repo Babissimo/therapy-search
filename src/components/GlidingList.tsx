@@ -17,14 +17,15 @@ export class GlidingList extends Component<Props> {
   private readonly list = createRef<HTMLUListElement>();
   private readonly glides = new WeakMap<Element, Animation>();
 
-  // Taken before React changes the list, so it reads where each item stood as last drawn.
+  // Taken before React changes the list, so it reads where each item stood as last drawn. Hidden, as with the column holding
+  // it, its items stand nowhere, all reading as at its corner, so it glides nothing as it hides or shows again.
   override getSnapshotBeforeUpdate(prev: Props): Map<string, Spot> | null {
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return null;
+    if (!this.drawn() || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return null;
     return new Map(this.items(prev.children).map(([key, item]) => [key, this.spot(item)]));
   }
 
   override componentDidUpdate(_prev: Props, _state: unknown, before: Map<string, Spot> | null) {
-    if (!before) return;
+    if (!before || !this.drawn()) return;
     for (const [key, item] of this.items(this.props.children)) {
       const was = before.get(key);
       const { offsetLeft: x, offsetTop: y } = item;
@@ -46,6 +47,10 @@ export class GlidingList extends Component<Props> {
     return Children.toArray(children).flatMap((child, i): [string, HTMLElement][] =>
       isValidElement(child) && elements[i] ? [[String(child.key), elements[i]]] : [],
     );
+  }
+
+  private drawn() {
+    return Boolean(this.list.current?.getClientRects().length);
   }
 
   private spot(item: HTMLElement): Spot {
