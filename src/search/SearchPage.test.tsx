@@ -214,6 +214,7 @@ function renderPage(url: string | { pathname: string; state: unknown }, client =
                 <Route path="/" element={page} />
                 <Route path="/online" element={page} />
                 <Route path="/therapist/:slug" element={<Profile />} />
+                <Route path="/questions" element={<p>A few questions</p>} />
               </Routes>
             </MemoryRouter>
           </TooltipProvider>
@@ -948,17 +949,36 @@ describe("SearchPage", () => {
     expect(screen.getByTestId("url").textContent).toBe("");
   });
 
-  it("hides the questions' line, keeping its room, while anything is ticked, as the ticks wait in a draft that leaving for them would lose", () => {
+  it("brings back what was ticked and typed on Back from the questions, in place of a place they sent", () => {
     screenIs(true);
-    renderAt("/");
-    // jsdom loads no stylesheet, so the class that hides the line is what can be seen of it.
-    const hidden = () => screen.getByText("Answer a few questions instead").closest("p")!.classList.contains("invisible");
-    expect(hidden()).toBe(false);
+    answer([]);
+    renderPage({ pathname: "/", state: { place: "Leeds" } });
+    const place = () => screen.getByRole<HTMLInputElement>("textbox", { name: "Location" });
+    const keyword = () => screen.getByRole<HTMLInputElement>("searchbox", { name: "Keyword search" });
     fireEvent.click(within(results()).getByRole("button", { name: "Find a therapist who speaks your language" }));
     fireEvent.click(screen.getByRole("checkbox", { name: "French" }));
-    expect(hidden()).toBe(true);
+    fireEvent.change(keyword(), { target: { value: "grief" } });
+    fireEvent.change(place(), { target: { value: "York" } });
+    fireEvent.click(screen.getByRole("link", { name: "Answer a few questions instead" }));
+    expect(screen.getByText("A few questions")).toBeTruthy();
+    travel(-1);
+    expect(screen.getByRole("checkbox", { name: "French" }).getAttribute("aria-checked")).toBe("true");
+    expect([keyword().value, place().value]).toEqual(["grief", "York"]);
+    expect([path(), url().toString()]).toEqual(["/", ""]);
+    expect(api.search).not.toHaveBeenCalled();
+  });
+
+  it("brings back what was ticked on Back from online, which the switch took there", async () => {
+    screenIs(true);
+    renderAt("/");
+    fireEvent.click(within(results()).getByRole("button", { name: "Find a therapist who speaks your language" }));
     fireEvent.click(screen.getByRole("checkbox", { name: "French" }));
-    expect(hidden()).toBe(false);
+    fireEvent.click(screen.getByRole("link", { name: "Online" }));
+    expect([path(), url().toString()]).toEqual(["/online", "Languages=French"]);
+    await loaded();
+    travel(-1);
+    expect([path(), url().toString()]).toEqual(["/", ""]);
+    expect(screen.getByRole("checkbox", { name: "French" }).getAttribute("aria-checked")).toBe("true");
   });
 
   it("leaves what was typed in the place box alone when its entry comes back with a new state object, as a history pop gives", () => {
@@ -1189,6 +1209,22 @@ describe("SearchPage", () => {
     expect(url().toString()).toBe("Location=Leeds&Languages=French");
     expect(screen.queryByRole("region", { name: "Refine your search" })).toBeNull();
     await waitFor(() => expect(api.search).toHaveBeenCalledTimes(2));
+  });
+
+  it("keeps nothing waiting behind the filters over the map for Back, where it would wait unseen", async () => {
+    screenIs(true);
+    renderAt(SEARCH);
+    await loaded();
+    fireEvent.click(screen.getByRole("button", { name: "Filters" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Languages/ }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "French" }));
+    fireEvent.click(screen.getByRole("link", { name: "Online" }));
+    expect([path(), url().toString()]).toEqual(["/online", "Languages=French"]);
+    await loaded();
+    travel(-1);
+    expect([path(), url().toString()]).toEqual(["/", "Location=Leeds"]);
+    await loaded();
+    expect(screen.getByRole("button", { name: "Filters" })).toBeTruthy();
   });
 
   it("searches nothing as the filters over the map are put away with nothing new in them, whatever is typed in the place box", async () => {
@@ -2124,14 +2160,10 @@ describe("SearchPage online", () => {
     screenIs(true);
     renderAt(ONLINE);
     expect(prompt()).toBeTruthy();
-    // The questions' line, hidden from a tick on, which they would lose.
-    const hidden = () => screen.getByText("Answer a few questions instead").closest("p")!.classList.contains("invisible");
-    expect(hidden()).toBe(false);
     const show = () => within(filters()).getByRole("button", { name: "Show results" });
     expect(show().getAttribute("aria-disabled")).toBe("true");
     fireEvent.click(within(filters()).getByRole("button", { name: /^Type of session/ }));
     fireEvent.click(within(filters()).getByRole("checkbox", { name: "Telephone Therapy" }));
-    expect(hidden()).toBe(true);
     expect(show().getAttribute("aria-disabled")).toBe("true");
     fireEvent.click(within(filters()).getByRole("button", { name: /^More filters/ }));
     fireEvent.click(within(filters()).getByRole("checkbox", { name: "Only show profiles with photos" }));
@@ -2176,6 +2208,44 @@ describe("SearchPage online", () => {
     fireEvent.click(within(sheet).getByRole("button", { name: "Show results" }));
     expect(prompt()).toBeTruthy();
     expect(document.activeElement).toBe(results().querySelector('[data-slot="accordion-trigger"]'));
+  });
+
+  it("brings back what was ticked and typed on Back from the questions, searching nothing", () => {
+    screenIs(true);
+    renderAt(ONLINE);
+    const keyword = () => within(filters()).getByRole<HTMLInputElement>("searchbox", { name: "Keyword search" });
+    fireEvent.click(within(filters()).getByRole("button", { name: /^Type of session/ }));
+    fireEvent.click(within(filters()).getByRole("checkbox", { name: "Telephone Therapy" }));
+    fireEvent.change(keyword(), { target: { value: "grief" } });
+    fireEvent.click(screen.getByRole("link", { name: "Answer a few questions instead" }));
+    expect(screen.getByText("A few questions")).toBeTruthy();
+    travel(-1);
+    expect(within(filters()).getByRole("checkbox", { name: "Telephone Therapy" }).getAttribute("aria-checked")).toBe("true");
+    expect(keyword().value).toBe("grief");
+    expect([path(), url().toString()]).toEqual([ONLINE, ""]);
+    expect(api.search).not.toHaveBeenCalled();
+  });
+
+  it("starts afresh at an address pasted in, which takes the key of the tab's first entry, where Near me kept ticks", () => {
+    screenIs(true);
+    answer([]);
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const navigator = { createHref: () => "/", go: () => {}, push: () => {}, replace: () => {} };
+    const at = (pathname: string) => (
+      <QueryClientProvider client={client}>
+        <TooltipProvider>
+          <Router location={{ pathname, search: "", hash: "", key: "default", state: null }} navigator={navigator}>
+            <SearchPage />
+          </Router>
+        </TooltipProvider>
+      </QueryClientProvider>
+    );
+    const { rerender } = render(at("/"));
+    fireEvent.click(within(results()).getByRole("button", { name: "Find a therapist who speaks your language" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "French" }));
+    rerender(at(ONLINE));
+    expect(prompt()).toBeTruthy();
+    expect(within(filters()).getByRole("button", { name: "Show results" }).getAttribute("aria-disabled")).toBe("true");
   });
 
   it("goes back to its prompt, asking UKCP nothing, when the last filter that narrows its search is unticked and the results updated", async () => {

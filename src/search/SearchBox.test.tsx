@@ -11,7 +11,7 @@ import { useDraft, useSearchDrafts } from "./useSearchDrafts";
 type HarnessProps = { params: SearchParams; onChange: (next: SearchParams) => void; onPlaceSearch?: () => void; onFocus?: () => void };
 
 function Harness({ params, onChange, onPlaceSearch, onFocus }: HarnessProps) {
-  const drafts = useSearchDrafts(params, onChange);
+  const drafts = useSearchDrafts(params, { entry: "default", kept: false }, onChange);
   const keyword = useDraft(drafts, "keyword");
   return (
     <>

@@ -14,26 +14,14 @@ describe("Prompt", () => {
 
   it("offers the questions where asked to, and leaves no line for them otherwise", () => {
     const { unmount } = render(
-      <Prompt ask="Start with what matters to you." questions="offered">
+      <Prompt ask="Start with what matters to you." questions>
         Tick anything that matters to you.
       </Prompt>,
       { wrapper: MemoryRouter },
     );
     expect(screen.getByRole("link", { name: "Answer a few questions instead" }).getAttribute("href")).toBe("/questions");
-    expect(screen.getByText("Answer a few questions instead").closest("p")!.classList.contains("invisible")).toBe(false);
     unmount();
     render(<Prompt ask="Before we search near Leeds">A tick or two below.</Prompt>, { wrapper: MemoryRouter });
     expect(screen.queryByText("Answer a few questions instead")).toBeNull();
-  });
-
-  it("keeps the questions' line in the layout while they are paused, only invisible", () => {
-    render(
-      <Prompt ask="Start with what matters to you." questions="paused">
-        Tick anything that matters to you.
-      </Prompt>,
-      { wrapper: MemoryRouter },
-    );
-    // jsdom loads no stylesheet, so visibility: hidden is never computed and the link stays reachable by role; the class is what hides it.
-    expect(screen.getByText("Answer a few questions instead").closest("p")!.classList.contains("invisible")).toBe(true);
   });
 });

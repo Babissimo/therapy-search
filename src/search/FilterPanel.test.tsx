@@ -10,7 +10,7 @@ import { withFlag, withMulti, withText } from "./state";
 import { useSearchDrafts } from "./useSearchDrafts";
 
 function Harness({ params, onChange }: { params: SearchParams; onChange: (next: SearchParams) => void }) {
-  const drafts = useSearchDrafts(params, onChange);
+  const drafts = useSearchDrafts(params, { entry: "default", kept: false }, onChange);
   return (
     <>
       <SearchBox params={params} drafts={drafts} />
