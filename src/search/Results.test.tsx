@@ -714,6 +714,10 @@ describe("Results", () => {
 describe("Results' line at the end of a whole list", () => {
   const anxious = withHelpWithTerms(leeds, ["Anxiety"]);
   const END = /^That's everyone/;
+  const LEAD = "Few therapists help with all of these. Try focusing on the one or two that matter most.";
+  // Panel order puts the session types before the topics.
+  const withSession = withMulti(leeds, "TypesOfSession", "Online Therapy", true);
+  const twoTopics = withMulti(withMulti(withSession, "HelpWithAdvanced", "Anxiety", true), "HelpWithAdvanced", "Depression", true);
 
   it("says that's everyone near the place with these filters, with a button for each filter", async () => {
     answerBatches({ total: 3 });
@@ -864,5 +868,34 @@ describe("Results' line at the end of a whole list", () => {
     view.rerender(withHelpWithTerms(leeds, ["Depression"]));
     await screen.findByText(END);
     expect(document.activeElement).toBe(document.body);
+  });
+
+  it("leads with focusing on fewer when several topics find fewer than five, their buttons first", async () => {
+    answerBatches({ total: 4 });
+    renderResults(twoTopics);
+    await screen.findByRole("heading", { name: "4 results within 0.1 miles" });
+    const lead = screen.getByText(LEAD);
+    expect(lead.nextElementSibling?.textContent).toMatch(/^That's everyone/);
+    expect(screen.getAllByRole("button", { name: /^Search without/ }).map((button) => button.textContent)).toEqual(["Anxiety", "Depression", "Online Therapy"]);
+  });
+
+  it("leads so when they find no one, too", async () => {
+    answerBatches({ total: 0 });
+    renderResults(twoTopics);
+    await screen.findByRole("heading", { name: "No results within your area" });
+    expect(screen.getByText(LEAD).nextElementSibling?.textContent).toBe("To see more, remove a filter:");
+  });
+
+  it("says nothing of fewer topics with five found, or with one topic", async () => {
+    answerBatches({ total: 5 });
+    const view = renderResults(twoTopics);
+    await screen.findByRole("heading", { name: "5 results within 0.1 miles" });
+    expect(screen.queryByText(LEAD)).toBeNull();
+    expect(screen.getAllByRole("button", { name: /^Search without/ }).map((button) => button.textContent)).toEqual(["Online Therapy", "Anxiety", "Depression"]);
+    answerBatches({ total: 4 });
+    view.rerender(withMulti(twoTopics, "HelpWithAdvanced", "Depression", false));
+    await screen.findByRole("heading", { name: "4 results within 0.1 miles" });
+    expect(screen.getByText(END)).toBeTruthy();
+    expect(screen.queryByText(LEAD)).toBeNull();
   });
 });
