@@ -4,23 +4,26 @@ import { describe, expect, it, vi } from "vitest";
 import { emptyParams, type SearchParams } from "@shared/query";
 import type { FilterField } from "@shared/types";
 import { withFlag, withMulti, withText } from "./state";
-import { useDraftFilters, useSearchDrafts } from "./useSearchDrafts";
+import { useDraftFilters, useSearchDrafts, type DraftEntry } from "./useSearchDrafts";
 
 const FRENCH: FilterField = { name: "Languages", value: "French", label: "French" };
 const GERMAN: FilterField = { name: "Languages", value: "German", label: "German" };
 const OUTSIDE_UK: FilterField = { name: "LocationSearchOutsideUK", value: "true", label: "Search locations outside the UK" };
 
 const inBath = withText(emptyParams(), "Location", "Bath");
+const inLeeds = withText(emptyParams(), "Location", "Leeds");
 
-function draftsFor(initial: SearchParams, onChange = vi.fn()) {
+/** The drafts of a view at `at`, which `show` brings to another search, at its entry or another. */
+function draftsFor(initial: SearchParams, onChange = vi.fn(), at: DraftEntry = { entry: "default", kept: true }) {
   const hook = renderHook(
-    ({ params }) => {
-      const drafts = useSearchDrafts(params, onChange);
+    ({ params, at }) => {
+      const drafts = useSearchDrafts(params, at, onChange);
       return { drafts, filters: useDraftFilters(drafts) };
     },
-    { initialProps: { params: initial } },
+    { initialProps: { params: initial, at } },
   );
-  return { ...hook, onChange, drafts: () => hook.result.current.drafts };
+  const show = (params: SearchParams, entry = at.entry) => hook.rerender({ params, at: { ...at, entry } });
+  return { ...hook, onChange, show, drafts: () => hook.result.current.drafts };
 }
 
 describe("useSearchDrafts", () => {
@@ -83,11 +86,68 @@ describe("useSearchDrafts", () => {
   });
 
   it("takes the filters of each new search on show, dropping ticks not searched", () => {
-    const { result, rerender, drafts } = draftsFor(inBath);
+    const { result, show, drafts } = draftsFor(inBath);
     act(() => drafts().toggle(FRENCH, true));
-    rerender({ params: withMulti(withText(emptyParams(), "Location", "Leeds"), "Languages", "German", true) });
+    show(withMulti(inLeeds, "Languages", "German", true));
     expect(result.current.filters.multi.Languages).toEqual(["German"]);
     expect(drafts().pending()).toBe(false);
+  });
+
+  it("keeps the draft for its entry, bringing it all back as the view mounts there again", () => {
+    const left = draftsFor(inBath);
+    act(() => {
+      left.drafts().toggle(FRENCH, true);
+      left.drafts().set("location", "Bristol");
+      left.drafts().set("keyword", "grief");
+    });
+    left.unmount();
+    const { result, drafts } = draftsFor(inBath);
+    expect(result.current.filters.multi.Languages).toEqual(["French"]);
+    expect([drafts().get("location"), drafts().get("keyword")]).toEqual(["Bristol", "grief"]);
+    expect(drafts().pending()).toBe(true);
+  });
+
+  it("starts from the search on show where its entry kept a draft over another search, as an address pasted in can", () => {
+    const left = draftsFor(inBath);
+    act(() => left.drafts().toggle(FRENCH, true));
+    left.unmount();
+    const { result, drafts } = draftsFor(inLeeds);
+    expect(result.current.filters.multi.Languages).toEqual([]);
+    expect(drafts().get("location")).toBe("Leeds");
+  });
+
+  it("takes the draft kept for each entry the view is brought to while mounted, or else the search on show there", () => {
+    const { result, show, drafts } = draftsFor(inBath, vi.fn(), { entry: "bath", kept: true });
+    act(() => drafts().toggle(FRENCH, true));
+    show(inLeeds, "leeds");
+    expect(result.current.filters.multi.Languages).toEqual([]);
+    expect(drafts().get("location")).toBe("Leeds");
+    act(() => drafts().toggle(GERMAN, true));
+    show(inBath, "bath");
+    expect(result.current.filters.multi.Languages).toEqual(["French"]);
+    expect(drafts().get("location")).toBe("Bath");
+    show(inLeeds, "leeds");
+    expect(result.current.filters.multi.Languages).toEqual(["German"]);
+  });
+
+  it("keeps nothing for an entry where the view keeps no draft", () => {
+    const left = draftsFor(inBath, vi.fn(), { entry: "default", kept: false });
+    act(() => left.drafts().toggle(FRENCH, true));
+    left.unmount();
+    const { result } = draftsFor(inBath);
+    expect(result.current.filters.multi.Languages).toEqual([]);
+  });
+
+  it("types a place its entry was sent with in the box, unless the entry kept a draft of its own or the search on show has a place", () => {
+    const sent = { entry: "sent", kept: true, place: "Leeds" };
+    const left = draftsFor(emptyParams(), vi.fn(), sent);
+    expect(left.drafts().get("location")).toBe("Leeds");
+    expect(left.drafts().pending()).toBe(false);
+    act(() => left.drafts().set("location", "York"));
+    left.unmount();
+    const { drafts } = draftsFor(emptyParams(), vi.fn(), sent);
+    expect(drafts().get("location")).toBe("York");
+    expect(draftsFor(inBath, vi.fn(), { ...sent, entry: "placed" }).drafts().get("location")).toBe("Bath");
   });
 
   it("clears the draft's filters and keyword without searching, keeping the place and the outside-UK tick", () => {

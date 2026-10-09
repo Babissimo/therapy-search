@@ -1,9 +1,10 @@
-import { useLayoutEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { emptyParams, toQuery, type SearchParams } from "@shared/query";
 import type { FilterField } from "@shared/types";
 import { createStore } from "@/lib/store";
 import { activeFilters } from "./activeFilters";
 import { withField, withFlag, withText } from "./state";
+import { savedView, saveView } from "./viewMemory";
 
 /** The boxes typed in before a search. */
 type Box = "location" | "keyword";
@@ -35,19 +36,42 @@ export type SearchDrafts = {
 };
 
 /**
+ * The history entry a view's draft is for: whether the draft is kept there for a return, and any place the entry was sent
+ * with, typed in the box where the search on show has none and the entry kept no draft.
+ */
+export type DraftEntry = { entry: string; kept: boolean; place?: string };
+
+/**
  * What is chosen but not yet searched, shared by the search box, the filter panel and the controls that search it, so
  * every search takes it all. The search on show stays in the URL; the draft takes its filters whenever it changes, and
- * each box's draft is reset whenever the URL's value for it changes. It lives outside React state, so a keystroke or a
- * tick redraws what reads the draft rather than the page and every card on it.
+ * each box's draft is reset whenever the URL's value for it changes. Where the view keeps it for its history entry, a
+ * view that mounts there again, or is brought back there, finds it as it was left. It lives outside React state, so a
+ * keystroke or a tick redraws what reads the draft rather than the page and every card on it.
  */
-export function useSearchDrafts(params: SearchParams, onChange: (next: SearchParams) => void): SearchDrafts {
-  const [store] = useState(() => createDraftStore({ location: params.text.Location, keyword: params.text.KeywordFilter, filters: filtersOf(params) }));
-  const { Location, KeywordFilter } = params.text;
-  const shown = toQuery(params);
-  useLayoutEffect(() => store.set("location", Location), [store, Location]);
-  useLayoutEffect(() => store.set("keyword", KeywordFilter), [store, KeywordFilter]);
+export function useSearchDrafts(params: SearchParams, at: DraftEntry, onChange: (next: SearchParams) => void): SearchDrafts {
+  const { entry, kept } = at;
   // Keyed by the whole search, not the object, which the page builds afresh on each render.
-  useLayoutEffect(() => store.setFilters(filtersOf(params)), [store, shown]);
+  const shown = toQuery(params);
+  const location = params.text.Location || (at.place ?? "");
+  const keyword = params.text.KeywordFilter;
+  const [store] = useState(() => createDraftStore(keptAt(entry, shown) ?? { location, keyword, filters: filtersOf(params) }));
+  // What the draft last took from its entry and the search on show, so it takes only what changes.
+  const seen = useRef({ entry, kept, shown, location, keyword });
+  useLayoutEffect(() => {
+    const last = seen.current;
+    seen.current = { entry, kept, shown, location, keyword };
+    // A jump through history can bring the view, still mounted, to another of its entries.
+    const draft = entry === last.entry ? undefined : keptAt(entry, shown);
+    if (draft) {
+      store.replace(draft);
+      return;
+    }
+    if (location !== last.location) store.set("location", location);
+    if (keyword !== last.keyword) store.set("keyword", keyword);
+    if (shown !== last.shown) store.setFilters(filtersOf(params));
+  }, [store, entry, kept, shown, location, keyword]);
+  // For the entry the effect above has moved on to, so a jump never keeps one entry's draft for another.
+  useLayoutEffect(() => store.subscribe(() => keep(seen.current, store.state())), [store]);
   return {
     get: (box) => store.state()[box],
     subscribe: store.subscribe,
@@ -105,6 +129,18 @@ function searchOf({ location, keyword, filters }: Draft): SearchParams {
   return withText(withText(filters, "Location", location), "KeywordFilter", keyword);
 }
 
+/** The draft kept at `entry`, if it was drafted over the search on show there: an address pasted in can bring another to its key. */
+function keptAt(entry: string, shown: string): Draft | undefined {
+  const { draft } = savedView(entry);
+  if (draft?.over !== shown) return undefined;
+  const { location, keyword, filters } = draft;
+  return { location, keyword, filters };
+}
+
+function keep({ entry, kept, shown }: { entry: string; kept: boolean; shown: string }, draft: Draft) {
+  if (kept) saveView(entry, { draft: { over: shown, ...draft } });
+}
+
 function differs(draft: SearchParams, shown: SearchParams): boolean {
   return toQuery(withText(draft, "Location", "")) !== toQuery(withText(shown, "Location", ""));
 }
@@ -119,6 +155,7 @@ function createDraftStore(initial: Draft) {
     setFilters: (filters: SearchParams) => {
       if (toQuery(filters) !== toQuery(draft.get().filters)) draft.set({ ...draft.get(), filters });
     },
+    replace: draft.set,
     subscribe: draft.subscribe,
   };
 }

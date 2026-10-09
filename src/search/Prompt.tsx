@@ -16,12 +16,8 @@ type Props = {
   askRef?: Ref<HTMLDivElement>;
   /** Offers a button down to the filters, for a phone, where they follow the prompt out of sight below it. */
   toFilters?: boolean;
-  /**
-   * Offers the questions in place of the filters, on a view's start screen. It is paused, out of sight and reach, once
-   * anything is chosen in the filters: what is chosen there waits in a draft, which leaving for the questions would lose.
-   * Left out, no line is made for them.
-   */
-  questions?: "offered" | "paused";
+  /** Offers the questions in place of the filters, on a view's start screen. */
+  questions?: boolean;
   className?: string;
 };
 
@@ -31,7 +27,7 @@ type Props = {
  * languages among the filters, and, smaller, where to turn for help today and that UKCP doesn't run the site, for anyone
  * who arrives thinking it does.
  */
-export function Prompt({ ask, children, askRef, toFilters = false, questions, className }: Props) {
+export function Prompt({ ask, children, askRef, toFilters = false, questions = false, className }: Props) {
   const link = useDrawerLink();
   return (
     <div className={cn("space-y-4 text-center text-balance sm:space-y-6", className)}>
@@ -46,8 +42,7 @@ export function Prompt({ ask, children, askRef, toFilters = false, questions, cl
         </Button>
       )}
       {questions && (
-        // invisible keeps the line's height, so the filters beneath it on a phone don't jump as a tick is made.
-        <p className={cn("text-lg", questions === "paused" && "invisible")}>
+        <p className="text-lg">
           <Link className="underline" to={QUESTIONS_PATH} onPointerEnter={preloadQuestions} onFocus={preloadQuestions}>
             Answer a few questions instead
           </Link>

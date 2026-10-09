@@ -127,18 +127,14 @@ function SearchView({ params, onChange, wide }: ViewProps) {
   // one looking nearby. Ticks and the keyword wait for one.
   const searching = placed(params);
   const results = useResults(params, searching);
-  const drafts = useSearchDrafts(params, (next) => {
+  // Kept for its entry only before a search, after which the filters fold away, searching what they hold as they close. A
+  // place the questions send with "Choose filters yourself" waits in the box.
+  const drafts = useSearchDrafts(params, { entry, kept: !searching, place: placeSent(arrival) }, (next) => {
     results.retrySame(next);
     // Beginning or clearing a search sets the page out afresh, its pieces gliding to their new places.
     if (placed(next) === searching) onChange(next);
     else startMorph(() => onChange(next));
   });
-  // A place the questions send with "Choose filters yourself" waits in the box, after the drafts take the URL's. It is set once per
-  // history entry: a pop hands the same entry a new state object, which must not undo what was typed since.
-  useLayoutEffect(() => {
-    const place = placeSent(arrival);
-    if (place !== undefined) drafts.set("location", place);
-  }, [entry]);
   // The search, which the map's framings, and the selections on them, belong to.
   const fitKey = searching ? toQuery(params) : "";
   useShortlistRefresh(results.therapists);
@@ -350,7 +346,7 @@ function SearchView({ params, onChange, wide }: ViewProps) {
   // Before a search, the filters come first and the place last: beside the prompt on wide screens, beneath it on a phone.
   const start = (
     <div className="space-y-8">
-      {heldAt === undefined ? <NearPrompt wide={wide} askRef={askRef} drafts={drafts} /> : <FiltersFirst place={heldAt} wide={wide} askRef={askRef} />}
+      {heldAt === undefined ? <NearPrompt wide={wide} askRef={askRef} /> : <FiltersFirst place={heldAt} wide={wide} askRef={askRef} />}
       {!wide && (
         <div className="space-y-6">
           <FilterPanel params={params} drafts={drafts} />
@@ -668,16 +664,9 @@ function Toolbar({
 }
 
 /** In place of the results until there is a place to search, asking for what matters before where. */
-function NearPrompt({ wide, askRef, drafts }: { wide: boolean; askRef: RefObject<HTMLDivElement | null>; drafts: SearchDrafts }) {
-  const filtered = useDraftFiltered(drafts);
+function NearPrompt({ wide, askRef }: { wide: boolean; askRef: RefObject<HTMLDivElement | null> }) {
   return (
-    <Prompt
-      askRef={askRef}
-      ask="Start with what matters to you."
-      toFilters={!wide}
-      questions={filtered ? "paused" : "offered"}
-      className={wide ? "py-10 sm:py-16" : "pt-6"}
-    >
+    <Prompt askRef={askRef} ask="Start with what matters to you." toFilters={!wide} questions className={wide ? "py-10 sm:py-16" : "pt-6"}>
       Tick anything that matters to you {wide ? "in the filters to the right" : "below"}, then type a postcode, town or city
       {wide && " beneath them"} to see the UKCP therapists nearest to it.
     </Prompt>

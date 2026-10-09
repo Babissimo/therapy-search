@@ -1,8 +1,17 @@
 import { useLayoutEffect, useRef, useState } from "react";
+import type { SearchParams } from "@shared/query";
 import type { ListTab } from "./ListTabs";
 
-/** How far a visitor had got in a search: the list's open tab and its scroll, and the map's view with how many therapists it had placed then. */
-export type SavedView = { tab?: ListTab; scrollTop?: number; map?: { fitKey: string; placed: number; centre: [number, number]; zoom: number } };
+/**
+ * How far a visitor had got in a search: the list's open tab and its scroll, the map's view with how many therapists it had
+ * placed then, and, before a search, what was typed and chosen for it, with the search on show it was drafted over.
+ */
+export type SavedView = {
+  tab?: ListTab;
+  scrollTop?: number;
+  map?: { fitKey: string; placed: number; centre: [number, number]; zoom: number };
+  draft?: { over: string; location: string; keyword: string; filters: SearchParams };
+};
 
 // Keyed by history entry, so a return to an entry finds what it showed. Memory only: a reload starts afresh.
 const views = new Map<string, SavedView>();
