@@ -1252,6 +1252,18 @@ describe("SearchPage", () => {
     await waitFor(() => expect(api.search).toHaveBeenCalledTimes(2));
   });
 
+  it("searches without a filter from the list's end at once, taking ticks still waiting with it, as its chip does", async () => {
+    screenIs(true);
+    renderAt("/?Location=Leeds&Languages=Greek", [therapist("a")]);
+    await within(results()).findByRole("heading", { name: "1 result" });
+    expect(within(results()).getByText(/^That's everyone/).textContent).toBe("That's everyone near Leeds with these filters. To see more, remove a filter:");
+    fireEvent.click(screen.getByRole("button", { name: "Filters, 1 ticked" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "French" }));
+    fireEvent.click(screen.getByRole("button", { name: "Search without Greek" }));
+    expect(url().toString()).toBe("Location=Leeds&Languages=French");
+    await waitFor(() => expect(api.search).toHaveBeenCalledTimes(2));
+  });
+
   it.each([
     { screen: "wide", wide: true, close: "Close filters" },
     { screen: "narrow", wide: false, close: "Close" },
@@ -2195,6 +2207,44 @@ describe("SearchPage online", () => {
     // Right of the list, or on a phone beneath the prompt, where the filters go back to as the search ends.
     const holder = wide ? filters() : results();
     expect(document.activeElement).toBe(holder.querySelector('[data-slot="accordion-trigger"]'));
+  });
+
+  it.each([
+    { screen: "wide", wide: true },
+    { screen: "narrow", wide: false },
+  ])("hands the keyboard to the first group of filters as the list's last filter goes from its end, on $screen screens", async ({ wide }) => {
+    screenIs(wide);
+    renderAt(GREEK, [therapist("a")]);
+    const button = await within(results()).findByRole("button", { name: "Search without Greek" });
+    button.focus();
+    fireEvent.click(button);
+    expect(prompt()).toBeTruthy();
+    const holder = wide ? filters() : results();
+    expect(document.activeElement).toBe(holder.querySelector('[data-slot="accordion-trigger"]'));
+  });
+
+  it("leaves the filters beside the list where they were when a pointer press that focuses nothing ends the search, on wide screens", async () => {
+    screenIs(true);
+    renderAt(GREEK, [therapist("a")]);
+    await within(results()).findByRole("heading", { name: "1 result" });
+    fireEvent.click(within(filters()).getByRole("checkbox", { name: "Greek" }));
+    fireEvent.click(within(filters()).getByRole("button", { name: "Update results" }));
+    expect(prompt()).toBeTruthy();
+    expect(document.activeElement).toBe(document.body);
+  });
+
+  it("leaves the filters beside the list be as a pointer press ends a search that a line button's press carried on, on wide screens", async () => {
+    screenIs(true);
+    renderAt(`${GREEK}&Languages=French`, [therapist("a")]);
+    const button = await within(results()).findByRole("button", { name: "Search without Greek" });
+    button.focus();
+    fireEvent.click(button);
+    const heading = () => within(results()).getByRole("heading", { name: "1 result" });
+    await waitFor(() => expect(document.activeElement).toBe(heading()));
+    fireEvent.click(within(filters()).getByRole("checkbox", { name: "French" }));
+    fireEvent.click(within(filters()).getByRole("button", { name: "Update results" }));
+    expect(prompt()).toBeTruthy();
+    expect(document.activeElement).toBe(document.body);
   });
 
   it("hands the keyboard to the filters beneath the prompt as a phone's filters sheet ends the search", async () => {

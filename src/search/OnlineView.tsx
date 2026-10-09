@@ -3,7 +3,7 @@ import { useId, useLayoutEffect, useRef, type RefObject } from "react";
 import { useLocation } from "react-router";
 import { ONLINE_FILTER_GROUPS } from "@shared/filterGroups";
 import { narrowsOnline, onlineSearch } from "@shared/online";
-import type { SearchParams } from "@shared/query";
+import { toQuery, type SearchParams } from "@shared/query";
 import { Morph, startMorph } from "@/components/Morph";
 import { focusOnceShown, SkipLinks } from "@/layout/SkipLinks";
 import { cn } from "@/lib/utils";
@@ -56,18 +56,25 @@ export function OnlineView({ params, onChange, wide }: Props) {
   const firstFilter = () => document.getElementById(filtersId)?.querySelector<HTMLElement>('[data-slot="accordion-trigger"]');
   const tabsRef = useRef<HTMLDivElement>(null);
   const wasSearching = useRef(searching);
-  // A search begins at the list's top rather than where the filters beneath the prompt were scrolled to. On a phone the
-  // keyboard goes with what held it as a search begins or ends: Show results beneath the prompt gives way to the results,
-  // so it goes to their tab, as Near me's place box does; the filters' sheet goes, so it goes to the filters beneath the
-  // prompt.
+  // Whether the line's button held the keyboard as it asked for a search without a filter.
+  const lineHadKeyboard = useRef(false);
+  const loosen = (key: string, hadKeyboard: boolean) => {
+    lineHadKeyboard.current = hadKeyboard;
+    drafts.applyWithout(key);
+  };
+  const searchKey = toQuery(params);
+  // A search begins at the list's top. The keyboard follows what held it as a search begins or ends: on a phone to the
+  // results' tab or the filters beneath the prompt; on a wide screen to the filters only when the line's button had it.
   useLayoutEffect(() => {
     if (searching && !wasSearching.current) scroll.toTop();
-    if (!wide && wasSearching.current !== searching && document.activeElement === document.body) {
-      if (searching) tabsRef.current?.querySelector<HTMLElement>('[aria-selected="true"]')?.focus();
-      else firstFilter()?.focus();
+    if (wasSearching.current !== searching && document.activeElement === document.body) {
+      if (!searching && (!wide || lineHadKeyboard.current)) firstFilter()?.focus();
+      else if (searching && !wide) tabsRef.current?.querySelector<HTMLElement>('[aria-selected="true"]')?.focus();
     }
     wasSearching.current = searching;
-  }, [searching, wide]);
+    // Meant for the search the line asked for, not a later one, so every search runs this.
+    lineHadKeyboard.current = false;
+  }, [searching, wide, searchKey]);
 
   const toolbar = (
     <Morph name="toolbar">
@@ -101,7 +108,7 @@ export function OnlineView({ params, onChange, wide }: Props) {
       results={
         searching ? (
           <>
-            <Results params={search} asked={params} results={results} listRef={listRef} online />
+            <Results params={search} asked={params} results={results} listRef={listRef} online onLoosen={loosen} />
             {/* The list is the page here, so the button comes at its end rather than holding a strip beneath it. */}
             <LoadMore results={results} listRef={listRef} atEnd />
           </>

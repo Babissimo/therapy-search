@@ -47,6 +47,8 @@ export type SearchResults = {
   stale: boolean;
   /** True while the nearest few fall short of the first page their batch will show, which counts more and reaches further. */
   partial: boolean;
+  /** True once the whole list is in, with nothing more to load: its last page has answered, or the nearest few found no one. */
+  complete: boolean;
   /** The first batch's failure, which shows alone, with nothing else of the search, until it is asked again and answers. */
   failure: Failure;
   /** Tries the search again, as Try again does, if it failed and `next` asks UKCP the same; one that answered stays as it is. */
@@ -85,6 +87,8 @@ export function useResults(params: SearchParams, enabled = true): SearchResults 
     loading: query.isPending && !showsEarly && !failed,
     stale: query.isPlaceholderData && !showsEarly && !failed,
     partial: showsEarly && early.therapists.length < Math.min(PAGE_SIZE, early.total),
+    // The nearest few may be all there are, but their batch may yet order them otherwise.
+    complete: !failed && (showsEarly ? early.total === 0 : arrived && !query.hasNextPage),
     failure,
     retrySame: (next) => {
       if (enabled && toQuery(next) === key) failure.retry();

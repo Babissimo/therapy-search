@@ -1,4 +1,5 @@
 import { X } from "lucide-react";
+import type { ComponentProps } from "react";
 import type { SearchParams } from "@shared/query";
 import { GlidingList } from "@/components/GlidingList";
 import { Morph } from "@/components/Morph";
@@ -44,23 +45,29 @@ export function FilterChips({ params, onRemove, onEmptied, className }: Props) {
               {...props}
               className="fade-in-0 fade-out-0 zoom-in-90 zoom-out-90 motion-safe:data-entering:animate-in motion-safe:data-leaving:animate-out"
             >
-              {/* Filled, as a choice that is on. The secondary slate is the map tiles' own tint, light and dark, and sinks into them. */}
-              <Button
-                size="xs"
-                className="h-auto min-h-6 rounded-full py-1 text-left whitespace-normal pointer-coarse:min-h-8"
+              <FilterChip
+                label={filter.label}
                 aria-label={`Remove ${filter.label}`}
                 onClick={(event) => {
                   handOn(event.currentTarget);
                   onRemove(filter.key);
                 }}
-              >
-                {filter.label}
-                <X aria-hidden />
-              </Button>
+              />
             </li>
           ))}
         </GlidingList>
       )}
     </Morph>
+  );
+}
+
+/** A filter as a chip: its name and a ×, pressed to search without it. */
+export function FilterChip({ label, className, ...props }: ComponentProps<typeof Button> & { label: string }) {
+  return (
+    // Filled, as a choice that is on. The secondary slate is the map tiles' own tint, light and dark, and sinks into them.
+    <Button size="xs" className={cn("h-auto min-h-6 rounded-full py-1 text-left whitespace-normal pointer-coarse:min-h-8", className)} {...props}>
+      {label}
+      <X aria-hidden />
+    </Button>
   );
 }

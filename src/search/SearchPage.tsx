@@ -315,6 +315,7 @@ function SearchView({ params, onChange, wide }: ViewProps) {
         unplaced={unplaced}
         selected={mapsShortlist ? undefined : selected}
         onHighlight={highlight.set}
+        onLoosen={drafts.applyWithout}
       />
       {/* Where the list leads, it is the page, so the button comes at its end, as online's does. */}
       {!wide && <LoadMore results={results} listRef={listRef} placing={placing || moving} atEnd />}
