@@ -41,6 +41,19 @@ describe("activeFilters", () => {
     expect(filters[0]?.without.text.HelpWith).toBe("");
     expect(filters[0]?.without.multi.HelpWithAdvanced).toEqual([]);
   });
+
+  it("marks the help-with topics, typed or ticked, apart from the other filters", () => {
+    const anxiety = { name: "HelpWithAdvanced", value: "Anxiety", label: "Anxiety" };
+    const withIssues = { ...options, groups: [{ label: "I Want Help With", fields: [anxiety] }, ...options.groups] };
+    let params = withField(withField(withHelpWithTerms(emptyParams(), ["Trauma"]), anxiety, true), french, true);
+    params = withText(params, "KeywordFilter", "grief");
+    expect(activeFilters(params, withIssues).map((f) => [f.label, f.topic])).toEqual([
+      ["Trauma", true],
+      ["Anxiety", true],
+      ["French", false],
+      ["Keyword: grief", false],
+    ]);
+  });
 });
 
 describe("soughtTerms", () => {
