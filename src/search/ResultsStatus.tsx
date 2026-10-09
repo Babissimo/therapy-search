@@ -5,7 +5,7 @@ import type { Failure } from "@/components/FailedAlert";
 import { useTitle } from "@/lib/useTitle";
 import { therapistCount } from "@/shortlist/useShortlist";
 import { activeFilters } from "./activeFilters";
-import { reachWithin } from "./reach";
+import { resultsWhere } from "./reach";
 import type { SearchResults } from "./useResults";
 
 // How long a search runs before the list says why. A whole list is slower, and says so sooner.
@@ -59,14 +59,9 @@ function foundLines(params: SearchParams, { first, therapists, searchedPlace, lo
   if (loading || stale || partial || first === undefined) return undefined;
   const typed = params.text.Location.trim();
   const fellBack = locationFellBack(typed, first.locationSearched);
-  // UKCP names the place in full, such as "Brighton, Brighton and Hove, UK".
-  const place = searchedPlace?.split(",")[0] || typed;
-  // A search near a place counts, as the list's heading does, those loaded and how far out they reach.
-  const near = searchedPlace !== undefined && first.total > 0;
-  const within = near ? reachWithin(therapists) : undefined;
-  const count = near ? therapists.length : first.total;
-  const where = online ? " working online or by phone" : fellBack ? " across the UK" : within ? ` ${within} of ${place}` : place ? ` near ${place}` : "";
-  const title = `${count === 0 ? "No therapists" : therapistCount(count)}${where}`;
+  // A search near a place counts, as the list's heading does, those loaded.
+  const count = searchedPlace !== undefined && first.total > 0 ? therapists.length : first.total;
+  const title = `${count === 0 ? "No therapists" : therapistCount(count)}${resultsWhere(params, { first, therapists, searchedPlace }, online)}`;
   if (first.total === 0) return { title, said: activeFilters(params).length > 0 ? `${title}. Remove a filter to see more.` : `${title}.` };
   return { title, said: fellBack ? `${title}. UKCP didn't recognise "${typed}".` : `${title}.` };
 }
