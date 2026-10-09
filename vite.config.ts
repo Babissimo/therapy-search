@@ -8,4 +8,8 @@ export default defineConfig({
   plugins: [react(), tailwindcss(), cloudflare(), preloadFonts()],
   // The @ and @shared aliases, as tsconfig.json names them.
   resolve: { tsconfigPaths: true },
+  environments: {
+    // Everything the first page loads is one chunk, which the lazy chunks import from.
+    client: { build: { rolldownOptions: { output: { codeSplitting: { groups: [{ name: "initial", tags: ["$initial"] }] } } } } },
+  },
 });
