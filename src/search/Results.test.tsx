@@ -48,16 +48,16 @@ function answerBatches({ total = 30, size = 12, fail }: { total?: number; size?:
 /** The pins and whether they are still being placed, as the search page would pass them. */
 type Placing = { pins?: Pin[]; placing?: boolean };
 
-/** Online, with the search as the visitor set it where `params` adds to it, as the online view passes them. */
-type View = { online?: boolean; asked?: SearchParams };
+/** Online, with the search as the visitor set it where `params` adds to it, as the online view passes them, and what a button at the list's end asks for. */
+type View = { online?: boolean; asked?: SearchParams; onLoosen?: (key: string, hadKeyboard: boolean) => void };
 
-function Harness({ params, pins, placing, online, asked }: { params: SearchParams } & Placing & View) {
+function Harness({ params, pins, placing, online, asked, onLoosen = () => {} }: { params: SearchParams } & Placing & View) {
   const results = useResults(params);
   const listRef = useRef<HTMLUListElement>(null);
   return (
     <>
       <ResultsStatus params={params} results={results} />
-      <Results params={params} results={results} listRef={listRef} pins={pins} online={online} asked={asked} />
+      <Results params={params} results={results} listRef={listRef} pins={pins} online={online} asked={asked} onLoosen={onLoosen} />
       <LoadMore results={results} listRef={listRef} placing={placing} />
     </>
   );
@@ -463,7 +463,8 @@ describe("Results", () => {
     const view = renderResults(params);
     await screen.findByRole("link", { name: "Therapist a" });
     view.rerender(params, { pins: [{ key: "LS1", point: { lat: 53.8, lng: -1.55 }, therapists: therapists.slice(1), kind: "outcode" }] });
-    expect(screen.getAllByText("Anxiety")).toHaveLength(3);
+    // Not the button at the list's end, which names the same filter.
+    expect(within(document.querySelector<HTMLElement>("section > ul")!).getAllByText("Anxiety")).toHaveLength(3);
     expect(within(screen.getByRole("group")).getAllByText("Anxiety")).toHaveLength(2);
     expect(screen.queryByText("Trauma")).toBeNull();
   });
@@ -707,5 +708,161 @@ describe("Results", () => {
     view.rerender(leeds, { pins: [{ key: "LS1", point: { lat: 53.8, lng: -1.55 }, therapists, kind: "outcode" }] });
     fireEvent.click(within(screen.getByRole("group")).getByRole("button", { name: "Add Therapist b to your shortlist" }));
     expect(shortlist.get()[0]?.search).toBe(toQuery(leeds));
+  });
+});
+
+describe("Results' line at the end of a whole list", () => {
+  const anxious = withHelpWithTerms(leeds, ["Anxiety"]);
+  const END = /^That's everyone/;
+
+  it("says that's everyone near the place with these filters, with a button for each filter", async () => {
+    answerBatches({ total: 3 });
+    renderResults(withText(anxious, "KeywordFilter", "grief"));
+    await screen.findByRole("heading", { name: "3 results within 0.1 miles" });
+    expect(screen.getByText(END).textContent).toBe("That's everyone within 0.1 miles of Leeds with these filters. To see more, remove a filter:");
+    const buttons = screen.getAllByRole("button", { name: /^Search without/ });
+    expect(buttons.map((button) => button.getAttribute("aria-label"))).toEqual(["Search without Anxiety", "Search without Keyword: grief"]);
+    expect(buttons.map((button) => button.textContent)).toEqual(["Anxiety", "Keyword: grief"]);
+  });
+
+  it("waits for the last page before saying so", async () => {
+    answerBatches();
+    renderResults(anxious);
+    await screen.findByRole("heading", { name: "12 results within 0.1 miles" });
+    expect(screen.queryByText(END)).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Load more" }));
+    await screen.findByRole("heading", { name: /^24 results/ });
+    expect(screen.queryByText(END)).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Load more" }));
+    await screen.findByRole("heading", { name: /^30 results/ });
+    expect(screen.getByText(END)).toBeTruthy();
+  });
+
+  it("waits for the first batch, though the nearest few are all there are", async () => {
+    const batches = answerBatches({ total: 3 });
+    const answer = batches.getMockImplementation()!;
+    let land = () => {};
+    batches.mockImplementation((query) => new Promise((resolve) => (land = () => resolve(answer(query)))));
+    vi.spyOn(api, "searchEarly").mockImplementation(answer);
+    renderResults(anxious);
+    await screen.findByRole("heading", { name: "3 results within 0.1 miles" });
+    expect(screen.queryByText(END)).toBeNull();
+    act(() => land());
+    expect(await screen.findByText(END)).toBeTruthy();
+  });
+
+  it("keeps the line from the old list while the next search's first batch is on its way, and says it once that lands", async () => {
+    const batches = answerBatches({ total: 3 });
+    const answer = batches.getMockImplementation()!;
+    vi.spyOn(api, "searchEarly").mockImplementation(() => new Promise(() => {}));
+    const view = renderResults(anxious);
+    expect(await screen.findByText(END)).toBeTruthy();
+    let land = () => {};
+    batches.mockImplementation((query) => new Promise((resolve) => (land = () => resolve(answer(query)))));
+    view.rerender(withHelpWithTerms(leeds, ["Depression"]));
+    await waitFor(() => expect(screen.getByRole("heading", { name: "3 results within 0.1 miles" }).closest('[aria-busy="true"]')).not.toBeNull());
+    expect(screen.queryByText(END)).toBeNull();
+    act(() => land());
+    expect(await screen.findByText(END)).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "3 results within 0.1 miles" }).closest('[aria-busy="true"]')).toBeNull();
+    expect(screen.getByRole("button", { name: "Search without Depression" })).toBeTruthy();
+  });
+
+  it("keeps the line away while a page that failed to load is still to come", async () => {
+    answerBatches({ fail: 2 });
+    renderResults(anxious);
+    fireEvent.click(await screen.findByRole("button", { name: "Load more" }));
+    await screen.findByRole("button", { name: "Try again" });
+    expect(screen.queryByText(END)).toBeNull();
+  });
+
+  it("offers the buttons before the first batch when the nearest few found no one", async () => {
+    vi.spyOn(api, "search").mockImplementation(() => new Promise(() => {}));
+    vi.spyOn(api, "searchEarly").mockResolvedValue(listed({ total: 0, from: 0, to: 0, notices: [], therapists: [], locationSearched: "Leeds" }));
+    renderResults(anxious);
+    expect(await screen.findByText("To see more, remove a filter:")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Search without Anxiety" })).toBeTruthy();
+  });
+
+  it("says nothing at the end of a list with no filters", async () => {
+    answerBatches({ total: 3 });
+    renderResults(leeds);
+    await screen.findByRole("heading", { name: "3 results within 0.1 miles" });
+    expect(screen.queryByText(END)).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Search without/ })).toBeNull();
+  });
+
+  it("offers the same buttons under the heading when a filtered search found no one", async () => {
+    answerBatches({ total: 0 });
+    renderResults(anxious);
+    await screen.findByRole("heading", { name: "No results within your area" });
+    expect(screen.queryByText(END)).toBeNull();
+    const line = screen.getByText("To see more, remove a filter:");
+    expect(screen.getByRole("button", { name: "Search without Anxiety" })).toBeTruthy();
+    // The empty list is out of layout, so the line sits one gap below the heading.
+    expect(line.closest("section")!.querySelector("ul")!.hidden).toBe(true);
+  });
+
+  it("names an online list's end as online, with buttons for the filters the visitor set, not those the view adds", async () => {
+    answerBatches({ total: 3 });
+    const asked = withHelpWithTerms(emptyParams(), ["Anxiety"]);
+    renderResults(onlineSearch(asked), undefined, { online: true, asked });
+    await screen.findByRole("heading", { name: "3 results" });
+    expect(screen.getByText(END).textContent).toBe("That's everyone working online or by phone with these filters. To see more, remove a filter:");
+    expect(screen.getAllByRole("button", { name: /^Search without/ }).map((button) => button.textContent)).toEqual(["Anxiety"]);
+  });
+
+  it("asks the page for the search without a button's filter, by its chip's key, and says whether the button had the keyboard", async () => {
+    answerBatches({ total: 3 });
+    const onLoosen = vi.fn();
+    renderResults(anxious, undefined, { onLoosen });
+    const button = await screen.findByRole("button", { name: "Search without Anxiety" });
+    fireEvent.click(button);
+    expect(onLoosen).toHaveBeenLastCalledWith("HelpWith=Anxiety", false);
+    act(() => button.focus());
+    fireEvent.click(button);
+    expect(onLoosen).toHaveBeenLastCalledWith("HelpWith=Anxiety", true);
+  });
+
+  it("is left off paper, which names the filters under the heading", async () => {
+    answerBatches({ total: 3 });
+    renderResults(anxious);
+    const line = (await screen.findByText(END)).parentElement!;
+    expect(line.classList.contains("print:hidden")).toBe(true);
+  });
+
+  it("hands the keyboard from a button to the heading of the list it brings", async () => {
+    answerBatches({ total: 3 });
+    const view = renderResults(anxious);
+    const button = await screen.findByRole("button", { name: "Search without Anxiety" });
+    act(() => button.focus());
+    fireEvent.click(button);
+    view.rerender(leeds);
+    const heading = screen.getByRole("heading", { name: "3 results within 0.1 miles" });
+    await waitFor(() => expect(document.activeElement).toBe(heading));
+  });
+
+  it("leaves the keyboard alone when the button didn't have it", async () => {
+    answerBatches({ total: 3 });
+    const view = renderResults(anxious);
+    fireEvent.click(await screen.findByRole("button", { name: "Search without Anxiety" }));
+    view.rerender(leeds);
+    await waitFor(() => expect(screen.getByRole("heading", { name: "3 results within 0.1 miles" }).closest('[aria-busy="true"]')).toBeNull());
+    expect(document.activeElement).toBe(document.body);
+  });
+
+  it("gives up the keyboard when the search the button asked for fails, so a later search leaves it be", async () => {
+    answerBatches({ total: 3 });
+    const view = renderResults(anxious);
+    const button = await screen.findByRole("button", { name: "Search without Anxiety" });
+    act(() => button.focus());
+    fireEvent.click(button);
+    answerBatches({ fail: 1 });
+    view.rerender(leeds);
+    await screen.findByRole("button", { name: "Try again" });
+    answerBatches({ total: 3 });
+    view.rerender(withHelpWithTerms(leeds, ["Depression"]));
+    await screen.findByText(END);
+    expect(document.activeElement).toBe(document.body);
   });
 });

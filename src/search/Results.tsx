@@ -1,5 +1,5 @@
 import { MapPin } from "lucide-react";
-import { useId, type ComponentProps, type ReactNode, type Ref } from "react";
+import { useEffect, useId, useRef, type ComponentProps, type ReactNode, type Ref } from "react";
 import { toQuery, type SearchParams } from "@shared/query";
 import type { TherapistCard as Therapist } from "@shared/types";
 import { SkeletonText } from "@/components/SkeletonText";
@@ -10,8 +10,9 @@ import { useShortlistStatus } from "@/shortlist/useShortlist";
 import { activeFilters, soughtTerms } from "./activeFilters";
 import { feeKinds, feeLine, type Fee } from "./fee";
 import { LocationNotice } from "./LocationNotice";
+import { LoosenLine } from "./LoosenLine";
 import { listEntries, pinLabel, type Pin } from "./map/pins";
-import { resultsHeading } from "./reach";
+import { resultsHeading, resultsWhere } from "./reach";
 import { ResultsError } from "./ResultsError";
 import { useSlowLine } from "./ResultsStatus";
 import { TherapistCard, TherapistCardSkeleton } from "./TherapistCard";
@@ -33,6 +34,8 @@ type Props = {
   online?: boolean;
   /** The search as the visitor set it, where `params` adds to it, whose filters paper names. */
   asked?: SearchParams;
+  /** Searches without the filter of this key, as its chip's × does, and whether the line's button held the keyboard. */
+  onLoosen: (key: string, hadKeyboard: boolean) => void;
 };
 
 // UKCP's notices about its own pages, which don't hold for this list: that it lists a location search at random, when
@@ -40,9 +43,20 @@ type Props = {
 const UKCP_PAGING = /^(Location searches are grouped by distance|This search returns more than \d+ results)/;
 
 /** A search's list. Its ResultsStatus goes outside it, as the list is marked busy and dimmed while it loads. */
-export function Results({ params, results, listRef, pins = [], unplaced = [], selected, onHighlight, online = false, asked = params }: Props) {
+export function Results({ params, results, listRef, pins = [], unplaced = [], selected, onHighlight, online = false, asked = params, onLoosen }: Props) {
   const { first, therapists, searchedPlace, loading, stale, failure } = results;
   const { officeOf } = useOffices(therapists, !params.flags.LocationSearchOutsideUK);
+  // Whether the keyboard was on the line's button that asked for this search.
+  const loosened = useRef(false);
+  const asking = toQuery(params);
+  // The button goes with its filter, so the keyboard carries on from the heading of the list it brings.
+  useEffect(() => {
+    // A failed search's own Try again and landing take the keyboard on from here.
+    if (failure.error) loosened.current = false;
+    if (!loosened.current || loading || stale) return;
+    loosened.current = false;
+    if (document.activeElement === document.body) failure.landing.current?.focus();
+  }, [loading, stale, failure.error, asking]);
   // Kept from screen readers, which the status region tells.
   const slow = useSlowLine(params, results);
   const slowNote = slow && (
@@ -120,7 +134,8 @@ export function Results({ params, results, listRef, pins = [], unplaced = [], se
             </Alert>
           ))}
         </div>
-        <ul ref={listRef} className="space-y-4">
+        {/* Out of layout when empty, as its space-y margin would double the gap above the line. */}
+        <ul ref={listRef} hidden={therapists.length === 0} className="space-y-4">
           {listEntries(therapists, pins).map((entry) => {
             const { key, pin, therapist: t } = entry;
             const marked = pin !== undefined && pin.key === selected?.key;
@@ -141,6 +156,17 @@ export function Results({ params, results, listRef, pins = [], unplaced = [], se
             );
           })}
         </ul>
+        {results.complete && (
+          <LoosenLine
+            filters={filters}
+            where={resultsWhere(params, results, online)}
+            found={therapists.length}
+            onLoosen={(key, button) => {
+              loosened.current = document.activeElement === button;
+              onLoosen(key, loosened.current);
+            }}
+          />
+        )}
       </section>
     </>
   );
