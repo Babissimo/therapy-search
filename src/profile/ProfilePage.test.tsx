@@ -434,6 +434,17 @@ describe("ProfilePage's status track", () => {
     expect(step(await track())).toBe("Consultation");
     expect(screen.queryByText("Removed Test Therapist from your shortlist.")).toBeNull();
   });
+
+  it("says who Not for me took off the shortlist and gives focus to the bookmark", async () => {
+    const store = createShortlistStore(null);
+    store.add(THERAPIST, { status: "maybe" });
+    renderAt(["/therapist/Test-ABCDEFGH"], PROFILE, { store });
+    await track();
+    fireEvent.click(screen.getByRole("button", { name: "Not for me, Test Therapist" }));
+    expect([store.has("Test-ABCDEFGH"), store.passed("Test-ABCDEFGH")]).toEqual([false, true]);
+    screen.getByText("Test Therapist: Not for me, and removed from your shortlist.", { selector: "[aria-live=polite]" });
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Add Test Therapist to your shortlist" }));
+  });
 });
 
 describe("ProfilePage's notes", () => {

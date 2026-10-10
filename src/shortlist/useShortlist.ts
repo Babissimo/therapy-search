@@ -87,6 +87,12 @@ export function useShortlisted(slug: string): boolean {
   return useSyncExternalStore(store.subscribe, () => store.has(slug));
 }
 
+/** Whether the visitor said a therapist wasn't for them; a change to the list leaves it, and its readers, alone. */
+export function usePassed(slug: string): boolean {
+  const store = useShortlistStore();
+  return useSyncExternalStore(store.subscribe, () => store.passed(slug));
+}
+
 /** Where the visitor stands with a therapist, or nothing while they aren't shortlisted; a reorder leaves it, and its readers, alone. */
 export function useShortlistStatus(slug: string): Status | undefined {
   const store = useShortlistStore();

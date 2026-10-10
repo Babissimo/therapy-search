@@ -3,7 +3,7 @@ import { useLayoutEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { LazyEmailDrafter, usePreloadDrafter } from "@/drafter/LazyEmailDrafter";
 import { cn } from "@/lib/utils";
-import { STATUS_LABEL } from "./status";
+import { PASSED_LABEL, STATUS_LABEL } from "./status";
 import { StatusMenu } from "./StatusMenu";
 import type { ShortlistCard, Status } from "./store";
 import { useShortlistStore } from "./useShortlist";
@@ -40,10 +40,12 @@ type Props = {
   onChosen?: (status: Status) => void;
   /** After the menu takes the therapist off the shortlist. */
   onRemoved?: () => void;
+  /** After "Not for me" passes the therapist, which takes them off the shortlist. */
+  onPassed?: () => void;
 };
 
 /** Where the visitor stands with a therapist along the usual path, with the next step and the menu to change it. */
-export function StatusTrack({ therapist, status, listed = true, onChosen, onRemoved }: Props) {
+export function StatusTrack({ therapist, status, listed = true, onChosen, onRemoved, onPassed }: Props) {
   const store = useShortlistStore();
   const root = useRef<HTMLDivElement>(null);
   // What takes focus once the track redraws, where what had it has gone or a click never gave it.
@@ -136,12 +138,27 @@ export function StatusTrack({ therapist, status, listed = true, onChosen, onRemo
               </Button>
             )}
             {status === "maybe" && (
-              <Button variant="outline" size="sm" onClick={yes}>
-                <span className={cn(fadeIn)}>Yes, add to my list</span>
-                <span className="sr-only">
-                  , <span translate="no">{therapist.name}</span>
-                </span>
-              </Button>
+              <>
+                <Button variant="outline" size="sm" onClick={yes}>
+                  <span className={cn(fadeIn)}>Yes, add to my list</span>
+                  <span className="sr-only">
+                    , <span translate="no">{therapist.name}</span>
+                  </span>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    store.pass(therapist.slug);
+                    onPassed?.();
+                  }}
+                >
+                  <span className={cn(fadeIn)}>{PASSED_LABEL}</span>
+                  <span className="sr-only">
+                    , <span translate="no">{therapist.name}</span>
+                  </span>
+                </Button>
+              </>
             )}
             {next && (
               <Button variant="outline" size="sm" data-next-step onClick={() => step(next.status)}>

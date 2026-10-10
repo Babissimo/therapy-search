@@ -40,7 +40,7 @@ import { CopyShortlist } from "./CopyShortlist";
 import { CountBadge } from "./CountBadge";
 import { useSetAsideOpen } from "./setAside";
 import { ShortlistButton } from "./ShortlistButton";
-import { STATUS_ICON, STATUS_LABEL } from "./status";
+import { PASSED_LABEL, STATUS_ICON, STATUS_LABEL } from "./status";
 import { StatusTrack } from "./StatusTrack";
 import { byRank, REMOVED_DAYS, statusOf, type Between, type Shortlist, type ShortlistCard, type ShortlistEntry, type Status } from "./store";
 import { therapistCount, useShortlist, useShortlistAnnouncement, useShortlistClears, useShortlistRemoved, useShortlistStore } from "./useShortlist";
@@ -143,8 +143,8 @@ export function ShortlistTab({ sought, feeKinds = [], online = false, pins = [],
   }
 
   // Their menu went with them, so focus goes to the bookmark that can put them back.
-  function removed(therapist: ShortlistCard) {
-    announce(`Removed ${therapist.name} from your shortlist.`);
+  function removed(therapist: ShortlistCard, said = `Removed ${therapist.name} from your shortlist.`) {
+    announce(said);
     refocus.current = `[data-bookmark="${window.CSS.escape(therapist.slug)}"]`;
   }
 
@@ -180,6 +180,7 @@ export function ShortlistTab({ sought, feeKinds = [], online = false, pins = [],
             onDown={i < entries.length - 1 ? () => moved(entries, i, i + 1) : undefined}
             onChosen={(to) => changed(card, status, to)}
             onRemoved={() => removed(card)}
+            onPassed={() => removed(card, `${card.name}: ${PASSED_LABEL}, and removed from your shortlist.`)}
           />
         );
       })}
@@ -235,10 +236,10 @@ function ClearShortlist({ listed, removed, onClear }: ClearProps) {
           <AlertDialogTitle className="text-lg">Clear your shortlist?</AlertDialogTitle>
           <AlertDialogDescription className="text-base">
             {listed > 0
-              ? `This removes ${therapistCount(listed)} from this browser, with your notes, drafts and where you stand with them${
+              ? `This removes ${therapistCount(listed)} from this browser, with your notes, drafts, where you stand with them and those you said weren't for you${
                   removed > 0 ? `, and forgets the ${therapistCount(removed)} you removed` : ""
                 }. It can't be undone.`
-              : `This forgets the ${therapistCount(removed)} you removed, with your notes, drafts and where you stood with them, so they can't be put back as they were.`}
+              : `This forgets the ${therapistCount(removed)} you removed, with your notes, drafts, where you stood with them and those you said weren't for you, so they can't be put back as they were.`}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
@@ -384,13 +385,16 @@ type EntryProps = {
   onChosen: (status: Status) => void;
   /** After the track's menu takes the therapist off the shortlist. */
   onRemoved: () => void;
+  /** After the track's Not for me takes the therapist off the shortlist. */
+  onPassed: () => void;
 };
 
 /**
  * A card with a handle to drag it by and buttons to move it a place at a time; a therapist removed here can't be moved
  * until they are added back.
  */
-function SortableEntry({ entry, heading, listed, sought, online, fee, pinKey, marked, onHighlight, onUp, onDown, onChosen, onRemoved }: EntryProps) {
+function SortableEntry({ entry, heading, listed, sought, online, fee, pinKey, marked, onHighlight, onUp, onDown, onChosen,
+  onRemoved, onPassed }: EntryProps) {
   const { card } = entry;
   const status = statusOf(entry);
   // The cards a drag passes glide aside, and the one let go glides into place, unless the visitor asks for less motion.
@@ -474,7 +478,7 @@ function SortableEntry({ entry, heading, listed, sought, online, fee, pinKey, ma
           faded={!listed}
           brief
           action={<ShortlistButton therapist={card} />}
-          track={<StatusTrack therapist={card} status={status} listed={listed} onChosen={onChosen} onRemoved={onRemoved} />}
+          track={<StatusTrack therapist={card} status={status} listed={listed} onChosen={onChosen} onRemoved={onRemoved} onPassed={onPassed} />}
           note={entry.note}
           onHighlight={(on) => {
             highlighting.current = on ? onHighlight : undefined;

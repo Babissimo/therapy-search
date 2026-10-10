@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState } from "react";
-import { STATUS_LABEL } from "@/shortlist/status";
+import { PASSED_LABEL, STATUS_LABEL } from "@/shortlist/status";
 import type { ShortlistCard, Status } from "@/shortlist/store";
 import { useShortlistAnnouncement, useShortlistStatus, useShortlistStore } from "@/shortlist/useShortlist";
 
@@ -19,7 +19,7 @@ export function useStanding(slug: string, search?: string) {
   const root = useRef<HTMLElement>(null);
   // The phone or email link followed, which takes focus back once the offer is answered.
   const followed = useRef<HTMLElement | null>(null);
-  // Set when the track's menu takes the therapist off, for the bookmark that can put them back to take focus once the track has gone.
+  // Set when the track takes the therapist off, for the bookmark that can put them back to take focus once the track has gone.
   const toBookmark = useRef(false);
   useLayoutEffect(() => {
     if (!toBookmark.current) return;
@@ -42,6 +42,11 @@ export function useStanding(slug: string, search?: string) {
     /** After the track's menu takes the therapist off the shortlist. */
     removed: (therapist: ShortlistCard) => {
       announce(`Removed ${therapist.name} from your shortlist.`);
+      toBookmark.current = true;
+    },
+    /** After the track's Not for me passes the therapist, taking them off the shortlist. */
+    passed: (therapist: ShortlistCard) => {
+      announce(`${therapist.name}: ${PASSED_LABEL}, and removed from your shortlist.`);
       toBookmark.current = true;
     },
     /**

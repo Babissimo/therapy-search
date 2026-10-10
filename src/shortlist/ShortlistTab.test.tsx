@@ -211,7 +211,7 @@ describe("ShortlistTab", () => {
     screen.getByText(/^Bookmark anyone who might suit you/);
     screen.getByText("2 therapists you removed are kept for 30 days, in case you add them back.");
     fireEvent.click(screen.getByRole("button", { name: "Clear shortlist" }));
-    screen.getByText("This forgets the 2 therapists you removed, with your notes, drafts and where you stood with them, so they can't be put back as they were.");
+    screen.getByText("This forgets the 2 therapists you removed, with your notes, drafts, where you stood with them and those you said weren't for you, so they can't be put back as they were.");
     fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Clear shortlist" }));
     expect(store.removedCount()).toBe(0);
     expect(screen.queryByText(/you removed/)).toBeNull();
@@ -349,6 +349,20 @@ describe("ShortlistTab", () => {
     expect(store.get().map((e) => e.card.name)).toEqual(["Ann", "Bo"]);
   });
 
+  it("passes a maybe on Not for me, keeping their card in place as removed, saying so and giving focus to their bookmark", () => {
+    const store = renderTab({ statuses: { "Ann-AAAAAAAA": "maybe" } }, card("Ann-AAAAAAAA", "Ann"), card("Bo-BBBBBBBB", "Bo"));
+    fireEvent.click(button("Not for me, Ann"));
+    expect([store.has("Ann-AAAAAAAA"), store.passed("Ann-AAAAAAAA")]).toEqual([false, true]);
+    expect(names()).toEqual(["Bo", "Ann"]);
+    expect(faded("Ann")).toBe(true);
+    within(entry("Ann")!).getByText("Removed from your shortlist");
+    screen.getByText("Ann: Not for me, and removed from your shortlist.");
+    expect(document.activeElement).toBe(button("Add Ann to your shortlist"));
+    fireEvent.click(button("Add Ann to your shortlist"));
+    expect(store.passed("Ann-AAAAAAAA")).toBe(false);
+    within(entry("Ann")!).getByText("Maybe", { selector: "p" });
+  });
+
   it("follows a therapist the menu makes a maybe into their section, focus with them", () => {
     renderTab({}, card("Ann-AAAAAAAA", "Ann"), card("Bo-BBBBBBBB", "Bo"));
     openMenu("Bo");
@@ -419,7 +433,7 @@ describe("ShortlistTab", () => {
     fireEvent.click(screen.getByRole("button", { name: "Remove Ann from your shortlist" }));
     expect(names()).toEqual(["Ann"]);
     fireEvent.click(screen.getByRole("button", { name: "Clear shortlist" }));
-    screen.getByText("This forgets the 1 therapist you removed, with your notes, drafts and where you stood with them, so they can't be put back as they were.");
+    screen.getByText("This forgets the 1 therapist you removed, with your notes, drafts, where you stood with them and those you said weren't for you, so they can't be put back as they were.");
     fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Clear shortlist" }));
     expect(screen.queryAllByRole("heading")).toEqual([]);
     expect(screen.queryByRole("button", { name: "Clear shortlist" })).toBeNull();
@@ -446,7 +460,7 @@ describe("ShortlistTab", () => {
     fireEvent.click(screen.getByRole("button", { name: "Clear shortlist" }));
     const dialog = screen.getByRole("alertdialog", { name: "Clear your shortlist?" });
     const description = screen.getByText(
-      "This removes 2 therapists from this browser, with your notes, drafts and where you stand with them, and forgets the 1 therapist you removed. It can't be undone.",
+      "This removes 2 therapists from this browser, with your notes, drafts, where you stand with them and those you said weren't for you, and forgets the 1 therapist you removed. It can't be undone.",
     );
     expect(dialog.getAttribute("aria-describedby")).toBe(description.id);
     // The safer choice has focus as the dialog opens.
@@ -521,7 +535,7 @@ describe("ShortlistTab", () => {
     expect(names()).toEqual(["Ann"]);
     fireEvent.click(screen.getByRole("button", { name: "Clear shortlist" }));
     screen.getByText(
-      "This removes 1 therapist from this browser, with your notes, drafts and where you stand with them, and forgets the 1 therapist you removed. It can't be undone.",
+      "This removes 1 therapist from this browser, with your notes, drafts, where you stand with them and those you said weren't for you, and forgets the 1 therapist you removed. It can't be undone.",
     );
   });
 
@@ -543,7 +557,7 @@ describe("ShortlistTab", () => {
     const before = store.get();
     const button = screen.getByRole("button", { name: "Clear shortlist" });
     fireEvent.click(button);
-    screen.getByText("This removes 1 therapist from this browser, with your notes, drafts and where you stand with them. It can't be undone.");
+    screen.getByText("This removes 1 therapist from this browser, with your notes, drafts, where you stand with them and those you said weren't for you. It can't be undone.");
     fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Cancel" }));
     expect(screen.queryByRole("alertdialog")).toBeNull();
     expect(store.get()).toBe(before);

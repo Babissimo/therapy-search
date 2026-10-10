@@ -349,6 +349,7 @@ function StandingSection({ slug, therapist, standing }: StandingProps) {
                 listed={standing.status !== undefined}
                 onChosen={(to) => standing.chosen(therapist, to)}
                 onRemoved={() => standing.removed(therapist)}
+                onPassed={() => standing.passed(therapist)}
               />
             </div>
             <NoteField slug={slug} />

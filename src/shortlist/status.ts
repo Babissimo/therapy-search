@@ -1,4 +1,4 @@
-import { Archive, CalendarCheck, Circle, CircleCheck, CircleDashed, Hourglass, Send, type LucideIcon } from "lucide-react";
+import { Archive, CalendarCheck, Circle, CircleCheck, CircleDashed, CircleMinus, Hourglass, Send, type LucideIcon } from "lucide-react";
 import type { Status } from "./store";
 
 export const STATUS_LABEL: Record<Status, string> = {
@@ -21,3 +21,7 @@ export const STATUS_ICON: Record<Status, LucideIcon> = {
   seeing: CircleCheck,
   setAside: Archive,
 };
+
+/** What a therapist the visitor passed over is called where a status would go. */
+export const PASSED_LABEL = "Not for me";
+export const PASSED_ICON: LucideIcon = CircleMinus;

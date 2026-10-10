@@ -22,16 +22,17 @@ describe("AboutText", () => {
     expect(screen.getByRole("heading", { name: "Who sees what" })).toBeTruthy();
   });
 
-  it("says the browser keeps those removed from the shortlist until it is cleared or the site is opened 30 days on", () => {
-    render(<AboutText />, { wrapper: MemoryRouter });
-    screen.getByText(/Anyone you remove from your shortlist is kept in case you add them back, until you clear it or open this site 30 days or more/);
-    screen.getByText(/or open this site 30 days or more after removing them\.$/);
-  });
-
-  it("says the browser keeps the search each therapist was found by, with where the visitor stands, their notes and their drafts", () => {
+  it("says the browser keeps those removed from the shortlist, and remembers those not for the visitor, until it is cleared or the site is opened 30 days on", () => {
     render(<AboutText />, { wrapper: MemoryRouter });
     screen.getByText(
-      /with where you stand with each therapist, the search you found them by, your notes and email drafts, and the name and free times you give for drafts\)/,
+      /Anyone you remove from your shortlist is kept in case you add them back, and anyone you say isn't for you is remembered, until you clear it or open this site 30 days or more later\.$/,
+    );
+  });
+
+  it("says the browser keeps the search each therapist was found by, with where the visitor stands, their notes, their drafts and those not for them", () => {
+    render(<AboutText />, { wrapper: MemoryRouter });
+    screen.getByText(
+      /with where you stand with each therapist, the search you found them by, your notes and email drafts, those you said weren't for you, and the name and free times you give for drafts\)/,
     );
   });
 

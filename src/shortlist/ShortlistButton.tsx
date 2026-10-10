@@ -37,7 +37,7 @@ export function ShortlistButton({ therapist, search, className }: Props) {
         variant="ghost"
         size="icon-sm"
         className={className}
-        // Marked by slug, for a list to give it focus once a menu has taken the therapist off.
+        // Marked by slug, for the list or profile around it to give it focus once what had focus has gone.
         data-bookmark={therapist.slug}
         onClick={toggle}
       >
