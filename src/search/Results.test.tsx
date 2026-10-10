@@ -527,6 +527,24 @@ describe("Results", () => {
     expect(faded("a")).toBe(false);
   });
 
+  it("says on the card of anyone passed over that they were not for the visitor, until a bookmark shortlists them", async () => {
+    const named = (slug: string) => ({ slug, name: `Therapist ${slug}`, initials: "T", tags: [] });
+    const therapists = ["a", "b"].map(named);
+    vi.spyOn(api, "search").mockResolvedValue(listed({ total: 2, from: 1, to: 2, notices: [], therapists }));
+    const shortlist = createShortlistStore(null);
+    shortlist.pass("a");
+    renderResults(leeds, shortlist);
+    await screen.findByRole("link", { name: "Therapist a" });
+    const card = (slug: string) => screen.getByRole("link", { name: `Therapist ${slug}` }).closest<HTMLElement>("[data-slot=card]")!;
+    const faded = (slug: string) => /\bopacity-60\b/.test(within(card(slug)).getByText("T").closest("[data-slot=avatar]")?.parentElement?.className ?? "");
+    expect(within(card("a")).getByText("Not for me").closest("p")?.textContent).toBe("Status: Not for me");
+    expect([faded("a"), faded("b")]).toEqual([true, false]);
+    expect(within(card("b")).queryByText(/Status/)).toBeNull();
+    fireEvent.click(within(card("a")).getByRole("button", { name: "Add Therapist a to your shortlist" }));
+    expect(within(card("a")).queryByText(/Status/)).toBeNull();
+    expect(faded("a")).toBe(false);
+  });
+
   it("asks nothing of profiles in a search outside the UK", async () => {
     vi.spyOn(api, "search").mockResolvedValue(
       listed({ total: 1, from: 1, to: 1, notices: [], therapists: [{ slug: "a", name: "Therapist a", initials: "T", tags: [], location: "Paris 75001" }] }),

@@ -1,4 +1,4 @@
-import { Banknote, MapPin, NotebookPen } from "lucide-react";
+import { Banknote, MapPin, NotebookPen, type LucideIcon } from "lucide-react";
 import type { ComponentProps, ReactNode } from "react";
 import { Link } from "react-router";
 import { classifyLocation } from "@shared/location";
@@ -12,7 +12,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { useProfileLink } from "@/profile/profileLink";
-import { STATUS_ICON, STATUS_LABEL } from "@/shortlist/status";
+import { PASSED_ICON, PASSED_LABEL, STATUS_ICON, STATUS_LABEL } from "@/shortlist/status";
 import type { Status } from "@/shortlist/store";
 import type { Fee } from "./fee";
 
@@ -36,6 +36,8 @@ type Props = {
   fee?: Fee;
   /** Where the visitor stands with a shortlisted therapist; "To contact" goes unsaid, the filled bookmark saying as much. */
   status?: Status;
+  /** Passed over by the visitor, which the card says where a status would go, fading the portrait as "Set aside" does. */
+  passed?: boolean;
   /** Fades the portrait as "Set aside" does, for a therapist taken off the shortlist whose card stays to add them back. */
   faded?: boolean;
   /** Leaves out the summary, for the shortlist's cards, which hold where the visitor stands in its place. */
@@ -43,8 +45,8 @@ type Props = {
   onHighlight?: (on: boolean) => void;
 };
 
-export function TherapistCard({ therapist: t, sought, grouped = false, online = false, heading, action, track, note, fee, status, faded, brief,
-  onHighlight }: Props) {
+export function TherapistCard({ therapist: t, sought, grouped = false, online = false, heading, action, track, note, fee, status, passed, faded,
+  brief, onHighlight }: Props) {
   const profile = useProfileLink();
   const where = grouped || online ? undefined : placeOf(t);
   // UKCP's "0.2 miles from E8 3DQ" repeats the searched place, which the list already names.
@@ -101,9 +103,15 @@ export function TherapistCard({ therapist: t, sought, grouped = false, online = 
           </span>
         )
       }
-      status={status && status !== "toContact" && <StatusLine status={status} />}
+      status={
+        passed ? (
+          <StatusLine icon={PASSED_ICON} label={PASSED_LABEL} />
+        ) : (
+          status && status !== "toContact" && <StatusLine icon={STATUS_ICON[status]} label={STATUS_LABEL[status]} />
+        )
+      }
       // Only the portrait fades: the card stays live wherever it shows, and faded text would fall below AA contrast.
-      faded={faded || status === "setAside"}
+      faded={faded || status === "setAside" || passed}
       action={action}
       track={track}
       note={
@@ -216,14 +224,13 @@ function CardLayout({ heading: Heading = "h2", photo, name, printed, place, meet
   );
 }
 
-/** A status by its icon and label, as the status menu gives it. */
-function StatusLine({ status }: { status: Status }) {
-  const Icon = STATUS_ICON[status];
+/** Where the visitor stands, by an icon and label. */
+function StatusLine({ icon: Icon, label }: { icon: LucideIcon; label: string }) {
   return (
     <span className="flex items-center gap-1.5">
       <Icon aria-hidden className="size-4 shrink-0" />
       <span className="sr-only">Status: </span>
-      {STATUS_LABEL[status]}
+      {label}
     </span>
   );
 }

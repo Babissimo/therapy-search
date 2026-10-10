@@ -26,12 +26,13 @@ type Options = {
   online?: boolean;
   fee?: Fee;
   status?: Status;
+  passed?: boolean;
   track?: ReactNode;
   note?: string;
   brief?: boolean;
 };
 
-function renderCard(t: Therapist, sought: string[] = [], { grouped, action, online, fee, status, track, note, brief }: Options = {}) {
+function renderCard(t: Therapist, sought: string[] = [], { grouped, action, online, fee, status, passed, track, note, brief }: Options = {}) {
   render(
     <MemoryRouter>
       <TherapistCard
@@ -42,6 +43,7 @@ function renderCard(t: Therapist, sought: string[] = [], { grouped, action, onli
         online={online}
         fee={fee}
         status={status}
+        passed={passed}
         track={track}
         note={note}
         brief={brief}
@@ -119,6 +121,22 @@ describe("TherapistCard", () => {
     cleanup();
     renderCard(therapist(), [], { status: "contacted" });
     expect(portrait()?.className).not.toMatch(/\bopacity-60\b/);
+  });
+
+  it("says a therapist is a maybe without fading their portrait", () => {
+    renderCard(therapist(), [], { status: "maybe" });
+    const line = screen.getByText("Maybe").closest("p");
+    expect(line?.textContent).toBe("Status: Maybe");
+    expect(line?.querySelector("svg.lucide-circle-dashed")).not.toBeNull();
+    expect(screen.getByText("TT").closest("[data-slot=avatar]")?.parentElement?.className).not.toMatch(/\bopacity-60\b/);
+  });
+
+  it("says a therapist passed over was not for the visitor where a status would go, fading their portrait as Set aside does", () => {
+    renderCard(therapist(), [], { passed: true });
+    const line = screen.getByText("Not for me").closest("p");
+    expect(line?.textContent).toBe("Status: Not for me");
+    expect(line?.querySelector("svg.lucide-circle-minus")).not.toBeNull();
+    expect(screen.getByText("TT").closest("[data-slot=avatar]")?.parentElement?.className).toMatch(/\bopacity-60\b/);
   });
 
   it("gives the first line written of the visitor's note under the track, cut to the card's width on screen alone", () => {

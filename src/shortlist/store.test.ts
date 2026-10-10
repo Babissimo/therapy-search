@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from "vitest";
 import type { TherapistCard } from "@shared/types";
-import { createShortlistStore, MESSAGE_LIMIT, NOTE_LIMIT, REMOVED_DAYS, SEARCH_LIMIT, SENDER_LIMIT, SHORTLIST_KEY, statusOf, SUBJECT_LIMIT } from "./store";
+import { createShortlistStore, MESSAGE_LIMIT, NOTE_LIMIT, REMOVED_DAYS, SEARCH_LIMIT, SENDER_LIMIT, SHORTLIST_KEY, STATUSES, statusOf, SUBJECT_LIMIT } from "./store";
 
 function memory(initial?: unknown) {
   const store = new Map<string, string>(initial === undefined ? [] : [[SHORTLIST_KEY, typeof initial === "string" ? initial : JSON.stringify(initial)]]);
@@ -404,6 +404,17 @@ describe("createShortlistStore", () => {
     expect(read(3)).toBeUndefined();
   });
 
+  it("keeps Maybe as a status ahead of To contact, written and read as the rest are", () => {
+    const storage = memory();
+    const store = createShortlistStore(storage, clock());
+    store.add(card("a"), { status: "maybe" });
+    store.add(card("b"));
+    store.setStatus("b", "maybe");
+    expect(JSON.parse(storage.store.get(SHORTLIST_KEY)!).entries.a.status).toBe("maybe");
+    expect(createShortlistStore(storage).get().map(statusOf)).toEqual(["maybe", "maybe"]);
+    expect(STATUSES.slice(0, 2)).toEqual(["maybe", "toContact"]);
+  });
+
   it("follows a status changed in another tab", () => {
     const storage = memory();
     const events = new EventTarget();
@@ -618,6 +629,105 @@ describe("createShortlistStore", () => {
     createShortlistStore(storage).clear();
     events.dispatchEvent(new StorageEvent("storage", { key: SHORTLIST_KEY, newValue: null }));
     expect(store.removedCount()).toBe(0);
+  });
+
+  it("passes a listed therapist as Remove does, to be added back as they were, which takes them off the passed list", () => {
+    const storage = memory();
+    const store = createShortlistStore(storage, clock());
+    store.add(card("a"), { status: "maybe" });
+    store.setNote("a", "Rang on Tuesday");
+    store.pass("a");
+    expect(store.has("a")).toBe(false);
+    expect(store.passed("a")).toBe(true);
+    expect(store.removedCount()).toBe(1);
+    // Read on a test clock too, as the real one would find the pass made over 30 days ago and forget it.
+    expect(createShortlistStore(storage, clock(2000)).passed("a")).toBe(true);
+    expect(store.add(card("a"))).toBe("maybe");
+    expect(store.get()[0]?.note).toBe("Rang on Tuesday");
+    expect(store.passed("a")).toBe(false);
+    expect(createShortlistStore(storage, clock(2000)).passed("a")).toBe(false);
+  });
+
+  it("passes a therapist not on the list without listing them, until shortlisting them by any means", () => {
+    const store = createShortlistStore(memory(), clock());
+    store.pass("a");
+    expect([store.passed("a"), store.has("a"), store.removedCount()]).toEqual([true, false, 0]);
+    store.add(card("a"), { status: "contacted" });
+    expect(store.passed("a")).toBe(false);
+  });
+
+  it("takes a therapist off the passed list on Undo, leaving them removed", () => {
+    const storage = memory();
+    const store = createShortlistStore(storage, clock());
+    store.add(card("a"));
+    store.pass("a");
+    store.unpass("a");
+    expect([store.passed("a"), store.has("a"), store.removedCount()]).toEqual([false, false, 1]);
+    expect(createShortlistStore(storage, clock(2000)).passed("a")).toBe(false);
+  });
+
+  it("forgets those passed once a page loads 30 days or more after, in storage too", () => {
+    const day = 24 * 60 * 60 * 1000;
+    const storage = memory();
+    let t = 0;
+    const earlier = createShortlistStore(storage, () => t);
+    earlier.pass("a");
+    t = 5 * day;
+    earlier.pass("b");
+    t = REMOVED_DAYS * day - 1;
+    expect(createShortlistStore(storage, () => t).passed("a")).toBe(true);
+    t += 1;
+    const later = createShortlistStore(storage, () => t);
+    expect([later.passed("a"), later.passed("b")]).toEqual([false, true]);
+    expect(Object.keys(JSON.parse(storage.store.get(SHORTLIST_KEY)!).passed)).toEqual(["b"]);
+  });
+
+  it("forgets those passed as it clears, here or in another tab", () => {
+    const storage = memory();
+    const events = new EventTarget();
+    const store = createShortlistStore(storage, clock(), events);
+    store.subscribe(() => {});
+    store.pass("a");
+    store.clear();
+    expect(store.passed("a")).toBe(false);
+    store.pass("a");
+    createShortlistStore(storage).clear();
+    events.dispatchEvent(new StorageEvent("storage", { key: SHORTLIST_KEY, newValue: null }));
+    expect(store.passed("a")).toBe(false);
+  });
+
+  it("hears a pass made in another tab, as it is made or once someone here subscribes again", () => {
+    const storage = memory();
+    const events = new EventTarget();
+    const store = createShortlistStore(storage, clock(), events);
+    const stop = store.subscribe(() => {});
+    createShortlistStore(storage).pass("a");
+    events.dispatchEvent(new StorageEvent("storage", { key: SHORTLIST_KEY, newValue: storage.store.get(SHORTLIST_KEY) }));
+    expect(store.passed("a")).toBe(true);
+    stop();
+    createShortlistStore(storage).pass("b");
+    store.subscribe(() => {});
+    expect(store.passed("b")).toBe(true);
+  });
+
+  it("keeps a pass another tab made unheard as this tab changes the list", () => {
+    const storage = memory();
+    const here = createShortlistStore(storage, clock());
+    here.add(card("a"));
+    createShortlistStore(storage, clock(2000)).pass("b");
+    here.setNote("a", "Rang on Tuesday");
+    expect(here.passed("b")).toBe(true);
+    expect(createShortlistStore(storage, clock(3000)).passed("b")).toBe(true);
+  });
+
+  it("reads those passed beside the list, dropping any it can't read or that are listed", () => {
+    const entry = (slug: string) => ({ addedAt: 1, card: { slug, name: slug, initials: "X", tags: [] } });
+    // Only "b" reads: "a" is listed and "c" has no time.
+    const read = createShortlistStore(memory({ v: 1, entries: { a: entry("a") }, passed: { a: 2, b: 2, c: "2" } }), () => 3);
+    expect(["a", "b", "c"].map(read.passed)).toEqual([false, true, false]);
+    expect(createShortlistStore(memory({ v: 1, entries: {}, passed: "b" })).passed("b")).toBe(false);
+    // As a release before those passed were kept wrote it.
+    expect(createShortlistStore(memory({ v: 1, entries: {} })).passed("b")).toBe(false);
   });
 
   it("reads those removed beside the list, dropping any it can't read or that are listed too", () => {

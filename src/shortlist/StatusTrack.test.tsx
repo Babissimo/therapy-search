@@ -145,6 +145,44 @@ describe("StatusTrack", () => {
     expect(currentStep()).toBe("To contact");
   });
 
+  it("offers a maybe a place on the list, standing at no step", () => {
+    renderTrack("maybe");
+    expect(currentStep()).toBeUndefined();
+    expect(drawn()).toBe("○─○─○─○");
+    screen.getByText("Maybe", { selector: "p" });
+    const yes = screen.getByRole("button", { name: "Yes, add to my list, Jo Bloggs" });
+    expect(within(yes).getByText("Jo Bloggs").getAttribute("translate")).toBe("no");
+    const no = screen.getByRole("button", { name: "Not for me, Jo Bloggs" });
+    expect(within(no).getByText("Jo Bloggs").getAttribute("translate")).toBe("no");
+    screen.getByRole("button", { name: "Status of Jo Bloggs: maybe" });
+    expect(screen.queryByRole("button", { name: /^Draft an email/ })).toBeNull();
+  });
+
+  it("puts a maybe at the top of the list at To contact on Yes, giving focus to the menu", () => {
+    const onChosen = vi.fn();
+    const store = renderTrack("maybe", { onChosen });
+    act(() => void store.add({ slug: "Ann-AAAAAAAA", name: "Ann", initials: "A", tags: [] }));
+    expect(store.get().map((e) => e.card.name)).toEqual(["Ann", "Jo Bloggs"]);
+    const yes = screen.getByRole("button", { name: "Yes, add to my list, Jo Bloggs" });
+    act(() => yes.focus());
+    fireEvent.click(yes);
+    expect(store.get().map((e) => [e.card.name, statusOf(e)])).toEqual([
+      ["Jo Bloggs", "toContact"],
+      ["Ann", "toContact"],
+    ]);
+    expect(onChosen).toHaveBeenCalledWith("toContact");
+    expect(currentStep()).toBe("To contact");
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Status of Jo Bloggs: to contact" }));
+  });
+
+  it("passes a maybe on Not for me, taking them off the shortlist, and says so", () => {
+    const onPassed = vi.fn();
+    const store = renderTrack("maybe", { onPassed });
+    fireEvent.click(screen.getByRole("button", { name: "Not for me, Jo Bloggs" }));
+    expect([store.has(JO.slug), store.passed(JO.slug)]).toEqual([false, true]);
+    expect(onPassed).toHaveBeenCalledOnce();
+  });
+
   it("keeps the therapist's name in the next step's button from machine translation", () => {
     renderTrack("toContact");
     const button = screen.getByRole("button", { name: "Mark contacted, Jo Bloggs" });

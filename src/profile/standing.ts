@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef, useState } from "react";
-import { STATUS_LABEL } from "@/shortlist/status";
+import { PASSED_LABEL, STATUS_LABEL } from "@/shortlist/status";
 import type { ShortlistCard, Status } from "@/shortlist/store";
-import { useShortlistAnnouncement, useShortlistStatus, useShortlistStore } from "@/shortlist/useShortlist";
+import { usePassed, useShortlistAnnouncement, useShortlistStatus, useShortlistStore } from "@/shortlist/useShortlist";
 
 /**
  * Where the visitor stands with a profile's therapist, with the offer to mark them contacted once a phone or email link is
@@ -11,7 +11,8 @@ import { useShortlistAnnouncement, useShortlistStatus, useShortlistStore } from 
 export function useStanding(slug: string, search?: string) {
   const store = useShortlistStore();
   const status = useShortlistStatus(slug);
-  const unmarked = status === undefined || status === "toContact";
+  const notForMe = usePassed(slug);
+  const unmarked = status === undefined || status === "maybe" || status === "toContact";
   const [offered, setOffered] = useState(false);
   // Marked another way, by the track or in another tab, they need no asking.
   if (offered && !unmarked) setOffered(false);
@@ -19,7 +20,7 @@ export function useStanding(slug: string, search?: string) {
   const root = useRef<HTMLElement>(null);
   // The phone or email link followed, which takes focus back once the offer is answered.
   const followed = useRef<HTMLElement | null>(null);
-  // Set when the track's menu takes the therapist off, for the bookmark that can put them back to take focus once the track has gone.
+  // Set when the track takes the therapist off or the note's Undo goes, for the bookmark to take focus once what had it has gone.
   const toBookmark = useRef(false);
   useLayoutEffect(() => {
     if (!toBookmark.current) return;
@@ -33,6 +34,8 @@ export function useStanding(slug: string, search?: string) {
     /** The profile, in which the bookmark is found. */
     root,
     status,
+    /** Whether the visitor said the therapist wasn't for them. */
+    notForMe,
     /** For the profile's polite live region. */
     announcement,
     /** Whether to ask if they got in touch. */
@@ -44,7 +47,21 @@ export function useStanding(slug: string, search?: string) {
       announce(`Removed ${therapist.name} from your shortlist.`);
       toBookmark.current = true;
     },
-    /** After the visitor follows a phone or email link: asks whether they got in touch, while the therapist is to contact or not shortlisted. */
+    /** After the track's Not for me passes the therapist, taking them off the shortlist. */
+    passed: (therapist: ShortlistCard) => {
+      announce(`${therapist.name}: ${PASSED_LABEL}, and removed from your shortlist.`);
+      toBookmark.current = true;
+    },
+    /** Takes back the visitor's Not for me, saying so; the note's Undo goes with it, so focus goes to the bookmark. */
+    undo: (therapist: ShortlistCard) => {
+      store.unpass(slug);
+      announce(`${therapist.name} is no longer marked not for you.`);
+      toBookmark.current = true;
+    },
+    /**
+     * After the visitor follows a phone or email link: asks whether they got in touch, while the therapist is a maybe, to contact
+     * or not shortlisted.
+     */
     reached: (link: HTMLElement) => {
       if (!unmarked) return;
       followed.current = link;

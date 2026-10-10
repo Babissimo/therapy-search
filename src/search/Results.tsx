@@ -6,7 +6,7 @@ import { SkeletonText } from "@/components/SkeletonText";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
 import { ShortlistButton } from "@/shortlist/ShortlistButton";
-import { useShortlistStatus } from "@/shortlist/useShortlist";
+import { usePassed, useShortlistStatus } from "@/shortlist/useShortlist";
 import { activeFilters, soughtTerms } from "./activeFilters";
 import { feeKinds, feeLine, type Fee } from "./fee";
 import { LocationNotice } from "./LocationNotice";
@@ -172,10 +172,11 @@ export function Results({ params, results, listRef, pins = [], unplaced = [], se
   );
 }
 
-/** A result's card with its bookmark, saying where the visitor stands with them once shortlisted. */
-function ResultCard({ search, ...props }: Omit<ComponentProps<typeof TherapistCard>, "action" | "status"> & { search?: string }) {
+/** A result's card with its bookmark, saying where the visitor stands with them once shortlisted, or that they were passed over. */
+function ResultCard({ search, ...props }: Omit<ComponentProps<typeof TherapistCard>, "action" | "status" | "passed"> & { search?: string }) {
   const status = useShortlistStatus(props.therapist.slug);
-  return <TherapistCard {...props} action={<ShortlistButton therapist={props.therapist} search={search} />} status={status} />;
+  const passed = usePassed(props.therapist.slug);
+  return <TherapistCard {...props} action={<ShortlistButton therapist={props.therapist} search={search} />} status={status} passed={passed} />;
 }
 
 /** The list's heading and the lines under it, shared by the list and its skeleton. */

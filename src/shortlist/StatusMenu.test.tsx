@@ -56,6 +56,7 @@ describe("StatusMenu", () => {
     const store = renderMenu(shortlisted, { onRemoved });
     const menu = open("Status of Jo Bloggs: to contact");
     expect(within(menu).getAllByRole("menuitemradio").map((item) => item.textContent)).toEqual([
+      "Maybe",
       "To contact",
       "Contacted",
       "Waiting list",

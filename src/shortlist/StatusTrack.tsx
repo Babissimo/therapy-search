@@ -3,7 +3,7 @@ import { useLayoutEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { LazyEmailDrafter, usePreloadDrafter } from "@/drafter/LazyEmailDrafter";
 import { cn } from "@/lib/utils";
-import { STATUS_LABEL } from "./status";
+import { PASSED_LABEL, STATUS_LABEL } from "./status";
 import { StatusMenu } from "./StatusMenu";
 import type { ShortlistCard, Status } from "./store";
 import { useShortlistStore } from "./useShortlist";
@@ -18,6 +18,8 @@ const AHEAD = "bg-border forced-colors:bg-[GrayText]";
 
 /** Where the button moves a therapist on to, in its words; the path ends at "Seeing them", with none. */
 const NEXT_STEP: Record<Status, { label: string; status: Status } | undefined> = {
+  // A maybe has its own choice in its place.
+  maybe: undefined,
   toContact: { label: "Mark contacted", status: "contacted" },
   contacted: { label: "Consultation booked", status: "consultation" },
   waiting: { label: "Consultation booked", status: "consultation" },
@@ -38,10 +40,12 @@ type Props = {
   onChosen?: (status: Status) => void;
   /** After the menu takes the therapist off the shortlist. */
   onRemoved?: () => void;
+  /** After "Not for me" passes the therapist, which takes them off the shortlist. */
+  onPassed?: () => void;
 };
 
 /** Where the visitor stands with a therapist along the usual path, with the next step and the menu to change it. */
-export function StatusTrack({ therapist, status, listed = true, onChosen, onRemoved }: Props) {
+export function StatusTrack({ therapist, status, listed = true, onChosen, onRemoved, onPassed }: Props) {
   const store = useShortlistStore();
   const root = useRef<HTMLDivElement>(null);
   // What takes focus once the track redraws, where what had it has gone or a click never gave it.
@@ -61,7 +65,7 @@ export function StatusTrack({ therapist, status, listed = true, onChosen, onRemo
   const [shown, setShown] = useState({ status, changed: false });
   if (status !== shown.status) setShown({ status, changed: true });
   const fadeIn = shown.changed && "fade-in-0 motion-safe:animate-in motion-safe:duration-200 motion-safe:ease-in-out";
-  // "Waiting list" pauses at "Contacted"; "Set aside" stands at no step.
+  // "Waiting list" pauses at "Contacted"; "Maybe" and "Set aside" stand at no step.
   const current = STEPS.indexOf(status === "waiting" ? "contacted" : status);
   const next = NEXT_STEP[status];
 
@@ -70,6 +74,14 @@ export function StatusTrack({ therapist, status, listed = true, onChosen, onRemo
     if (NEXT_STEP[to] === undefined) refocus.current = "[data-status-menu]";
     store.setStatus(therapist.slug, to);
     onChosen?.(to);
+  }
+
+  // To the top of the visitor's list at To contact, the button going with the status, so focus moves to the menu beside it.
+  function yes() {
+    refocus.current = "[data-status-menu]";
+    store.setStatus(therapist.slug, "toContact");
+    store.move(therapist.slug, { below: store.get()[0] });
+    onChosen?.("toContact");
   }
 
   return (
@@ -124,6 +136,29 @@ export function StatusTrack({ therapist, status, listed = true, onChosen, onRemo
                   to <span translate="no">{therapist.name}</span>
                 </span>
               </Button>
+            )}
+            {status === "maybe" && (
+              <>
+                <Button variant="outline" size="sm" onClick={yes}>
+                  <span className={cn(fadeIn)}>Yes, add to my list</span>
+                  <span className="sr-only">
+                    , <span translate="no">{therapist.name}</span>
+                  </span>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    store.pass(therapist.slug);
+                    onPassed?.();
+                  }}
+                >
+                  <span className={cn(fadeIn)}>{PASSED_LABEL}</span>
+                  <span className="sr-only">
+                    , <span translate="no">{therapist.name}</span>
+                  </span>
+                </Button>
+              </>
             )}
             {next && (
               <Button variant="outline" size="sm" data-next-step onClick={() => step(next.status)}>

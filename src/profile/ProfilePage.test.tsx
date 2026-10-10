@@ -434,6 +434,46 @@ describe("ProfilePage's status track", () => {
     expect(step(await track())).toBe("Consultation");
     expect(screen.queryByText("Removed Test Therapist from your shortlist.")).toBeNull();
   });
+
+  it("says who Not for me took off the shortlist and gives focus to the bookmark", async () => {
+    const store = createShortlistStore(null);
+    store.add(THERAPIST, { status: "maybe" });
+    renderAt(["/therapist/Test-ABCDEFGH"], PROFILE, { store });
+    await track();
+    fireEvent.click(screen.getByRole("button", { name: "Not for me, Test Therapist" }));
+    expect([store.has("Test-ABCDEFGH"), store.passed("Test-ABCDEFGH")]).toEqual([false, true]);
+    screen.getByText("Test Therapist: Not for me, and removed from your shortlist.", { selector: "[aria-live=polite]" });
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Add Test Therapist to your shortlist" }));
+  });
+
+  it("says on the profile of anyone passed over that the visitor said not for me, with Undo, which takes that back", async () => {
+    const store = createShortlistStore(null);
+    store.pass("Test-ABCDEFGH");
+    renderAt(["/therapist/Test-ABCDEFGH"], PROFILE, { store });
+    await screen.findByRole("heading", { name: "Test Therapist" });
+    const note = screen.getByText("You said not for me").closest("article > .grid")!;
+    expect(note.hasAttribute("inert")).toBe(false);
+    expect(screen.queryByRole("list", { name: "Steps with Test Therapist" })).toBeNull();
+    fireEvent.click(within(note as HTMLElement).getByRole("button", { name: "Undo", description: "You said not for me" }));
+    expect(store.passed("Test-ABCDEFGH")).toBe(false);
+    expect(note.hasAttribute("inert")).toBe(true);
+    screen.getByText("Test Therapist is no longer marked not for you.", { selector: "[aria-live=polite]" });
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Add Test Therapist to your shortlist" }));
+  });
+
+  it("says not for me once the track passes a maybe, and nothing once the bookmark shortlists them again", async () => {
+    const store = createShortlistStore(null);
+    store.add(THERAPIST, { status: "maybe" });
+    renderAt(["/therapist/Test-ABCDEFGH"], PROFILE, { store });
+    await track();
+    expect(screen.queryByText("You said not for me")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Not for me, Test Therapist" }));
+    const note = screen.getByText("You said not for me").closest("article > .grid")!;
+    expect(note.hasAttribute("inert")).toBe(false);
+    fireEvent.click(screen.getByRole("button", { name: "Add Test Therapist to your shortlist" }));
+    expect(note.hasAttribute("inert")).toBe(true);
+    expect(screen.queryByText("You said not for me")).toBeNull();
+  });
 });
 
 describe("ProfilePage's notes", () => {
@@ -565,6 +605,16 @@ describe("ProfilePage's contact offer", () => {
     expect(store.get()).toEqual([expect.objectContaining({ rank: 5, status: "contacted", card })]);
     screen.getByText("Test Therapist: Contacted.");
     expect(await step()).toBe("Contacted");
+  });
+
+  it("asks about a maybe too, marking them contacted on Yes in their place", async () => {
+    const store = createShortlistStore(null);
+    store.add(THERAPIST, { rank: 5, status: "maybe" });
+    await renderReachable(store);
+    follow("Email: test@example.com");
+    fireEvent.click(screen.getByRole("button", { name: "Yes" }));
+    expect(store.get()).toEqual([expect.objectContaining({ rank: 5, status: "contacted" })]);
+    screen.getByText("Test Therapist: Contacted.");
   });
 
   it("puts back a therapist removed earlier as contacted on Yes, in their old place and with their note", async () => {

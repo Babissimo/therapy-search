@@ -40,7 +40,7 @@ import { CopyShortlist } from "./CopyShortlist";
 import { CountBadge } from "./CountBadge";
 import { useSetAsideOpen } from "./setAside";
 import { ShortlistButton } from "./ShortlistButton";
-import { STATUS_ICON, STATUS_LABEL } from "./status";
+import { PASSED_LABEL, STATUS_ICON, STATUS_LABEL } from "./status";
 import { StatusTrack } from "./StatusTrack";
 import { byRank, REMOVED_DAYS, statusOf, type Between, type Shortlist, type ShortlistCard, type ShortlistEntry, type Status } from "./store";
 import { therapistCount, useShortlist, useShortlistAnnouncement, useShortlistClears, useShortlistRemoved, useShortlistStore } from "./useShortlist";
@@ -62,7 +62,7 @@ type Props = {
   onHighlight?: (slug: string | undefined) => void;
 };
 
-/** The shortlist beside the search's results, in the visitor's order, with those set aside gathered at its foot. */
+/** The shortlist beside the search's results, in the visitor's order, with maybes gathered after it and those set aside at its foot. */
 export function ShortlistTab({ sought, feeKinds = [], online = false, pins = [], unplaced = 0, selected, onHighlight }: Props) {
   const store = useShortlistStore();
   // Drawn before the callback returns, for the transition to see the page as the clear leaves it.
@@ -70,10 +70,11 @@ export function ShortlistTab({ sought, feeKinds = [], online = false, pins = [],
   const shortlist = useShortlist();
   const shown = useShown(shortlist);
   const [setAsideOpen, toggleSetAside] = useSetAsideOpen();
-  const list = shown.filter((entry) => statusOf(entry) !== "setAside");
+  const list = shown.filter((entry) => sectionOf(statusOf(entry)) === "list");
+  const maybes = shown.filter((entry) => statusOf(entry) === "maybe");
   const setAside = shown.filter((entry) => statusOf(entry) === "setAside");
   // A shortlist gathers therapists from any search, so their offices are asked about whatever this one is, while their cards show.
-  const { officeOf } = useOffices((setAsideOpen ? [...list, ...setAside] : list).map((entry) => entry.card), true);
+  const { officeOf } = useOffices([...list, ...maybes, ...(setAsideOpen ? setAside : [])].map((entry) => entry.card), true);
   const feeOf = (card: ShortlistCard) => {
     const office = officeOf(card);
     return office && feeLine(office.cost, feeKinds);
@@ -131,19 +132,19 @@ export function ShortlistTab({ sought, feeKinds = [], online = false, pins = [],
     );
   }
 
-  // A card stays put unless it goes into or out of "Set aside", when focus follows it there, or to the section's
-  // heading while it is closed.
+  // A card stays put unless its status takes it to another section, when focus follows it there, or to the "Set aside"
+  // heading while that section is closed.
   function changed(therapist: ShortlistCard, from: Status, to: Status) {
     announce(`${therapist.name}: ${STATUS_LABEL[to]}.`);
-    if ((from === "setAside") === (to === "setAside")) return;
+    if (sectionOf(from) === sectionOf(to)) return;
     // Where each card stands before the list redraws, for it to glide from there.
     glide(therapist.slug);
     refocus.current = to === "setAside" && !setAsideOpen ? "[data-set-aside-toggle]" : `[data-status-menu="${window.CSS.escape(therapist.slug)}"]`;
   }
 
   // Their menu went with them, so focus goes to the bookmark that can put them back.
-  function removed(therapist: ShortlistCard) {
-    announce(`Removed ${therapist.name} from your shortlist.`);
+  function removed(therapist: ShortlistCard, said = `Removed ${therapist.name} from your shortlist.`) {
+    announce(said);
     refocus.current = `[data-bookmark="${window.CSS.escape(therapist.slug)}"]`;
   }
 
@@ -179,6 +180,7 @@ export function ShortlistTab({ sought, feeKinds = [], online = false, pins = [],
             onDown={i < entries.length - 1 ? () => moved(entries, i, i + 1) : undefined}
             onChosen={(to) => changed(card, status, to)}
             onRemoved={() => removed(card)}
+            onPassed={() => removed(card, `${card.name}: ${PASSED_LABEL}, and removed from your shortlist.`)}
           />
         );
       })}
@@ -199,6 +201,7 @@ export function ShortlistTab({ sought, feeKinds = [], online = false, pins = [],
       {/* Paper has no tabs to say whose list this is. */}
       <p className="hidden font-heading text-xl font-medium print:block">Your shortlist</p>
       {list.length > 0 && cards(list, "h2")}
+      {maybes.length > 0 && <MaybeSection count={maybes.filter((entry) => listed.has(entry.card.slug)).length}>{cards(maybes, "h3")}</MaybeSection>}
       {setAside.length > 0 && (
         <SetAsideSection count={setAside.filter((entry) => listed.has(entry.card.slug)).length} open={setAsideOpen} onToggle={toggleSetAside}>
           {cards(setAside, "h3")}
@@ -233,10 +236,10 @@ function ClearShortlist({ listed, removed, onClear }: ClearProps) {
           <AlertDialogTitle className="text-lg">Clear your shortlist?</AlertDialogTitle>
           <AlertDialogDescription className="text-base">
             {listed > 0
-              ? `This removes ${therapistCount(listed)} from this browser, with your notes, drafts and where you stand with them${
+              ? `This removes ${therapistCount(listed)} from this browser, with your notes, drafts, where you stand with them and those you said weren't for you${
                   removed > 0 ? `, and forgets the ${therapistCount(removed)} you removed` : ""
                 }. It can't be undone.`
-              : `This forgets the ${therapistCount(removed)} you removed, with your notes, drafts and where you stood with them, so they can't be put back as they were.`}
+              : `This forgets the ${therapistCount(removed)} you removed, with your notes, drafts, where you stood with them and those you said weren't for you, so they can't be put back as they were.`}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
@@ -285,6 +288,25 @@ function SetAsideSection({ count, open, onToggle, children }: SectionProps) {
   );
 }
 
+type MaybeProps = { count: number; children: ReactNode };
+
+/** Those the visitor is unsure of, open under a heading of their own. */
+function MaybeSection({ count, children }: MaybeProps) {
+  const Icon = STATUS_ICON.maybe;
+  return (
+    // With no one in it listed, it stays off paper, which would have its heading over no one.
+    <section className={cn("space-y-2", count === 0 && "print:hidden")}>
+      {/* Its icon in line with Set aside's, past the chevron there, which paper leaves out. */}
+      <h2 data-glide="maybe" className="flex items-center gap-2 py-1 pl-6 text-sm font-medium print:pl-0">
+        <Icon aria-hidden className="size-4 shrink-0 text-muted-foreground" />
+        {STATUS_LABEL.maybe}
+        <CountBadge count={count} />
+      </h2>
+      {children}
+    </section>
+  );
+}
+
 type ListProps = {
   entries: Shortlist;
   /** Everyone the tab shows, among whom a moved therapist takes their place. */
@@ -329,8 +351,8 @@ function SortableList({ entries, shown, children }: ListProps) {
 
 /**
  * Where a therapist moved from `from` to `to` among `entries` goes: beside their new neighbour there and in the shortlist's
- * whole order alike, so they keep a place among everyone `shown` for when they go into or out of "Set aside". A therapist
- * removed here counts as a neighbour, keeping theirs.
+ * whole order alike, so they keep a place among everyone `shown` for when a status takes them to another section. A
+ * therapist removed here counts as a neighbour, keeping theirs.
  */
 function between(entries: Shortlist, shown: Shortlist, from: number, to: number): Between {
   const order = arrayMove([...entries], from, to);
@@ -338,6 +360,11 @@ function between(entries: Shortlist, shown: Shortlist, from: number, to: number)
   const above = order[to - 1];
   const below = order[to + 1];
   return above ? { above, below: others[others.indexOf(above) + 1] } : { above: others[others.indexOf(below!) - 1], below };
+}
+
+/** Which of the tab's sections a status puts a therapist in: the visitor's list, then Maybe, then Set aside. */
+function sectionOf(status: Status): "list" | "maybe" | "setAside" {
+  return status === "maybe" || status === "setAside" ? status : "list";
 }
 
 type EntryProps = {
@@ -358,13 +385,16 @@ type EntryProps = {
   onChosen: (status: Status) => void;
   /** After the track's menu takes the therapist off the shortlist. */
   onRemoved: () => void;
+  /** After the track's Not for me takes the therapist off the shortlist. */
+  onPassed: () => void;
 };
 
 /**
  * A card with a handle to drag it by and buttons to move it a place at a time; a therapist removed here can't be moved
  * until they are added back.
  */
-function SortableEntry({ entry, heading, listed, sought, online, fee, pinKey, marked, onHighlight, onUp, onDown, onChosen, onRemoved }: EntryProps) {
+function SortableEntry({ entry, heading, listed, sought, online, fee, pinKey, marked, onHighlight, onUp, onDown, onChosen,
+  onRemoved, onPassed }: EntryProps) {
   const { card } = entry;
   const status = statusOf(entry);
   // The cards a drag passes glide aside, and the one let go glides into place, unless the visitor asks for less motion.
@@ -448,7 +478,7 @@ function SortableEntry({ entry, heading, listed, sought, online, fee, pinKey, ma
           faded={!listed}
           brief
           action={<ShortlistButton therapist={card} />}
-          track={<StatusTrack therapist={card} status={status} listed={listed} onChosen={onChosen} onRemoved={onRemoved} />}
+          track={<StatusTrack therapist={card} status={status} listed={listed} onChosen={onChosen} onRemoved={onRemoved} onPassed={onPassed} />}
           note={entry.note}
           onHighlight={(on) => {
             highlighting.current = on ? onHighlight : undefined;
@@ -508,8 +538,8 @@ function useShown(shortlist: Shortlist): Shortlist {
 }
 
 /**
- * Marks where each card, and the "Set aside" heading, stands in the tab, for the next draw to glide each from there to where
- * it puts them, as a status moves a card into or out of "Set aside". The card whose status it was is raised over those it
+ * Marks where each card, and each section's heading, stands in the tab, for the next draw to glide each from there to where
+ * it puts them, as a status moves a card from one section to another. The card whose status it was is raised over those it
  * passes, which a card brought back from below would otherwise glide beneath, and stays raised if another change restarts its
  * glide. Under reduced motion they move at once.
  */
@@ -548,7 +578,7 @@ function useGlide(root: RefObject<HTMLElement | null>): (raised: string) => void
   };
 }
 
-/** What glides in the tab: each card, by slug, and the "Set aside" heading. */
+/** What glides in the tab: each card, by slug, and each section's heading. */
 function gliders(root: HTMLElement | null): HTMLElement[] {
   return [...(root?.querySelectorAll<HTMLElement>("[data-glide]") ?? [])];
 }
