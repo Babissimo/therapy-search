@@ -54,6 +54,37 @@ describe("shortlistText", () => {
     );
   });
 
+  it("gives maybes under a heading of their own, between those numbered and those set aside", () => {
+    const list = shortlist(
+      { "Ann-AAAAAAAA": "maybe", "Bo-BBBBBBBB": "setAside" },
+      card("Ann-AAAAAAAA", "Ann Ash"),
+      card("Bo-BBBBBBBB", "Bo Birch"),
+      card("Cy-CCCCCCCC", "Cy Cedar"),
+    );
+    expect(shortlistText(list, ON)).toBe(
+      [
+        "My shortlist of UKCP therapists, 2 October 2026",
+        "",
+        "1. Cy Cedar: To contact",
+        "Leeds LS1 · In-person & Remote",
+        "https://www.psychotherapy.org.uk/therapist/Cy-CCCCCCCC",
+        "",
+        "Maybe",
+        "",
+        "Ann Ash",
+        "Leeds LS1 · In-person & Remote",
+        "https://www.psychotherapy.org.uk/therapist/Ann-AAAAAAAA",
+        "",
+        "Set aside",
+        "",
+        "Bo Birch",
+        "Leeds LS1 · In-person & Remote",
+        "https://www.psychotherapy.org.uk/therapist/Bo-BBBBBBBB",
+        "",
+      ].join("\n"),
+    );
+  });
+
   it("gives the visitor's notes under each therapist, their lines kept but not the blank ones between", () => {
     let t = 1000;
     const store = createShortlistStore(null, () => t++);

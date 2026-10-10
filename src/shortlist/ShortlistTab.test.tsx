@@ -322,6 +322,48 @@ describe("ShortlistTab", () => {
     expect(store.get().map((e) => e.card.name)).toEqual(["Cy", "Bo", "Ann"]);
   });
 
+  it("gathers maybes under a heading of their own, after the visitor's list and before Set aside", () => {
+    renderTab(
+      { statuses: { "Ann-AAAAAAAA": "maybe", "Cy-CCCCCCCC": "setAside", "Di-DDDDDDDD": "maybe" } },
+      card("Ann-AAAAAAAA", "Ann"),
+      card("Bo-BBBBBBBB", "Bo"),
+      card("Cy-CCCCCCCC", "Cy"),
+      card("Di-DDDDDDDD", "Di"),
+    );
+    openSetAside();
+    expect(names()).toEqual(["Bo", "Di", "Ann", "Cy"]);
+    const maybes = screen.getByRole("heading", { name: "Maybe, 2 therapists", level: 2 }).closest("section")!;
+    expect(within(maybes).getAllByRole("heading", { level: 3 }).map((heading) => heading.textContent)).toEqual(["Di", "Ann"]);
+    expect(screen.getByRole("heading", { name: "Bo" }).tagName).toBe("H2");
+    within(entry("Di")!).getByText("Maybe", { selector: "p" });
+  });
+
+  it("moves a maybe to the top of the list on Yes, focus following, and drops their heading once no maybe is left", () => {
+    const store = renderTab({ statuses: { "Ann-AAAAAAAA": "maybe" } }, card("Ann-AAAAAAAA", "Ann"), card("Bo-BBBBBBBB", "Bo"));
+    expect(names()).toEqual(["Bo", "Ann"]);
+    fireEvent.click(button("Yes, add to my list, Ann"));
+    expect(names()).toEqual(["Ann", "Bo"]);
+    expect(screen.queryByRole("heading", { name: /^Maybe/ })).toBeNull();
+    expect(document.activeElement).toBe(button("Status of Ann: to contact"));
+    screen.getByText("Ann: To contact.");
+    expect(store.get().map((e) => e.card.name)).toEqual(["Ann", "Bo"]);
+  });
+
+  it("follows a therapist the menu makes a maybe into their section, focus with them", () => {
+    renderTab({}, card("Ann-AAAAAAAA", "Ann"), card("Bo-BBBBBBBB", "Bo"));
+    openMenu("Bo");
+    choose("Maybe");
+    expect(names()).toEqual(["Ann", "Bo"]);
+    within(screen.getByRole("heading", { name: "Maybe, 1 therapist" }).closest("section")!).getByRole("heading", { name: "Bo" });
+    expect(document.activeElement).toBe(button("Status of Bo: maybe"));
+    screen.getByText("Bo: Maybe.");
+  });
+
+  it("asks about the offices of maybes as of the rest of the list", async () => {
+    renderTab({ statuses: { "Ann-AAAAAAAA": "maybe" } }, card("Ann-AAAAAAAA", "Ann"), card("Bo-BBBBBBBB", "Bo"));
+    await waitFor(() => expect(vi.mocked(api.office).mock.calls.map(([slug]) => slug).sort()).toEqual(["Ann-AAAAAAAA", "Bo-BBBBBBBB"]));
+  });
+
   it("keeps a removed therapist in place, their portrait faded, with where they stood but nothing to change it, until they are added back", () => {
     const store = renderTab({}, card("Ann-AAAAAAAA", "Ann"), card("Bo-BBBBBBBB", "Bo"), card("Cy-CCCCCCCC", "Cy"));
     fireEvent.click(screen.getByRole("button", { name: "Remove Bo from your shortlist" }));
@@ -594,6 +636,17 @@ describe("ShortlistTab", () => {
     expect(display(entry("Di"))).toEqual([]);
   });
 
+  it("prints the maybes under their heading, leaving the heading off paper once none on it is listed", () => {
+    renderTab({ statuses: { "Ann-AAAAAAAA": "maybe" } }, card("Ann-AAAAAAAA", "Ann"), card("Bo-BBBBBBBB", "Bo"));
+    const display = (element: Element | null | undefined) => [...(element?.classList ?? [])].filter((name) => /^(print:)?(hidden|block)$/.test(name));
+    const heading = screen.getByRole("heading", { name: /^Maybe, / });
+    const maybes = heading.closest("section");
+    expect(display(maybes)).toEqual([]);
+    expect(heading.classList.contains("print:pl-0")).toBe(true);
+    fireEvent.click(button("Remove Ann from your shortlist"));
+    expect(display(maybes)).toEqual(["print:hidden"]);
+  });
+
   it("moves a therapist by their handle, saying where they are as they go", () => {
     layOutEntries();
     const store = renderTab({}, card("Ann-AAAAAAAA", "Ann"), card("Bo-BBBBBBBB", "Bo"), card("Cy-CCCCCCCC", "Cy"));
@@ -759,6 +812,21 @@ describe("ShortlistTab", () => {
     expect(store.get().map((e) => e.card.name)).toEqual(["Bo", "Cy", "Ann", "Di"]);
   });
 
+  it("keeps a move by buttons among the maybes, numbering each among their own", () => {
+    const store = renderTab(
+      { statuses: { "Ann-AAAAAAAA": "maybe", "Bo-BBBBBBBB": "maybe" } },
+      card("Ann-AAAAAAAA", "Ann"),
+      card("Bo-BBBBBBBB", "Bo"),
+      card("Cy-CCCCCCCC", "Cy"),
+    );
+    expect(names()).toEqual(["Cy", "Bo", "Ann"]);
+    expect(button("Move Bo up").disabled).toBe(true);
+    fireEvent.click(button("Move Ann up"));
+    expect(names()).toEqual(["Cy", "Ann", "Bo"]);
+    screen.getByText("Ann moved to number 1 of 2.");
+    expect(store.get().map((e) => e.card.name)).toEqual(["Cy", "Ann", "Bo"]);
+  });
+
   it("shows therapists shortlisted in another tab while it is open", () => {
     const store = renderTab({}, card("Ann-AAAAAAAA", "Ann"));
     act(() => store.add(card("Bo-BBBBBBBB", "Bo")));
@@ -867,6 +935,17 @@ describe("ShortlistTab", () => {
       ["set-aside", { translate: ["0 -200px", "0 0"] }],
     ]);
     expect(document.querySelector("[data-glide='Bo-BBBBBBBB']")!.classList.contains("relative")).toBe(true);
+  });
+
+  it("glides a maybe added to the list from where they stood, and the card they pass", () => {
+    renderTab({ statuses: { "Ann-AAAAAAAA": "maybe" } }, card("Ann-AAAAAAAA", "Ann"), card("Bo-BBBBBBBB", "Bo"));
+    const { glides } = layOutGlides();
+    // Bo, the Maybe heading, then Ann; Ann goes to the top, and the heading goes with the last maybe.
+    fireEvent.click(button("Yes, add to my list, Ann"));
+    expect(glides()).toEqual([
+      ["Ann-AAAAAAAA", { translate: ["0 400px", "0 0"], zIndex: [1, 1] }],
+      ["Bo-BBBBBBBB", { translate: ["0 -200px", "0 0"] }],
+    ]);
   });
 
   it("measures each card from the top of the tab, so the scroll a focus causes is not taken for movement", () => {

@@ -18,6 +18,7 @@ const AHEAD = "bg-border forced-colors:bg-[GrayText]";
 
 /** Where the button moves a therapist on to, in its words; the path ends at "Seeing them", with none. */
 const NEXT_STEP: Record<Status, { label: string; status: Status } | undefined> = {
+  // A maybe has its own choice in its place.
   maybe: undefined,
   toContact: { label: "Mark contacted", status: "contacted" },
   contacted: { label: "Consultation booked", status: "consultation" },
@@ -73,6 +74,14 @@ export function StatusTrack({ therapist, status, listed = true, onChosen, onRemo
     onChosen?.(to);
   }
 
+  // To the top of the visitor's list at To contact, the button going with the status, so focus moves to the menu beside it.
+  function yes() {
+    refocus.current = "[data-status-menu]";
+    store.setStatus(therapist.slug, "toContact");
+    store.move(therapist.slug, { below: store.get()[0] });
+    onChosen?.("toContact");
+  }
+
   return (
     // A container for the status menu, which names itself on a touch screen only where the row has the room.
     <div ref={root} className="@container/status-track space-y-1.5">
@@ -123,6 +132,14 @@ export function StatusTrack({ therapist, status, listed = true, onChosen, onRemo
                 Draft an email{" "}
                 <span className="sr-only">
                   to <span translate="no">{therapist.name}</span>
+                </span>
+              </Button>
+            )}
+            {status === "maybe" && (
+              <Button variant="outline" size="sm" onClick={yes}>
+                <span className={cn(fadeIn)}>Yes, add to my list</span>
+                <span className="sr-only">
+                  , <span translate="no">{therapist.name}</span>
                 </span>
               </Button>
             )}
