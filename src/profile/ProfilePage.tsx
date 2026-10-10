@@ -1,4 +1,4 @@
-import { Component, createRef, Fragment, lazy, useEffect, type ReactNode, type Ref } from "react";
+import { Component, createRef, Fragment, lazy, useEffect, useId, type ReactNode, type Ref } from "react";
 import { queryOptions, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, ExternalLink, Heart, MapPin } from "lucide-react";
 import type { Office, Profile, ProfileSection } from "@shared/types";
@@ -9,6 +9,7 @@ import { Portrait } from "@/components/Portrait";
 import { Sessions } from "@/components/Sessions";
 import { SkeletonText } from "@/components/SkeletonText";
 import { Badge, TAG } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -23,6 +24,7 @@ import { cachedCard } from "@/search/useResults";
 import { useShownSearch } from "@/search/useSearchState";
 import { LazyStatusTrack, usePreloadStatusTrack } from "@/shortlist/LazyStatusTrack";
 import { ShortlistButton } from "@/shortlist/ShortlistButton";
+import { PASSED_ICON } from "@/shortlist/status";
 import type { ShortlistCard } from "@/shortlist/store";
 import { ContactList, ContactListSkeleton } from "./ContactList";
 import { ContactOffer } from "./ContactOffer";
@@ -152,8 +154,9 @@ export function ProfileBody({ slug, back, close }: { slug: string } & Exits) {
         </p>
 
         <StandingSection key={slug} slug={slug} therapist={therapist} standing={standing} />
+        <PassedNote therapist={therapist} standing={standing} />
 
-        <HeldPlace above={standing.status !== undefined}>
+        <HeldPlace above={`${standing.status !== undefined} ${standing.notForMe}`}>
           <Columns
             besideLong={besideLong}
             main={
@@ -356,6 +359,28 @@ function StandingSection({ slug, therapist, standing }: StandingProps) {
           </div>
         </div>
       )}
+    </Unfold>
+  );
+}
+
+/** That the visitor said the therapist wasn't for them, with Undo, unrolled while they stand so, as the track is while they are shortlisted. */
+function PassedNote({ therapist, standing }: Omit<StandingProps, "slug">) {
+  const Icon = PASSED_ICON;
+  const said = useId();
+  return (
+    <Unfold open={standing.notForMe} className="-mx-1.5 mb-0 [header[data-stuck]~&]:duration-0">
+      <div className="px-1.5 pb-8">
+        <div className="flex max-w-sm flex-wrap items-center justify-between gap-2">
+          <p id={said} className="flex items-center gap-1.5 text-sm text-muted-foreground">
+            <Icon aria-hidden className="size-4 shrink-0" />
+            You said not for me
+          </p>
+          {/* Described by the note, which says what it undoes. */}
+          <Button variant="outline" size="sm" aria-describedby={said} onClick={() => standing.undo(therapist)}>
+            Undo
+          </Button>
+        </div>
+      </div>
     </Unfold>
   );
 }
