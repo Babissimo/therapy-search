@@ -121,6 +121,14 @@ describe("TherapistCard", () => {
     expect(portrait()?.className).not.toMatch(/\bopacity-60\b/);
   });
 
+  it("says a therapist is a maybe without fading their portrait", () => {
+    renderCard(therapist(), [], { status: "maybe" });
+    const line = screen.getByText("Maybe").closest("p");
+    expect(line?.textContent).toBe("Status: Maybe");
+    expect(line?.querySelector("svg.lucide-circle-dashed")).not.toBeNull();
+    expect(screen.getByText("TT").closest("[data-slot=avatar]")?.parentElement?.className).not.toMatch(/\bopacity-60\b/);
+  });
+
   it("gives the first line written of the visitor's note under the track, cut to the card's width on screen alone", () => {
     renderCard(therapist(), [], { track: <div>Track</div>, note: "\n  Rang on Tuesday\nCall back Friday" });
     const text = screen.getByText("Rang on Tuesday");

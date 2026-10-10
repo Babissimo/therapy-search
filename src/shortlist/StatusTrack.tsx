@@ -18,6 +18,7 @@ const AHEAD = "bg-border forced-colors:bg-[GrayText]";
 
 /** Where the button moves a therapist on to, in its words; the path ends at "Seeing them", with none. */
 const NEXT_STEP: Record<Status, { label: string; status: Status } | undefined> = {
+  maybe: undefined,
   toContact: { label: "Mark contacted", status: "contacted" },
   contacted: { label: "Consultation booked", status: "consultation" },
   waiting: { label: "Consultation booked", status: "consultation" },
@@ -61,7 +62,7 @@ export function StatusTrack({ therapist, status, listed = true, onChosen, onRemo
   const [shown, setShown] = useState({ status, changed: false });
   if (status !== shown.status) setShown({ status, changed: true });
   const fadeIn = shown.changed && "fade-in-0 motion-safe:animate-in motion-safe:duration-200 motion-safe:ease-in-out";
-  // "Waiting list" pauses at "Contacted"; "Set aside" stands at no step.
+  // "Waiting list" pauses at "Contacted"; "Maybe" and "Set aside" stand at no step.
   const current = STEPS.indexOf(status === "waiting" ? "contacted" : status);
   const next = NEXT_STEP[status];
 

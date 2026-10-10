@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from "vitest";
 import type { TherapistCard } from "@shared/types";
-import { createShortlistStore, MESSAGE_LIMIT, NOTE_LIMIT, REMOVED_DAYS, SEARCH_LIMIT, SENDER_LIMIT, SHORTLIST_KEY, statusOf, SUBJECT_LIMIT } from "./store";
+import { createShortlistStore, MESSAGE_LIMIT, NOTE_LIMIT, REMOVED_DAYS, SEARCH_LIMIT, SENDER_LIMIT, SHORTLIST_KEY, STATUSES, statusOf, SUBJECT_LIMIT } from "./store";
 
 function memory(initial?: unknown) {
   const store = new Map<string, string>(initial === undefined ? [] : [[SHORTLIST_KEY, typeof initial === "string" ? initial : JSON.stringify(initial)]]);
@@ -402,6 +402,17 @@ describe("createShortlistStore", () => {
     expect(read("toContact")).toBeUndefined();
     expect(read("ghosted")).toBeUndefined();
     expect(read(3)).toBeUndefined();
+  });
+
+  it("keeps Maybe as a status ahead of To contact, written and read as the rest are", () => {
+    const storage = memory();
+    const store = createShortlistStore(storage, clock());
+    store.add(card("a"), { status: "maybe" });
+    store.add(card("b"));
+    store.setStatus("b", "maybe");
+    expect(JSON.parse(storage.store.get(SHORTLIST_KEY)!).entries.a.status).toBe("maybe");
+    expect(createShortlistStore(storage).get().map(statusOf)).toEqual(["maybe", "maybe"]);
+    expect(STATUSES.slice(0, 2)).toEqual(["maybe", "toContact"]);
   });
 
   it("follows a status changed in another tab", () => {

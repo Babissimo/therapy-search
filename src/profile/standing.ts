@@ -11,7 +11,7 @@ import { useShortlistAnnouncement, useShortlistStatus, useShortlistStore } from 
 export function useStanding(slug: string, search?: string) {
   const store = useShortlistStore();
   const status = useShortlistStatus(slug);
-  const unmarked = status === undefined || status === "toContact";
+  const unmarked = status === undefined || status === "maybe" || status === "toContact";
   const [offered, setOffered] = useState(false);
   // Marked another way, by the track or in another tab, they need no asking.
   if (offered && !unmarked) setOffered(false);
@@ -44,7 +44,10 @@ export function useStanding(slug: string, search?: string) {
       announce(`Removed ${therapist.name} from your shortlist.`);
       toBookmark.current = true;
     },
-    /** After the visitor follows a phone or email link: asks whether they got in touch, while the therapist is to contact or not shortlisted. */
+    /**
+     * After the visitor follows a phone or email link: asks whether they got in touch, while the therapist is a maybe, to contact
+     * or not shortlisted.
+     */
     reached: (link: HTMLElement) => {
       if (!unmarked) return;
       followed.current = link;

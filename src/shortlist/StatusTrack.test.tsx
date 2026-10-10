@@ -78,6 +78,7 @@ describe("StatusTrack", () => {
     ["consultation", "Consultation", "Consultation", "Seeing them, Jo Bloggs", "●━●━●─○"],
     ["seeing", "Seeing them", "Seeing them", undefined, "●━●━●━●"],
     ["setAside", undefined, "Set aside", "Consider again, Jo Bloggs", "○─○─○─○"],
+    ["maybe", undefined, "Maybe", undefined, "○─○─○─○"],
   ])("draws %s at its step, with its label and next step", (status, step, label, next, track) => {
     renderTrack(status);
     expect(within(screen.getByRole("list", { name: "Steps with Jo Bloggs" })).getAllByRole("listitem").map((s) => s.textContent)).toEqual([

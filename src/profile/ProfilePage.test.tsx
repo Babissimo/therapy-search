@@ -567,6 +567,16 @@ describe("ProfilePage's contact offer", () => {
     expect(await step()).toBe("Contacted");
   });
 
+  it("asks about a maybe too, marking them contacted on Yes in their place", async () => {
+    const store = createShortlistStore(null);
+    store.add(THERAPIST, { rank: 5, status: "maybe" });
+    await renderReachable(store);
+    follow("Email: test@example.com");
+    fireEvent.click(screen.getByRole("button", { name: "Yes" }));
+    expect(store.get()).toEqual([expect.objectContaining({ rank: 5, status: "contacted" })]);
+    screen.getByText("Test Therapist: Contacted.");
+  });
+
   it("puts back a therapist removed earlier as contacted on Yes, in their old place and with their note", async () => {
     const store = createShortlistStore(null);
     store.add(THERAPIST, { addedAt: 1, status: "waiting" });

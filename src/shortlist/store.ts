@@ -18,8 +18,8 @@ export const SENDER_LIMIT = 200;
 /** The longest found-by search kept, above what a search with every filter ticked makes. */
 export const SEARCH_LIMIT = 12_000;
 
-/** Where the visitor stands with a shortlisted therapist, in the order a search usually runs through them. */
-export const STATUSES = ["toContact", "contacted", "waiting", "consultation", "seeing", "setAside"] as const;
+/** Where the visitor stands with a shortlisted therapist: unsure yet, then in the order a search usually runs through them. */
+export const STATUSES = ["maybe", "toContact", "contacted", "waiting", "consultation", "seeing", "setAside"] as const;
 export type Status = (typeof STATUSES)[number];
 /** "To contact" is where a bookmark puts a therapist, so it is stored as no status at all. */
 type StoredStatus = Exclude<Status, "toContact">;

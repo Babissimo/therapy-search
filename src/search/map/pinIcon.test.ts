@@ -79,6 +79,7 @@ describe("pinIcon", () => {
   });
 
   it.each([
+    ["maybe", "Maybe", "maybe"],
     ["contacted", "Contacted", "contacted"],
     ["waiting", "Waiting list", "waiting list"],
     ["consultation", "Consultation", "consultation"],
@@ -92,7 +93,7 @@ describe("pinIcon", () => {
     expect(root.getAttribute("aria-label")).toBe(`Jo Cole, ${said}`);
   });
 
-  it.each(["contacted", "waiting", "consultation", "seeing", "setAside"] as const)("draws %s with the icon the cards show for it", (status) => {
+  it.each(["maybe", "contacted", "waiting", "consultation", "seeing", "setAside"] as const)("draws %s with the icon the cards show for it", (status) => {
     const lucide = document.createElement("div");
     lucide.innerHTML = renderToStaticMarkup(createElement(STATUS_ICON[status]));
     const drawn = marked([card("jo")], [["jo", status]]).querySelector(`[title="${STATUS_LABEL[status]}"] svg`);
